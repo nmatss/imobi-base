@@ -59,6 +59,26 @@ export type Lead = {
   createdAt: string;
 };
 
+export type Visit = {
+  id: string;
+  leadId: string;
+  propertyId: string;
+  date: string; // ISO string
+  status: "scheduled" | "completed" | "cancelled";
+  notes?: string;
+  tenantId: string;
+};
+
+export type Contract = {
+  id: string;
+  leadId: string;
+  propertyId: string;
+  status: "draft" | "sent" | "signed" | "rejected";
+  value: number;
+  createdAt: string;
+  tenantId: string;
+};
+
 // --- Mock Data ---
 
 const MOCK_TENANTS: Tenant[] = [
@@ -92,6 +112,17 @@ export const MOCK_LEADS: Lead[] = [
   { id: "l5", name: "Roberto Dias", email: "roberto@uol.com.br", phone: "(11) 91234-5678", status: "contract", source: "Google", budget: 2500000, tenantId: "t1", createdAt: "2023-09-15" },
 ];
 
+export const MOCK_VISITS: Visit[] = [
+  { id: "v1", leadId: "l2", propertyId: "p1", date: "2023-10-20T14:00:00", status: "scheduled", tenantId: "t1" },
+  { id: "v2", leadId: "l1", propertyId: "p2", date: "2023-10-21T10:00:00", status: "scheduled", tenantId: "t1" },
+  { id: "v3", leadId: "l3", propertyId: "p1", date: "2023-10-18T16:00:00", status: "completed", notes: "Gostou muito, vai fazer proposta", tenantId: "t1" },
+];
+
+export const MOCK_CONTRACTS: Contract[] = [
+  { id: "c1", leadId: "l3", propertyId: "p1", status: "draft", value: 2400000, createdAt: "2023-10-19", tenantId: "t1" },
+  { id: "c2", leadId: "l5", propertyId: "p3", status: "signed", value: 340000, createdAt: "2023-09-25", tenantId: "t1" },
+];
+
 // --- Context ---
 
 type ImobiContextType = {
@@ -100,6 +131,8 @@ type ImobiContextType = {
   tenants: Tenant[];
   properties: Property[];
   leads: Lead[];
+  visits: Visit[];
+  contracts: Contract[];
   login: () => void;
   logout: () => void;
   switchTenant: (tenantId: string) => void;
@@ -113,6 +146,8 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
   const [tenant, setTenant] = useState<Tenant | null>(MOCK_TENANTS[0]);
   const [leads, setLeads] = useState<Lead[]>(MOCK_LEADS);
   const [properties, setProperties] = useState<Property[]>([]);
+  const [visits, setVisits] = useState<Visit[]>(MOCK_VISITS);
+  const [contracts, setContracts] = useState<Contract[]>(MOCK_CONTRACTS);
   const [, setLocation] = useLocation();
 
   useEffect(() => {
@@ -221,6 +256,8 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
         tenants: MOCK_TENANTS,
         properties: properties.filter(p => p.tenantId === tenant?.id),
         leads: leads.filter(l => l.tenantId === tenant?.id),
+        visits: visits.filter(v => v.tenantId === tenant?.id),
+        contracts: contracts.filter(c => c.tenantId === tenant?.id),
         login,
         logout,
         switchTenant,

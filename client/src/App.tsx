@@ -3,7 +3,11 @@ import { ImobiProvider, useImobi } from "@/lib/imobi-context";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import Dashboard from "@/pages/dashboard";
 import PropertiesList from "@/pages/properties/list";
+import PropertyDetailsPage from "@/pages/properties/details";
 import LeadsKanban from "@/pages/leads/kanban";
+import CalendarPage from "@/pages/calendar";
+import ContractsPage from "@/pages/contracts";
+import SettingsPage from "@/pages/settings";
 import TenantLanding from "@/pages/public/landing";
 import NotFound from "@/pages/not-found";
 import { Button } from "@/components/ui/button";
@@ -87,7 +91,11 @@ function Router() {
       <Route path="/" component={() => <ProtectedRoute component={Dashboard} />} />
       <Route path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
       <Route path="/properties" component={() => <ProtectedRoute component={PropertiesList} />} />
+      <Route path="/properties/:id" component={() => <ProtectedRoute component={PropertyDetailsPage} />} />
       <Route path="/leads" component={() => <ProtectedRoute component={LeadsKanban} />} />
+      <Route path="/calendar" component={() => <ProtectedRoute component={CalendarPage} />} />
+      <Route path="/contracts" component={() => <ProtectedRoute component={ContractsPage} />} />
+      <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
       
       {/* Fallback */}
       <Route component={NotFound} />
