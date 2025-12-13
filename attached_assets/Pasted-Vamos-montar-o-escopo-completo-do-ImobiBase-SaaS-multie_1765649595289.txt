@@ -1,0 +1,460 @@
+Vamos montar o escopo completo do ImobiBase (SaaS multiempresa), já pensando em MVP mockup no Replit (rápido, vendável, clicável) e depois evoluir pra produção sem refazer tudo.
+
+1) Conceito do produto (visão de cima)
+
+ImobiBase = CRM + Gestão de Imóveis + Funil de Leads + Agenda + Documentos + Financeiro básico + Portal do cliente (opcional) + Integrações.
+
+Multiempresa (multi-tenant): cada imobiliária é um “tenant”, com seus usuários, permissões, imóveis, leads, contratos e relatórios separados. Padrão “como sempre foi feito”: cadastro → captação → divulgação → visita → proposta → contrato → recebimento. Só que sem planilha infernal.
+
+2) Planos e regras (do jeito que dá dinheiro)
+Free (entrada, viral, prova)
+
+1 empresa
+
+até 1 usuário
+
+até 50 imóveis
+
+até 100 leads
+
+Funil simples + agenda básica
+
+Landing page pública de imóvel (1 link por imóvel)
+
+Exportação CSV (limitada)
+
+“Powered by ImobiBase”
+
+Inicial – R$ 29,90
+
+até 3 usuários
+
+até 300 imóveis
+
+até 1.000 leads
+
+Funil completo + automações básicas
+
+Propostas simples (PDF)
+
+Templates de mensagens (WhatsApp “copiar/colar”)
+
+Relatórios básicos
+
+Profissional – R$ 109,90
+
+até 10 usuários
+
+até 2.000 imóveis
+
+leads ilimitados (ou 10k, pra não estourar)
+
+Automação de tarefas + lembretes
+
+Integrações (WhatsApp link, e-mail, portais via CSV/API quando existir)
+
+Gestão de documentos/contratos (upload + versionamento simples)
+
+Dashboard completo + metas
+
+Permissões por perfil (corretor, gerente, admin)
+
+Empresa – R$ 389,90
+
+usuários ilimitados (ou 50/100)
+
+multi-filiais / multi-equipes
+
+SLA + auditoria + logs avançados
+
+SSO (futuro) / 2FA
+
+Webhooks e integrações avançadas (Z-API/n8n/CRM externo)
+
+Campos personalizados por entidade (imóvel/lead/cliente)
+
+Relatórios avançados (performance por time, funil por canal, ROI)
+
+Rotina de backup/export completo
+
+3) MVP no Replit (mockup “clicável e vendável”)
+
+Objetivo do mockup: parecer sistema real, com dados fake, navegação completa, telas com tabela, filtros, cards, funil e “ações”.
+Sem obsessão por backend agora. Pode ser:
+
+Front-end em React + Tailwind (perfeito pra Replit)
+
+Dados em JSON/local storage (ou SQLite simples)
+
+Auth fake (login “admin@demo.com
+”)
+
+O que o mockup precisa ter (pra convencer qualquer imobiliária)
+
+Login / seleção de empresa (multiempresa “na cara”)
+
+Dashboard com KPIs
+
+Lista de imóveis + cadastro/edição
+
+Lista de leads + funil Kanban
+
+Agenda de visitas
+
+Propostas/contratos (gerar PDF fake ou “download”)
+
+Administração (usuários, planos, permissões)
+
+Página pública de imóvel (mini-site)
+
+4) Landing Page do ImobiBase (escopo completo)
+Páginas públicas
+
+Home
+
+Hero com promessa: “Captação, leads e contratos num só lugar”
+
+CTA: “Criar conta grátis”
+
+Prova social (depois)
+
+Recursos
+
+CRM/funil, imóveis, propostas, agenda, relatórios
+
+Planos e preços
+
+comparação Free / Inicial 29,90 / Profissional 109,90 / Empresa 389,90
+
+Segmentos
+
+“Imobiliária pequena”, “corretor autônomo”, “rede/filiais”
+
+Segurança e LGPD
+
+básico: controle de acesso, logs, isolamento por empresa
+
+FAQ
+
+Blog/Conteúdo (pode ser placeholder)
+
+Contato / Suporte
+
+Termos de uso / Privacidade
+
+Elementos obrigatórios
+
+Topbar + CTA fixo
+
+Seção “Como funciona” (5 passos)
+
+Depoimentos (fake no mockup, real depois)
+
+Captura de lead (newsletter/whatsapp)
+
+5) Onboarding e acesso
+Fluxo de entrada
+
+Criar conta
+
+Criar empresa (nome, CNPJ opcional, cidade)
+
+Escolher plano (começa no Free)
+
+Criar usuários (convidar por e-mail depois; no mockup é manual)
+
+Assistente inicial:
+
+cadastrar 1 imóvel
+
+importar leads (CSV)
+
+criar 1 etapa do funil
+
+agendar 1 visita
+
+6) Estrutura do sistema interno (páginas e módulos)
+6.1 Dashboard (Home do sistema)
+
+KPIs:
+
+leads novos (7/30 dias)
+
+imóveis ativos / em captação / alugados / vendidos
+
+visitas agendadas
+
+propostas enviadas / aceitas
+
+conversão por etapa do funil
+
+Gráficos simples (mock)
+
+Atalhos: “Novo imóvel”, “Novo lead”, “Agendar visita”
+
+6.2 CRM / Leads (coração)
+
+Lista de leads (filtros por origem, status, corretor, cidade, faixa de preço)
+
+Funil Kanban (arrastar e soltar):
+
+Novo → Qualificação → Visita → Proposta → Contrato → Ganhou/Perdeu
+
+Lead 360:
+
+dados (nome, contato, interesse, orçamento)
+
+histórico (tarefas, visitas, mensagens, propostas)
+
+imóveis recomendados (no mock, regra simples)
+
+tarefas e lembretes
+
+6.3 Imóveis
+
+Lista de imóveis (tabela com filtros e tags)
+
+Cadastro de imóvel:
+
+tipo (apto/casa/terreno/comercial)
+
+endereço (cidade/bairro/rua)
+
+características (quartos, vagas, m²)
+
+preço venda / aluguel
+
+status (captação, ativo, reservado, alugado, vendido)
+
+proprietário (vincular)
+
+fotos/galeria (mock)
+
+documentos (matrícula/contrato etc.)
+
+Página do imóvel (visão “card”, timeline, leads interessados)
+
+Publicação:
+
+gerar “link público” do imóvel (mini landing do imóvel)
+
+6.4 Clientes e Proprietários
+
+Cadastro de cliente comprador/locatário
+
+Cadastro de proprietário
+
+Vínculos:
+
+proprietário ↔ imóveis
+
+cliente ↔ interesse (tipo/valor/região)
+
+6.5 Agenda e Visitas
+
+Calendário (mensal/semanal) + lista
+
+Agendar visita:
+
+lead + imóvel + corretor + data/hora + local
+
+Lembretes (no mock: badge e notificação interna)
+
+Check-in/resultado:
+
+visitou? feedback? próximo passo?
+
+6.6 Propostas e Contratos
+
+Propostas:
+
+valor, condições, observações, validade
+
+gerar PDF (mock: template)
+
+Contratos:
+
+upload + status (em assinatura / assinado / cancelado)
+
+checklist (documentos pendentes)
+
+6.7 Financeiro (MVP pé no chão)
+
+Controle simples:
+
+comissões (por contrato)
+
+receitas previstas x realizadas
+
+despesas básicas (opcional)
+
+Relatório por corretor / por período (mock)
+
+6.8 Relatórios
+
+Funil por origem (Instagram, Portais, Indicação)
+
+Performance por corretor
+
+Imóveis parados (sem lead há X dias)
+
+Tempo médio por etapa
+
+Taxa de conversão
+
+6.9 Configurações da Empresa
+
+Dados da imobiliária
+
+Funil (etapas editáveis)
+
+Origens de lead
+
+Motivos de perda
+
+Templates de mensagem (WhatsApp)
+
+Campos personalizados (só no plano Empresa, mas no mock já deixa desenhado)
+
+6.10 Usuários e Permissões
+
+Perfis padrão:
+
+Admin (tudo)
+
+Gerente (tudo menos billing)
+
+Corretor (leads/imóveis/agenda próprios)
+
+Atendimento (cadastro e triagem)
+
+Permissões por módulo e por “visibilidade”:
+
+ver tudo da empresa vs ver só o seu
+
+7) Administração do sistema (painel master / SaaS)
+
+Um painel separado (superadmin), obrigatório pro teu lado “Head de TI” controlar sem drama:
+
+7.1 Gestão de Tenants (empresas)
+
+criar/editar empresa
+
+status (ativa/suspensa)
+
+plano atual
+
+limites e consumo
+
+logs de acesso
+
+7.2 Billing (mesmo que no mock seja fake)
+
+planos
+
+upgrade/downgrade
+
+histórico
+
+cupons (futuro)
+
+7.3 Suporte
+
+tickets simples (ou formulário)
+
+impersonate (acesso assistido) só no Empresa e com log
+
+7.4 Auditoria e Segurança
+
+logins
+
+ações críticas (excluir imóvel, exportar dados, alterar permissões)
+
+export de dados (LGPD)
+
+8) Requisitos de segurança e multiempresa (sem brincadeira)
+
+Isolamento por tenant_id em tudo
+
+Permissões por perfil
+
+Logs de auditoria (mínimo)
+
+Política de retenção e export (LGPD)
+
+Backup/export (planejado)
+
+Rate limit login (depois)
+
+No mock, isso vira:
+
+“Empresa selecionada” fixa no topo
+
+Dados sempre filtrados por empresa
+
+9) Estrutura recomendada de telas no Replit (mapa do menu)
+
+Menu lateral
+
+Dashboard
+
+Leads (Lista)
+
+Funil (Kanban)
+
+Imóveis
+
+Agenda
+
+Clientes
+
+Propostas
+
+Contratos
+
+Financeiro
+
+Relatórios
+
+Configurações
+
+Usuários
+
+Topo
+
+Empresa atual (dropdown)
+
+Plano atual (badge)
+
+Botão “Upgrade”
+
+Perfil/Logout
+
+10) Roadmap de evolução (pra não virar Frankenstein)
+Fase 1 (Mockup Replit)
+
+UI completa + dados fake + fluxo redondo
+
+Fase 2 (MVP real)
+
+Auth real
+
+Banco real
+
+Multi-tenant real
+
+Upload de fotos/documentos
+
+PDF de proposta
+
+Fase 3 (Tração)
+
+Importação CSV
+
+Integrações (Z-API/n8n)
+
+Portais (export/feeds)
+
+Fase 4 (Enterprise)
+
+Logs avançados, SSO, webhooks, custom fields, governança

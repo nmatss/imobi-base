@@ -1,0 +1,187 @@
+Perfeito. Isso é ouro pra vender o ImobiBase: cada imobiliária ganha um “site pronto” sem pagar agência. E tecnicamente é simples se a gente fizer direito desde o começo.
+
+Como vai funcionar a “Landing Page da Imobiliária” (página externa)
+
+Cada empresa (tenant) terá uma página pública com:
+
+Logo, cores, nome, cidade, WhatsApp
+
+Lista de imóveis (venda/aluguel) com filtros
+
+Página do imóvel (detalhe + galeria + CTA)
+
+Formulário de lead (cai direto no CRM com origem “Site”)
+
+SEO básico (title/description por cidade/tipo)
+
+URL (padrão bom e fácil)
+
+Você tem 3 opções. Eu faria assim:
+
+Subdomínio (top, cara de “plataforma séria”)
+nomedaempresa.imobibase.com.br
+✅ melhor pra marketing
+⚠️ precisa configurar wildcard DNS + roteamento
+
+Caminho (mais simples pro MVP)
+imobibase.com.br/e/nomedaempresa
+✅ zero dor de cabeça pra mockup/MVP
+⚠️ menos “premium”
+
+Domínio próprio (Plano Empresa)
+www.imobiliariax.com.br apontando pro ImobiBase
+✅ vende muito no Enterprise
+⚠️ exige DNS + TLS + validação
+
+No mockup do Replit: vai de caminho (opção 2). Depois evolui pra subdomínio/domínio próprio.
+
+Escopo da Landing Page da Empresa (externa)
+1) Página “Home” da imobiliária
+
+Hero com:
+
+nome da empresa
+
+slogan (editável)
+
+CTA: “Falar no WhatsApp” / “Ver imóveis”
+
+Destaques (cards):
+
+“Imóveis à venda”
+
+“Imóveis para alugar”
+
+“Bairros que atendemos”
+
+Vitrine de imóveis (cards)
+
+Depoimentos (opcional)
+
+Rodapé com redes sociais + endereço + CRECI (se quiser)
+
+2) Página “Imóveis” (catálogo)
+
+Busca e filtros:
+
+venda/aluguel
+
+cidade/bairro
+
+tipo
+
+faixa de preço
+
+quartos/vagas
+
+Ordenação:
+
+mais recentes
+
+menor/maior preço
+
+Paginação
+
+3) Página “Detalhe do imóvel”
+
+Galeria de fotos
+
+Info completa (quartos, metragem, etc.)
+
+Mapa (no mock: placeholder / depois integra)
+
+CTA fixo:
+
+WhatsApp (mensagem pronta com código do imóvel)
+
+“Tenho interesse” (form)
+
+“Imóveis similares”
+
+4) Página “Sobre”
+
+História / equipe / diferenciais
+
+5) Página “Contato”
+
+Form (nome, tel, e-mail, mensagem, interesse)
+
+Captura de lead no CRM com:
+
+origem = Site
+
+empresa = tenant
+
+imovel_id quando vier do imóvel
+
+Painel interno pra empresa configurar a landing (módulo novo)
+
+Menu: Configurações → Site da Empresa
+
+Branding
+
+Logo
+
+Cores (primária/secundária)
+
+Banner/hero (imagem)
+
+Texto do hero + slogan
+
+Botões (WhatsApp, telefone, e-mail)
+
+Conteúdo
+
+“Sobre nós”
+
+Endereço e horário
+
+Redes sociais
+
+CRECI
+
+Bairros atendidos (tags)
+
+Imóveis exibidos
+
+Mostrar só “ativos”
+
+Destaques (marcar imóveis como “destaque”)
+
+Opção “mostrar preço” ou “sob consulta”
+
+Opção de ocultar endereço exato (segurança)
+
+Captura de lead
+
+Definir para qual etapa do funil entra (“Novo”)
+
+Quem recebe a notificação (corretor padrão ou fila)
+
+Template da mensagem WhatsApp automática (futuro)
+
+Regras por plano (pra monetizar sem dó)
+
+Free: landing simples + catálogo + “Powered by ImobiBase” + sem domínio próprio
+
+Inicial: remove algumas limitações (logo e cores básicas)
+
+Profissional: customização completa + destaques + SEO editável + pixel/analytics (depois)
+
+Empresa: domínio próprio + multi-filial + páginas extras + integrações + webhooks
+
+Pra mockup no Replit ficar convincente
+
+Você precisa de 2 “áreas” no projeto:
+
+App interno: /app/*
+
+Site público: /e/:slug/* (ou /empresa/:slug/*)
+
+E um dataset fake com 2 empresas:
+
+“Imobiliária Sol” (slug: sol)
+
+“Nova Casa” (slug: novacasa)
+
+Cada uma com 10 imóveis e landing com cores diferentes. Isso dá aquele efeito: “caramba, é multiempresa de verdade”.
