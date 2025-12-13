@@ -140,3 +140,93 @@ export const newsletterSubscriptions = pgTable("newsletter_subscriptions", {
 export const insertNewsletterSchema = createInsertSchema(newsletterSubscriptions).omit({ id: true, subscribedAt: true });
 export type InsertNewsletter = z.infer<typeof insertNewsletterSchema>;
 export type Newsletter = typeof newsletterSubscriptions.$inferSelect;
+
+export const owners = pgTable("owners", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone").notNull(),
+  cpfCnpj: text("cpf_cnpj"),
+  address: text("address"),
+  bankName: text("bank_name"),
+  bankAgency: text("bank_agency"),
+  bankAccount: text("bank_account"),
+  pixKey: text("pix_key"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertOwnerSchema = createInsertSchema(owners).omit({ id: true, createdAt: true });
+export type InsertOwner = z.infer<typeof insertOwnerSchema>;
+export type Owner = typeof owners.$inferSelect;
+
+export const renters = pgTable("renters", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone").notNull(),
+  cpfCnpj: text("cpf_cnpj"),
+  rg: text("rg"),
+  profession: text("profession"),
+  income: decimal("income", { precision: 12, scale: 2 }),
+  address: text("address"),
+  emergencyContact: text("emergency_contact"),
+  emergencyPhone: text("emergency_phone"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertRenterSchema = createInsertSchema(renters).omit({ id: true, createdAt: true });
+export type InsertRenter = z.infer<typeof insertRenterSchema>;
+export type Renter = typeof renters.$inferSelect;
+
+export const rentalContracts = pgTable("rental_contracts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  propertyId: varchar("property_id").notNull().references(() => properties.id),
+  ownerId: varchar("owner_id").notNull().references(() => owners.id),
+  renterId: varchar("renter_id").notNull().references(() => renters.id),
+  rentValue: decimal("rent_value", { precision: 12, scale: 2 }).notNull(),
+  condoFee: decimal("condo_fee", { precision: 12, scale: 2 }),
+  iptuValue: decimal("iptu_value", { precision: 12, scale: 2 }),
+  dueDay: integer("due_day").notNull().default(10),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  adjustmentIndex: text("adjustment_index").default("IGPM"),
+  depositValue: decimal("deposit_value", { precision: 12, scale: 2 }),
+  administrationFee: decimal("administration_fee", { precision: 5, scale: 2 }).default("10"),
+  status: text("status").notNull().default("active"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertRentalContractSchema = createInsertSchema(rentalContracts).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertRentalContract = z.infer<typeof insertRentalContractSchema>;
+export type RentalContract = typeof rentalContracts.$inferSelect;
+
+export const rentalPayments = pgTable("rental_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  rentalContractId: varchar("rental_contract_id").notNull().references(() => rentalContracts.id),
+  referenceMonth: text("reference_month").notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  rentValue: decimal("rent_value", { precision: 12, scale: 2 }).notNull(),
+  condoFee: decimal("condo_fee", { precision: 12, scale: 2 }),
+  iptuValue: decimal("iptu_value", { precision: 12, scale: 2 }),
+  extraCharges: decimal("extra_charges", { precision: 12, scale: 2 }),
+  discounts: decimal("discounts", { precision: 12, scale: 2 }),
+  totalValue: decimal("total_value", { precision: 12, scale: 2 }).notNull(),
+  paidValue: decimal("paid_value", { precision: 12, scale: 2 }),
+  paidDate: timestamp("paid_date"),
+  status: text("status").notNull().default("pending"),
+  paymentMethod: text("payment_method"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertRentalPaymentSchema = createInsertSchema(rentalPayments).omit({ id: true, createdAt: true });
+export type InsertRentalPayment = z.infer<typeof insertRentalPaymentSchema>;
+export type RentalPayment = typeof rentalPayments.$inferSelect;

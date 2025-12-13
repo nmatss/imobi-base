@@ -11,7 +11,11 @@ import type {
   Interaction, InsertInteraction,
   Visit, InsertVisit,
   Contract, InsertContract,
-  Newsletter, InsertNewsletter
+  Newsletter, InsertNewsletter,
+  Owner, InsertOwner,
+  Renter, InsertRenter,
+  RentalContract, InsertRentalContract,
+  RentalPayment, InsertRentalPayment
 } from "@shared/schema";
 
 const pool = new Pool({
@@ -89,6 +93,45 @@ export interface IStorage {
     totalLeads: number;
     totalContracts: number;
     totalVisits: number;
+  }>;
+  
+  // Owners (Locadores)
+  getOwner(id: string): Promise<Owner | undefined>;
+  getOwnersByTenant(tenantId: string): Promise<Owner[]>;
+  createOwner(owner: InsertOwner): Promise<Owner>;
+  updateOwner(id: string, owner: Partial<InsertOwner>): Promise<Owner | undefined>;
+  deleteOwner(id: string): Promise<boolean>;
+  
+  // Renters (Inquilinos)
+  getRenter(id: string): Promise<Renter | undefined>;
+  getRentersByTenant(tenantId: string): Promise<Renter[]>;
+  createRenter(renter: InsertRenter): Promise<Renter>;
+  updateRenter(id: string, renter: Partial<InsertRenter>): Promise<Renter | undefined>;
+  deleteRenter(id: string): Promise<boolean>;
+  
+  // Rental Contracts (Contratos de Aluguel)
+  getRentalContract(id: string): Promise<RentalContract | undefined>;
+  getRentalContractsByTenant(tenantId: string): Promise<RentalContract[]>;
+  getRentalContractsByOwner(ownerId: string): Promise<RentalContract[]>;
+  getRentalContractsByRenter(renterId: string): Promise<RentalContract[]>;
+  createRentalContract(contract: InsertRentalContract): Promise<RentalContract>;
+  updateRentalContract(id: string, contract: Partial<InsertRentalContract>): Promise<RentalContract | undefined>;
+  
+  // Rental Payments (Pagamentos de Aluguel)
+  getRentalPayment(id: string): Promise<RentalPayment | undefined>;
+  getRentalPaymentsByTenant(tenantId: string, filters?: { status?: string; month?: string }): Promise<RentalPayment[]>;
+  getRentalPaymentsByContract(contractId: string): Promise<RentalPayment[]>;
+  createRentalPayment(payment: InsertRentalPayment): Promise<RentalPayment>;
+  updateRentalPayment(id: string, payment: Partial<InsertRentalPayment>): Promise<RentalPayment | undefined>;
+  
+  // Reports
+  getRentalReportData(tenantId: string, startDate: Date, endDate: Date): Promise<{
+    totalReceived: number;
+    totalPending: number;
+    totalOverdue: number;
+    paymentsByMonth: { month: string; received: number; pending: number }[];
+    occupancyRate: number;
+    activeContracts: number;
   }>;
 }
 
@@ -386,6 +429,219 @@ export class DbStorage implements IStorage {
       totalLeads: Number(leadsCount.count),
       totalContracts: Number(contractsCount.count),
       totalVisits: Number(visitsCount.count),
+    };
+  }
+
+  // Owners (Locadores)
+  async getOwner(id: string): Promise<Owner | undefined> {
+    const [owner] = await db.select().from(schema.owners).where(eq(schema.owners.id, id));
+    return owner;
+  }
+
+  async getOwnersByTenant(tenantId: string): Promise<Owner[]> {
+    return db.select().from(schema.owners)
+      .where(eq(schema.owners.tenantId, tenantId))
+      .orderBy(desc(schema.owners.createdAt));
+  }
+
+  async createOwner(owner: InsertOwner): Promise<Owner> {
+    const [created] = await db.insert(schema.owners).values(owner).returning();
+    return created;
+  }
+
+  async updateOwner(id: string, owner: Partial<InsertOwner>): Promise<Owner | undefined> {
+    const [updated] = await db.update(schema.owners)
+      .set(owner)
+      .where(eq(schema.owners.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteOwner(id: string): Promise<boolean> {
+    const result = await db.delete(schema.owners).where(eq(schema.owners.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Renters (Inquilinos)
+  async getRenter(id: string): Promise<Renter | undefined> {
+    const [renter] = await db.select().from(schema.renters).where(eq(schema.renters.id, id));
+    return renter;
+  }
+
+  async getRentersByTenant(tenantId: string): Promise<Renter[]> {
+    return db.select().from(schema.renters)
+      .where(eq(schema.renters.tenantId, tenantId))
+      .orderBy(desc(schema.renters.createdAt));
+  }
+
+  async createRenter(renter: InsertRenter): Promise<Renter> {
+    const [created] = await db.insert(schema.renters).values(renter).returning();
+    return created;
+  }
+
+  async updateRenter(id: string, renter: Partial<InsertRenter>): Promise<Renter | undefined> {
+    const [updated] = await db.update(schema.renters)
+      .set(renter)
+      .where(eq(schema.renters.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteRenter(id: string): Promise<boolean> {
+    const result = await db.delete(schema.renters).where(eq(schema.renters.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Rental Contracts
+  async getRentalContract(id: string): Promise<RentalContract | undefined> {
+    const [contract] = await db.select().from(schema.rentalContracts).where(eq(schema.rentalContracts.id, id));
+    return contract;
+  }
+
+  async getRentalContractsByTenant(tenantId: string): Promise<RentalContract[]> {
+    return db.select().from(schema.rentalContracts)
+      .where(eq(schema.rentalContracts.tenantId, tenantId))
+      .orderBy(desc(schema.rentalContracts.createdAt));
+  }
+
+  async getRentalContractsByOwner(ownerId: string): Promise<RentalContract[]> {
+    return db.select().from(schema.rentalContracts)
+      .where(eq(schema.rentalContracts.ownerId, ownerId))
+      .orderBy(desc(schema.rentalContracts.createdAt));
+  }
+
+  async getRentalContractsByRenter(renterId: string): Promise<RentalContract[]> {
+    return db.select().from(schema.rentalContracts)
+      .where(eq(schema.rentalContracts.renterId, renterId))
+      .orderBy(desc(schema.rentalContracts.createdAt));
+  }
+
+  async createRentalContract(contract: InsertRentalContract): Promise<RentalContract> {
+    const [created] = await db.insert(schema.rentalContracts).values(contract).returning();
+    return created;
+  }
+
+  async updateRentalContract(id: string, contract: Partial<InsertRentalContract>): Promise<RentalContract | undefined> {
+    const [updated] = await db.update(schema.rentalContracts)
+      .set({ ...contract, updatedAt: new Date() })
+      .where(eq(schema.rentalContracts.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Rental Payments
+  async getRentalPayment(id: string): Promise<RentalPayment | undefined> {
+    const [payment] = await db.select().from(schema.rentalPayments).where(eq(schema.rentalPayments.id, id));
+    return payment;
+  }
+
+  async getRentalPaymentsByTenant(tenantId: string, filters?: { status?: string; month?: string }): Promise<RentalPayment[]> {
+    const conditions = [eq(schema.rentalPayments.tenantId, tenantId)];
+    
+    if (filters?.status) {
+      conditions.push(eq(schema.rentalPayments.status, filters.status));
+    }
+    if (filters?.month) {
+      conditions.push(eq(schema.rentalPayments.referenceMonth, filters.month));
+    }
+    
+    return db.select().from(schema.rentalPayments)
+      .where(and(...conditions))
+      .orderBy(desc(schema.rentalPayments.dueDate));
+  }
+
+  async getRentalPaymentsByContract(contractId: string): Promise<RentalPayment[]> {
+    return db.select().from(schema.rentalPayments)
+      .where(eq(schema.rentalPayments.rentalContractId, contractId))
+      .orderBy(desc(schema.rentalPayments.dueDate));
+  }
+
+  async createRentalPayment(payment: InsertRentalPayment): Promise<RentalPayment> {
+    const [created] = await db.insert(schema.rentalPayments).values(payment).returning();
+    return created;
+  }
+
+  async updateRentalPayment(id: string, payment: Partial<InsertRentalPayment>): Promise<RentalPayment | undefined> {
+    const [updated] = await db.update(schema.rentalPayments)
+      .set(payment)
+      .where(eq(schema.rentalPayments.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Reports
+  async getRentalReportData(tenantId: string, startDate: Date, endDate: Date): Promise<{
+    totalReceived: number;
+    totalPending: number;
+    totalOverdue: number;
+    paymentsByMonth: { month: string; received: number; pending: number }[];
+    occupancyRate: number;
+    activeContracts: number;
+  }> {
+    const payments = await db.select().from(schema.rentalPayments)
+      .where(and(
+        eq(schema.rentalPayments.tenantId, tenantId),
+        sql`${schema.rentalPayments.dueDate} >= ${startDate}`,
+        sql`${schema.rentalPayments.dueDate} <= ${endDate}`
+      ));
+
+    const totalReceived = payments
+      .filter(p => p.status === 'paid')
+      .reduce((sum, p) => sum + Number(p.paidValue || 0), 0);
+
+    const totalPending = payments
+      .filter(p => p.status === 'pending')
+      .reduce((sum, p) => sum + Number(p.totalValue || 0), 0);
+
+    const now = new Date();
+    const totalOverdue = payments
+      .filter(p => p.status === 'pending' && new Date(p.dueDate) < now)
+      .reduce((sum, p) => sum + Number(p.totalValue || 0), 0);
+
+    const monthlyData: Record<string, { received: number; pending: number }> = {};
+    payments.forEach(p => {
+      const month = p.referenceMonth;
+      if (!monthlyData[month]) {
+        monthlyData[month] = { received: 0, pending: 0 };
+      }
+      if (p.status === 'paid') {
+        monthlyData[month].received += Number(p.paidValue || 0);
+      } else {
+        monthlyData[month].pending += Number(p.totalValue || 0);
+      }
+    });
+
+    const paymentsByMonth = Object.entries(monthlyData).map(([month, data]) => ({
+      month,
+      received: data.received,
+      pending: data.pending,
+    })).sort((a, b) => a.month.localeCompare(b.month));
+
+    const [activeContractsCount] = await db.select({ count: sql<number>`count(*)` })
+      .from(schema.rentalContracts)
+      .where(and(
+        eq(schema.rentalContracts.tenantId, tenantId),
+        eq(schema.rentalContracts.status, 'active')
+      ));
+
+    const [totalProperties] = await db.select({ count: sql<number>`count(*)` })
+      .from(schema.properties)
+      .where(and(
+        eq(schema.properties.tenantId, tenantId),
+        eq(schema.properties.category, 'rent')
+      ));
+
+    const activeContracts = Number(activeContractsCount.count);
+    const totalRentProps = Number(totalProperties.count);
+    const occupancyRate = totalRentProps > 0 ? (activeContracts / totalRentProps) * 100 : 0;
+
+    return {
+      totalReceived,
+      totalPending,
+      totalOverdue,
+      paymentsByMonth,
+      occupancyRate: Math.round(occupancyRate),
+      activeContracts,
     };
   }
 }
