@@ -7,6 +7,7 @@ import PropertyDetailsPage from "@/pages/properties/details";
 import LeadsKanban from "@/pages/leads/kanban";
 import CalendarPage from "@/pages/calendar";
 import ContractsPage from "@/pages/contracts";
+import RentalsPage from "@/pages/rentals";
 import SettingsPage from "@/pages/settings";
 import TenantLanding from "@/pages/public/landing";
 import ProductLanding from "@/pages/public/product-landing";
@@ -204,6 +205,7 @@ function Router() {
       <Route path="/leads" component={() => <ProtectedRoute component={LeadsKanban} />} />
       <Route path="/calendar" component={() => <ProtectedRoute component={CalendarPage} />} />
       <Route path="/contracts" component={() => <ProtectedRoute component={ContractsPage} />} />
+      <Route path="/rentals" component={() => <ProtectedRoute component={RentalsPage} />} />
       <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
       
       {/* Fallback */}

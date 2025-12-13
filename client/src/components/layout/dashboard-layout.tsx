@@ -14,7 +14,8 @@ import {
   Search,
   Bell,
   ExternalLink,
-  Loader2
+  Loader2,
+  Home
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -112,6 +113,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: "/leads", label: "Leads & CRM", icon: Users },
     { href: "/calendar", label: "Agenda", icon: CalendarDays },
     { href: "/contracts", label: "Propostas", icon: FileText },
+    { href: "/rentals", label: "Aluguéis", icon: Home },
     { href: "/settings", label: "Configurações", icon: Settings },
   ];
 

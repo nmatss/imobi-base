@@ -457,8 +457,11 @@ export async function registerRoutes(
 
   app.patch("/api/owners/:id", requireAuth, async (req, res) => {
     try {
-      const owner = await storage.updateOwner(req.params.id, req.body);
-      if (!owner) return res.status(404).json({ error: "Locador não encontrado" });
+      const existing = await storage.getOwner(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Locador não encontrado" });
+      if (existing.tenantId !== req.user!.tenantId) return res.status(403).json({ error: "Acesso negado" });
+      const { tenantId, id, ...allowedFields } = req.body;
+      const owner = await storage.updateOwner(req.params.id, allowedFields);
       res.json(owner);
     } catch (error: any) {
       res.status(400).json({ error: error.message || "Erro ao atualizar locador" });
@@ -467,8 +470,10 @@ export async function registerRoutes(
 
   app.delete("/api/owners/:id", requireAuth, async (req, res) => {
     try {
+      const existing = await storage.getOwner(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Locador não encontrado" });
+      if (existing.tenantId !== req.user!.tenantId) return res.status(403).json({ error: "Acesso negado" });
       const success = await storage.deleteOwner(req.params.id);
-      if (!success) return res.status(404).json({ error: "Locador não encontrado" });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Erro ao deletar locador" });
@@ -507,8 +512,11 @@ export async function registerRoutes(
 
   app.patch("/api/renters/:id", requireAuth, async (req, res) => {
     try {
-      const renter = await storage.updateRenter(req.params.id, req.body);
-      if (!renter) return res.status(404).json({ error: "Inquilino não encontrado" });
+      const existing = await storage.getRenter(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Inquilino não encontrado" });
+      if (existing.tenantId !== req.user!.tenantId) return res.status(403).json({ error: "Acesso negado" });
+      const { tenantId, id, ...allowedFields } = req.body;
+      const renter = await storage.updateRenter(req.params.id, allowedFields);
       res.json(renter);
     } catch (error: any) {
       res.status(400).json({ error: error.message || "Erro ao atualizar inquilino" });
@@ -517,8 +525,10 @@ export async function registerRoutes(
 
   app.delete("/api/renters/:id", requireAuth, async (req, res) => {
     try {
+      const existing = await storage.getRenter(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Inquilino não encontrado" });
+      if (existing.tenantId !== req.user!.tenantId) return res.status(403).json({ error: "Acesso negado" });
       const success = await storage.deleteRenter(req.params.id);
-      if (!success) return res.status(404).json({ error: "Inquilino não encontrado" });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Erro ao deletar inquilino" });
@@ -557,8 +567,11 @@ export async function registerRoutes(
 
   app.patch("/api/rental-contracts/:id", requireAuth, async (req, res) => {
     try {
-      const contract = await storage.updateRentalContract(req.params.id, req.body);
-      if (!contract) return res.status(404).json({ error: "Contrato de aluguel não encontrado" });
+      const existing = await storage.getRentalContract(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Contrato de aluguel não encontrado" });
+      if (existing.tenantId !== req.user!.tenantId) return res.status(403).json({ error: "Acesso negado" });
+      const { tenantId, id, ...allowedFields } = req.body;
+      const contract = await storage.updateRentalContract(req.params.id, allowedFields);
       res.json(contract);
     } catch (error: any) {
       res.status(400).json({ error: error.message || "Erro ao atualizar contrato de aluguel" });
@@ -610,8 +623,11 @@ export async function registerRoutes(
 
   app.patch("/api/rental-payments/:id", requireAuth, async (req, res) => {
     try {
-      const payment = await storage.updateRentalPayment(req.params.id, req.body);
-      if (!payment) return res.status(404).json({ error: "Pagamento não encontrado" });
+      const existing = await storage.getRentalPayment(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Pagamento não encontrado" });
+      if (existing.tenantId !== req.user!.tenantId) return res.status(403).json({ error: "Acesso negado" });
+      const { tenantId, id, ...allowedFields } = req.body;
+      const payment = await storage.updateRentalPayment(req.params.id, allowedFields);
       res.json(payment);
     } catch (error: any) {
       res.status(400).json({ error: error.message || "Erro ao atualizar pagamento" });
