@@ -8,7 +8,6 @@ export default function TenantLanding() {
   const [match, params] = useRoute("/e/:rest*");
   const { tenants, properties } = useImobi();
 
-  // Fix for wouter wildcard params type
   const rest = (params as any)?.rest || (params as any)?.["rest*"] || "";
   const tenantSlug = rest.split("/")[0];
   
@@ -29,15 +28,21 @@ export default function TenantLanding() {
     );
   }
 
+  function formatPrice(price: string) {
+    const num = parseFloat(price);
+    if (isNaN(num)) return price;
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
+  }
+
   return (
     <div className="min-h-screen flex flex-col font-sans" style={{ 
-      '--primary': tenant.colors.primary, 
-      '--secondary': tenant.colors.secondary 
+      '--primary': tenant.primaryColor, 
+      '--secondary': tenant.secondaryColor 
     } as any}>
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-2 font-heading font-bold text-2xl" style={{ color: tenant.colors.primary }}>
+          <div className="flex items-center gap-2 font-heading font-bold text-2xl" style={{ color: tenant.primaryColor }}>
             <Building className="h-6 w-6" />
             {tenant.name}
           </div>
@@ -51,7 +56,7 @@ export default function TenantLanding() {
             <Link href="/login">
                <Button variant="ghost" size="sm">Área do Corretor</Button>
             </Link>
-            <Button style={{ backgroundColor: tenant.colors.primary }}>
+            <Button style={{ backgroundColor: tenant.primaryColor }}>
               Falar no WhatsApp
             </Button>
           </div>
@@ -78,7 +83,7 @@ export default function TenantLanding() {
               <Button size="lg" className="text-lg px-8 h-14 bg-white text-black hover:bg-white/90 border-none">
                 Ver Imóveis
               </Button>
-              <Button size="lg" className="text-lg px-8 h-14" style={{ backgroundColor: tenant.colors.primary }}>
+              <Button size="lg" className="text-lg px-8 h-14" style={{ backgroundColor: tenant.primaryColor }}>
                 Fale Conosco
               </Button>
             </div>
@@ -98,16 +103,16 @@ export default function TenantLanding() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {tenantProperties.map(property => (
-                <div key={property.id} className="group rounded-xl overflow-hidden border bg-card hover:shadow-xl transition-all duration-300">
+                <div key={property.id} data-testid={`card-property-${property.id}`} className="group rounded-xl overflow-hidden border bg-card hover:shadow-xl transition-all duration-300">
                   <div className="relative aspect-[4/3] overflow-hidden">
                     <img 
-                      src={property.image} 
+                      src={property.images?.[0] || "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800"} 
                       alt={property.title}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                     />
                     <div className="absolute top-4 right-4 flex gap-2">
                        <Badge className="bg-white/90 text-black backdrop-blur-sm shadow-sm hover:bg-white">
-                        {property.type === 'sale' ? 'Venda' : 'Aluguel'}
+                        {property.category === 'sale' ? 'Venda' : 'Aluguel'}
                       </Badge>
                     </div>
                   </div>
@@ -117,25 +122,25 @@ export default function TenantLanding() {
                     </h3>
                     <p className="text-muted-foreground flex items-center mb-4 text-sm">
                       <MapPin className="w-4 h-4 mr-1" />
-                      {property.address}
+                      {property.address}, {property.city}
                     </p>
                     <div className="flex items-center justify-between py-4 border-t border-b mb-4">
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
                         <BedDouble className="w-4 h-4" />
-                        <span>{property.beds}</span>
+                        <span>{property.bedrooms || 0}</span>
                       </div>
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
                         <Bath className="w-4 h-4" />
-                        <span>{property.baths}</span>
+                        <span>{property.bathrooms || 0}</span>
                       </div>
                       <div className="flex items-center gap-1 text-sm text-muted-foreground">
                         <Ruler className="w-4 h-4" />
-                        <span>{property.sqm}m²</span>
+                        <span>{property.area || 0}m²</span>
                       </div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-2xl font-bold text-primary" style={{ color: tenant.colors.primary }}>
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(property.price)}
+                      <span className="text-2xl font-bold" style={{ color: tenant.primaryColor }}>
+                        {formatPrice(property.price)}
                       </span>
                       <Button size="sm" variant="outline" className="group-hover:bg-primary group-hover:text-white transition-colors border-primary/20">
                         Detalhes <ArrowRight className="w-4 h-4 ml-1" />
@@ -149,7 +154,7 @@ export default function TenantLanding() {
         </section>
 
         {/* Features / Why Us */}
-        <section className="py-20" style={{ backgroundColor: tenant.colors.secondary }}>
+        <section id="sobre" className="py-20" style={{ backgroundColor: `${tenant.secondaryColor}15` }}>
           <div className="container mx-auto px-4">
             <div className="grid md:grid-cols-2 gap-12 items-center">
               <div>
@@ -162,14 +167,14 @@ export default function TenantLanding() {
                     "Transparência e segurança no negócio"
                   ].map((item, i) => (
                     <div key={i} className="flex items-center gap-3">
-                      <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center shrink-0" style={{ backgroundColor: `${tenant.colors.primary}33` }}>
-                        <Check className="w-4 h-4" style={{ color: tenant.colors.primary }} />
+                      <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: `${tenant.primaryColor}33` }}>
+                        <Check className="w-4 h-4" style={{ color: tenant.primaryColor }} />
                       </div>
                       <span className="font-medium">{item}</span>
                     </div>
                   ))}
                 </div>
-                <Button className="mt-8" size="lg" style={{ backgroundColor: tenant.colors.primary }}>
+                <Button className="mt-8" size="lg" style={{ backgroundColor: tenant.primaryColor }}>
                   Conheça nossa história
                 </Button>
               </div>
@@ -185,7 +190,7 @@ export default function TenantLanding() {
         </section>
 
         {/* Footer */}
-        <footer className="bg-slate-900 text-slate-300 py-12">
+        <footer id="contato" className="bg-slate-900 text-slate-300 py-12">
           <div className="container mx-auto px-4">
             <div className="grid md:grid-cols-4 gap-8">
               <div>
@@ -208,16 +213,16 @@ export default function TenantLanding() {
               <div>
                 <h4 className="font-bold text-white mb-4">Contato</h4>
                 <ul className="space-y-2 text-sm">
-                  <li className="flex items-center gap-2"><Phone className="w-4 h-4"/> (11) 99999-9999</li>
-                  <li className="flex items-center gap-2"><Mail className="w-4 h-4"/> contato@{tenant.slug}.com.br</li>
-                  <li className="flex items-center gap-2"><MapPin className="w-4 h-4"/> São Paulo, SP</li>
+                  <li className="flex items-center gap-2"><Phone className="w-4 h-4"/> {tenant.phone || "(11) 99999-9999"}</li>
+                  <li className="flex items-center gap-2"><Mail className="w-4 h-4"/> {tenant.email || `contato@${tenant.slug}.com.br`}</li>
+                  <li className="flex items-center gap-2"><MapPin className="w-4 h-4"/> {tenant.address || "São Paulo, SP"}</li>
                 </ul>
               </div>
               <div>
                 <h4 className="font-bold text-white mb-4">Newsletter</h4>
                 <div className="flex gap-2">
                   <input type="email" placeholder="Seu e-mail" className="bg-slate-800 border-none rounded px-3 py-2 text-sm w-full" />
-                  <Button size="sm" style={{ backgroundColor: tenant.colors.primary }}>OK</Button>
+                  <Button size="sm" style={{ backgroundColor: tenant.primaryColor }}>OK</Button>
                 </div>
               </div>
             </div>
