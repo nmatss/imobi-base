@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,8 +10,11 @@ import {
   Home,
   Loader2,
   Download,
-  Calendar
+  Calendar,
+  FileText
 } from "lucide-react";
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 import {
   BarChart,
   Bar,
@@ -46,6 +49,8 @@ const COLORS = ['#22c55e', '#f59e0b', '#ef4444', '#6366f1'];
 export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
   const [startDate, setStartDate] = useState(() => {
     const date = new Date();
     date.setMonth(0);
@@ -107,6 +112,77 @@ export default function ReportsPage() {
     { name: 'Atrasado', value: reportData.totalOverdue },
   ].filter(item => item.value > 0) : [];
 
+  const handleExportPDF = async () => {
+    if (!reportRef.current || !reportData) return;
+    
+    setIsExporting(true);
+    try {
+      const element = reportRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      const headerHeight = 25;
+      const margin = 10;
+      const availableWidth = pdfWidth - (margin * 2);
+      const availableHeight = pdfHeight - headerHeight - margin;
+      
+      const imgRatio = canvas.width / canvas.height;
+      const scaledWidth = availableWidth;
+      const scaledHeight = scaledWidth / imgRatio;
+      
+      pdf.setFontSize(16);
+      pdf.text('Relatório de Aluguéis', pdfWidth / 2, 12, { align: 'center' });
+      pdf.setFontSize(10);
+      pdf.text(`Período: ${startDate} a ${endDate}`, pdfWidth / 2, 18, { align: 'center' });
+      
+      if (scaledHeight <= availableHeight) {
+        pdf.addImage(imgData, 'PNG', margin, headerHeight, scaledWidth, scaledHeight);
+      } else {
+        let yOffset = 0;
+        let pageNumber = 0;
+        const pixelsPerMm = canvas.height / scaledHeight;
+        
+        while (yOffset < canvas.height) {
+          if (pageNumber > 0) {
+            pdf.addPage();
+          }
+          
+          const sourceY = yOffset;
+          const sourceHeight = Math.min(availableHeight * pixelsPerMm, canvas.height - yOffset);
+          const destHeight = sourceHeight / pixelsPerMm;
+          
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = canvas.width;
+          tempCanvas.height = sourceHeight;
+          const ctx = tempCanvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(canvas, 0, sourceY, canvas.width, sourceHeight, 0, 0, canvas.width, sourceHeight);
+            const pageImgData = tempCanvas.toDataURL('image/png');
+            pdf.addImage(pageImgData, 'PNG', margin, pageNumber === 0 ? headerHeight : margin, scaledWidth, destHeight);
+          }
+          
+          yOffset += sourceHeight;
+          pageNumber++;
+        }
+      }
+      
+      pdf.save(`relatorio_alugueis_${startDate}_${endDate}.pdf`);
+    } catch (error) {
+      console.error('Erro ao exportar PDF:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -122,11 +198,18 @@ export default function ReportsPage() {
           <h1 data-testid="text-reports-title" className="text-2xl sm:text-3xl font-heading font-bold text-foreground">Relatórios</h1>
           <p className="text-muted-foreground text-sm sm:text-base">Análise financeira e de ocupação dos aluguéis</p>
         </div>
-        <Button data-testid="button-export-csv" onClick={handleExportCSV} variant="outline" className="gap-2">
-          <Download className="h-4 w-4" /> Exportar CSV
-        </Button>
+        <div className="flex gap-2">
+          <Button data-testid="button-export-csv" onClick={handleExportCSV} variant="outline" className="gap-2">
+            <Download className="h-4 w-4" /> CSV
+          </Button>
+          <Button data-testid="button-export-pdf" onClick={handleExportPDF} disabled={isExporting} className="gap-2">
+            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+            {isExporting ? "Gerando..." : "Exportar PDF"}
+          </Button>
+        </div>
       </div>
 
+      <div ref={reportRef} className="space-y-6 bg-background">
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -328,6 +411,7 @@ export default function ReportsPage() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
