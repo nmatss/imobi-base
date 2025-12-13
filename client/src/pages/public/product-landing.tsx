@@ -176,18 +176,9 @@ export default function ProductLanding() {
                 </motion.div>
                 
                 <motion.div variants={fadeInUp} className="mt-10 flex items-center justify-center lg:justify-start gap-4 text-sm text-muted-foreground">
-                  <div className="flex -space-x-3">
-                    {[1,2,3,4].map(i => (
-                      <div key={i} className="w-8 h-8 rounded-full border-2 border-background bg-muted flex items-center justify-center overflow-hidden">
-                        <img src={`https://i.pravatar.cc/100?img=${i+10}`} alt="User" />
-                      </div>
-                    ))}
-                  </div>
-                  <div>
-                    <div className="flex text-yellow-500 mb-0.5">
-                      {[1,2,3,4,5].map(i => <Star key={i} className="w-3 h-3 fill-current" />)}
-                    </div>
-                    <p>Mais de <span className="font-bold text-foreground">500+</span> corretores confiam</p>
+                  <div className="flex items-center gap-2 px-4 py-2 bg-muted rounded-full">
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    <span className="font-medium">Sistema disponível para testes</span>
                   </div>
                 </motion.div>
               </motion.div>
@@ -257,29 +248,8 @@ export default function ProductLanding() {
           </div>
         </section>
 
-        {/* Marquee Section */}
-        <section className="py-10 border-y bg-muted/20 overflow-hidden">
-          <div className="container mx-auto px-4 mb-6 text-center">
-            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-              Potencializando o crescimento de líderes do mercado
-            </p>
-          </div>
-          <div className="relative flex overflow-x-hidden group">
-            <div className="animate-marquee whitespace-nowrap flex gap-16 items-center opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
-              {[...Array(2)].map((_, i) => (
-                <div key={i} className="flex gap-16">
-                  {["Nexus", "Urban", "Horizon", "Terra", "Vanguard", "Elevate", "Prime", "Summit"].map((name) => (
-                    <div key={name} className="flex items-center gap-2 font-bold text-2xl font-heading text-foreground/80">
-                      <Building2 className="w-6 h-6" /> {name}
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-            <div className="absolute top-0 left-0 w-32 h-full bg-gradient-to-r from-background to-transparent z-10" />
-            <div className="absolute top-0 right-0 w-32 h-full bg-gradient-to-l from-background to-transparent z-10" />
-          </div>
-        </section>
+        {/* Marquee Section Removed as per request for honesty */}
+
 
         {/* Feature Tabs Section */}
         <section id="recursos" className="py-24 bg-background relative">
