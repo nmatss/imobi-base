@@ -230,3 +230,119 @@ export const rentalPayments = pgTable("rental_payments", {
 export const insertRentalPaymentSchema = createInsertSchema(rentalPayments).omit({ id: true, createdAt: true });
 export type InsertRentalPayment = z.infer<typeof insertRentalPaymentSchema>;
 export type RentalPayment = typeof rentalPayments.$inferSelect;
+
+// ============== MÓDULO DE VENDAS ==============
+
+export const saleProposals = pgTable("sale_proposals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  propertyId: varchar("property_id").notNull().references(() => properties.id),
+  leadId: varchar("lead_id").notNull().references(() => leads.id),
+  proposedValue: decimal("proposed_value", { precision: 12, scale: 2 }).notNull(),
+  validityDate: timestamp("validity_date"),
+  status: text("status").notNull().default("pending"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertSaleProposalSchema = createInsertSchema(saleProposals).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertSaleProposal = z.infer<typeof insertSaleProposalSchema>;
+export type SaleProposal = typeof saleProposals.$inferSelect;
+
+export const propertySales = pgTable("property_sales", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  propertyId: varchar("property_id").notNull().references(() => properties.id),
+  buyerLeadId: varchar("buyer_lead_id").notNull().references(() => leads.id),
+  sellerId: varchar("seller_id").references(() => owners.id),
+  brokerId: varchar("broker_id").references(() => users.id),
+  saleValue: decimal("sale_value", { precision: 12, scale: 2 }).notNull(),
+  saleDate: timestamp("sale_date").notNull(),
+  commissionRate: decimal("commission_rate", { precision: 5, scale: 2 }).default("6"),
+  commissionValue: decimal("commission_value", { precision: 12, scale: 2 }),
+  status: text("status").notNull().default("completed"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertPropertySaleSchema = createInsertSchema(propertySales).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPropertySale = z.infer<typeof insertPropertySaleSchema>;
+export type PropertySale = typeof propertySales.$inferSelect;
+
+// ============== MÓDULO FINANCEIRO ==============
+
+export const financeCategories = pgTable("finance_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  name: text("name").notNull(),
+  type: text("type").notNull(),
+  color: text("color").default("#6b7280"),
+  isSystemGenerated: boolean("is_system_generated").default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertFinanceCategorySchema = createInsertSchema(financeCategories).omit({ id: true, createdAt: true });
+export type InsertFinanceCategory = z.infer<typeof insertFinanceCategorySchema>;
+export type FinanceCategory = typeof financeCategories.$inferSelect;
+
+export const financeEntries = pgTable("finance_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  categoryId: varchar("category_id").references(() => financeCategories.id),
+  sourceType: text("source_type"),
+  sourceId: varchar("source_id"),
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  flow: text("flow").notNull(),
+  entryDate: timestamp("entry_date").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertFinanceEntrySchema = createInsertSchema(financeEntries).omit({ id: true, createdAt: true });
+export type InsertFinanceEntry = z.infer<typeof insertFinanceEntrySchema>;
+export type FinanceEntry = typeof financeEntries.$inferSelect;
+
+// ============== MELHORIAS NO CRM ==============
+
+export const leadTags = pgTable("lead_tags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  name: text("name").notNull(),
+  color: text("color").default("#3b82f6"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertLeadTagSchema = createInsertSchema(leadTags).omit({ id: true, createdAt: true });
+export type InsertLeadTag = z.infer<typeof insertLeadTagSchema>;
+export type LeadTag = typeof leadTags.$inferSelect;
+
+export const leadTagLinks = pgTable("lead_tag_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id").notNull().references(() => leads.id),
+  tagId: varchar("tag_id").notNull().references(() => leadTags.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertLeadTagLinkSchema = createInsertSchema(leadTagLinks).omit({ id: true, createdAt: true });
+export type InsertLeadTagLink = z.infer<typeof insertLeadTagLinkSchema>;
+export type LeadTagLink = typeof leadTagLinks.$inferSelect;
+
+export const followUps = pgTable("follow_ups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  leadId: varchar("lead_id").notNull().references(() => leads.id),
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  dueAt: timestamp("due_at").notNull(),
+  type: text("type").notNull(),
+  status: text("status").notNull().default("pending"),
+  notes: text("notes"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertFollowUpSchema = createInsertSchema(followUps).omit({ id: true, createdAt: true });
+export type InsertFollowUp = z.infer<typeof insertFollowUpSchema>;
+export type FollowUp = typeof followUps.$inferSelect;
