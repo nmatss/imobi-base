@@ -9,6 +9,7 @@ import CalendarPage from "@/pages/calendar";
 import ContractsPage from "@/pages/contracts";
 import SettingsPage from "@/pages/settings";
 import TenantLanding from "@/pages/public/landing";
+import ProductLanding from "@/pages/public/product-landing";
 import NotFound from "@/pages/not-found";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,12 +84,11 @@ function Router() {
   return (
     <Switch>
       {/* Public Tenant Routes */}
-      <Route path="/e/:slug" component={TenantLanding} />
-      <Route path="/e/:slug/*" component={TenantLanding} />
+      <Route path="/e/:rest*" component={TenantLanding} />
 
       {/* App Routes */}
+      <Route path="/" component={ProductLanding} />
       <Route path="/login" component={LoginPage} />
-      <Route path="/" component={() => <ProtectedRoute component={Dashboard} />} />
       <Route path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
       <Route path="/properties" component={() => <ProtectedRoute component={PropertiesList} />} />
       <Route path="/properties/:id" component={() => <ProtectedRoute component={PropertyDetailsPage} />} />
