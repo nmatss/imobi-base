@@ -24,7 +24,12 @@ import {
   Calendar,
   CheckCircle2,
   AlertCircle,
-  Clock
+  Clock,
+  BarChart2,
+  Download,
+  Filter,
+  TrendingUp,
+  TrendingDown
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -163,6 +168,19 @@ export default function RentalsPage() {
     rentalContractId: "", referenceMonth: "", dueDate: "", rentValue: "",
     condoFee: "", iptuValue: "", extraCharges: "", discounts: "", totalValue: "", notes: ""
   });
+
+  const [reportFilters, setReportFilters] = useState({
+    ownerId: "",
+    renterId: "",
+    status: "",
+    startDate: "",
+    endDate: ""
+  });
+  const [ownerReport, setOwnerReport] = useState<any[]>([]);
+  const [renterReport, setRenterReport] = useState<any[]>([]);
+  const [paymentsReport, setPaymentsReport] = useState<any[]>([]);
+  const [overdueReport, setOverdueReport] = useState<any>(null);
+  const [loadingReports, setLoadingReports] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -365,6 +383,62 @@ export default function RentalsPage() {
   const getRenterName = (renterId: string) => renters.find(r => r.id === renterId)?.name || "-";
   const getPropertyTitle = (propertyId: string) => properties.find(p => p.id === propertyId)?.title || "-";
 
+  const fetchReports = async () => {
+    setLoadingReports(true);
+    try {
+      const params = new URLSearchParams();
+      if (reportFilters.ownerId) params.set("ownerId", reportFilters.ownerId);
+      if (reportFilters.renterId) params.set("renterId", reportFilters.renterId);
+      if (reportFilters.status) params.set("status", reportFilters.status);
+      if (reportFilters.startDate) params.set("startDate", reportFilters.startDate);
+      if (reportFilters.endDate) params.set("endDate", reportFilters.endDate);
+
+      const [ownersRes, rentersRes, paymentsRes, overdueRes] = await Promise.all([
+        fetch(`/api/reports/owners?${params}`, { credentials: "include" }),
+        fetch(`/api/reports/renters?${params}`, { credentials: "include" }),
+        fetch(`/api/reports/payments-detailed?${params}`, { credentials: "include" }),
+        fetch("/api/reports/overdue", { credentials: "include" }),
+      ]);
+
+      if (ownersRes.ok) setOwnerReport(await ownersRes.json());
+      if (rentersRes.ok) setRenterReport(await rentersRes.json());
+      if (paymentsRes.ok) setPaymentsReport(await paymentsRes.json());
+      if (overdueRes.ok) setOverdueReport(await overdueRes.json());
+    } catch (error) {
+      console.error("Error fetching reports:", error);
+      toast({ title: "Erro", description: "Erro ao carregar relatórios", variant: "destructive" });
+    } finally {
+      setLoadingReports(false);
+    }
+  };
+
+  const exportToPDF = async (elementId: string, filename: string) => {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+
+    try {
+      const html2canvas = (await import("html2canvas")).default;
+      const jsPDF = (await import("jspdf")).default;
+
+      const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("l", "mm", "a4");
+      const imgWidth = 280;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
+      pdf.save(`${filename}.pdf`);
+      toast({ title: "PDF exportado", description: "Relatório salvo com sucesso." });
+    } catch (error) {
+      toast({ title: "Erro", description: "Erro ao exportar PDF", variant: "destructive" });
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "reports") {
+      fetchReports();
+    }
+  }, [activeTab]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -438,11 +512,12 @@ export default function RentalsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="owners" data-testid="tab-owners">Locadores</TabsTrigger>
           <TabsTrigger value="renters" data-testid="tab-renters">Inquilinos</TabsTrigger>
           <TabsTrigger value="contracts" data-testid="tab-contracts">Contratos</TabsTrigger>
           <TabsTrigger value="payments" data-testid="tab-payments">Pagamentos</TabsTrigger>
+          <TabsTrigger value="reports" data-testid="tab-reports">Relatórios</TabsTrigger>
         </TabsList>
 
         <TabsContent value="owners" className="space-y-4">
@@ -657,6 +732,299 @@ export default function RentalsPage() {
                 </TableBody>
               </Table>
             </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="reports" className="space-y-6">
+          <Card>
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-5 w-5 text-muted-foreground" />
+                  <CardTitle className="text-lg">Filtros</CardTitle>
+                </div>
+                <Button onClick={fetchReports} disabled={loadingReports} data-testid="button-apply-filters">
+                  {loadingReports ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Aplicar Filtros
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="space-y-2">
+                  <Label>Locador</Label>
+                  <Select value={reportFilters.ownerId} onValueChange={(v) => setReportFilters(prev => ({ ...prev, ownerId: v === "all" ? "" : v }))}>
+                    <SelectTrigger data-testid="select-report-owner"><SelectValue placeholder="Todos" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      {owners.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Inquilino</Label>
+                  <Select value={reportFilters.renterId} onValueChange={(v) => setReportFilters(prev => ({ ...prev, renterId: v === "all" ? "" : v }))}>
+                    <SelectTrigger data-testid="select-report-renter"><SelectValue placeholder="Todos" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      {renters.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select value={reportFilters.status} onValueChange={(v) => setReportFilters(prev => ({ ...prev, status: v === "all" ? "" : v }))}>
+                    <SelectTrigger data-testid="select-report-status"><SelectValue placeholder="Todos" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="paid">Pagos</SelectItem>
+                      <SelectItem value="pending">Pendentes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Data Início</Label>
+                  <Input type="date" value={reportFilters.startDate} onChange={(e) => setReportFilters(prev => ({ ...prev, startDate: e.target.value }))} data-testid="input-report-start-date" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Data Fim</Label>
+                  <Input type="date" value={reportFilters.endDate} onChange={(e) => setReportFilters(prev => ({ ...prev, endDate: e.target.value }))} data-testid="input-report-end-date" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {loadingReports ? (
+            <div className="flex items-center justify-center h-32">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <Card id="report-owners">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Home className="h-5 w-5 text-blue-600" />
+                      <CardTitle className="text-lg">Performance por Locador</CardTitle>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => exportToPDF("report-owners", "relatorio-locadores")} data-testid="button-export-owners">
+                      <Download className="h-4 w-4 mr-2" /> Exportar PDF
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {ownerReport.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">Nenhum dado disponível</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Locador</TableHead>
+                          <TableHead>Contratos Ativos</TableHead>
+                          <TableHead>Total Recebido</TableHead>
+                          <TableHead>Total Pendente</TableHead>
+                          <TableHead>Taxa Adimplência</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {ownerReport.map((row: any) => (
+                          <TableRow key={row.ownerId} data-testid={`row-report-owner-${row.ownerId}`}>
+                            <TableCell className="font-medium">{row.ownerName}</TableCell>
+                            <TableCell>{row.activeContracts}</TableCell>
+                            <TableCell className="text-green-600">{formatPrice(String(row.totalReceived))}</TableCell>
+                            <TableCell className="text-orange-600">{formatPrice(String(row.totalPending))}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {row.paymentRate >= 80 ? (
+                                  <TrendingUp className="h-4 w-4 text-green-600" />
+                                ) : (
+                                  <TrendingDown className="h-4 w-4 text-red-600" />
+                                )}
+                                <span className={row.paymentRate >= 80 ? "text-green-600" : "text-red-600"}>
+                                  {row.paymentRate?.toFixed(1)}%
+                                </span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card id="report-renters">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-5 w-5 text-purple-600" />
+                      <CardTitle className="text-lg">Performance por Inquilino</CardTitle>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => exportToPDF("report-renters", "relatorio-inquilinos")} data-testid="button-export-renters">
+                      <Download className="h-4 w-4 mr-2" /> Exportar PDF
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {renterReport.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">Nenhum dado disponível</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Inquilino</TableHead>
+                          <TableHead>Contratos Ativos</TableHead>
+                          <TableHead>Total Pago</TableHead>
+                          <TableHead>Total Pendente</TableHead>
+                          <TableHead>Média Atraso (dias)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {renterReport.map((row: any) => (
+                          <TableRow key={row.renterId} data-testid={`row-report-renter-${row.renterId}`}>
+                            <TableCell className="font-medium">{row.renterName}</TableCell>
+                            <TableCell>{row.activeContracts}</TableCell>
+                            <TableCell className="text-green-600">{formatPrice(String(row.totalPaid))}</TableCell>
+                            <TableCell className="text-orange-600">{formatPrice(String(row.totalPending))}</TableCell>
+                            <TableCell>
+                              <span className={row.avgDelayDays > 5 ? "text-red-600" : "text-green-600"}>
+                                {row.avgDelayDays?.toFixed(1) || "0"} dias
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card id="report-payments">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-5 w-5 text-green-600" />
+                      <CardTitle className="text-lg">Pagamentos Detalhados</CardTitle>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => exportToPDF("report-payments", "relatorio-pagamentos")} data-testid="button-export-payments">
+                      <Download className="h-4 w-4 mr-2" /> Exportar PDF
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {paymentsReport.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">Nenhum dado disponível</p>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Referência</TableHead>
+                          <TableHead>Imóvel</TableHead>
+                          <TableHead>Inquilino</TableHead>
+                          <TableHead>Locador</TableHead>
+                          <TableHead>Vencimento</TableHead>
+                          <TableHead>Valor</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paymentsReport.slice(0, 20).map((row: any) => (
+                          <TableRow key={row.paymentId} data-testid={`row-report-payment-${row.paymentId}`}>
+                            <TableCell className="font-medium">{row.referenceMonth}</TableCell>
+                            <TableCell>{row.propertyTitle}</TableCell>
+                            <TableCell>{row.renterName}</TableCell>
+                            <TableCell>{row.ownerName}</TableCell>
+                            <TableCell>{formatDate(row.dueDate)}</TableCell>
+                            <TableCell>{formatPrice(String(row.totalValue))}</TableCell>
+                            <TableCell>{getPaymentStatusBadge(row.status, row.dueDate)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                  {paymentsReport.length > 20 && (
+                    <p className="text-muted-foreground text-center text-sm mt-4">Mostrando 20 de {paymentsReport.length} registros</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card id="report-overdue">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5 text-red-600" />
+                      <CardTitle className="text-lg">Inadimplência</CardTitle>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => exportToPDF("report-overdue", "relatorio-inadimplencia")} data-testid="button-export-overdue">
+                      <Download className="h-4 w-4 mr-2" /> Exportar PDF
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {!overdueReport ? (
+                    <p className="text-muted-foreground text-center py-8">Nenhum dado disponível</p>
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Card className="border-orange-200 bg-orange-50">
+                          <CardContent className="pt-6">
+                            <div className="text-center">
+                              <p className="text-3xl font-bold text-orange-600">{formatPrice(String(overdueReport.range0to30?.total || 0))}</p>
+                              <p className="text-sm text-muted-foreground mt-1">0 a 30 dias</p>
+                              <p className="text-xs text-muted-foreground">{overdueReport.range0to30?.count || 0} pagamentos</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        <Card className="border-red-200 bg-red-50">
+                          <CardContent className="pt-6">
+                            <div className="text-center">
+                              <p className="text-3xl font-bold text-red-600">{formatPrice(String(overdueReport.range31to60?.total || 0))}</p>
+                              <p className="text-sm text-muted-foreground mt-1">31 a 60 dias</p>
+                              <p className="text-xs text-muted-foreground">{overdueReport.range31to60?.count || 0} pagamentos</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                        <Card className="border-red-400 bg-red-100">
+                          <CardContent className="pt-6">
+                            <div className="text-center">
+                              <p className="text-3xl font-bold text-red-700">{formatPrice(String(overdueReport.range61plus?.total || 0))}</p>
+                              <p className="text-sm text-muted-foreground mt-1">61+ dias</p>
+                              <p className="text-xs text-muted-foreground">{overdueReport.range61plus?.count || 0} pagamentos</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                      {overdueReport.details && overdueReport.details.length > 0 && (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Inquilino</TableHead>
+                              <TableHead>Imóvel</TableHead>
+                              <TableHead>Referência</TableHead>
+                              <TableHead>Vencimento</TableHead>
+                              <TableHead>Dias Atraso</TableHead>
+                              <TableHead>Valor</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {overdueReport.details.slice(0, 10).map((row: any, idx: number) => (
+                              <TableRow key={idx} data-testid={`row-overdue-${idx}`}>
+                                <TableCell className="font-medium">{row.renterName}</TableCell>
+                                <TableCell>{row.propertyTitle}</TableCell>
+                                <TableCell>{row.referenceMonth}</TableCell>
+                                <TableCell>{formatDate(row.dueDate)}</TableCell>
+                                <TableCell className="text-red-600 font-semibold">{row.daysOverdue} dias</TableCell>
+                                <TableCell>{formatPrice(String(row.totalValue))}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           )}
         </TabsContent>
       </Tabs>
