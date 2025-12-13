@@ -11,8 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
-import { BedDouble, Bath, Ruler, MapPin, Search, Filter, Plus, Pencil, Trash2, Loader2, Share2 } from "lucide-react";
+import { BedDouble, Bath, Ruler, MapPin, Search, Filter, Plus, Pencil, Trash2, Loader2, Share2, Images } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ImageLightbox } from "@/components/ui/image-lightbox";
 
 function formatPrice(price: string) {
   const num = parseFloat(price);
@@ -66,6 +67,15 @@ export default function PropertiesList() {
   const [formData, setFormData] = useState<PropertyFormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  const openLightbox = (images: string[]) => {
+    if (images && images.length > 0) {
+      setLightboxImages(images);
+      setLightboxOpen(true);
+    }
+  };
 
   const filteredProperties = properties.filter((p) => {
     const matchesSearch = p.title.toLowerCase().includes(filter.toLowerCase()) || 
@@ -261,8 +271,16 @@ export default function PropertiesList() {
                 <img 
                   src={property.images?.[0] || "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800"} 
                   alt={property.title} 
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 cursor-pointer"
+                  onClick={() => openLightbox(property.images || [property.images?.[0] || "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800"])}
+                  data-testid={`img-property-${property.id}`}
                 />
+                {property.images && property.images.length > 1 && (
+                  <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                    <Images className="h-3 w-3" />
+                    {property.images.length}
+                  </div>
+                )}
                 <div className="absolute top-3 right-3 flex gap-2 flex-wrap justify-end">
                   <Badge variant="secondary" className="backdrop-blur-md bg-white/90 text-black shadow-sm font-semibold text-xs">
                     {property.category === 'sale' ? 'Venda' : 'Aluguel'}
@@ -280,6 +298,20 @@ export default function PropertiesList() {
                   </Badge>
                 </div>
                 <div className="absolute top-3 left-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {property.images && property.images.length > 1 && (
+                    <Button 
+                      data-testid={`button-gallery-property-${property.id}`}
+                      variant="secondary" 
+                      size="icon" 
+                      className="h-8 w-8 backdrop-blur-md bg-white/90 hover:bg-blue-100"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        openLightbox(property.images || []);
+                      }}
+                    >
+                      <Images className="h-4 w-4 text-blue-600" />
+                    </Button>
+                  )}
                   <Button 
                     data-testid={`button-share-property-${property.id}`}
                     variant="secondary" 
@@ -654,6 +686,12 @@ export default function PropertiesList() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ImageLightbox
+        images={lightboxImages}
+        isOpen={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+      />
     </div>
   );
 }
