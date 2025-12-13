@@ -176,7 +176,7 @@ export default function ProductLanding() {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
                   </span>
-                  Novidade: Integração com WhatsApp Business
+                  Sistema Completo para Imobiliárias
                 </motion.div>
                 
                 <motion.h1 variants={fadeInUp} className="text-5xl md:text-6xl lg:text-7xl font-heading font-bold tracking-tight mb-6 leading-[1.1]">
