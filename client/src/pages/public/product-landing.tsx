@@ -45,12 +45,38 @@ export default function ProductLanding() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const handleNewsletterSubmit = (e: React.FormEvent) => {
+  const handleNewsletterSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    toast({
-      title: "Inscrição confirmada!",
-      description: "Você receberá nossas novidades em breve.",
-    });
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get("email") as string;
+    
+    try {
+      const res = await fetch("/api/newsletter/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, active: true }),
+      });
+
+      if (res.ok) {
+        toast({
+          title: "Inscrição confirmada!",
+          description: "Você receberá nossas novidades em breve.",
+        });
+        e.currentTarget.reset();
+      } else {
+        toast({
+          title: "Erro",
+          description: "Não foi possível completar a inscrição.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível completar a inscrição.",
+        variant: "destructive",
+      });
+    }
   };
 
   const fadeInUp = {
@@ -592,7 +618,7 @@ export default function ProductLanding() {
                   Receba dicas de vendas e novidades da plataforma.
                 </p>
                 <form onSubmit={handleNewsletterSubmit} className="flex gap-2">
-                  <Input placeholder="seu@email.com" className="bg-muted border-transparent focus:bg-background" required />
+                  <Input name="email" type="email" placeholder="seu@email.com" className="bg-muted border-transparent focus:bg-background" required />
                   <Button type="submit" size="icon" className="shrink-0">
                     <ArrowRight className="w-4 h-4" />
                   </Button>
