@@ -74,6 +74,12 @@ export const leads = pgTable("leads", {
   interests: text("interests").array(),
   notes: text("notes"),
   assignedTo: varchar("assigned_to").references(() => users.id),
+  preferredType: text("preferred_type"),
+  preferredCategory: text("preferred_category"),
+  preferredCity: text("preferred_city"),
+  preferredNeighborhood: text("preferred_neighborhood"),
+  minBedrooms: integer("min_bedrooms"),
+  maxBedrooms: integer("max_bedrooms"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

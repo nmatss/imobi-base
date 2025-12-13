@@ -307,6 +307,16 @@ export async function registerRoutes(
     }
   });
 
+  // ===== LEAD MATCHED PROPERTIES =====
+  app.get("/api/leads/:leadId/matched-properties", requireAuth, async (req, res) => {
+    try {
+      const matchedProperties = await storage.getMatchedProperties(req.params.leadId, req.user!.tenantId);
+      res.json(matchedProperties);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar imóveis recomendados" });
+    }
+  });
+
   // ===== INTERACTION ROUTES =====
   app.get("/api/leads/:leadId/interactions", requireAuth, async (req, res) => {
     try {

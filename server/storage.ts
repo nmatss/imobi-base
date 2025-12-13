@@ -189,6 +189,9 @@ export interface IStorage {
   createFollowUp(followUp: InsertFollowUp): Promise<FollowUp>;
   updateFollowUp(id: string, followUp: Partial<InsertFollowUp>): Promise<FollowUp | undefined>;
   deleteFollowUp(id: string): Promise<boolean>;
+  
+  // Property Matching
+  getMatchedProperties(leadId: string, tenantId: string): Promise<{ property: Property; score: number; matchReasons: string[] }[]>;
 }
 
 export class DbStorage implements IStorage {
@@ -1057,7 +1060,7 @@ export class DbStorage implements IStorage {
     const links = await db.select().from(schema.leadTagLinks).where(sql`${schema.leadTagLinks.leadId} = ANY(${leadIds})`);
     if (links.length === 0) return {};
     
-    const tagIds = [...new Set(links.map(l => l.tagId))];
+    const tagIds = Array.from(new Set(links.map(l => l.tagId)));
     const tags = await db.select().from(schema.leadTags).where(sql`${schema.leadTags.id} = ANY(${tagIds})`);
     const tagsById = new Map(tags.map(t => [t.id, t]));
     
@@ -1121,6 +1124,74 @@ export class DbStorage implements IStorage {
   async deleteFollowUp(id: string): Promise<boolean> {
     const result = await db.delete(schema.followUps).where(eq(schema.followUps.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Property Matching
+  async getMatchedProperties(leadId: string, tenantId: string): Promise<{ property: Property; score: number; matchReasons: string[] }[]> {
+    const lead = await this.getLead(leadId);
+    if (!lead || lead.tenantId !== tenantId) return [];
+
+    const properties = await this.getPropertiesByTenant(lead.tenantId, { status: "available" });
+    
+    const results: { property: Property; score: number; matchReasons: string[] }[] = [];
+    
+    for (const property of properties) {
+      let score = 0;
+      const matchReasons: string[] = [];
+      
+      // Price/Budget match (40 points max)
+      const budget = lead.budget ? parseFloat(lead.budget) : null;
+      const price = property.price ? parseFloat(property.price) : null;
+      if (budget && !isNaN(budget) && price && !isNaN(price)) {
+        if (price <= budget) {
+          score += 40;
+          matchReasons.push("Dentro do orçamento");
+        } else if (price <= budget * 1.2) {
+          score += 20;
+          matchReasons.push("Próximo ao orçamento");
+        }
+      }
+      
+      // Type match (20 points)
+      if (lead.preferredType && lead.preferredType === property.type) {
+        score += 20;
+        matchReasons.push(`Tipo: ${property.type}`);
+      }
+      
+      // Category match (15 points)
+      if (lead.preferredCategory && lead.preferredCategory === property.category) {
+        score += 15;
+        matchReasons.push(`Categoria: ${property.category}`);
+      }
+      
+      // City match (15 points)
+      if (lead.preferredCity && property.city?.toLowerCase().includes(lead.preferredCity.toLowerCase())) {
+        score += 15;
+        matchReasons.push(`Cidade: ${property.city}`);
+      }
+      
+      // Neighborhood match (10 points)
+      if (lead.preferredNeighborhood && property.address?.toLowerCase().includes(lead.preferredNeighborhood.toLowerCase())) {
+        score += 10;
+        matchReasons.push(`Bairro: ${lead.preferredNeighborhood}`);
+      }
+      
+      // Bedrooms match (10 points)
+      if (property.bedrooms) {
+        const minBed = lead.minBedrooms || 0;
+        const maxBed = lead.maxBedrooms || 99;
+        if (property.bedrooms >= minBed && property.bedrooms <= maxBed) {
+          score += 10;
+          matchReasons.push(`${property.bedrooms} quartos`);
+        }
+      }
+      
+      if (score > 0) {
+        results.push({ property, score, matchReasons });
+      }
+    }
+    
+    return results.sort((a, b) => b.score - a.score);
   }
 }
 

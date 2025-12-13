@@ -58,6 +58,12 @@ export type Lead = {
   interests: string[] | null;
   notes: string | null;
   assignedTo: string | null;
+  preferredType: string | null;
+  preferredCategory: string | null;
+  preferredCity: string | null;
+  preferredNeighborhood: string | null;
+  minBedrooms: number | null;
+  maxBedrooms: number | null;
   createdAt: Date;
   updatedAt: Date;
 };

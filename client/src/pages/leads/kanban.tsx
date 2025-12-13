@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, MoreHorizontal, Phone, Mail, Users, ArrowRight, Loader2, MessageSquare, PhoneCall, Calendar, FileText, Send, Tag, Bell, Clock, X, Check, Filter } from "lucide-react";
+import { Plus, MoreHorizontal, Phone, Mail, Users, ArrowRight, Loader2, MessageSquare, PhoneCall, Calendar, FileText, Send, Tag, Bell, Clock, X, Check, Filter, Home, MapPin, Bed } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -49,6 +49,12 @@ type LeadFormData = {
   source: string;
   budget: string;
   notes: string;
+  preferredType: string;
+  preferredCategory: string;
+  preferredCity: string;
+  preferredNeighborhood: string;
+  minBedrooms: string;
+  maxBedrooms: string;
 };
 
 const initialFormData: LeadFormData = {
@@ -58,6 +64,12 @@ const initialFormData: LeadFormData = {
   source: "Site",
   budget: "",
   notes: "",
+  preferredType: "",
+  preferredCategory: "",
+  preferredCity: "",
+  preferredNeighborhood: "",
+  minBedrooms: "",
+  maxBedrooms: "",
 };
 
 type Interaction = {
@@ -144,6 +156,15 @@ export default function LeadsKanban() {
   const [newFollowUpNotes, setNewFollowUpNotes] = useState("");
   const [isCreatingFollowUp, setIsCreatingFollowUp] = useState(false);
 
+  // Matched properties state
+  type MatchedProperty = {
+    property: { id: string; title: string; price: string; city: string; type: string; category: string; bedrooms: number | null; images: string[] | null };
+    score: number;
+    matchReasons: string[];
+  };
+  const [matchedProperties, setMatchedProperties] = useState<MatchedProperty[]>([]);
+  const [loadingMatched, setLoadingMatched] = useState(false);
+
   useEffect(() => {
     fetchAllTags();
     fetchAllFollowUps();
@@ -160,12 +181,29 @@ export default function LeadsKanban() {
       fetchInteractions(editingLead.id);
       fetchLeadTags(editingLead.id);
       fetchLeadFollowUps(editingLead.id);
+      fetchMatchedProperties(editingLead.id);
     } else {
       setInteractions([]);
       setLeadTags([]);
       setLeadFollowUps([]);
+      setMatchedProperties([]);
     }
   }, [editingLead]);
+
+  const fetchMatchedProperties = async (leadId: string) => {
+    setLoadingMatched(true);
+    try {
+      const res = await fetch(`/api/leads/${leadId}/matched-properties`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setMatchedProperties(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch matched properties:", error);
+    } finally {
+      setLoadingMatched(false);
+    }
+  };
 
   const fetchAllTags = async () => {
     try {
@@ -403,6 +441,12 @@ export default function LeadsKanban() {
       source: lead.source,
       budget: lead.budget || "",
       notes: lead.notes || "",
+      preferredType: lead.preferredType || "",
+      preferredCategory: lead.preferredCategory || "",
+      preferredCity: lead.preferredCity || "",
+      preferredNeighborhood: lead.preferredNeighborhood || "",
+      minBedrooms: lead.minBedrooms?.toString() || "",
+      maxBedrooms: lead.maxBedrooms?.toString() || "",
     });
     setIsModalOpen(true);
   };
@@ -420,6 +464,12 @@ export default function LeadsKanban() {
         budget: formData.budget || null,
         notes: formData.notes || null,
         status: editingLead?.status || "new",
+        preferredType: formData.preferredType || null,
+        preferredCategory: formData.preferredCategory || null,
+        preferredCity: formData.preferredCity || null,
+        preferredNeighborhood: formData.preferredNeighborhood || null,
+        minBedrooms: formData.minBedrooms ? parseInt(formData.minBedrooms) : null,
+        maxBedrooms: formData.maxBedrooms ? parseInt(formData.maxBedrooms) : null,
       };
 
       const url = editingLead ? `/api/leads/${editingLead.id}` : "/api/leads";
@@ -817,9 +867,13 @@ export default function LeadsKanban() {
           
           {editingLead ? (
             <Tabs defaultValue="data" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="data">Dados</TabsTrigger>
                 <TabsTrigger value="tags">Tags</TabsTrigger>
+                <TabsTrigger value="matched" data-testid="tab-matched-properties">
+                  <Home className="h-3 w-3 mr-1" />
+                  Imóveis ({matchedProperties.length})
+                </TabsTrigger>
                 <TabsTrigger value="followups">Lembretes ({leadFollowUps.filter(f => f.status === "pending").length})</TabsTrigger>
                 <TabsTrigger value="history">Histórico ({interactions.length})</TabsTrigger>
               </TabsList>
@@ -864,6 +918,62 @@ export default function LeadsKanban() {
                     <Label htmlFor="notes">Observações</Label>
                     <Textarea id="notes" data-testid="input-lead-notes" value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} rows={2} />
                   </div>
+                  
+                  <div className="border-t pt-4 mt-4">
+                    <Label className="text-sm font-medium">Preferências de Imóvel</Label>
+                    <p className="text-xs text-muted-foreground mb-3">Preencha para encontrar imóveis recomendados automaticamente</p>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="preferredType">Tipo</Label>
+                        <Select value={formData.preferredType} onValueChange={(v) => setFormData(prev => ({ ...prev, preferredType: v }))}>
+                          <SelectTrigger data-testid="select-preferred-type"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">Qualquer</SelectItem>
+                            <SelectItem value="Apartamento">Apartamento</SelectItem>
+                            <SelectItem value="Casa">Casa</SelectItem>
+                            <SelectItem value="Terreno">Terreno</SelectItem>
+                            <SelectItem value="Comercial">Comercial</SelectItem>
+                            <SelectItem value="Rural">Rural</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="preferredCategory">Categoria</Label>
+                        <Select value={formData.preferredCategory} onValueChange={(v) => setFormData(prev => ({ ...prev, preferredCategory: v }))}>
+                          <SelectTrigger data-testid="select-preferred-category"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">Qualquer</SelectItem>
+                            <SelectItem value="Venda">Venda</SelectItem>
+                            <SelectItem value="Aluguel">Aluguel</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 mt-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="preferredCity">Cidade</Label>
+                        <Input id="preferredCity" data-testid="input-preferred-city" value={formData.preferredCity} onChange={(e) => setFormData(prev => ({ ...prev, preferredCity: e.target.value }))} placeholder="Ex: São Paulo" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="preferredNeighborhood">Bairro</Label>
+                        <Input id="preferredNeighborhood" data-testid="input-preferred-neighborhood" value={formData.preferredNeighborhood} onChange={(e) => setFormData(prev => ({ ...prev, preferredNeighborhood: e.target.value }))} placeholder="Ex: Centro" />
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 mt-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="minBedrooms">Quartos (mín)</Label>
+                        <Input id="minBedrooms" type="number" min="0" data-testid="input-min-bedrooms" value={formData.minBedrooms} onChange={(e) => setFormData(prev => ({ ...prev, minBedrooms: e.target.value }))} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="maxBedrooms">Quartos (máx)</Label>
+                        <Input id="maxBedrooms" type="number" min="0" data-testid="input-max-bedrooms" value={formData.maxBedrooms} onChange={(e) => setFormData(prev => ({ ...prev, maxBedrooms: e.target.value }))} />
+                      </div>
+                    </div>
+                  </div>
+                  
                   <DialogFooter>
                     <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
                     <Button type="submit" disabled={isSubmitting} data-testid="button-submit-lead">
@@ -936,6 +1046,77 @@ export default function LeadsKanban() {
                       {isCreatingTag ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                     </Button>
                   </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="matched" className="space-y-4 pt-2">
+                <div className="space-y-3">
+                  <div className="font-medium text-sm">Imóveis Recomendados</div>
+                  <p className="text-xs text-muted-foreground">
+                    Imóveis que correspondem às preferências deste lead. Preencha as preferências na aba "Dados" para ver recomendações.
+                  </p>
+                  
+                  {loadingMatched ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                    </div>
+                  ) : matchedProperties.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground" data-testid="empty-matched-properties">
+                      <Home className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">Nenhum imóvel encontrado</p>
+                      <p className="text-xs mt-1">Preencha as preferências do lead na aba "Dados"</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {matchedProperties.map((match) => (
+                        <div 
+                          key={match.property.id} 
+                          className="flex gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
+                          data-testid={`matched-property-${match.property.id}`}
+                        >
+                          <div className="w-16 h-16 rounded-md bg-muted flex items-center justify-center shrink-0 overflow-hidden">
+                            {match.property.images && match.property.images.length > 0 ? (
+                              <img src={match.property.images[0]} alt={match.property.title} className="w-full h-full object-cover" />
+                            ) : (
+                              <Home className="h-6 w-6 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <h4 className="font-medium text-sm truncate">{match.property.title}</h4>
+                              <Badge 
+                                variant={match.score >= 80 ? "default" : match.score >= 50 ? "secondary" : "outline"}
+                                className="shrink-0 text-[10px]"
+                                data-testid={`match-score-${match.property.id}`}
+                              >
+                                {match.score}% match
+                              </Badge>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                              <MapPin className="h-3 w-3" />
+                              <span>{match.property.city}</span>
+                              {match.property.bedrooms && (
+                                <>
+                                  <Bed className="h-3 w-3 ml-2" />
+                                  <span>{match.property.bedrooms} quartos</span>
+                                </>
+                              )}
+                            </div>
+                            <div className="text-sm font-medium mt-1" style={{ color: tenant?.primaryColor }}>
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(parseFloat(match.property.price))}
+                            </div>
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {match.matchReasons.slice(0, 3).map((reason, idx) => (
+                                <Badge key={idx} variant="outline" className="text-[10px] py-0 px-1.5">
+                                  {reason}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </TabsContent>
 
