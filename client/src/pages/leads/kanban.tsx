@@ -605,9 +605,25 @@ export default function LeadsKanban() {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-3 pt-2 text-xs text-muted-foreground space-y-2">
-          <div className="flex items-center gap-2">
-            <Phone className="h-3 w-3" />
-            <span>{lead.phone}</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Phone className="h-3 w-3" />
+              <span>{lead.phone}</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-50"
+              onClick={(e) => {
+                e.stopPropagation();
+                const phone = lead.phone.replace(/\D/g, '');
+                const formattedPhone = phone.startsWith('55') ? phone : `55${phone}`;
+                window.open(`https://wa.me/${formattedPhone}`, '_blank');
+              }}
+              data-testid={`button-whatsapp-${lead.id}`}
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+            </Button>
           </div>
           {!isMobile && (
             <div className="flex items-center gap-2">
@@ -972,6 +988,108 @@ export default function LeadsKanban() {
                         <Input id="maxBedrooms" type="number" min="0" data-testid="input-max-bedrooms" value={formData.maxBedrooms} onChange={(e) => setFormData(prev => ({ ...prev, maxBedrooms: e.target.value }))} />
                       </div>
                     </div>
+                  </div>
+                  
+                  <div className="border-t pt-4 mt-4">
+                    <Label className="text-sm font-medium flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4 text-green-600" />
+                      Enviar WhatsApp
+                    </Label>
+                    <p className="text-xs text-muted-foreground mb-3">Escolha um template ou envie mensagem personalizada</p>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="justify-start text-left h-auto py-2 px-3"
+                        onClick={() => {
+                          const phone = editingLead.phone.replace(/\D/g, '');
+                          const formattedPhone = phone.startsWith('55') ? phone : `55${phone}`;
+                          const msg = encodeURIComponent(`Olá ${editingLead.name.split(' ')[0]}! Tudo bem? Vi que você tem interesse em imóveis. Como posso ajudar?`);
+                          window.open(`https://wa.me/${formattedPhone}?text=${msg}`, '_blank');
+                        }}
+                        data-testid="button-whatsapp-template-greeting"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-xs font-medium">Primeiro contato</span>
+                          <span className="text-[10px] text-muted-foreground">Boas vindas ao lead</span>
+                        </div>
+                      </Button>
+                      
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="justify-start text-left h-auto py-2 px-3"
+                        onClick={() => {
+                          const phone = editingLead.phone.replace(/\D/g, '');
+                          const formattedPhone = phone.startsWith('55') ? phone : `55${phone}`;
+                          const msg = encodeURIComponent(`Olá ${editingLead.name.split(' ')[0]}! Encontrei algumas opções de imóveis que podem te interessar. Podemos marcar uma visita?`);
+                          window.open(`https://wa.me/${formattedPhone}?text=${msg}`, '_blank');
+                        }}
+                        data-testid="button-whatsapp-template-visit"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-xs font-medium">Agendar visita</span>
+                          <span className="text-[10px] text-muted-foreground">Convite para visita</span>
+                        </div>
+                      </Button>
+                      
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="justify-start text-left h-auto py-2 px-3"
+                        onClick={() => {
+                          const phone = editingLead.phone.replace(/\D/g, '');
+                          const formattedPhone = phone.startsWith('55') ? phone : `55${phone}`;
+                          const msg = encodeURIComponent(`Olá ${editingLead.name.split(' ')[0]}! Como foi a visita ao imóvel? Gostaria de saber sua opinião e se posso ajudar com algo mais.`);
+                          window.open(`https://wa.me/${formattedPhone}?text=${msg}`, '_blank');
+                        }}
+                        data-testid="button-whatsapp-template-followup"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-xs font-medium">Follow-up visita</span>
+                          <span className="text-[10px] text-muted-foreground">Após visita</span>
+                        </div>
+                      </Button>
+                      
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="justify-start text-left h-auto py-2 px-3"
+                        onClick={() => {
+                          const phone = editingLead.phone.replace(/\D/g, '');
+                          const formattedPhone = phone.startsWith('55') ? phone : `55${phone}`;
+                          const msg = encodeURIComponent(`Olá ${editingLead.name.split(' ')[0]}! Preparei uma proposta especial para você. Posso enviar os detalhes?`);
+                          window.open(`https://wa.me/${formattedPhone}?text=${msg}`, '_blank');
+                        }}
+                        data-testid="button-whatsapp-template-proposal"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-xs font-medium">Enviar proposta</span>
+                          <span className="text-[10px] text-muted-foreground">Oferta comercial</span>
+                        </div>
+                      </Button>
+                    </div>
+                    
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      className="w-full mt-3 bg-green-600 hover:bg-green-700 gap-2"
+                      onClick={() => {
+                        const phone = editingLead.phone.replace(/\D/g, '');
+                        const formattedPhone = phone.startsWith('55') ? phone : `55${phone}`;
+                        window.open(`https://wa.me/${formattedPhone}`, '_blank');
+                      }}
+                      data-testid="button-whatsapp-direct"
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                      Abrir WhatsApp (sem template)
+                    </Button>
                   </div>
                   
                   <DialogFooter>
