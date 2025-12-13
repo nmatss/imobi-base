@@ -29,7 +29,11 @@ import {
   Download,
   Filter,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  X,
+  RotateCcw,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -174,13 +178,138 @@ export default function RentalsPage() {
     renterId: "",
     status: "",
     startDate: "",
-    endDate: ""
+    endDate: "",
+    propertyId: "",
+    minValue: "",
+    maxValue: "",
+    onlyOverdue: false,
+    periodPreset: ""
   });
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [ownerReport, setOwnerReport] = useState<any[]>([]);
   const [renterReport, setRenterReport] = useState<any[]>([]);
   const [paymentsReport, setPaymentsReport] = useState<any[]>([]);
   const [overdueReport, setOverdueReport] = useState<any>(null);
   const [loadingReports, setLoadingReports] = useState(false);
+
+  const periodPresets = [
+    { label: "Hoje", value: "today" },
+    { label: "Últimos 7 dias", value: "7days" },
+    { label: "Últimos 30 dias", value: "30days" },
+    { label: "Mês Atual", value: "currentMonth" },
+    { label: "Trimestre", value: "quarter" },
+    { label: "Ano Atual", value: "currentYear" },
+  ];
+
+  const applyPeriodPreset = (preset: string) => {
+    const today = new Date();
+    let startDate = "";
+    let endDate = today.toISOString().split("T")[0];
+
+    switch (preset) {
+      case "today":
+        startDate = endDate;
+        break;
+      case "7days":
+        startDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+        break;
+      case "30days":
+        startDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+        break;
+      case "currentMonth":
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split("T")[0];
+        break;
+      case "quarter":
+        const quarterStart = Math.floor(today.getMonth() / 3) * 3;
+        startDate = new Date(today.getFullYear(), quarterStart, 1).toISOString().split("T")[0];
+        break;
+      case "currentYear":
+        startDate = new Date(today.getFullYear(), 0, 1).toISOString().split("T")[0];
+        break;
+    }
+
+    setReportFilters(prev => ({ ...prev, periodPreset: preset, startDate, endDate }));
+  };
+
+  const clearAllFilters = () => {
+    setReportFilters({
+      ownerId: "",
+      renterId: "",
+      status: "",
+      startDate: "",
+      endDate: "",
+      propertyId: "",
+      minValue: "",
+      maxValue: "",
+      onlyOverdue: false,
+      periodPreset: ""
+    });
+  };
+
+  const removeFilter = (key: keyof typeof reportFilters) => {
+    if (key === "startDate" || key === "endDate" || key === "periodPreset") {
+      setReportFilters(prev => ({ ...prev, startDate: "", endDate: "", periodPreset: "" }));
+    } else {
+      setReportFilters(prev => ({ ...prev, [key]: key === "onlyOverdue" ? false : "" }));
+    }
+  };
+
+  const getActiveFiltersCount = () => {
+    let count = 0;
+    if (reportFilters.ownerId) count++;
+    if (reportFilters.renterId) count++;
+    if (reportFilters.status) count++;
+    if (reportFilters.startDate || reportFilters.endDate) count++;
+    if (reportFilters.propertyId) count++;
+    if (reportFilters.minValue || reportFilters.maxValue) count++;
+    if (reportFilters.onlyOverdue) count++;
+    return count;
+  };
+
+  const getActiveFilterChips = () => {
+    const chips: { key: keyof typeof reportFilters; label: string }[] = [];
+    if (reportFilters.ownerId) {
+      const owner = owners.find(o => o.id === reportFilters.ownerId);
+      chips.push({ key: "ownerId", label: `Locador: ${owner?.name || ""}` });
+    }
+    if (reportFilters.renterId) {
+      const renter = renters.find(r => r.id === reportFilters.renterId);
+      chips.push({ key: "renterId", label: `Inquilino: ${renter?.name || ""}` });
+    }
+    if (reportFilters.status) {
+      const statusLabels: Record<string, string> = { paid: "Pagos", pending: "Pendentes" };
+      chips.push({ key: "status", label: `Status: ${statusLabels[reportFilters.status] || reportFilters.status}` });
+    }
+    if (reportFilters.startDate || reportFilters.endDate) {
+      const preset = periodPresets.find(p => p.value === reportFilters.periodPreset);
+      if (preset) {
+        chips.push({ key: "periodPreset", label: `Período: ${preset.label}` });
+      } else if (reportFilters.startDate && reportFilters.endDate) {
+        chips.push({ key: "startDate", label: `${formatDate(reportFilters.startDate)} - ${formatDate(reportFilters.endDate)}` });
+      } else if (reportFilters.startDate) {
+        chips.push({ key: "startDate", label: `A partir de ${formatDate(reportFilters.startDate)}` });
+      } else {
+        chips.push({ key: "endDate", label: `Até ${formatDate(reportFilters.endDate)}` });
+      }
+    }
+    if (reportFilters.propertyId) {
+      const property = properties.find(p => p.id === reportFilters.propertyId);
+      chips.push({ key: "propertyId", label: `Imóvel: ${property?.title || ""}` });
+    }
+    if (reportFilters.minValue || reportFilters.maxValue) {
+      if (reportFilters.minValue && reportFilters.maxValue) {
+        chips.push({ key: "minValue", label: `Valor: ${formatPrice(reportFilters.minValue)} - ${formatPrice(reportFilters.maxValue)}` });
+      } else if (reportFilters.minValue) {
+        chips.push({ key: "minValue", label: `Valor mín: ${formatPrice(reportFilters.minValue)}` });
+      } else {
+        chips.push({ key: "maxValue", label: `Valor máx: ${formatPrice(reportFilters.maxValue)}` });
+      }
+    }
+    if (reportFilters.onlyOverdue) {
+      chips.push({ key: "onlyOverdue", label: "Só vencidos" });
+    }
+    return chips;
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -392,12 +521,16 @@ export default function RentalsPage() {
       if (reportFilters.status) params.set("status", reportFilters.status);
       if (reportFilters.startDate) params.set("startDate", reportFilters.startDate);
       if (reportFilters.endDate) params.set("endDate", reportFilters.endDate);
+      if (reportFilters.propertyId) params.set("propertyId", reportFilters.propertyId);
+      if (reportFilters.minValue) params.set("minValue", reportFilters.minValue);
+      if (reportFilters.maxValue) params.set("maxValue", reportFilters.maxValue);
+      if (reportFilters.onlyOverdue) params.set("onlyOverdue", "true");
 
       const [ownersRes, rentersRes, paymentsRes, overdueRes] = await Promise.all([
         fetch(`/api/reports/owners?${params}`, { credentials: "include" }),
         fetch(`/api/reports/renters?${params}`, { credentials: "include" }),
         fetch(`/api/reports/payments-detailed?${params}`, { credentials: "include" }),
-        fetch("/api/reports/overdue", { credentials: "include" }),
+        fetch(`/api/reports/overdue?${params}`, { credentials: "include" }),
       ]);
 
       if (ownersRes.ok) setOwnerReport(await ownersRes.json());
@@ -738,19 +871,46 @@ export default function RentalsPage() {
         <TabsContent value="reports" className="space-y-6">
           <Card>
             <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
                   <Filter className="h-5 w-5 text-muted-foreground" />
                   <CardTitle className="text-lg">Filtros</CardTitle>
+                  {getActiveFiltersCount() > 0 && (
+                    <Badge variant="secondary" className="ml-2">{getActiveFiltersCount()} ativo{getActiveFiltersCount() > 1 ? "s" : ""}</Badge>
+                  )}
                 </div>
-                <Button onClick={fetchReports} disabled={loadingReports} data-testid="button-apply-filters">
-                  {loadingReports ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Aplicar Filtros
-                </Button>
+                <div className="flex items-center gap-2">
+                  {getActiveFiltersCount() > 0 && (
+                    <Button variant="ghost" size="sm" onClick={clearAllFilters} data-testid="button-clear-filters">
+                      <RotateCcw className="h-4 w-4 mr-1" /> Limpar
+                    </Button>
+                  )}
+                  <Button onClick={fetchReports} disabled={loadingReports} data-testid="button-apply-filters">
+                    {loadingReports ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Aplicar Filtros
+                  </Button>
+                </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <Label className="text-sm font-medium text-muted-foreground">Período Rápido</Label>
+                <div className="flex flex-wrap gap-2">
+                  {periodPresets.map((preset) => (
+                    <Button
+                      key={preset.value}
+                      variant={reportFilters.periodPreset === preset.value ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => applyPeriodPreset(preset.value)}
+                      data-testid={`button-preset-${preset.value}`}
+                    >
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 <div className="space-y-2">
                   <Label>Locador</Label>
                   <Select value={reportFilters.ownerId} onValueChange={(v) => setReportFilters(prev => ({ ...prev, ownerId: v === "all" ? "" : v }))}>
@@ -784,13 +944,105 @@ export default function RentalsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Data Início</Label>
-                  <Input type="date" value={reportFilters.startDate} onChange={(e) => setReportFilters(prev => ({ ...prev, startDate: e.target.value }))} data-testid="input-report-start-date" />
+                  <Input 
+                    type="date" 
+                    value={reportFilters.startDate} 
+                    onChange={(e) => setReportFilters(prev => ({ ...prev, startDate: e.target.value, periodPreset: "" }))} 
+                    data-testid="input-report-start-date" 
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Data Fim</Label>
-                  <Input type="date" value={reportFilters.endDate} onChange={(e) => setReportFilters(prev => ({ ...prev, endDate: e.target.value }))} data-testid="input-report-end-date" />
+                  <Input 
+                    type="date" 
+                    value={reportFilters.endDate} 
+                    onChange={(e) => setReportFilters(prev => ({ ...prev, endDate: e.target.value, periodPreset: "" }))} 
+                    data-testid="input-report-end-date" 
+                  />
                 </div>
               </div>
+
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="w-full justify-center text-muted-foreground hover:text-foreground"
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                data-testid="button-toggle-advanced"
+              >
+                {showAdvancedFilters ? <ChevronUp className="h-4 w-4 mr-2" /> : <ChevronDown className="h-4 w-4 mr-2" />}
+                Filtros Avançados
+              </Button>
+
+              {showAdvancedFilters && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2 border-t">
+                  <div className="space-y-2">
+                    <Label>Imóvel</Label>
+                    <Select value={reportFilters.propertyId} onValueChange={(v) => setReportFilters(prev => ({ ...prev, propertyId: v === "all" ? "" : v }))}>
+                      <SelectTrigger data-testid="select-report-property"><SelectValue placeholder="Todos" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Valor Mínimo</Label>
+                    <Input 
+                      type="number" 
+                      placeholder="R$ 0,00" 
+                      value={reportFilters.minValue} 
+                      onChange={(e) => setReportFilters(prev => ({ ...prev, minValue: e.target.value }))} 
+                      data-testid="input-report-min-value" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Valor Máximo</Label>
+                    <Input 
+                      type="number" 
+                      placeholder="R$ 0,00" 
+                      value={reportFilters.maxValue} 
+                      onChange={(e) => setReportFilters(prev => ({ ...prev, maxValue: e.target.value }))} 
+                      data-testid="input-report-max-value" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Só Vencidos</Label>
+                    <Button
+                      variant={reportFilters.onlyOverdue ? "default" : "outline"}
+                      className="w-full"
+                      onClick={() => setReportFilters(prev => ({ ...prev, onlyOverdue: !prev.onlyOverdue }))}
+                      data-testid="button-toggle-overdue"
+                    >
+                      <AlertCircle className="h-4 w-4 mr-2" />
+                      {reportFilters.onlyOverdue ? "Ativado" : "Desativado"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {getActiveFilterChips().length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-3 border-t">
+                  {getActiveFilterChips().map((chip) => (
+                    <Badge 
+                      key={chip.key} 
+                      variant="secondary" 
+                      className="flex items-center gap-1 pl-3 pr-1 py-1"
+                      data-testid={`chip-filter-${chip.key}`}
+                    >
+                      {chip.label}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-4 w-4 ml-1 hover:bg-destructive/20"
+                        onClick={() => removeFilter(chip.key)}
+                        data-testid={`button-remove-filter-${chip.key}`}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
