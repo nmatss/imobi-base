@@ -6,7 +6,7 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { insertUserSchema, insertPropertySchema, insertLeadSchema, insertVisitSchema, insertContractSchema, insertNewsletterSchema, insertInteractionSchema } from "@shared/schema";
+import { insertUserSchema, insertPropertySchema, insertLeadSchema, insertVisitSchema, insertContractSchema, insertNewsletterSchema, insertInteractionSchema, insertOwnerSchema, insertRenterSchema, insertRentalContractSchema, insertRentalPaymentSchema } from "@shared/schema";
 import type { User } from "@shared/schema";
 
 const scryptAsync = promisify(scrypt);
@@ -422,6 +422,213 @@ export async function registerRoutes(
       res.json(results);
     } catch (error) {
       res.status(500).json({ error: "Erro ao buscar" });
+    }
+  });
+
+  // ===== OWNER ROUTES (Locadores) =====
+  app.get("/api/owners", requireAuth, async (req, res) => {
+    try {
+      const owners = await storage.getOwnersByTenant(req.user!.tenantId);
+      res.json(owners);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar locadores" });
+    }
+  });
+
+  app.get("/api/owners/:id", requireAuth, async (req, res) => {
+    try {
+      const owner = await storage.getOwner(req.params.id);
+      if (!owner) return res.status(404).json({ error: "Locador não encontrado" });
+      res.json(owner);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar locador" });
+    }
+  });
+
+  app.post("/api/owners", requireAuth, async (req, res) => {
+    try {
+      const data = insertOwnerSchema.parse({ ...req.body, tenantId: req.user!.tenantId });
+      const owner = await storage.createOwner(data);
+      res.status(201).json(owner);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao criar locador" });
+    }
+  });
+
+  app.patch("/api/owners/:id", requireAuth, async (req, res) => {
+    try {
+      const owner = await storage.updateOwner(req.params.id, req.body);
+      if (!owner) return res.status(404).json({ error: "Locador não encontrado" });
+      res.json(owner);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao atualizar locador" });
+    }
+  });
+
+  app.delete("/api/owners/:id", requireAuth, async (req, res) => {
+    try {
+      const success = await storage.deleteOwner(req.params.id);
+      if (!success) return res.status(404).json({ error: "Locador não encontrado" });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao deletar locador" });
+    }
+  });
+
+  // ===== RENTER ROUTES (Inquilinos) =====
+  app.get("/api/renters", requireAuth, async (req, res) => {
+    try {
+      const renters = await storage.getRentersByTenant(req.user!.tenantId);
+      res.json(renters);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar inquilinos" });
+    }
+  });
+
+  app.get("/api/renters/:id", requireAuth, async (req, res) => {
+    try {
+      const renter = await storage.getRenter(req.params.id);
+      if (!renter) return res.status(404).json({ error: "Inquilino não encontrado" });
+      res.json(renter);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar inquilino" });
+    }
+  });
+
+  app.post("/api/renters", requireAuth, async (req, res) => {
+    try {
+      const data = insertRenterSchema.parse({ ...req.body, tenantId: req.user!.tenantId });
+      const renter = await storage.createRenter(data);
+      res.status(201).json(renter);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao criar inquilino" });
+    }
+  });
+
+  app.patch("/api/renters/:id", requireAuth, async (req, res) => {
+    try {
+      const renter = await storage.updateRenter(req.params.id, req.body);
+      if (!renter) return res.status(404).json({ error: "Inquilino não encontrado" });
+      res.json(renter);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao atualizar inquilino" });
+    }
+  });
+
+  app.delete("/api/renters/:id", requireAuth, async (req, res) => {
+    try {
+      const success = await storage.deleteRenter(req.params.id);
+      if (!success) return res.status(404).json({ error: "Inquilino não encontrado" });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao deletar inquilino" });
+    }
+  });
+
+  // ===== RENTAL CONTRACT ROUTES (Contratos de Aluguel) =====
+  app.get("/api/rental-contracts", requireAuth, async (req, res) => {
+    try {
+      const contracts = await storage.getRentalContractsByTenant(req.user!.tenantId);
+      res.json(contracts);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar contratos de aluguel" });
+    }
+  });
+
+  app.get("/api/rental-contracts/:id", requireAuth, async (req, res) => {
+    try {
+      const contract = await storage.getRentalContract(req.params.id);
+      if (!contract) return res.status(404).json({ error: "Contrato de aluguel não encontrado" });
+      res.json(contract);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar contrato de aluguel" });
+    }
+  });
+
+  app.post("/api/rental-contracts", requireAuth, async (req, res) => {
+    try {
+      const data = insertRentalContractSchema.parse({ ...req.body, tenantId: req.user!.tenantId });
+      const contract = await storage.createRentalContract(data);
+      res.status(201).json(contract);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao criar contrato de aluguel" });
+    }
+  });
+
+  app.patch("/api/rental-contracts/:id", requireAuth, async (req, res) => {
+    try {
+      const contract = await storage.updateRentalContract(req.params.id, req.body);
+      if (!contract) return res.status(404).json({ error: "Contrato de aluguel não encontrado" });
+      res.json(contract);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao atualizar contrato de aluguel" });
+    }
+  });
+
+  // ===== RENTAL PAYMENT ROUTES (Pagamentos de Aluguel) =====
+  app.get("/api/rental-payments", requireAuth, async (req, res) => {
+    try {
+      const { status, month } = req.query;
+      const payments = await storage.getRentalPaymentsByTenant(req.user!.tenantId, {
+        status: status as string,
+        month: month as string,
+      });
+      res.json(payments);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar pagamentos" });
+    }
+  });
+
+  app.get("/api/rental-payments/contract/:contractId", requireAuth, async (req, res) => {
+    try {
+      const payments = await storage.getRentalPaymentsByContract(req.params.contractId);
+      res.json(payments);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar pagamentos do contrato" });
+    }
+  });
+
+  app.get("/api/rental-payments/:id", requireAuth, async (req, res) => {
+    try {
+      const payment = await storage.getRentalPayment(req.params.id);
+      if (!payment) return res.status(404).json({ error: "Pagamento não encontrado" });
+      res.json(payment);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar pagamento" });
+    }
+  });
+
+  app.post("/api/rental-payments", requireAuth, async (req, res) => {
+    try {
+      const data = insertRentalPaymentSchema.parse({ ...req.body, tenantId: req.user!.tenantId });
+      const payment = await storage.createRentalPayment(data);
+      res.status(201).json(payment);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao criar pagamento" });
+    }
+  });
+
+  app.patch("/api/rental-payments/:id", requireAuth, async (req, res) => {
+    try {
+      const payment = await storage.updateRentalPayment(req.params.id, req.body);
+      if (!payment) return res.status(404).json({ error: "Pagamento não encontrado" });
+      res.json(payment);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao atualizar pagamento" });
+    }
+  });
+
+  // ===== RENTAL REPORTS =====
+  app.get("/api/reports/rentals", requireAuth, async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      const start = startDate ? new Date(startDate as string) : new Date(new Date().getFullYear(), 0, 1);
+      const end = endDate ? new Date(endDate as string) : new Date();
+      
+      const reportData = await storage.getRentalReportData(req.user!.tenantId, start, end);
+      res.json(reportData);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao gerar relatório" });
     }
   });
 
