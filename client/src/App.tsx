@@ -8,6 +8,8 @@ import LeadsKanban from "@/pages/leads/kanban";
 import CalendarPage from "@/pages/calendar";
 import ContractsPage from "@/pages/contracts";
 import RentalsPage from "@/pages/rentals";
+import VendasPage from "@/pages/vendas";
+import FinanceiroPage from "@/pages/financeiro";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
 import TenantLanding from "@/pages/public/landing";
@@ -207,6 +209,8 @@ function Router() {
       <Route path="/calendar" component={() => <ProtectedRoute component={CalendarPage} />} />
       <Route path="/contracts" component={() => <ProtectedRoute component={ContractsPage} />} />
       <Route path="/rentals" component={() => <ProtectedRoute component={RentalsPage} />} />
+      <Route path="/vendas" component={() => <ProtectedRoute component={VendasPage} />} />
+      <Route path="/financeiro" component={() => <ProtectedRoute component={FinanceiroPage} />} />
       <Route path="/reports" component={() => <ProtectedRoute component={ReportsPage} />} />
       <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
       

@@ -16,7 +16,9 @@ import {
   ExternalLink,
   Loader2,
   Home,
-  BarChart3
+  BarChart3,
+  DollarSign,
+  Wallet
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -114,7 +116,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: "/leads", label: "Leads & CRM", icon: Users },
     { href: "/calendar", label: "Agenda", icon: CalendarDays },
     { href: "/contracts", label: "Propostas", icon: FileText },
+    { href: "/vendas", label: "Vendas", icon: DollarSign },
     { href: "/rentals", label: "Aluguéis", icon: Home },
+    { href: "/financeiro", label: "Financeiro", icon: Wallet },
     { href: "/reports", label: "Relatórios", icon: BarChart3 },
     { href: "/settings", label: "Configurações", icon: Settings },
   ];

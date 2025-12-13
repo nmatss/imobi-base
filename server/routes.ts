@@ -173,6 +173,23 @@ export async function registerRoutes(
     }
   });
 
+  // ===== USER ROUTES =====
+  app.get("/api/users", requireAuth, async (req, res) => {
+    try {
+      const users = await storage.getUsersByTenant(req.user!.tenantId);
+      res.json(users.map(u => ({
+        id: u.id,
+        tenantId: u.tenantId,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        avatar: u.avatar,
+      })));
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar usuários" });
+    }
+  });
+
   // ===== PROPERTY ROUTES =====
   app.get("/api/properties", requireAuth, async (req, res) => {
     try {
