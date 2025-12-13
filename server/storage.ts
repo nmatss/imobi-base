@@ -15,7 +15,14 @@ import type {
   Owner, InsertOwner,
   Renter, InsertRenter,
   RentalContract, InsertRentalContract,
-  RentalPayment, InsertRentalPayment
+  RentalPayment, InsertRentalPayment,
+  SaleProposal, InsertSaleProposal,
+  PropertySale, InsertPropertySale,
+  FinanceCategory, InsertFinanceCategory,
+  FinanceEntry, InsertFinanceEntry,
+  LeadTag, InsertLeadTag,
+  LeadTagLink, InsertLeadTagLink,
+  FollowUp, InsertFollowUp
 } from "@shared/schema";
 
 const pool = new Pool({
@@ -133,6 +140,54 @@ export interface IStorage {
     occupancyRate: number;
     activeContracts: number;
   }>;
+  
+  // Sale Proposals
+  getSaleProposal(id: string): Promise<SaleProposal | undefined>;
+  getSaleProposalsByTenant(tenantId: string): Promise<SaleProposal[]>;
+  getSaleProposalsByProperty(propertyId: string): Promise<SaleProposal[]>;
+  createSaleProposal(proposal: InsertSaleProposal): Promise<SaleProposal>;
+  updateSaleProposal(id: string, proposal: Partial<InsertSaleProposal>): Promise<SaleProposal | undefined>;
+  deleteSaleProposal(id: string): Promise<boolean>;
+  
+  // Property Sales
+  getPropertySale(id: string): Promise<PropertySale | undefined>;
+  getPropertySalesByTenant(tenantId: string): Promise<PropertySale[]>;
+  createPropertySale(sale: InsertPropertySale): Promise<PropertySale>;
+  updatePropertySale(id: string, sale: Partial<InsertPropertySale>): Promise<PropertySale | undefined>;
+  
+  // Finance Categories
+  getFinanceCategory(id: string): Promise<FinanceCategory | undefined>;
+  getFinanceCategoriesByTenant(tenantId: string): Promise<FinanceCategory[]>;
+  createFinanceCategory(category: InsertFinanceCategory): Promise<FinanceCategory>;
+  updateFinanceCategory(id: string, category: Partial<InsertFinanceCategory>): Promise<FinanceCategory | undefined>;
+  deleteFinanceCategory(id: string): Promise<boolean>;
+  
+  // Finance Entries
+  getFinanceEntry(id: string): Promise<FinanceEntry | undefined>;
+  getFinanceEntriesByTenant(tenantId: string, filters?: { startDate?: Date; endDate?: Date; flow?: string; categoryId?: string }): Promise<FinanceEntry[]>;
+  createFinanceEntry(entry: InsertFinanceEntry): Promise<FinanceEntry>;
+  updateFinanceEntry(id: string, entry: Partial<InsertFinanceEntry>): Promise<FinanceEntry | undefined>;
+  deleteFinanceEntry(id: string): Promise<boolean>;
+  
+  // Lead Tags
+  getLeadTag(id: string): Promise<LeadTag | undefined>;
+  getLeadTagsByTenant(tenantId: string): Promise<LeadTag[]>;
+  createLeadTag(tag: InsertLeadTag): Promise<LeadTag>;
+  updateLeadTag(id: string, tag: Partial<InsertLeadTag>): Promise<LeadTag | undefined>;
+  deleteLeadTag(id: string): Promise<boolean>;
+  
+  // Lead Tag Links
+  getTagsByLead(leadId: string): Promise<LeadTag[]>;
+  addTagToLead(link: InsertLeadTagLink): Promise<LeadTagLink>;
+  removeTagFromLead(leadId: string, tagId: string): Promise<boolean>;
+  
+  // Follow-ups
+  getFollowUp(id: string): Promise<FollowUp | undefined>;
+  getFollowUpsByTenant(tenantId: string, filters?: { status?: string }): Promise<FollowUp[]>;
+  getFollowUpsByLead(leadId: string): Promise<FollowUp[]>;
+  createFollowUp(followUp: InsertFollowUp): Promise<FollowUp>;
+  updateFollowUp(id: string, followUp: Partial<InsertFollowUp>): Promise<FollowUp | undefined>;
+  deleteFollowUp(id: string): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -816,6 +871,232 @@ export class DbStorage implements IStorage {
       total31_60: bucket31_60.reduce((sum, p) => sum + Number(p.totalValue || 0), 0),
       total61plus: bucket61plus.reduce((sum, p) => sum + Number(p.totalValue || 0), 0),
     };
+  }
+
+  // Sale Proposals
+  async getSaleProposal(id: string): Promise<SaleProposal | undefined> {
+    const [proposal] = await db.select().from(schema.saleProposals).where(eq(schema.saleProposals.id, id));
+    return proposal;
+  }
+
+  async getSaleProposalsByTenant(tenantId: string): Promise<SaleProposal[]> {
+    return db.select().from(schema.saleProposals)
+      .where(eq(schema.saleProposals.tenantId, tenantId))
+      .orderBy(desc(schema.saleProposals.createdAt));
+  }
+
+  async getSaleProposalsByProperty(propertyId: string): Promise<SaleProposal[]> {
+    return db.select().from(schema.saleProposals)
+      .where(eq(schema.saleProposals.propertyId, propertyId))
+      .orderBy(desc(schema.saleProposals.createdAt));
+  }
+
+  async createSaleProposal(proposal: InsertSaleProposal): Promise<SaleProposal> {
+    const [created] = await db.insert(schema.saleProposals).values(proposal).returning();
+    return created;
+  }
+
+  async updateSaleProposal(id: string, proposal: Partial<InsertSaleProposal>): Promise<SaleProposal | undefined> {
+    const [updated] = await db.update(schema.saleProposals)
+      .set({ ...proposal, updatedAt: new Date() })
+      .where(eq(schema.saleProposals.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSaleProposal(id: string): Promise<boolean> {
+    const result = await db.delete(schema.saleProposals).where(eq(schema.saleProposals.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Property Sales
+  async getPropertySale(id: string): Promise<PropertySale | undefined> {
+    const [sale] = await db.select().from(schema.propertySales).where(eq(schema.propertySales.id, id));
+    return sale;
+  }
+
+  async getPropertySalesByTenant(tenantId: string): Promise<PropertySale[]> {
+    return db.select().from(schema.propertySales)
+      .where(eq(schema.propertySales.tenantId, tenantId))
+      .orderBy(desc(schema.propertySales.saleDate));
+  }
+
+  async createPropertySale(sale: InsertPropertySale): Promise<PropertySale> {
+    const [created] = await db.insert(schema.propertySales).values(sale).returning();
+    return created;
+  }
+
+  async updatePropertySale(id: string, sale: Partial<InsertPropertySale>): Promise<PropertySale | undefined> {
+    const [updated] = await db.update(schema.propertySales)
+      .set({ ...sale, updatedAt: new Date() })
+      .where(eq(schema.propertySales.id, id))
+      .returning();
+    return updated;
+  }
+
+  // Finance Categories
+  async getFinanceCategory(id: string): Promise<FinanceCategory | undefined> {
+    const [category] = await db.select().from(schema.financeCategories).where(eq(schema.financeCategories.id, id));
+    return category;
+  }
+
+  async getFinanceCategoriesByTenant(tenantId: string): Promise<FinanceCategory[]> {
+    return db.select().from(schema.financeCategories)
+      .where(eq(schema.financeCategories.tenantId, tenantId))
+      .orderBy(schema.financeCategories.name);
+  }
+
+  async createFinanceCategory(category: InsertFinanceCategory): Promise<FinanceCategory> {
+    const [created] = await db.insert(schema.financeCategories).values(category).returning();
+    return created;
+  }
+
+  async updateFinanceCategory(id: string, category: Partial<InsertFinanceCategory>): Promise<FinanceCategory | undefined> {
+    const [updated] = await db.update(schema.financeCategories)
+      .set(category)
+      .where(eq(schema.financeCategories.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteFinanceCategory(id: string): Promise<boolean> {
+    const result = await db.delete(schema.financeCategories).where(eq(schema.financeCategories.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Finance Entries
+  async getFinanceEntry(id: string): Promise<FinanceEntry | undefined> {
+    const [entry] = await db.select().from(schema.financeEntries).where(eq(schema.financeEntries.id, id));
+    return entry;
+  }
+
+  async getFinanceEntriesByTenant(tenantId: string, filters?: { startDate?: Date; endDate?: Date; flow?: string; categoryId?: string }): Promise<FinanceEntry[]> {
+    const conditions = [eq(schema.financeEntries.tenantId, tenantId)];
+    
+    if (filters?.flow) {
+      conditions.push(eq(schema.financeEntries.flow, filters.flow));
+    }
+    if (filters?.categoryId) {
+      conditions.push(eq(schema.financeEntries.categoryId, filters.categoryId));
+    }
+    if (filters?.startDate) {
+      conditions.push(sql`${schema.financeEntries.entryDate} >= ${filters.startDate}`);
+    }
+    if (filters?.endDate) {
+      conditions.push(sql`${schema.financeEntries.entryDate} <= ${filters.endDate}`);
+    }
+    
+    return db.select().from(schema.financeEntries)
+      .where(and(...conditions))
+      .orderBy(desc(schema.financeEntries.entryDate));
+  }
+
+  async createFinanceEntry(entry: InsertFinanceEntry): Promise<FinanceEntry> {
+    const [created] = await db.insert(schema.financeEntries).values(entry).returning();
+    return created;
+  }
+
+  async updateFinanceEntry(id: string, entry: Partial<InsertFinanceEntry>): Promise<FinanceEntry | undefined> {
+    const [updated] = await db.update(schema.financeEntries)
+      .set(entry)
+      .where(eq(schema.financeEntries.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteFinanceEntry(id: string): Promise<boolean> {
+    const result = await db.delete(schema.financeEntries).where(eq(schema.financeEntries.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Lead Tags
+  async getLeadTag(id: string): Promise<LeadTag | undefined> {
+    const [tag] = await db.select().from(schema.leadTags).where(eq(schema.leadTags.id, id));
+    return tag;
+  }
+
+  async getLeadTagsByTenant(tenantId: string): Promise<LeadTag[]> {
+    return db.select().from(schema.leadTags)
+      .where(eq(schema.leadTags.tenantId, tenantId))
+      .orderBy(schema.leadTags.name);
+  }
+
+  async createLeadTag(tag: InsertLeadTag): Promise<LeadTag> {
+    const [created] = await db.insert(schema.leadTags).values(tag).returning();
+    return created;
+  }
+
+  async updateLeadTag(id: string, tag: Partial<InsertLeadTag>): Promise<LeadTag | undefined> {
+    const [updated] = await db.update(schema.leadTags)
+      .set(tag)
+      .where(eq(schema.leadTags.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteLeadTag(id: string): Promise<boolean> {
+    await db.delete(schema.leadTagLinks).where(eq(schema.leadTagLinks.tagId, id));
+    const result = await db.delete(schema.leadTags).where(eq(schema.leadTags.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Lead Tag Links
+  async getTagsByLead(leadId: string): Promise<LeadTag[]> {
+    const links = await db.select().from(schema.leadTagLinks).where(eq(schema.leadTagLinks.leadId, leadId));
+    if (links.length === 0) return [];
+    const tagIds = links.map(l => l.tagId);
+    return db.select().from(schema.leadTags).where(sql`${schema.leadTags.id} = ANY(${tagIds})`);
+  }
+
+  async addTagToLead(link: InsertLeadTagLink): Promise<LeadTagLink> {
+    const [created] = await db.insert(schema.leadTagLinks).values(link).returning();
+    return created;
+  }
+
+  async removeTagFromLead(leadId: string, tagId: string): Promise<boolean> {
+    const result = await db.delete(schema.leadTagLinks)
+      .where(and(eq(schema.leadTagLinks.leadId, leadId), eq(schema.leadTagLinks.tagId, tagId)));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Follow-ups
+  async getFollowUp(id: string): Promise<FollowUp | undefined> {
+    const [followUp] = await db.select().from(schema.followUps).where(eq(schema.followUps.id, id));
+    return followUp;
+  }
+
+  async getFollowUpsByTenant(tenantId: string, filters?: { status?: string }): Promise<FollowUp[]> {
+    const conditions = [eq(schema.followUps.tenantId, tenantId)];
+    if (filters?.status) {
+      conditions.push(eq(schema.followUps.status, filters.status));
+    }
+    return db.select().from(schema.followUps)
+      .where(and(...conditions))
+      .orderBy(schema.followUps.dueAt);
+  }
+
+  async getFollowUpsByLead(leadId: string): Promise<FollowUp[]> {
+    return db.select().from(schema.followUps)
+      .where(eq(schema.followUps.leadId, leadId))
+      .orderBy(desc(schema.followUps.dueAt));
+  }
+
+  async createFollowUp(followUp: InsertFollowUp): Promise<FollowUp> {
+    const [created] = await db.insert(schema.followUps).values(followUp).returning();
+    return created;
+  }
+
+  async updateFollowUp(id: string, followUp: Partial<InsertFollowUp>): Promise<FollowUp | undefined> {
+    const [updated] = await db.update(schema.followUps)
+      .set(followUp)
+      .where(eq(schema.followUps.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteFollowUp(id: string): Promise<boolean> {
+    const result = await db.delete(schema.followUps).where(eq(schema.followUps.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
   }
 }
 

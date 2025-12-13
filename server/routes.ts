@@ -6,7 +6,7 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { insertUserSchema, insertPropertySchema, insertLeadSchema, insertVisitSchema, insertContractSchema, insertNewsletterSchema, insertInteractionSchema, insertOwnerSchema, insertRenterSchema, insertRentalContractSchema, insertRentalPaymentSchema } from "@shared/schema";
+import { insertUserSchema, insertPropertySchema, insertLeadSchema, insertVisitSchema, insertContractSchema, insertNewsletterSchema, insertInteractionSchema, insertOwnerSchema, insertRenterSchema, insertRentalContractSchema, insertRentalPaymentSchema, insertSaleProposalSchema, insertPropertySaleSchema, insertFinanceCategorySchema, insertFinanceEntrySchema, insertLeadTagSchema, insertLeadTagLinkSchema, insertFollowUpSchema } from "@shared/schema";
 import type { User } from "@shared/schema";
 
 const scryptAsync = promisify(scrypt);
@@ -701,6 +701,351 @@ export async function registerRoutes(
       res.json(report);
     } catch (error) {
       res.status(500).json({ error: "Erro ao gerar relatório de inadimplência" });
+    }
+  });
+
+  // ===== SALE PROPOSALS ROUTES =====
+  app.get("/api/sale-proposals", requireAuth, async (req, res) => {
+    try {
+      const proposals = await storage.getSaleProposalsByTenant(req.user!.tenantId);
+      res.json(proposals);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar propostas de venda" });
+    }
+  });
+
+  app.get("/api/sale-proposals/:id", requireAuth, async (req, res) => {
+    try {
+      const proposal = await storage.getSaleProposal(req.params.id);
+      if (!proposal) return res.status(404).json({ error: "Proposta não encontrada" });
+      res.json(proposal);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar proposta" });
+    }
+  });
+
+  app.post("/api/sale-proposals", requireAuth, async (req, res) => {
+    try {
+      const data = insertSaleProposalSchema.parse({ ...req.body, tenantId: req.user!.tenantId });
+      const proposal = await storage.createSaleProposal(data);
+      res.status(201).json(proposal);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao criar proposta" });
+    }
+  });
+
+  app.patch("/api/sale-proposals/:id", requireAuth, async (req, res) => {
+    try {
+      const existing = await storage.getSaleProposal(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Proposta não encontrada" });
+      if (existing.tenantId !== req.user!.tenantId) return res.status(403).json({ error: "Acesso negado" });
+      const { tenantId, id, ...allowedFields } = req.body;
+      const proposal = await storage.updateSaleProposal(req.params.id, allowedFields);
+      res.json(proposal);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao atualizar proposta" });
+    }
+  });
+
+  app.delete("/api/sale-proposals/:id", requireAuth, async (req, res) => {
+    try {
+      const existing = await storage.getSaleProposal(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Proposta não encontrada" });
+      if (existing.tenantId !== req.user!.tenantId) return res.status(403).json({ error: "Acesso negado" });
+      await storage.deleteSaleProposal(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao deletar proposta" });
+    }
+  });
+
+  // ===== PROPERTY SALES ROUTES =====
+  app.get("/api/property-sales", requireAuth, async (req, res) => {
+    try {
+      const sales = await storage.getPropertySalesByTenant(req.user!.tenantId);
+      res.json(sales);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar vendas" });
+    }
+  });
+
+  app.get("/api/property-sales/:id", requireAuth, async (req, res) => {
+    try {
+      const sale = await storage.getPropertySale(req.params.id);
+      if (!sale) return res.status(404).json({ error: "Venda não encontrada" });
+      res.json(sale);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar venda" });
+    }
+  });
+
+  app.post("/api/property-sales", requireAuth, async (req, res) => {
+    try {
+      const data = insertPropertySaleSchema.parse({ ...req.body, tenantId: req.user!.tenantId });
+      const sale = await storage.createPropertySale(data);
+      res.status(201).json(sale);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao registrar venda" });
+    }
+  });
+
+  app.patch("/api/property-sales/:id", requireAuth, async (req, res) => {
+    try {
+      const existing = await storage.getPropertySale(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Venda não encontrada" });
+      if (existing.tenantId !== req.user!.tenantId) return res.status(403).json({ error: "Acesso negado" });
+      const { tenantId, id, ...allowedFields } = req.body;
+      const sale = await storage.updatePropertySale(req.params.id, allowedFields);
+      res.json(sale);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao atualizar venda" });
+    }
+  });
+
+  // ===== FINANCE CATEGORIES ROUTES =====
+  app.get("/api/finance-categories", requireAuth, async (req, res) => {
+    try {
+      const categories = await storage.getFinanceCategoriesByTenant(req.user!.tenantId);
+      res.json(categories);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar categorias" });
+    }
+  });
+
+  app.post("/api/finance-categories", requireAuth, async (req, res) => {
+    try {
+      const data = insertFinanceCategorySchema.parse({ ...req.body, tenantId: req.user!.tenantId });
+      const category = await storage.createFinanceCategory(data);
+      res.status(201).json(category);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao criar categoria" });
+    }
+  });
+
+  app.patch("/api/finance-categories/:id", requireAuth, async (req, res) => {
+    try {
+      const existing = await storage.getFinanceCategory(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Categoria não encontrada" });
+      if (existing.tenantId !== req.user!.tenantId) return res.status(403).json({ error: "Acesso negado" });
+      const { tenantId, id, ...allowedFields } = req.body;
+      const category = await storage.updateFinanceCategory(req.params.id, allowedFields);
+      res.json(category);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao atualizar categoria" });
+    }
+  });
+
+  app.delete("/api/finance-categories/:id", requireAuth, async (req, res) => {
+    try {
+      const existing = await storage.getFinanceCategory(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Categoria não encontrada" });
+      if (existing.tenantId !== req.user!.tenantId) return res.status(403).json({ error: "Acesso negado" });
+      await storage.deleteFinanceCategory(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao deletar categoria" });
+    }
+  });
+
+  // ===== FINANCE ENTRIES ROUTES =====
+  app.get("/api/finance-entries", requireAuth, async (req, res) => {
+    try {
+      const { startDate, endDate, flow, categoryId } = req.query;
+      const filters = {
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        flow: flow as string | undefined,
+        categoryId: categoryId as string | undefined,
+      };
+      const entries = await storage.getFinanceEntriesByTenant(req.user!.tenantId, filters);
+      res.json(entries);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar lançamentos" });
+    }
+  });
+
+  app.get("/api/finance-entries/:id", requireAuth, async (req, res) => {
+    try {
+      const entry = await storage.getFinanceEntry(req.params.id);
+      if (!entry) return res.status(404).json({ error: "Lançamento não encontrado" });
+      res.json(entry);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar lançamento" });
+    }
+  });
+
+  app.post("/api/finance-entries", requireAuth, async (req, res) => {
+    try {
+      const data = insertFinanceEntrySchema.parse({ ...req.body, tenantId: req.user!.tenantId });
+      const entry = await storage.createFinanceEntry(data);
+      res.status(201).json(entry);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao criar lançamento" });
+    }
+  });
+
+  app.patch("/api/finance-entries/:id", requireAuth, async (req, res) => {
+    try {
+      const existing = await storage.getFinanceEntry(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Lançamento não encontrado" });
+      if (existing.tenantId !== req.user!.tenantId) return res.status(403).json({ error: "Acesso negado" });
+      const { tenantId, id, ...allowedFields } = req.body;
+      const entry = await storage.updateFinanceEntry(req.params.id, allowedFields);
+      res.json(entry);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao atualizar lançamento" });
+    }
+  });
+
+  app.delete("/api/finance-entries/:id", requireAuth, async (req, res) => {
+    try {
+      const existing = await storage.getFinanceEntry(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Lançamento não encontrado" });
+      if (existing.tenantId !== req.user!.tenantId) return res.status(403).json({ error: "Acesso negado" });
+      await storage.deleteFinanceEntry(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao deletar lançamento" });
+    }
+  });
+
+  // ===== LEAD TAGS ROUTES =====
+  app.get("/api/lead-tags", requireAuth, async (req, res) => {
+    try {
+      const tags = await storage.getLeadTagsByTenant(req.user!.tenantId);
+      res.json(tags);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar tags" });
+    }
+  });
+
+  app.post("/api/lead-tags", requireAuth, async (req, res) => {
+    try {
+      const data = insertLeadTagSchema.parse({ ...req.body, tenantId: req.user!.tenantId });
+      const tag = await storage.createLeadTag(data);
+      res.status(201).json(tag);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao criar tag" });
+    }
+  });
+
+  app.patch("/api/lead-tags/:id", requireAuth, async (req, res) => {
+    try {
+      const existing = await storage.getLeadTag(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Tag não encontrada" });
+      if (existing.tenantId !== req.user!.tenantId) return res.status(403).json({ error: "Acesso negado" });
+      const { tenantId, id, ...allowedFields } = req.body;
+      const tag = await storage.updateLeadTag(req.params.id, allowedFields);
+      res.json(tag);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao atualizar tag" });
+    }
+  });
+
+  app.delete("/api/lead-tags/:id", requireAuth, async (req, res) => {
+    try {
+      const existing = await storage.getLeadTag(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Tag não encontrada" });
+      if (existing.tenantId !== req.user!.tenantId) return res.status(403).json({ error: "Acesso negado" });
+      await storage.deleteLeadTag(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao deletar tag" });
+    }
+  });
+
+  // ===== LEAD TAG LINKS ROUTES =====
+  app.get("/api/leads/:leadId/tags", requireAuth, async (req, res) => {
+    try {
+      const tags = await storage.getTagsByLead(req.params.leadId);
+      res.json(tags);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar tags do lead" });
+    }
+  });
+
+  app.post("/api/leads/:leadId/tags", requireAuth, async (req, res) => {
+    try {
+      const data = insertLeadTagLinkSchema.parse({ leadId: req.params.leadId, tagId: req.body.tagId });
+      const link = await storage.addTagToLead(data);
+      res.status(201).json(link);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao adicionar tag" });
+    }
+  });
+
+  app.delete("/api/leads/:leadId/tags/:tagId", requireAuth, async (req, res) => {
+    try {
+      await storage.removeTagFromLead(req.params.leadId, req.params.tagId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao remover tag" });
+    }
+  });
+
+  // ===== FOLLOW-UPS ROUTES =====
+  app.get("/api/follow-ups", requireAuth, async (req, res) => {
+    try {
+      const { status } = req.query;
+      const filters = { status: status as string | undefined };
+      const followUps = await storage.getFollowUpsByTenant(req.user!.tenantId, filters);
+      res.json(followUps);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar follow-ups" });
+    }
+  });
+
+  app.get("/api/leads/:leadId/follow-ups", requireAuth, async (req, res) => {
+    try {
+      const followUps = await storage.getFollowUpsByLead(req.params.leadId);
+      res.json(followUps);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar follow-ups do lead" });
+    }
+  });
+
+  app.get("/api/follow-ups/:id", requireAuth, async (req, res) => {
+    try {
+      const followUp = await storage.getFollowUp(req.params.id);
+      if (!followUp) return res.status(404).json({ error: "Follow-up não encontrado" });
+      res.json(followUp);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar follow-up" });
+    }
+  });
+
+  app.post("/api/follow-ups", requireAuth, async (req, res) => {
+    try {
+      const data = insertFollowUpSchema.parse({ ...req.body, tenantId: req.user!.tenantId });
+      const followUp = await storage.createFollowUp(data);
+      res.status(201).json(followUp);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao criar follow-up" });
+    }
+  });
+
+  app.patch("/api/follow-ups/:id", requireAuth, async (req, res) => {
+    try {
+      const existing = await storage.getFollowUp(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Follow-up não encontrado" });
+      if (existing.tenantId !== req.user!.tenantId) return res.status(403).json({ error: "Acesso negado" });
+      const { tenantId, id, ...allowedFields } = req.body;
+      const followUp = await storage.updateFollowUp(req.params.id, allowedFields);
+      res.json(followUp);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Erro ao atualizar follow-up" });
+    }
+  });
+
+  app.delete("/api/follow-ups/:id", requireAuth, async (req, res) => {
+    try {
+      const existing = await storage.getFollowUp(req.params.id);
+      if (!existing) return res.status(404).json({ error: "Follow-up não encontrado" });
+      if (existing.tenantId !== req.user!.tenantId) return res.status(403).json({ error: "Acesso negado" });
+      await storage.deleteFollowUp(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao deletar follow-up" });
     }
   });
 
