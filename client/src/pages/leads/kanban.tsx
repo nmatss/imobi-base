@@ -180,18 +180,15 @@ export default function LeadsKanban() {
   };
 
   const fetchAllLeadTags = async () => {
-    const map: Record<string, LeadTag[]> = {};
-    for (const lead of leads) {
-      try {
-        const res = await fetch(`/api/leads/${lead.id}/tags`, { credentials: "include" });
-        if (res.ok) {
-          map[lead.id] = await res.json();
-        }
-      } catch (error) {
-        console.error("Failed to fetch tags for lead:", error);
+    try {
+      const res = await fetch("/api/leads/tags/batch", { credentials: "include" });
+      if (res.ok) {
+        const map = await res.json();
+        setLeadTagsMap(map);
       }
+    } catch (error) {
+      console.error("Failed to fetch lead tags batch:", error);
     }
-    setLeadTagsMap(map);
   };
 
   const fetchLeadTags = async (leadId: string) => {

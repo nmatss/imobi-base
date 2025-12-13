@@ -20,7 +20,18 @@ import {
   DollarSign,
   Wallet
 } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { format, isToday, isPast } from "date-fns";
+import { ptBR } from "date-fns/locale";
+
+type FollowUp = {
+  id: string;
+  leadId: string;
+  dueAt: string;
+  type: string;
+  status: string;
+  notes: string | null;
+};
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,7 +57,7 @@ type SearchResult = {
 };
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, tenant, tenants, switchTenant, logout } = useImobi();
+  const { user, tenant, tenants, switchTenant, logout, leads } = useImobi();
   const [location, setLocation] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -54,6 +65,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isSearching, setIsSearching] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [followUps, setFollowUps] = useState<FollowUp[]>([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchFollowUps = async () => {
+      try {
+        const res = await fetch("/api/follow-ups?status=pending", { credentials: "include" });
+        if (res.ok) setFollowUps(await res.json());
+      } catch (e) {}
+    };
+    fetchFollowUps();
+    const interval = setInterval(fetchFollowUps, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const pendingFollowUps = useMemo(() => {
+    return followUps
+      .filter(f => f.status === "pending")
+      .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
+      .slice(0, 5)
+      .map(f => ({ ...f, lead: leads.find(l => l.id === f.leadId), isOverdue: isPast(new Date(f.dueAt)) && !isToday(new Date(f.dueAt)) }));
+  }, [followUps, leads]);
+
+  const notificationCount = followUps.filter(f => f.status === "pending").length;
 
   useEffect(() => {
     if (searchQuery.length < 2) {
@@ -333,10 +368,50 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               )}
             </Popover>
             
-            <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-background"></span>
-            </Button>
+            <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground" data-testid="button-notifications">
+                  <Bell className="h-5 w-5" />
+                  {notificationCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 rounded-full text-[10px] text-white font-bold flex items-center justify-center border-2 border-background">
+                      {notificationCount > 9 ? "9+" : notificationCount}
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0" align="end">
+                <div className="p-3 border-b">
+                  <p className="font-medium">Lembretes Pendentes</p>
+                  <p className="text-xs text-muted-foreground">{notificationCount} pendente{notificationCount !== 1 ? "s" : ""}</p>
+                </div>
+                <div className="max-h-64 overflow-y-auto">
+                  {pendingFollowUps.length > 0 ? pendingFollowUps.map((f) => (
+                    <button
+                      key={f.id}
+                      className={`w-full text-left p-3 hover:bg-muted border-b last:border-b-0 flex items-start gap-3 ${f.isOverdue ? "bg-red-50" : ""}`}
+                      onClick={() => { setNotificationsOpen(false); setLocation("/leads"); }}
+                      data-testid={`notification-${f.id}`}
+                    >
+                      <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${f.isOverdue ? "bg-red-500" : "bg-amber-500"}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{f.lead?.name || "Lead"}</p>
+                        <p className="text-xs text-muted-foreground">{f.type} {f.notes ? `- ${f.notes}` : ""}</p>
+                        <p className={`text-xs ${f.isOverdue ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
+                          {f.isOverdue ? "Atrasado - " : ""}{format(new Date(f.dueAt), "dd/MM HH:mm", { locale: ptBR })}
+                        </p>
+                      </div>
+                    </button>
+                  )) : (
+                    <div className="p-4 text-center text-muted-foreground text-sm">Nenhum lembrete pendente</div>
+                  )}
+                </div>
+                <div className="p-2 border-t">
+                  <Button variant="ghost" size="sm" className="w-full" onClick={() => { setNotificationsOpen(false); setLocation("/leads"); }}>
+                    Ver todos os leads
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </header>
 

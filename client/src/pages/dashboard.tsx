@@ -1,16 +1,39 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useImobi } from "@/lib/imobi-context";
-import { Building2, Users, DollarSign, CalendarCheck, ArrowUpRight, ArrowDownRight, Plus, FileDown, Eye, Clock, MapPin, Phone } from "lucide-react";
+import { Building2, Users, DollarSign, CalendarCheck, ArrowUpRight, ArrowDownRight, Plus, FileDown, Eye, Clock, MapPin, Phone, Bell, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from "recharts";
 import { Button } from "@/components/ui/button";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocation } from "wouter";
-import { format } from "date-fns";
+import { format, isToday, isPast, isTomorrow } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useToast } from "@/hooks/use-toast";
+
+type FollowUp = {
+  id: string;
+  tenantId: string;
+  leadId: string;
+  assignedTo: string | null;
+  dueAt: string;
+  type: string;
+  status: string;
+  notes: string | null;
+  completedAt: string | null;
+  createdAt: string;
+};
+
+const FOLLOW_UP_TYPE_LABELS: Record<string, string> = {
+  call: "Ligar",
+  email: "E-mail",
+  whatsapp: "WhatsApp",
+  visit: "Visita",
+  proposal: "Proposta",
+  other: "Outro",
+};
 
 const LEAD_STATUS_COLORS: Record<string, string> = {
   new: "#3b82f6",
@@ -38,6 +61,7 @@ function parseCurrencyValue(value: string | null | undefined): number {
 export default function Dashboard() {
   const { tenant, properties, leads, contracts, visits, refetchLeads } = useImobi();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [newLeadForm, setNewLeadForm] = useState({
     name: "",
@@ -46,6 +70,61 @@ export default function Dashboard() {
     source: "website",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [followUps, setFollowUps] = useState<FollowUp[]>([]);
+  const [loadingFollowUps, setLoadingFollowUps] = useState(false);
+
+  useEffect(() => {
+    fetchFollowUps();
+  }, []);
+
+  const fetchFollowUps = async () => {
+    setLoadingFollowUps(true);
+    try {
+      const res = await fetch("/api/follow-ups?status=pending", { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setFollowUps(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch follow-ups:", error);
+    } finally {
+      setLoadingFollowUps(false);
+    }
+  };
+
+  const handleCompleteFollowUp = async (id: string) => {
+    try {
+      const res = await fetch(`/api/follow-ups/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: "completed", completedAt: new Date().toISOString() }),
+      });
+      if (res.ok) {
+        toast({ title: "Lembrete concluído", description: "O lembrete foi marcado como concluído." });
+        fetchFollowUps();
+      }
+    } catch (error) {
+      toast({ title: "Erro", description: "Não foi possível concluir o lembrete.", variant: "destructive" });
+    }
+  };
+
+  const upcomingFollowUps = useMemo(() => {
+    return followUps
+      .filter(f => f.status === "pending")
+      .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
+      .slice(0, 5)
+      .map(followUp => {
+        const lead = leads.find(l => l.id === followUp.leadId);
+        const dueDate = new Date(followUp.dueAt);
+        const isOverdue = isPast(dueDate) && !isToday(dueDate);
+        const isDueToday = isToday(dueDate);
+        const isDueTomorrow = isTomorrow(dueDate);
+        return { ...followUp, lead, isOverdue, isDueToday, isDueTomorrow };
+      });
+  }, [followUps, leads]);
+
+  const overdueCount = followUps.filter(f => f.status === "pending" && isPast(new Date(f.dueAt)) && !isToday(new Date(f.dueAt))).length;
 
   const kpis = useMemo(() => {
     const activeProperties = properties.filter(p => p.status === "available").length;
@@ -179,7 +258,33 @@ export default function Dashboard() {
           <p className="text-muted-foreground">Visão geral de {tenant?.name}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" data-testid="button-export">
+          <Button variant="outline" data-testid="button-export" onClick={() => {
+            const data = {
+              tenant: tenant?.name,
+              exportDate: format(new Date(), "dd/MM/yyyy HH:mm", { locale: ptBR }),
+              kpis: {
+                totalProperties: properties.length,
+                activeProperties: properties.filter(p => p.status === "available").length,
+                totalLeads: leads.length,
+                newLeads: leads.filter(l => l.status === "new").length,
+                pendingContracts: contracts.filter(c => c.status === "draft" || c.status === "sent").length,
+                signedContracts: contracts.filter(c => c.status === "signed").length,
+                scheduledVisits: visits.filter(v => v.status === "scheduled").length,
+                completedVisits: visits.filter(v => v.status === "completed").length,
+              },
+              totalContractValue: formatCurrency(totalContractValue),
+              pendingFollowUps: followUps.length,
+              overdueFollowUps: overdueCount,
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `dashboard-${format(new Date(), "yyyy-MM-dd")}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            toast({ title: "Exportado", description: "Os dados do dashboard foram exportados." });
+          }}>
             <FileDown className="mr-2 h-4 w-4" />
             Exportar
           </Button>
@@ -411,6 +516,78 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {(upcomingFollowUps.length > 0 || overdueCount > 0) && (
+        <Card className={overdueCount > 0 ? "border-red-200 bg-red-50/30" : ""}>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bell className={`h-5 w-5 ${overdueCount > 0 ? "text-red-500" : "text-amber-500"}`} />
+              <div>
+                <CardTitle>Lembretes Pendentes</CardTitle>
+                <CardDescription>
+                  {overdueCount > 0 ? `${overdueCount} atrasado${overdueCount > 1 ? "s" : ""}` : "Tarefas para acompanhamento"}
+                </CardDescription>
+              </div>
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => setLocation("/leads")}>
+              Ver todos
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {upcomingFollowUps.map((followUp) => (
+                <div 
+                  key={followUp.id} 
+                  data-testid={`card-followup-${followUp.id}`}
+                  className={`flex items-center gap-4 p-3 rounded-lg transition-colors ${
+                    followUp.isOverdue ? "bg-red-100/50 border border-red-200" : 
+                    followUp.isDueToday ? "bg-amber-100/50 border border-amber-200" : 
+                    "bg-muted/50 hover:bg-muted"
+                  }`}
+                >
+                  <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    followUp.isOverdue ? "bg-red-100" : followUp.isDueToday ? "bg-amber-100" : "bg-blue-100"
+                  }`}>
+                    {followUp.isOverdue ? (
+                      <AlertCircle className="h-5 w-5 text-red-600" />
+                    ) : (
+                      <Bell className={`h-5 w-5 ${followUp.isDueToday ? "text-amber-600" : "text-blue-600"}`} />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{followUp.lead?.name || "Lead"}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                      <span className="px-2 py-0.5 rounded bg-muted">{FOLLOW_UP_TYPE_LABELS[followUp.type] || followUp.type}</span>
+                      {followUp.notes && <span className="truncate">{followUp.notes}</span>}
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0 flex items-center gap-2">
+                    <div>
+                      <p className={`text-sm font-medium ${
+                        followUp.isOverdue ? "text-red-600" : followUp.isDueToday ? "text-amber-600" : ""
+                      }`}>
+                        {followUp.isOverdue ? "Atrasado" : followUp.isDueToday ? "Hoje" : followUp.isDueTomorrow ? "Amanhã" : format(new Date(followUp.dueAt), "dd/MM", { locale: ptBR })}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(followUp.dueAt), "HH:mm", { locale: ptBR })}
+                      </p>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8"
+                      onClick={() => handleCompleteFollowUp(followUp.id)}
+                      data-testid={`button-complete-followup-${followUp.id}`}
+                    >
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>

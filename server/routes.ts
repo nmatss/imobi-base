@@ -972,6 +972,15 @@ export async function registerRoutes(
   });
 
   // ===== LEAD TAG LINKS ROUTES =====
+  app.get("/api/leads/tags/batch", requireAuth, async (req, res) => {
+    try {
+      const tagsMap = await storage.getTagsForAllLeads(req.user!.tenantId);
+      res.json(tagsMap);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar tags dos leads" });
+    }
+  });
+
   app.get("/api/leads/:leadId/tags", requireAuth, async (req, res) => {
     try {
       const tags = await storage.getTagsByLead(req.params.leadId);

@@ -178,6 +178,7 @@ export interface IStorage {
   
   // Lead Tag Links
   getTagsByLead(leadId: string): Promise<LeadTag[]>;
+  getTagsForAllLeads(tenantId: string): Promise<Record<string, LeadTag[]>>;
   addTagToLead(link: InsertLeadTagLink): Promise<LeadTagLink>;
   removeTagFromLead(leadId: string, tagId: string): Promise<boolean>;
   
@@ -1046,6 +1047,29 @@ export class DbStorage implements IStorage {
     if (links.length === 0) return [];
     const tagIds = links.map(l => l.tagId);
     return db.select().from(schema.leadTags).where(sql`${schema.leadTags.id} = ANY(${tagIds})`);
+  }
+
+  async getTagsForAllLeads(tenantId: string): Promise<Record<string, LeadTag[]>> {
+    const leads = await db.select({ id: schema.leads.id }).from(schema.leads).where(eq(schema.leads.tenantId, tenantId));
+    if (leads.length === 0) return {};
+    
+    const leadIds = leads.map(l => l.id);
+    const links = await db.select().from(schema.leadTagLinks).where(sql`${schema.leadTagLinks.leadId} = ANY(${leadIds})`);
+    if (links.length === 0) return {};
+    
+    const tagIds = [...new Set(links.map(l => l.tagId))];
+    const tags = await db.select().from(schema.leadTags).where(sql`${schema.leadTags.id} = ANY(${tagIds})`);
+    const tagsById = new Map(tags.map(t => [t.id, t]));
+    
+    const result: Record<string, LeadTag[]> = {};
+    for (const link of links) {
+      const tag = tagsById.get(link.tagId);
+      if (tag) {
+        if (!result[link.leadId]) result[link.leadId] = [];
+        result[link.leadId].push(tag);
+      }
+    }
+    return result;
   }
 
   async addTagToLead(link: InsertLeadTagLink): Promise<LeadTagLink> {
