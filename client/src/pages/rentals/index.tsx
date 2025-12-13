@@ -173,6 +173,25 @@ export default function RentalsPage() {
     condoFee: "", iptuValue: "", extraCharges: "", discounts: "", totalValue: "", notes: ""
   });
 
+  // Filtros para aba Contratos
+  const [contractFilters, setContractFilters] = useState({
+    ownerId: "",
+    renterId: "",
+    propertyId: "",
+    status: "",
+    searchText: ""
+  });
+
+  // Filtros para aba Pagamentos
+  const [paymentFilters, setPaymentFilters] = useState({
+    status: "",
+    contractId: "",
+    periodPreset: "",
+    startDate: "",
+    endDate: "",
+    onlyOverdue: false
+  });
+
   const [reportFilters, setReportFilters] = useState({
     ownerId: "",
     renterId: "",
@@ -309,6 +328,107 @@ export default function RentalsPage() {
       chips.push({ key: "onlyOverdue", label: "Só vencidos" });
     }
     return chips;
+  };
+
+  // Funções auxiliares para filtros de contratos
+  const filteredContracts = rentalContracts.filter(contract => {
+    if (contractFilters.ownerId && contract.ownerId !== contractFilters.ownerId) return false;
+    if (contractFilters.renterId && contract.renterId !== contractFilters.renterId) return false;
+    if (contractFilters.propertyId && contract.propertyId !== contractFilters.propertyId) return false;
+    if (contractFilters.status && contract.status !== contractFilters.status) return false;
+    if (contractFilters.searchText) {
+      const search = contractFilters.searchText.toLowerCase();
+      const owner = owners.find(o => o.id === contract.ownerId);
+      const renter = renters.find(r => r.id === contract.renterId);
+      const property = properties.find(p => p.id === contract.propertyId);
+      const matchOwner = owner?.name.toLowerCase().includes(search);
+      const matchRenter = renter?.name.toLowerCase().includes(search);
+      const matchProperty = property?.title.toLowerCase().includes(search);
+      if (!matchOwner && !matchRenter && !matchProperty) return false;
+    }
+    return true;
+  });
+
+  const clearContractFilters = () => {
+    setContractFilters({ ownerId: "", renterId: "", propertyId: "", status: "", searchText: "" });
+  };
+
+  const getContractFiltersCount = () => {
+    let count = 0;
+    if (contractFilters.ownerId) count++;
+    if (contractFilters.renterId) count++;
+    if (contractFilters.propertyId) count++;
+    if (contractFilters.status) count++;
+    if (contractFilters.searchText) count++;
+    return count;
+  };
+
+  // Funções auxiliares para filtros de pagamentos
+  const applyPaymentPeriodPreset = (preset: string) => {
+    const today = new Date();
+    let startDate = "";
+    let endDate = today.toISOString().split("T")[0];
+
+    switch (preset) {
+      case "today":
+        startDate = endDate;
+        break;
+      case "7days":
+        startDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+        break;
+      case "30days":
+        startDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+        break;
+      case "currentMonth":
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split("T")[0];
+        break;
+      case "quarter":
+        const quarterStart = Math.floor(today.getMonth() / 3) * 3;
+        startDate = new Date(today.getFullYear(), quarterStart, 1).toISOString().split("T")[0];
+        break;
+      case "currentYear":
+        startDate = new Date(today.getFullYear(), 0, 1).toISOString().split("T")[0];
+        break;
+    }
+
+    setPaymentFilters(prev => ({ ...prev, periodPreset: preset, startDate, endDate }));
+  };
+
+  const filteredPayments = payments.filter(payment => {
+    if (paymentFilters.status && payment.status !== paymentFilters.status) return false;
+    if (paymentFilters.contractId && payment.rentalContractId !== paymentFilters.contractId) return false;
+    
+    if (paymentFilters.startDate) {
+      const paymentDate = new Date(payment.dueDate);
+      const startDate = new Date(paymentFilters.startDate);
+      if (paymentDate < startDate) return false;
+    }
+    if (paymentFilters.endDate) {
+      const paymentDate = new Date(payment.dueDate);
+      const endDate = new Date(paymentFilters.endDate);
+      if (paymentDate > endDate) return false;
+    }
+    
+    if (paymentFilters.onlyOverdue) {
+      const now = new Date();
+      const dueDate = new Date(payment.dueDate);
+      if (payment.status === "paid" || dueDate >= now) return false;
+    }
+    
+    return true;
+  });
+
+  const clearPaymentFilters = () => {
+    setPaymentFilters({ status: "", contractId: "", periodPreset: "", startDate: "", endDate: "", onlyOverdue: false });
+  };
+
+  const getPaymentFiltersCount = () => {
+    let count = 0;
+    if (paymentFilters.status) count++;
+    if (paymentFilters.contractId) count++;
+    if (paymentFilters.startDate || paymentFilters.endDate) count++;
+    if (paymentFilters.onlyOverdue) count++;
+    return count;
   };
 
   const fetchData = async () => {
@@ -760,23 +880,87 @@ export default function RentalsPage() {
         </TabsContent>
 
         <TabsContent value="contracts" className="space-y-4">
-          <div className="flex justify-end">
-            <Button data-testid="button-new-rental-contract" onClick={() => setIsContractModalOpen(true)} className="gap-2" disabled={owners.length === 0 || renters.length === 0}>
-              <Plus className="h-4 w-4" /> Novo Contrato
-            </Button>
-          </div>
-          {rentalContracts.length === 0 ? (
+          <Card className="mb-4">
+            <CardContent className="pt-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-5 w-5 text-muted-foreground" />
+                  <span className="font-medium">Filtros</span>
+                  {getContractFiltersCount() > 0 && (
+                    <Badge variant="secondary">{getContractFiltersCount()} ativo{getContractFiltersCount() > 1 ? "s" : ""}</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {getContractFiltersCount() > 0 && (
+                    <Button variant="ghost" size="sm" onClick={clearContractFilters} data-testid="button-clear-contract-filters">
+                      <RotateCcw className="h-4 w-4 mr-1" /> Limpar
+                    </Button>
+                  )}
+                  <Button data-testid="button-new-rental-contract" onClick={() => setIsContractModalOpen(true)} className="gap-2" disabled={owners.length === 0 || renters.length === 0}>
+                    <Plus className="h-4 w-4" /> Novo Contrato
+                  </Button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="md:col-span-2">
+                  <Input 
+                    placeholder="Buscar por locador, inquilino ou imóvel..." 
+                    value={contractFilters.searchText}
+                    onChange={(e) => setContractFilters(prev => ({ ...prev, searchText: e.target.value }))}
+                    data-testid="input-contract-search"
+                  />
+                </div>
+                <Select value={contractFilters.ownerId} onValueChange={(v) => setContractFilters(prev => ({ ...prev, ownerId: v === "all" ? "" : v }))}>
+                  <SelectTrigger data-testid="select-contract-owner"><SelectValue placeholder="Locador" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos Locadores</SelectItem>
+                    {owners.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={contractFilters.renterId} onValueChange={(v) => setContractFilters(prev => ({ ...prev, renterId: v === "all" ? "" : v }))}>
+                  <SelectTrigger data-testid="select-contract-renter"><SelectValue placeholder="Inquilino" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos Inquilinos</SelectItem>
+                    {renters.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={contractFilters.status} onValueChange={(v) => setContractFilters(prev => ({ ...prev, status: v === "all" ? "" : v }))}>
+                  <SelectTrigger data-testid="select-contract-status"><SelectValue placeholder="Status" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos Status</SelectItem>
+                    <SelectItem value="active">Ativo</SelectItem>
+                    <SelectItem value="ended">Encerrado</SelectItem>
+                    <SelectItem value="cancelled">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {filteredContracts.length === 0 ? (
             <div className="text-center py-16 bg-muted/20 rounded-xl border border-dashed">
               <FileText className="w-12 h-12 mx-auto text-muted-foreground opacity-30 mb-4" />
-              <h3 className="text-lg font-medium">Nenhum contrato de aluguel</h3>
-              <p className="text-muted-foreground mb-4 text-sm">Cadastre locadores e inquilinos primeiro.</p>
-              {owners.length > 0 && renters.length > 0 && (
+              <h3 className="text-lg font-medium">
+                {rentalContracts.length === 0 ? "Nenhum contrato de aluguel" : "Nenhum contrato encontrado"}
+              </h3>
+              <p className="text-muted-foreground mb-4 text-sm">
+                {rentalContracts.length === 0 
+                  ? "Cadastre locadores e inquilinos primeiro." 
+                  : "Tente ajustar os filtros."}
+              </p>
+              {rentalContracts.length === 0 && owners.length > 0 && renters.length > 0 && (
                 <Button variant="outline" onClick={() => setIsContractModalOpen(true)}>Criar Contrato</Button>
+              )}
+              {rentalContracts.length > 0 && getContractFiltersCount() > 0 && (
+                <Button variant="outline" onClick={clearContractFilters}>Limpar Filtros</Button>
               )}
             </div>
           ) : (
             <div className="grid gap-4">
-              {rentalContracts.map((contract) => (
+              <div className="text-sm text-muted-foreground">
+                Mostrando {filteredContracts.length} de {rentalContracts.length} contrato{rentalContracts.length !== 1 ? "s" : ""}
+              </div>
+              {filteredContracts.map((contract) => (
                 <Card key={contract.id} data-testid={`card-rental-contract-${contract.id}`} className="hover:shadow-lg transition-all">
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between">
@@ -818,19 +1002,111 @@ export default function RentalsPage() {
         </TabsContent>
 
         <TabsContent value="payments" className="space-y-4">
-          <div className="flex justify-end">
-            <Button data-testid="button-new-payment" onClick={() => setIsPaymentModalOpen(true)} className="gap-2" disabled={rentalContracts.length === 0}>
-              <Plus className="h-4 w-4" /> Novo Pagamento
-            </Button>
-          </div>
-          {payments.length === 0 ? (
+          <Card className="mb-4">
+            <CardContent className="pt-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-5 w-5 text-muted-foreground" />
+                  <span className="font-medium">Filtros</span>
+                  {getPaymentFiltersCount() > 0 && (
+                    <Badge variant="secondary">{getPaymentFiltersCount()} ativo{getPaymentFiltersCount() > 1 ? "s" : ""}</Badge>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {getPaymentFiltersCount() > 0 && (
+                    <Button variant="ghost" size="sm" onClick={clearPaymentFilters} data-testid="button-clear-payment-filters">
+                      <RotateCcw className="h-4 w-4 mr-1" /> Limpar
+                    </Button>
+                  )}
+                  <Button data-testid="button-new-payment" onClick={() => setIsPaymentModalOpen(true)} className="gap-2" disabled={rentalContracts.length === 0}>
+                    <Plus className="h-4 w-4" /> Novo Pagamento
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-muted-foreground">Período Rápido</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {periodPresets.map((preset) => (
+                      <Button
+                        key={preset.value}
+                        variant={paymentFilters.periodPreset === preset.value ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => applyPaymentPeriodPreset(preset.value)}
+                        data-testid={`button-payment-preset-${preset.value}`}
+                      >
+                        {preset.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <Select value={paymentFilters.status} onValueChange={(v) => setPaymentFilters(prev => ({ ...prev, status: v === "all" ? "" : v }))}>
+                    <SelectTrigger data-testid="select-payment-status"><SelectValue placeholder="Status" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos Status</SelectItem>
+                      <SelectItem value="pending">Pendente</SelectItem>
+                      <SelectItem value="paid">Pago</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={paymentFilters.contractId} onValueChange={(v) => setPaymentFilters(prev => ({ ...prev, contractId: v === "all" ? "" : v }))}>
+                    <SelectTrigger data-testid="select-payment-contract"><SelectValue placeholder="Contrato" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos Contratos</SelectItem>
+                      {rentalContracts.map(c => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {getPropertyTitle(c.propertyId)} - {getRenterName(c.renterId)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input 
+                    type="date" 
+                    value={paymentFilters.startDate}
+                    onChange={(e) => setPaymentFilters(prev => ({ ...prev, startDate: e.target.value, periodPreset: "" }))}
+                    data-testid="input-payment-start-date"
+                  />
+                  <Input 
+                    type="date" 
+                    value={paymentFilters.endDate}
+                    onChange={(e) => setPaymentFilters(prev => ({ ...prev, endDate: e.target.value, periodPreset: "" }))}
+                    data-testid="input-payment-end-date"
+                  />
+                  <Button
+                    variant={paymentFilters.onlyOverdue ? "default" : "outline"}
+                    onClick={() => setPaymentFilters(prev => ({ ...prev, onlyOverdue: !prev.onlyOverdue }))}
+                    data-testid="button-payment-only-overdue"
+                  >
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                    Só Vencidos
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {filteredPayments.length === 0 ? (
             <div className="text-center py-16 bg-muted/20 rounded-xl border border-dashed">
               <DollarSign className="w-12 h-12 mx-auto text-muted-foreground opacity-30 mb-4" />
-              <h3 className="text-lg font-medium">Nenhum pagamento registrado</h3>
-              <p className="text-muted-foreground mb-4 text-sm">Registre os pagamentos dos aluguéis.</p>
+              <h3 className="text-lg font-medium">
+                {payments.length === 0 ? "Nenhum pagamento registrado" : "Nenhum pagamento encontrado"}
+              </h3>
+              <p className="text-muted-foreground mb-4 text-sm">
+                {payments.length === 0 ? "Registre os pagamentos dos aluguéis." : "Tente ajustar os filtros."}
+              </p>
+              {payments.length > 0 && getPaymentFiltersCount() > 0 && (
+                <Button variant="outline" onClick={clearPaymentFilters}>Limpar Filtros</Button>
+              )}
             </div>
           ) : (
             <Card>
+              <div className="p-4 border-b">
+                <span className="text-sm text-muted-foreground">
+                  Mostrando {filteredPayments.length} de {payments.length} pagamento{payments.length !== 1 ? "s" : ""}
+                </span>
+              </div>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -842,7 +1118,7 @@ export default function RentalsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {payments.map((payment) => (
+                  {filteredPayments.map((payment) => (
                     <TableRow key={payment.id} data-testid={`row-payment-${payment.id}`}>
                       <TableCell className="font-medium">{payment.referenceMonth}</TableCell>
                       <TableCell>{formatDate(payment.dueDate)}</TableCell>
