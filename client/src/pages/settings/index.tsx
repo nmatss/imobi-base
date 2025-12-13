@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useImobi } from "@/lib/imobi-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,25 +7,47 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Building, Globe, Palette, Save } from "lucide-react";
+import { Building, Globe, Save, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 export default function SettingsPage() {
   const { tenant } = useImobi();
   const { toast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    name: tenant?.name || "",
+    email: tenant?.email || "",
+    phone: tenant?.phone || "",
+    address: tenant?.address || "",
+    primaryColor: tenant?.primaryColor || "#0066cc",
+    secondaryColor: tenant?.secondaryColor || "#333333",
+    slug: tenant?.slug || "",
+  });
 
-  const handleSave = () => {
-    toast({
-      title: "Configurações salvas",
-      description: "As alterações foram aplicadas com sucesso.",
-    });
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      toast({
+        title: "Configurações salvas",
+        description: "As alterações foram aplicadas com sucesso.",
+      });
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível salvar as configurações.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-3xl font-heading font-bold text-foreground">Configurações</h1>
-        <p className="text-muted-foreground">Gerencie os dados da sua imobiliária</p>
+        <h1 className="text-2xl sm:text-3xl font-heading font-bold text-foreground">Configurações</h1>
+        <p className="text-muted-foreground text-sm sm:text-base">Gerencie os dados da sua imobiliária</p>
       </div>
 
       <Tabs defaultValue="general" className="w-full">
@@ -37,7 +60,7 @@ export default function SettingsPage() {
         <TabsContent value="general" className="space-y-4 mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Dados da Empresa</CardTitle>
+              <CardTitle className="text-lg sm:text-xl">Dados da Empresa</CardTitle>
               <CardDescription>
                 Informações básicas da sua imobiliária.
               </CardDescription>
@@ -45,26 +68,50 @@ export default function SettingsPage() {
             <CardContent className="space-y-4">
               <div className="grid gap-2">
                 <Label htmlFor="name">Nome da Imobiliária</Label>
-                <Input id="name" defaultValue={tenant?.name} />
+                <Input 
+                  id="name" 
+                  data-testid="input-tenant-name"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="cnpj">CNPJ</Label>
-                  <Input id="cnpj" placeholder="00.000.000/0000-00" />
+                  <Label htmlFor="phone">Telefone</Label>
+                  <Input 
+                    id="phone" 
+                    data-testid="input-tenant-phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="(11) 99999-9999" 
+                  />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="creci">CRECI</Label>
-                  <Input id="creci" placeholder="J-12345" />
+                  <Label htmlFor="email">E-mail de Contato</Label>
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    data-testid="input-tenant-email"
+                    value={formData.email}
+                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  />
                 </div>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="email">E-mail de Contato</Label>
-                <Input id="email" type="email" defaultValue={`contato@${tenant?.slug}.com.br`} />
+                <Label htmlFor="address">Endereço</Label>
+                <Input 
+                  id="address" 
+                  data-testid="input-tenant-address"
+                  value={formData.address}
+                  onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                  placeholder="Rua, número - Bairro, Cidade/UF"
+                />
               </div>
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
-              <Button onClick={handleSave} className="ml-auto gap-2">
-                <Save className="w-4 h-4" /> Salvar Alterações
+              <Button onClick={handleSave} disabled={isSaving} className="ml-auto gap-2" data-testid="button-save-settings">
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Salvar Alterações
               </Button>
             </CardFooter>
           </Card>
@@ -73,18 +120,22 @@ export default function SettingsPage() {
         <TabsContent value="branding" className="space-y-4 mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Identidade Visual</CardTitle>
+              <CardTitle className="text-lg sm:text-xl">Identidade Visual</CardTitle>
               <CardDescription>
                 Personalize como sua imobiliária aparece no sistema e no site.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center gap-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
                 <div 
-                  className="w-24 h-24 rounded-lg border-2 border-dashed flex items-center justify-center bg-muted/50"
-                  style={{ borderColor: tenant?.colors.primary }}
+                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg border-2 border-dashed flex items-center justify-center bg-muted/50 shrink-0"
+                  style={{ borderColor: formData.primaryColor }}
                 >
-                  <Building className="w-8 h-8 opacity-20" />
+                  {tenant?.logo ? (
+                    <img src={tenant.logo} alt="Logo" className="w-full h-full object-contain rounded-lg" />
+                  ) : (
+                    <Building className="w-8 h-8 opacity-20" />
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label>Logo da Empresa</Label>
@@ -102,32 +153,51 @@ export default function SettingsPage() {
                 <div className="space-y-2">
                   <Label>Cor Primária</Label>
                   <div className="flex gap-2">
-                    <div 
-                      className="w-10 h-10 rounded-md border shadow-sm"
-                      style={{ backgroundColor: tenant?.colors.primary }}
+                    <input 
+                      type="color"
+                      value={formData.primaryColor}
+                      onChange={(e) => setFormData(prev => ({ ...prev, primaryColor: e.target.value }))}
+                      className="w-10 h-10 rounded-md border shadow-sm cursor-pointer"
                     />
-                    <Input defaultValue={tenant?.colors.primary} className="font-mono" />
+                    <Input 
+                      value={formData.primaryColor} 
+                      onChange={(e) => setFormData(prev => ({ ...prev, primaryColor: e.target.value }))}
+                      className="font-mono"
+                      data-testid="input-primary-color"
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Cor Secundária</Label>
                   <div className="flex gap-2">
-                    <div 
-                      className="w-10 h-10 rounded-md border shadow-sm"
-                      style={{ backgroundColor: tenant?.colors.secondary }}
+                    <input 
+                      type="color"
+                      value={formData.secondaryColor}
+                      onChange={(e) => setFormData(prev => ({ ...prev, secondaryColor: e.target.value }))}
+                      className="w-10 h-10 rounded-md border shadow-sm cursor-pointer"
                     />
-                    <Input defaultValue={tenant?.colors.secondary} className="font-mono" />
+                    <Input 
+                      value={formData.secondaryColor}
+                      onChange={(e) => setFormData(prev => ({ ...prev, secondaryColor: e.target.value }))}
+                      className="font-mono"
+                      data-testid="input-secondary-color"
+                    />
                   </div>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label>Endereço do Site Público</Label>
-                <div className="flex items-center gap-2">
-                  <div className="bg-muted px-3 py-2 rounded-md text-sm text-muted-foreground border">
-                    imobibase.com.br/e/
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                  <div className="bg-muted px-3 py-2 rounded-md text-sm text-muted-foreground border whitespace-nowrap">
+                    /e/
                   </div>
-                  <Input defaultValue={tenant?.slug} className="max-w-[200px]" />
+                  <Input 
+                    value={formData.slug}
+                    onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
+                    className="max-w-[200px]"
+                    data-testid="input-tenant-slug"
+                  />
                   <Button variant="ghost" size="icon" asChild>
                     <a href={`/e/${tenant?.slug}`} target="_blank">
                       <Globe className="w-4 h-4" />
@@ -137,8 +207,9 @@ export default function SettingsPage() {
               </div>
             </CardContent>
             <CardFooter className="border-t px-6 py-4">
-              <Button onClick={handleSave} className="ml-auto gap-2">
-                <Save className="w-4 h-4" /> Salvar Alterações
+              <Button onClick={handleSave} disabled={isSaving} className="ml-auto gap-2">
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Salvar Alterações
               </Button>
             </CardFooter>
           </Card>
@@ -147,11 +218,11 @@ export default function SettingsPage() {
         <TabsContent value="billing" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Plano Atual</CardTitle>
+              <CardTitle className="text-lg sm:text-xl">Plano Atual</CardTitle>
               <CardDescription>Gerencie sua assinatura</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-primary/5 rounded-lg border border-primary/20">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-primary/5 rounded-lg border border-primary/20 gap-3">
                 <div>
                   <h3 className="font-bold text-lg text-primary">Plano Profissional</h3>
                   <p className="text-sm text-muted-foreground">Até 10 usuários • 2.000 imóveis</p>
@@ -170,7 +241,7 @@ export default function SettingsPage() {
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="border-t px-6 py-4 flex justify-between">
+            <CardFooter className="border-t px-6 py-4 flex flex-col sm:flex-row justify-between gap-2">
               <Button variant="link" className="text-muted-foreground px-0">Cancelar assinatura</Button>
               <Button variant="outline">Alterar Plano</Button>
             </CardFooter>

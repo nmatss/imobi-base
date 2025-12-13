@@ -1,15 +1,31 @@
+import { useState } from "react";
 import { useImobi } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar as CalendarIcon, Clock, MapPin, CheckCircle, XCircle, Plus } from "lucide-react";
-import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Calendar as CalendarIcon, Clock, MapPin, CheckCircle, XCircle, Plus, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, startOfWeek, addDays, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useToast } from "@/hooks/use-toast";
 
 export default function CalendarPage() {
-  const { visits, leads, properties } = useImobi();
+  const { visits, leads, properties, refetchVisits } = useImobi();
+  const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    propertyId: "",
+    leadId: "",
+    date: format(new Date(), "yyyy-MM-dd"),
+    time: "10:00",
+    notes: "",
+  });
 
   const getVisitDetails = (visitId: string) => {
     const visit = visits.find(v => v.id === visitId);
@@ -26,6 +42,90 @@ export default function CalendarPage() {
     return visits.filter(v => isSameDay(new Date(v.scheduledFor), date));
   };
 
+  const openCreateModal = (date?: Date) => {
+    setFormData({
+      propertyId: "",
+      leadId: "",
+      date: format(date || new Date(), "yyyy-MM-dd"),
+      time: "10:00",
+      notes: "",
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    try {
+      const scheduledFor = new Date(`${formData.date}T${formData.time}:00`);
+      
+      const payload = {
+        propertyId: formData.propertyId,
+        leadId: formData.leadId || null,
+        scheduledFor: scheduledFor.toISOString(),
+        notes: formData.notes || null,
+        status: "scheduled",
+      };
+
+      const res = await fetch("/api/visits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Erro ao criar visita");
+      }
+
+      toast({
+        title: "Visita agendada",
+        description: "A visita foi agendada com sucesso.",
+      });
+
+      setIsModalOpen(false);
+      await refetchVisits();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateVisitStatus = async (visitId: string, status: "completed" | "cancelled") => {
+    try {
+      const res = await fetch(`/api/visits/${visitId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status }),
+      });
+
+      if (!res.ok) throw new Error("Erro ao atualizar visita");
+
+      toast({
+        title: status === "completed" ? "Visita realizada" : "Visita cancelada",
+        description: status === "completed" 
+          ? "A visita foi marcada como realizada."
+          : "A visita foi cancelada.",
+      });
+
+      await refetchVisits();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -33,7 +133,7 @@ export default function CalendarPage() {
           <h1 data-testid="text-calendar-title" className="text-2xl sm:text-3xl font-heading font-bold text-foreground">Agenda</h1>
           <p className="text-muted-foreground text-sm sm:text-base">Gerencie suas visitas e compromissos</p>
         </div>
-        <Button data-testid="button-new-visit" className="gap-2 w-full sm:w-auto">
+        <Button data-testid="button-new-visit" className="gap-2 w-full sm:w-auto" onClick={() => openCreateModal()}>
           <Plus className="h-4 w-4" /> Nova Visita
         </Button>
       </div>
@@ -48,7 +148,7 @@ export default function CalendarPage() {
             {/* Mobile: Show only 3 days */}
             <div className="block sm:hidden">
               <div className="grid grid-cols-3 gap-2 text-center mb-3">
-                {["Ontem", "Hoje", "Amanhã"].map((day, i) => (
+                {["Ontem", "Hoje", "Amanhã"].map((day) => (
                   <div key={day} className="text-xs font-medium text-muted-foreground py-1">
                     {day}
                   </div>
@@ -150,7 +250,9 @@ export default function CalendarPage() {
               <div data-testid="empty-state-daily-visits" className="flex flex-col items-center justify-center h-40 text-muted-foreground p-4 sm:p-6 text-center">
                 <Clock className="w-8 h-8 mb-2 opacity-20" />
                 <p className="text-sm">Nenhuma visita agendada.</p>
-                <Button variant="link" size="sm" className="mt-2">Agendar agora</Button>
+                <Button variant="link" size="sm" className="mt-2" onClick={() => openCreateModal(selectedDate)}>
+                  Agendar agora
+                </Button>
               </div>
             ) : (
               <div className="divide-y">
@@ -189,14 +291,30 @@ export default function CalendarPage() {
                           </div>
                         )}
 
-                        <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button size="icon" variant="ghost" className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-100">
-                            <CheckCircle className="w-4 h-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-6 w-6 text-red-600 hover:text-red-700 hover:bg-red-100">
-                            <XCircle className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        {visit.status === "scheduled" && (
+                          <div className="flex gap-2 mt-3">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="flex-1 text-green-600 hover:text-green-700 hover:bg-green-50"
+                              onClick={() => handleUpdateVisitStatus(visit.id, "completed")}
+                              data-testid={`button-complete-visit-${visit.id}`}
+                            >
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              Realizada
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => handleUpdateVisitStatus(visit.id, "cancelled")}
+                              data-testid={`button-cancel-visit-${visit.id}`}
+                            >
+                              <XCircle className="w-4 h-4 mr-1" />
+                              Cancelar
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -205,6 +323,91 @@ export default function CalendarPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle data-testid="dialog-title-visit">Nova Visita</DialogTitle>
+            <DialogDescription>Agende uma visita para um imóvel.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="propertyId">Imóvel *</Label>
+              <Select 
+                value={formData.propertyId} 
+                onValueChange={(v) => setFormData(prev => ({ ...prev, propertyId: v }))}
+              >
+                <SelectTrigger data-testid="select-visit-property">
+                  <SelectValue placeholder="Selecione o imóvel" />
+                </SelectTrigger>
+                <SelectContent>
+                  {properties.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="leadId">Cliente</Label>
+              <Select 
+                value={formData.leadId} 
+                onValueChange={(v) => setFormData(prev => ({ ...prev, leadId: v }))}
+              >
+                <SelectTrigger data-testid="select-visit-lead">
+                  <SelectValue placeholder="Selecione o cliente (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {leads.map(l => (
+                    <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="date">Data *</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  data-testid="input-visit-date"
+                  value={formData.date}
+                  onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="time">Horário *</Label>
+                <Input
+                  id="time"
+                  type="time"
+                  data-testid="input-visit-time"
+                  value={formData.time}
+                  onChange={(e) => setFormData(prev => ({ ...prev, time: e.target.value }))}
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="notes">Observações</Label>
+              <Textarea
+                id="notes"
+                data-testid="input-visit-notes"
+                value={formData.notes}
+                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                rows={2}
+                placeholder="Informações adicionais sobre a visita..."
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={isSubmitting || !formData.propertyId} data-testid="button-submit-visit">
+                {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Agendar
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

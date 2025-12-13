@@ -100,6 +100,8 @@ type ImobiContextType = {
   loading: boolean;
   refetchProperties: () => Promise<void>;
   refetchLeads: () => Promise<void>;
+  refetchVisits: () => Promise<void>;
+  refetchContracts: () => Promise<void>;
 };
 
 const ImobiContext = createContext<ImobiContextType | undefined>(undefined);
@@ -159,8 +161,8 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
       await Promise.all([
         refetchProperties(),
         refetchLeads(),
-        fetchVisits(),
-        fetchContracts(),
+        refetchVisits(),
+        refetchContracts(),
       ]);
     } catch (error) {
       console.error("Failed to fetch data:", error);
@@ -195,7 +197,7 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function fetchVisits() {
+  async function refetchVisits() {
     try {
       const res = await fetch("/api/visits", {
         credentials: "include",
@@ -209,7 +211,7 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function fetchContracts() {
+  async function refetchContracts() {
     try {
       const res = await fetch("/api/contracts", {
         credentials: "include",
@@ -290,6 +292,8 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
     loading,
     refetchProperties,
     refetchLeads,
+    refetchVisits,
+    refetchContracts,
   };
 
   return <ImobiContext.Provider value={value}>{children}</ImobiContext.Provider>;
