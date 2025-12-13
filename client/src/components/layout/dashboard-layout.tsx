@@ -15,7 +15,8 @@ import {
   Bell,
   ExternalLink,
   Loader2,
-  Home
+  Home,
+  BarChart3
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -114,6 +115,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: "/calendar", label: "Agenda", icon: CalendarDays },
     { href: "/contracts", label: "Propostas", icon: FileText },
     { href: "/rentals", label: "Aluguéis", icon: Home },
+    { href: "/reports", label: "Relatórios", icon: BarChart3 },
     { href: "/settings", label: "Configurações", icon: Settings },
   ];
 
