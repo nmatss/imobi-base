@@ -648,5 +648,61 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/reports/owners", requireAuth, async (req, res) => {
+    try {
+      const { ownerId, startDate, endDate } = req.query;
+      const filters = {
+        ownerId: ownerId as string | undefined,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+      };
+      const report = await storage.getOwnerReport(req.user!.tenantId, filters);
+      res.json(report);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao gerar relatório de locadores" });
+    }
+  });
+
+  app.get("/api/reports/renters", requireAuth, async (req, res) => {
+    try {
+      const { renterId, startDate, endDate } = req.query;
+      const filters = {
+        renterId: renterId as string | undefined,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+      };
+      const report = await storage.getRenterReport(req.user!.tenantId, filters);
+      res.json(report);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao gerar relatório de inquilinos" });
+    }
+  });
+
+  app.get("/api/reports/payments-detailed", requireAuth, async (req, res) => {
+    try {
+      const { ownerId, renterId, status, startDate, endDate } = req.query;
+      const filters = {
+        ownerId: ownerId as string | undefined,
+        renterId: renterId as string | undefined,
+        status: status as string | undefined,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+      };
+      const report = await storage.getPaymentDetailedReport(req.user!.tenantId, filters);
+      res.json(report);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao gerar relatório de pagamentos" });
+    }
+  });
+
+  app.get("/api/reports/overdue", requireAuth, async (req, res) => {
+    try {
+      const report = await storage.getOverdueReport(req.user!.tenantId);
+      res.json(report);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao gerar relatório de inadimplência" });
+    }
+  });
+
   return httpServer;
 }

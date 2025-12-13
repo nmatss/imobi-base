@@ -644,6 +644,179 @@ export class DbStorage implements IStorage {
       activeContracts,
     };
   }
+
+  async getOwnerReport(tenantId: string, filters: { ownerId?: string; startDate?: Date; endDate?: Date }) {
+    const owners = filters.ownerId 
+      ? await db.select().from(schema.owners).where(and(eq(schema.owners.tenantId, tenantId), eq(schema.owners.id, filters.ownerId)))
+      : await db.select().from(schema.owners).where(eq(schema.owners.tenantId, tenantId));
+
+    const contracts = await db.select().from(schema.rentalContracts).where(eq(schema.rentalContracts.tenantId, tenantId));
+    const payments = await db.select().from(schema.rentalPayments).where(eq(schema.rentalPayments.tenantId, tenantId));
+    const now = new Date();
+
+    return owners.map(owner => {
+      const ownerContracts = contracts.filter(c => c.ownerId === owner.id);
+      const contractIds = ownerContracts.map(c => c.id);
+      const ownerPayments = payments.filter(p => contractIds.includes(p.rentalContractId));
+      
+      let filteredPayments = ownerPayments;
+      if (filters.startDate) {
+        filteredPayments = filteredPayments.filter(p => new Date(p.dueDate) >= filters.startDate!);
+      }
+      if (filters.endDate) {
+        filteredPayments = filteredPayments.filter(p => new Date(p.dueDate) <= filters.endDate!);
+      }
+
+      const totalBilled = filteredPayments.reduce((sum, p) => sum + Number(p.totalValue || 0), 0);
+      const totalReceived = filteredPayments.filter(p => p.status === 'paid').reduce((sum, p) => sum + Number(p.paidValue || 0), 0);
+      const totalOverdue = filteredPayments.filter(p => p.status === 'pending' && new Date(p.dueDate) < now).reduce((sum, p) => sum + Number(p.totalValue || 0), 0);
+      const delinquencyRate = totalBilled > 0 ? (totalOverdue / totalBilled) * 100 : 0;
+      const adminFees = ownerContracts.reduce((sum, c) => {
+        const fee = c.administrationFee ? (Number(c.rentValue) * Number(c.administrationFee) / 100) : 0;
+        return sum + fee;
+      }, 0);
+
+      return {
+        owner,
+        activeContracts: ownerContracts.filter(c => c.status === 'active').length,
+        totalContracts: ownerContracts.length,
+        totalBilled,
+        totalReceived,
+        totalOverdue,
+        delinquencyRate: Math.round(delinquencyRate * 10) / 10,
+        adminFees,
+      };
+    });
+  }
+
+  async getRenterReport(tenantId: string, filters: { renterId?: string; startDate?: Date; endDate?: Date }) {
+    const renters = filters.renterId
+      ? await db.select().from(schema.renters).where(and(eq(schema.renters.tenantId, tenantId), eq(schema.renters.id, filters.renterId)))
+      : await db.select().from(schema.renters).where(eq(schema.renters.tenantId, tenantId));
+
+    const contracts = await db.select().from(schema.rentalContracts).where(eq(schema.rentalContracts.tenantId, tenantId));
+    const payments = await db.select().from(schema.rentalPayments).where(eq(schema.rentalPayments.tenantId, tenantId));
+    const now = new Date();
+
+    return renters.map(renter => {
+      const renterContracts = contracts.filter(c => c.renterId === renter.id);
+      const contractIds = renterContracts.map(c => c.id);
+      const renterPayments = payments.filter(p => contractIds.includes(p.rentalContractId));
+
+      let filteredPayments = renterPayments;
+      if (filters.startDate) {
+        filteredPayments = filteredPayments.filter(p => new Date(p.dueDate) >= filters.startDate!);
+      }
+      if (filters.endDate) {
+        filteredPayments = filteredPayments.filter(p => new Date(p.dueDate) <= filters.endDate!);
+      }
+
+      const totalScheduled = filteredPayments.reduce((sum, p) => sum + Number(p.totalValue || 0), 0);
+      const totalPaid = filteredPayments.filter(p => p.status === 'paid').reduce((sum, p) => sum + Number(p.paidValue || 0), 0);
+      const overdueCount = filteredPayments.filter(p => p.status === 'pending' && new Date(p.dueDate) < now).length;
+      const overdueAmount = filteredPayments.filter(p => p.status === 'pending' && new Date(p.dueDate) < now).reduce((sum, p) => sum + Number(p.totalValue || 0), 0);
+      const paidPayments = filteredPayments.filter(p => p.status === 'paid' && p.paidDate).sort((a, b) => new Date(b.paidDate!).getTime() - new Date(a.paidDate!).getTime());
+      const lastPaymentDate = paidPayments.length > 0 ? paidPayments[0].paidDate : null;
+
+      return {
+        renter,
+        activeContracts: renterContracts.filter(c => c.status === 'active').length,
+        totalScheduled,
+        totalPaid,
+        overdueCount,
+        overdueAmount,
+        lastPaymentDate,
+        riskLevel: overdueCount >= 3 ? 'high' : overdueCount >= 1 ? 'medium' : 'low',
+      };
+    });
+  }
+
+  async getPaymentDetailedReport(tenantId: string, filters: { ownerId?: string; renterId?: string; status?: string; startDate?: Date; endDate?: Date }) {
+    const contracts = await db.select().from(schema.rentalContracts).where(eq(schema.rentalContracts.tenantId, tenantId));
+    const owners = await db.select().from(schema.owners).where(eq(schema.owners.tenantId, tenantId));
+    const renters = await db.select().from(schema.renters).where(eq(schema.renters.tenantId, tenantId));
+    const properties = await db.select().from(schema.properties).where(eq(schema.properties.tenantId, tenantId));
+    let payments = await db.select().from(schema.rentalPayments).where(eq(schema.rentalPayments.tenantId, tenantId));
+
+    if (filters.status) {
+      payments = payments.filter(p => p.status === filters.status);
+    }
+    if (filters.startDate) {
+      payments = payments.filter(p => new Date(p.dueDate) >= filters.startDate!);
+    }
+    if (filters.endDate) {
+      payments = payments.filter(p => new Date(p.dueDate) <= filters.endDate!);
+    }
+    if (filters.ownerId) {
+      const ownerContractIds = contracts.filter(c => c.ownerId === filters.ownerId).map(c => c.id);
+      payments = payments.filter(p => ownerContractIds.includes(p.rentalContractId));
+    }
+    if (filters.renterId) {
+      const renterContractIds = contracts.filter(c => c.renterId === filters.renterId).map(c => c.id);
+      payments = payments.filter(p => renterContractIds.includes(p.rentalContractId));
+    }
+
+    return payments.map(payment => {
+      const contract = contracts.find(c => c.id === payment.rentalContractId);
+      const owner = contract ? owners.find(o => o.id === contract.ownerId) : null;
+      const renter = contract ? renters.find(r => r.id === contract.renterId) : null;
+      const property = contract ? properties.find(p => p.id === contract.propertyId) : null;
+
+      return {
+        ...payment,
+        ownerName: owner?.name || '-',
+        renterName: renter?.name || '-',
+        propertyTitle: property?.title || '-',
+        propertyAddress: property?.address || '-',
+      };
+    }).sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
+  }
+
+  async getOverdueReport(tenantId: string) {
+    const now = new Date();
+    const contracts = await db.select().from(schema.rentalContracts).where(eq(schema.rentalContracts.tenantId, tenantId));
+    const owners = await db.select().from(schema.owners).where(eq(schema.owners.tenantId, tenantId));
+    const renters = await db.select().from(schema.renters).where(eq(schema.renters.tenantId, tenantId));
+    const properties = await db.select().from(schema.properties).where(eq(schema.properties.tenantId, tenantId));
+    const payments = await db.select().from(schema.rentalPayments)
+      .where(and(eq(schema.rentalPayments.tenantId, tenantId), eq(schema.rentalPayments.status, 'pending')));
+
+    const overduePayments = payments.filter(p => new Date(p.dueDate) < now);
+
+    const bucket0_30: any[] = [];
+    const bucket31_60: any[] = [];
+    const bucket61plus: any[] = [];
+
+    overduePayments.forEach(payment => {
+      const daysOverdue = Math.floor((now.getTime() - new Date(payment.dueDate).getTime()) / (1000 * 60 * 60 * 24));
+      const contract = contracts.find(c => c.id === payment.rentalContractId);
+      const owner = contract ? owners.find(o => o.id === contract.ownerId) : null;
+      const renter = contract ? renters.find(r => r.id === contract.renterId) : null;
+      const property = contract ? properties.find(p => p.id === contract.propertyId) : null;
+
+      const item = {
+        ...payment,
+        daysOverdue,
+        ownerName: owner?.name || '-',
+        renterName: renter?.name || '-',
+        renterPhone: renter?.phone || '-',
+        propertyTitle: property?.title || '-',
+      };
+
+      if (daysOverdue <= 30) bucket0_30.push(item);
+      else if (daysOverdue <= 60) bucket31_60.push(item);
+      else bucket61plus.push(item);
+    });
+
+    return {
+      bucket0_30,
+      bucket31_60,
+      bucket61plus,
+      total0_30: bucket0_30.reduce((sum, p) => sum + Number(p.totalValue || 0), 0),
+      total31_60: bucket31_60.reduce((sum, p) => sum + Number(p.totalValue || 0), 0),
+      total61plus: bucket61plus.reduce((sum, p) => sum + Number(p.totalValue || 0), 0),
+    };
+  }
 }
 
 export const storage = new DbStorage();
