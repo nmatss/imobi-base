@@ -13,9 +13,10 @@ import {
   X,
   Search,
   Bell,
-  ExternalLink
+  ExternalLink,
+  Loader2
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,11 +29,82 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+
+type SearchResult = {
+  properties: Array<{ id: string; title: string; address: string; city: string }>;
+  leads: Array<{ id: string; name: string; email: string; phone: string }>;
+  contracts: Array<{ id: string; value: string }>;
+};
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, tenant, tenants, switchTenant, logout } = useImobi();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (searchQuery.length < 2) {
+      setSearchResults(null);
+      setSearchOpen(false);
+      return;
+    }
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`, {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data);
+          setSearchOpen(true);
+        }
+      } catch (error) {
+        console.error("Search failed:", error);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]);
+
+  const handleSelectResult = (type: "property" | "lead" | "contract", id: string) => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    setSearchResults(null);
+    if (type === "property") {
+      setLocation(`/properties/${id}`);
+    } else if (type === "lead") {
+      setLocation("/leads");
+    } else if (type === "contract") {
+      setLocation("/contracts");
+    }
+  };
+
+  const hasResults = searchResults && (
+    searchResults.properties.length > 0 || 
+    searchResults.leads.length > 0 || 
+    searchResults.contracts.length > 0
+  );
 
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -168,13 +240,90 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           <div className="flex items-center gap-4 ml-auto">
-            <div className="relative hidden md:block w-64">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Buscar imóveis, leads..." 
-                className="pl-9 h-9 bg-secondary/50 border-transparent focus:bg-background focus:border-input transition-all"
-              />
-            </div>
+            <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+              <PopoverTrigger asChild>
+                <div className="relative hidden md:block w-64">
+                  {isSearching ? (
+                    <Loader2 className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground animate-spin" />
+                  ) : (
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  )}
+                  <Input 
+                    placeholder="Buscar imóveis, leads..." 
+                    className="pl-9 h-9 bg-secondary/50 border-transparent focus:bg-background focus:border-input transition-all"
+                    data-testid="input-global-search"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => hasResults && setSearchOpen(true)}
+                  />
+                </div>
+              </PopoverTrigger>
+              {hasResults && (
+                <PopoverContent className="w-80 p-0" align="end" onOpenAutoFocus={(e) => e.preventDefault()}>
+                  <div className="max-h-80 overflow-y-auto">
+                    {searchResults.properties.length > 0 && (
+                      <div className="p-2 border-b">
+                        <p className="text-xs font-medium text-muted-foreground px-2 py-1">Imóveis</p>
+                        {searchResults.properties.map((p) => (
+                          <button
+                            key={p.id}
+                            className="w-full text-left px-2 py-2 hover:bg-muted rounded-md flex items-center gap-2 transition-colors"
+                            onClick={() => handleSelectResult("property", p.id)}
+                            data-testid={`search-result-property-${p.id}`}
+                          >
+                            <Building2 className="h-4 w-4 text-blue-500 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{p.title}</p>
+                              <p className="text-xs text-muted-foreground truncate">{p.address}, {p.city}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {searchResults.leads.length > 0 && (
+                      <div className="p-2 border-b">
+                        <p className="text-xs font-medium text-muted-foreground px-2 py-1">Leads</p>
+                        {searchResults.leads.map((l) => (
+                          <button
+                            key={l.id}
+                            className="w-full text-left px-2 py-2 hover:bg-muted rounded-md flex items-center gap-2 transition-colors"
+                            onClick={() => handleSelectResult("lead", l.id)}
+                            data-testid={`search-result-lead-${l.id}`}
+                          >
+                            <Users className="h-4 w-4 text-purple-500 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{l.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">{l.email}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {searchResults.contracts.length > 0 && (
+                      <div className="p-2">
+                        <p className="text-xs font-medium text-muted-foreground px-2 py-1">Contratos</p>
+                        {searchResults.contracts.map((c) => (
+                          <button
+                            key={c.id}
+                            className="w-full text-left px-2 py-2 hover:bg-muted rounded-md flex items-center gap-2 transition-colors"
+                            onClick={() => handleSelectResult("contract", c.id)}
+                            data-testid={`search-result-contract-${c.id}`}
+                          >
+                            <FileText className="h-4 w-4 text-green-500 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium">Contrato</p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(c.value))}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </PopoverContent>
+              )}
+            </Popover>
             
             <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
               <Bell className="h-5 w-5" />

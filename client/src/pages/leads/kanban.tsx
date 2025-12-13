@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useImobi, LeadStatus, Lead } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, MoreHorizontal, Phone, Mail, Users, ArrowRight, Loader2 } from "lucide-react";
+import { Plus, MoreHorizontal, Phone, Mail, Users, ArrowRight, Loader2, MessageSquare, PhoneCall, Calendar, FileText, Send } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,13 +57,95 @@ const initialFormData: LeadFormData = {
   notes: "",
 };
 
+type Interaction = {
+  id: string;
+  leadId: string;
+  userId: string;
+  type: string;
+  content: string;
+  createdAt: string;
+};
+
+const INTERACTION_TYPES = [
+  { value: "call", label: "Ligação", icon: PhoneCall },
+  { value: "email", label: "E-mail", icon: Mail },
+  { value: "whatsapp", label: "WhatsApp", icon: MessageSquare },
+  { value: "visit", label: "Visita", icon: Calendar },
+  { value: "note", label: "Anotação", icon: FileText },
+];
+
 export default function LeadsKanban() {
-  const { leads, tenant, refetchLeads } = useImobi();
+  const { leads, tenant, refetchLeads, user } = useImobi();
   const { toast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [formData, setFormData] = useState<LeadFormData>(initialFormData);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [interactions, setInteractions] = useState<Interaction[]>([]);
+  const [loadingInteractions, setLoadingInteractions] = useState(false);
+  const [newInteractionType, setNewInteractionType] = useState("note");
+  const [newInteractionContent, setNewInteractionContent] = useState("");
+  const [isAddingInteraction, setIsAddingInteraction] = useState(false);
+
+  useEffect(() => {
+    if (editingLead) {
+      fetchInteractions(editingLead.id);
+    } else {
+      setInteractions([]);
+    }
+  }, [editingLead]);
+
+  const fetchInteractions = async (leadId: string) => {
+    setLoadingInteractions(true);
+    try {
+      const res = await fetch(`/api/leads/${leadId}/interactions`, {
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setInteractions(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch interactions:", error);
+    } finally {
+      setLoadingInteractions(false);
+    }
+  };
+
+  const handleAddInteraction = async () => {
+    if (!editingLead || !newInteractionContent.trim()) return;
+    
+    setIsAddingInteraction(true);
+    try {
+      const res = await fetch("/api/interactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          leadId: editingLead.id,
+          type: newInteractionType,
+          content: newInteractionContent,
+        }),
+      });
+
+      if (res.ok) {
+        toast({
+          title: "Interação registrada",
+          description: "A interação foi adicionada ao histórico do lead.",
+        });
+        setNewInteractionContent("");
+        await fetchInteractions(editingLead.id);
+      }
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível registrar a interação.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAddingInteraction(false);
+    }
+  };
 
   const getLeadsByStatus = (status: LeadStatus) => {
     return leads.filter((l) => l.status === status);
@@ -449,95 +534,187 @@ export default function LeadsKanban() {
       </div>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className={editingLead ? "max-w-2xl" : "max-w-md"}>
           <DialogHeader>
             <DialogTitle data-testid="dialog-title-lead">
               {editingLead ? "Editar Lead" : "Novo Lead"}
             </DialogTitle>
             <DialogDescription>
-              {editingLead ? "Atualize os dados do lead." : "Preencha os dados do novo lead."}
+              {editingLead ? "Atualize os dados e veja o histórico de interações." : "Preencha os dados do novo lead."}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nome *</Label>
-              <Input
-                id="name"
-                data-testid="input-lead-name"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+          
+          {editingLead ? (
+            <Tabs defaultValue="data" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="data">Dados</TabsTrigger>
+                <TabsTrigger value="history">Histórico ({interactions.length})</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="data">
+                <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">Nome *</Label>
+                    <Input id="name" data-testid="input-lead-name" value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} required />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email">E-mail *</Label>
+                      <Input id="email" type="email" data-testid="input-lead-email" value={formData.email} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone">Telefone *</Label>
+                      <Input id="phone" data-testid="input-lead-phone" value={formData.phone} onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))} required />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="source">Origem</Label>
+                      <Select value={formData.source} onValueChange={(v) => setFormData(prev => ({ ...prev, source: v }))}>
+                        <SelectTrigger data-testid="select-lead-source"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Site">Site</SelectItem>
+                          <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                          <SelectItem value="Indicação">Indicação</SelectItem>
+                          <SelectItem value="Portal">Portal Imobiliário</SelectItem>
+                          <SelectItem value="Telefone">Telefone</SelectItem>
+                          <SelectItem value="Outro">Outro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="budget">Orçamento (R$)</Label>
+                      <Input id="budget" type="number" data-testid="input-lead-budget" value={formData.budget} onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))} />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="notes">Observações</Label>
+                    <Textarea id="notes" data-testid="input-lead-notes" value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} rows={2} />
+                  </div>
+                  <DialogFooter>
+                    <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
+                    <Button type="submit" disabled={isSubmitting} data-testid="button-submit-lead">
+                      {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Salvar
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </TabsContent>
+              
+              <TabsContent value="history" className="space-y-4 pt-2">
+                <div className="flex gap-2">
+                  <Select value={newInteractionType} onValueChange={setNewInteractionType}>
+                    <SelectTrigger className="w-36" data-testid="select-interaction-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INTERACTION_TYPES.map((t) => (
+                        <SelectItem key={t.value} value={t.value}>
+                          <div className="flex items-center gap-2">
+                            <t.icon className="h-3 w-3" />
+                            {t.label}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex-1 flex gap-2">
+                    <Input
+                      placeholder="Descreva a interação..."
+                      value={newInteractionContent}
+                      onChange={(e) => setNewInteractionContent(e.target.value)}
+                      data-testid="input-interaction-content"
+                    />
+                    <Button size="icon" onClick={handleAddInteraction} disabled={isAddingInteraction || !newInteractionContent.trim()} data-testid="button-add-interaction">
+                      {isAddingInteraction ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="max-h-64 overflow-y-auto space-y-3">
+                  {loadingInteractions ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                    </div>
+                  ) : interactions.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground" data-testid="empty-state-interactions">
+                      <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">Nenhuma interação registrada</p>
+                    </div>
+                  ) : (
+                    interactions.map((interaction) => {
+                      const typeInfo = INTERACTION_TYPES.find((t) => t.value === interaction.type) || INTERACTION_TYPES[4];
+                      const IconComp = typeInfo.icon;
+                      return (
+                        <div key={interaction.id} className="flex gap-3 p-3 rounded-lg bg-muted/50" data-testid={`interaction-${interaction.id}`}>
+                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <IconComp className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Badge variant="secondary" className="text-[10px]">{typeInfo.label}</Badge>
+                              <span className="text-[10px] text-muted-foreground">
+                                {format(new Date(interaction.createdAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                              </span>
+                            </div>
+                            <p className="text-sm">{interaction.content}</p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">E-mail *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  data-testid="input-lead-email"
-                  value={formData.email}
-                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                  required
-                />
+                <Label htmlFor="name">Nome *</Label>
+                <Input id="name" data-testid="input-lead-name" value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} required />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">E-mail *</Label>
+                  <Input id="email" type="email" data-testid="input-lead-email" value={formData.email} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Telefone *</Label>
+                  <Input id="phone" data-testid="input-lead-phone" value={formData.phone} onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))} required />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="source">Origem</Label>
+                  <Select value={formData.source} onValueChange={(v) => setFormData(prev => ({ ...prev, source: v }))}>
+                    <SelectTrigger data-testid="select-lead-source"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Site">Site</SelectItem>
+                      <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                      <SelectItem value="Indicação">Indicação</SelectItem>
+                      <SelectItem value="Portal">Portal Imobiliário</SelectItem>
+                      <SelectItem value="Telefone">Telefone</SelectItem>
+                      <SelectItem value="Outro">Outro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="budget">Orçamento (R$)</Label>
+                  <Input id="budget" type="number" data-testid="input-lead-budget" value={formData.budget} onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))} />
+                </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="phone">Telefone *</Label>
-                <Input
-                  id="phone"
-                  data-testid="input-lead-phone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                  required
-                />
+                <Label htmlFor="notes">Observações</Label>
+                <Textarea id="notes" data-testid="input-lead-notes" value={formData.notes} onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))} rows={2} />
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="source">Origem</Label>
-                <Select value={formData.source} onValueChange={(v) => setFormData(prev => ({ ...prev, source: v }))}>
-                  <SelectTrigger data-testid="select-lead-source">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Site">Site</SelectItem>
-                    <SelectItem value="WhatsApp">WhatsApp</SelectItem>
-                    <SelectItem value="Indicação">Indicação</SelectItem>
-                    <SelectItem value="Portal">Portal Imobiliário</SelectItem>
-                    <SelectItem value="Telefone">Telefone</SelectItem>
-                    <SelectItem value="Outro">Outro</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="budget">Orçamento (R$)</Label>
-                <Input
-                  id="budget"
-                  type="number"
-                  data-testid="input-lead-budget"
-                  value={formData.budget}
-                  onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="notes">Observações</Label>
-              <Textarea
-                id="notes"
-                data-testid="input-lead-notes"
-                value={formData.notes}
-                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                rows={2}
-              />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={isSubmitting} data-testid="button-submit-lead">
-                {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                {editingLead ? "Salvar" : "Cadastrar"}
-              </Button>
-            </DialogFooter>
-          </form>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
+                <Button type="submit" disabled={isSubmitting} data-testid="button-submit-lead">
+                  {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Cadastrar
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
         </DialogContent>
       </Dialog>
     </div>

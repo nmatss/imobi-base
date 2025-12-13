@@ -76,6 +76,13 @@ export interface IStorage {
   subscribeNewsletter(subscription: InsertNewsletter): Promise<Newsletter>;
   unsubscribeNewsletter(email: string): Promise<boolean>;
   
+  // Global search
+  globalSearch(tenantId: string, query: string): Promise<{
+    properties: Property[];
+    leads: Lead[];
+    contracts: Contract[];
+  }>;
+  
   // Dashboard stats
   getDashboardStats(tenantId: string): Promise<{
     totalProperties: number;
@@ -313,6 +320,42 @@ export class DbStorage implements IStorage {
       .where(eq(schema.newsletterSubscriptions.email, email))
       .returning();
     return !!updated;
+  }
+
+  // Global search
+  async globalSearch(tenantId: string, query: string): Promise<{
+    properties: Property[];
+    leads: Lead[];
+    contracts: Contract[];
+  }> {
+    const searchTerm = `%${query.toLowerCase()}%`;
+    
+    const propertiesResult = await db.select().from(schema.properties)
+      .where(and(
+        eq(schema.properties.tenantId, tenantId),
+        sql`(LOWER(${schema.properties.title}) LIKE ${searchTerm} OR LOWER(${schema.properties.address}) LIKE ${searchTerm} OR LOWER(${schema.properties.city}) LIKE ${searchTerm})`
+      ))
+      .limit(10);
+    
+    const leadsResult = await db.select().from(schema.leads)
+      .where(and(
+        eq(schema.leads.tenantId, tenantId),
+        sql`(LOWER(${schema.leads.name}) LIKE ${searchTerm} OR LOWER(${schema.leads.email}) LIKE ${searchTerm} OR ${schema.leads.phone} LIKE ${searchTerm})`
+      ))
+      .limit(10);
+    
+    const contractsResult = await db.select().from(schema.contracts)
+      .where(and(
+        eq(schema.contracts.tenantId, tenantId),
+        sql`CAST(${schema.contracts.value} AS TEXT) LIKE ${searchTerm}`
+      ))
+      .limit(5);
+
+    return {
+      properties: propertiesResult,
+      leads: leadsResult,
+      contracts: contractsResult,
+    };
   }
 
   // Dashboard stats

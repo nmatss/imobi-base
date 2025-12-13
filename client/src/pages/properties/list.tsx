@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
-import { BedDouble, Bath, Ruler, MapPin, Search, Filter, Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { BedDouble, Bath, Ruler, MapPin, Search, Filter, Plus, Pencil, Trash2, Loader2, Share2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 function formatPrice(price: string) {
@@ -280,6 +280,20 @@ export default function PropertiesList() {
                   </Badge>
                 </div>
                 <div className="absolute top-3 left-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button 
+                    data-testid={`button-share-property-${property.id}`}
+                    variant="secondary" 
+                    size="icon" 
+                    className="h-8 w-8 backdrop-blur-md bg-white/90 hover:bg-green-100"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      const url = `${window.location.origin}/e/${tenant?.slug}/imovel/${property.id}`;
+                      const text = `Confira este imóvel: ${property.title} - ${formatPrice(property.price)}\n${url}`;
+                      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                    }}
+                  >
+                    <Share2 className="h-4 w-4 text-green-600" />
+                  </Button>
                   <Button 
                     data-testid={`button-edit-property-${property.id}`}
                     variant="secondary" 

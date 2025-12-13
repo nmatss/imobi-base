@@ -411,5 +411,19 @@ export async function registerRoutes(
     }
   });
 
+  // ===== GLOBAL SEARCH =====
+  app.get("/api/search", requireAuth, async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      if (!query || query.length < 2) {
+        return res.json({ properties: [], leads: [], contracts: [] });
+      }
+      const results = await storage.globalSearch(req.user!.tenantId, query);
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ error: "Erro ao buscar" });
+    }
+  });
+
   return httpServer;
 }
