@@ -62,7 +62,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <div className="flex items-center gap-2 overflow-hidden">
                 <div 
                   className="w-4 h-4 rounded-full shrink-0" 
-                  style={{ backgroundColor: tenant?.colors.primary }} 
+                  style={{ backgroundColor: tenant?.primaryColor }} 
                 />
                 <span className="truncate">{tenant?.name}</span>
               </div>
@@ -80,7 +80,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               >
                 <div 
                   className="w-3 h-3 rounded-full mr-2" 
-                  style={{ backgroundColor: t.colors.primary }} 
+                  style={{ backgroundColor: t.primaryColor }} 
                 />
                 {t.name}
               </DropdownMenuItem>

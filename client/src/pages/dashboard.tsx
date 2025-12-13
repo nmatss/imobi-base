@@ -3,6 +3,7 @@ import { useImobi } from "@/lib/imobi-context";
 import { Building2, Users, DollarSign, CalendarCheck, TrendingUp, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
 import { Button } from "@/components/ui/button";
+import { useMemo } from "react";
 
 const MOCK_CHART_DATA = [
   { name: "Jan", total: 12 },
@@ -14,12 +15,12 @@ const MOCK_CHART_DATA = [
 ];
 
 export default function Dashboard() {
-  const { tenant, properties, leads } = useImobi();
+  const { tenant, properties, leads, contracts, visits } = useImobi();
 
-  const kpis = [
+  const kpis = useMemo(() => [
     {
       title: "Imóveis Ativos",
-      value: properties.length.toString(),
+      value: properties.filter(p => p.status === "available").length.toString(),
       change: "+2.5%",
       trend: "up",
       icon: Building2,
@@ -33,19 +34,19 @@ export default function Dashboard() {
     },
     {
       title: "Propostas",
-      value: "8",
+      value: contracts.filter(c => c.status === "draft" || c.status === "sent").length.toString(),
       change: "-4%",
       trend: "down",
       icon: DollarSign,
     },
     {
       title: "Visitas Agendadas",
-      value: "12",
+      value: visits.filter(v => v.status === "scheduled").length.toString(),
       change: "+8%",
       trend: "up",
       icon: CalendarCheck,
     },
-  ];
+  ], [properties, leads, contracts, visits]);
 
   return (
     <div className="space-y-8">
@@ -62,7 +63,7 @@ export default function Dashboard() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {kpis.map((kpi, i) => (
-          <Card key={i} className="hover-elevate transition-all duration-200 border-l-4" style={{ borderLeftColor: i === 0 ? tenant?.colors.primary : undefined }}>
+          <Card key={i} className="hover-elevate transition-all duration-200 border-l-4" style={{ borderLeftColor: i === 0 ? tenant?.primaryColor : undefined }}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {kpi.title}
@@ -116,7 +117,7 @@ export default function Dashboard() {
                 />
                 <Bar 
                   dataKey="total" 
-                  fill={tenant?.colors.primary || "currentColor"} 
+                  fill={tenant?.primaryColor || "currentColor"} 
                   radius={[4, 4, 0, 0]} 
                 />
               </BarChart>

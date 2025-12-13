@@ -57,7 +57,7 @@ export default function LeadsKanban() {
 
               <div className="p-3 space-y-3 overflow-y-auto flex-1 custom-scrollbar">
                 {getLeadsByStatus(column.id).map((lead) => (
-                  <Card key={lead.id} className="cursor-grab active:cursor-grabbing hover-elevate transition-all border-l-4" style={{ borderLeftColor: tenant?.colors.primary }}>
+                  <Card key={lead.id} className="cursor-grab active:cursor-grabbing hover-elevate transition-all border-l-4" style={{ borderLeftColor: tenant?.primaryColor }}>
                     <CardHeader className="p-3 pb-2 space-y-0">
                       <div className="flex items-start justify-between">
                         <Badge variant="outline" className="text-[10px] font-normal mb-2 bg-background/50">
@@ -91,7 +91,7 @@ export default function LeadsKanban() {
                       </div>
                       {lead.budget && (
                         <div className="mt-2 pt-2 border-t border-border/50 font-medium text-foreground">
-                          Orçamento: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumSignificantDigits: 3 }).format(lead.budget)}
+                          Orçamento: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumSignificantDigits: 3 }).format(Number(lead.budget))}
                         </div>
                       )}
                       

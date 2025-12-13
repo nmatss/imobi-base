@@ -26,39 +26,54 @@ function LoginPage() {
     if (user) setLocation("/dashboard");
   }, [user, setLocation]);
 
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+    
+    try {
+      await login(email, password);
+    } catch (error: any) {
+      alert(error.message || "Erro ao fazer login");
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-md shadow-lg border-primary/10">
-        <CardHeader className="space-y-1 flex flex-col items-center text-center">
-          <div className="w-12 h-12 rounded-lg bg-primary flex items-center justify-center mb-4">
-            <Building2 className="h-6 w-6 text-primary-foreground" />
-          </div>
-          <CardTitle className="text-2xl font-bold font-heading">ImobiBase</CardTitle>
-          <CardDescription>
-            Entre na sua conta para gerenciar sua imobiliária
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" placeholder="admin@demo.com" defaultValue="admin@demo.com" />
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Senha</Label>
-              <a href="#" className="text-sm text-primary hover:underline">Esqueceu a senha?</a>
+        <form onSubmit={handleSubmit}>
+          <CardHeader className="space-y-1 flex flex-col items-center text-center">
+            <div className="w-12 h-12 rounded-lg bg-primary flex items-center justify-center mb-4">
+              <Building2 className="h-6 w-6 text-primary-foreground" />
             </div>
-            <Input id="password" type="password" defaultValue="password" />
-          </div>
-          <Button className="w-full" onClick={login}>
-            Entrar
-          </Button>
-        </CardContent>
-        <CardFooter className="flex justify-center border-t p-4 mt-2">
-          <p className="text-sm text-muted-foreground">
-            Não tem uma conta? <a href="#" className="text-primary hover:underline">Cadastre-se</a>
-          </p>
-        </CardFooter>
+            <CardTitle className="text-2xl font-bold font-heading">ImobiBase</CardTitle>
+            <CardDescription>
+              Entre na sua conta para gerenciar sua imobiliária
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" name="email" type="email" placeholder="admin@sol.com" defaultValue="admin@sol.com" required />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Senha</Label>
+                <a href="#" className="text-sm text-primary hover:underline">Esqueceu a senha?</a>
+              </div>
+              <Input id="password" name="password" type="password" defaultValue="password" required />
+            </div>
+            <Button type="submit" className="w-full">
+              Entrar
+            </Button>
+          </CardContent>
+          <CardFooter className="flex justify-center border-t p-4 mt-2">
+            <p className="text-sm text-muted-foreground">
+              Não tem uma conta? <a href="#" className="text-primary hover:underline">Cadastre-se</a>
+            </p>
+          </CardFooter>
+        </form>
       </Card>
     </div>
   );
