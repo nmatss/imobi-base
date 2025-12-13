@@ -122,7 +122,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="p-4 border-t border-sidebar-border">
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9 border border-sidebar-border">
-            <AvatarImage src={user?.avatar} />
+            <AvatarImage src={user?.avatar || undefined} />
             <AvatarFallback>U</AvatarFallback>
           </Avatar>
           <div className="flex-1 overflow-hidden">
