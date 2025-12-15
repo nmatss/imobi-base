@@ -13,8 +13,14 @@ import FinanceiroPage from "@/pages/financeiro";
 import ReportsPage from "@/pages/reports";
 import SettingsPage from "@/pages/settings";
 import TenantLanding from "@/pages/public/landing";
+import PropertyDetails from "@/pages/public/property-details";
+import PublicProperties from "@/pages/public/properties";
 import ProductLanding from "@/pages/public/product-landing";
 import NotFound from "@/pages/not-found";
+import AdminDashboard from "@/pages/admin";
+import TenantsPage from "@/pages/admin/tenants";
+import PlansPage from "@/pages/admin/plans";
+import LogsPage from "@/pages/admin/logs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -121,27 +127,27 @@ function LoginPage() {
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-medium">Email</Label>
               <Input 
-                id="email" 
-                name="email" 
-                type="email" 
-                placeholder="seu@email.com" 
-                defaultValue="admin@sol.com" 
-                required 
+                id="email"
+                name="email"
+                type="email"
+                placeholder="seu@email.com"
+                defaultValue="admin@demo.com"
+                required
                 className="h-12"
                 data-testid="input-email"
               />
             </div>
-            
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password" className="text-sm font-medium">Senha</Label>
                 <a href="#" className="text-sm text-primary hover:underline">Esqueceu?</a>
               </div>
-              <Input 
-                id="password" 
-                name="password" 
-                type="password" 
-                defaultValue="password" 
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                defaultValue="demo123" 
                 required 
                 className="h-12"
                 data-testid="input-password"
@@ -193,10 +199,33 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
   );
 }
 
+function SuperAdminRoute({ component: Component }: { component: React.ComponentType }) {
+  const { user } = useImobi();
+  const [, setLocation] = useLocation();
+
+  if (!user) {
+    setLocation("/login");
+    return null;
+  }
+
+  if (user.role !== "superadmin") {
+    setLocation("/dashboard");
+    return null;
+  }
+
+  return (
+    <DashboardLayout>
+      <Component />
+    </DashboardLayout>
+  );
+}
+
 function Router() {
   return (
     <Switch>
       {/* Public Tenant Routes */}
+      <Route path="/e/:slug/imoveis" component={PublicProperties} />
+      <Route path="/e/:slug/imovel/:propertyId" component={PropertyDetails} />
       <Route path="/e/:rest*" component={TenantLanding} />
 
       {/* App Routes */}
@@ -213,7 +242,13 @@ function Router() {
       <Route path="/financeiro" component={() => <ProtectedRoute component={FinanceiroPage} />} />
       <Route path="/reports" component={() => <ProtectedRoute component={ReportsPage} />} />
       <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
-      
+
+      {/* Admin Routes (SuperAdmin only) */}
+      <Route path="/admin" component={() => <SuperAdminRoute component={AdminDashboard} />} />
+      <Route path="/admin/tenants" component={() => <SuperAdminRoute component={TenantsPage} />} />
+      <Route path="/admin/plans" component={() => <SuperAdminRoute component={PlansPage} />} />
+      <Route path="/admin/logs" component={() => <SuperAdminRoute component={LogsPage} />} />
+
       {/* Fallback */}
       <Route component={NotFound} />
     </Switch>

@@ -1,253 +1,462 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useImobi } from "@/lib/imobi-context";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { Building, Globe, Save, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Input } from "@/components/ui/input";
+import {
+  Building2,
+  Palette,
+  CreditCard,
+  Users,
+  Shield,
+  Plug,
+  Bell,
+  Sparkles,
+  Menu,
+  Search,
+  ChevronRight,
+  Settings as SettingsIcon,
+  MessageSquare,
+} from "lucide-react";
+import { GeneralTab } from "./tabs/GeneralTab";
+import { BrandTab } from "./tabs/BrandTab";
+import { PlansTab } from "./tabs/PlansTab";
+import { UsersTab } from "./tabs/UsersTab";
+import { PermissionsTab } from "./tabs/PermissionsTab";
+import { IntegrationsTab } from "./tabs/IntegrationsTab";
+import { NotificationsTab } from "./tabs/NotificationsTab";
+import { AITab } from "./tabs/AITab";
+import { WhatsAppTab } from "./tabs/WhatsAppTab";
+import type { TenantSettings, BrandSettings, AISettings, User } from "./types";
+
+type TabId = "general" | "brand" | "plans" | "users" | "permissions" | "integrations" | "notifications" | "ai" | "whatsapp";
+
+interface NavItem {
+  id: TabId;
+  label: string;
+  shortLabel: string;
+  icon: React.ReactNode;
+  description: string;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  {
+    id: "general",
+    label: "Geral",
+    shortLabel: "Geral",
+    icon: <Building2 className="w-4 h-4" />,
+    description: "Dados da empresa, CNPJ, CRECI",
+  },
+  {
+    id: "brand",
+    label: "Marca & Site",
+    shortLabel: "Marca",
+    icon: <Palette className="w-4 h-4" />,
+    description: "Logo, cores, domínio, redes sociais",
+  },
+  {
+    id: "plans",
+    label: "Planos",
+    shortLabel: "Planos",
+    icon: <CreditCard className="w-4 h-4" />,
+    description: "Assinatura e cobrança",
+  },
+  {
+    id: "users",
+    label: "Usuários",
+    shortLabel: "Usuários",
+    icon: <Users className="w-4 h-4" />,
+    description: "Gerenciar equipe e convites",
+  },
+  {
+    id: "permissions",
+    label: "Permissões",
+    shortLabel: "Permissões",
+    icon: <Shield className="w-4 h-4" />,
+    description: "Matriz de permissões por cargo",
+  },
+  {
+    id: "integrations",
+    label: "Integrações",
+    shortLabel: "Integrações",
+    icon: <Plug className="w-4 h-4" />,
+    description: "Portais, WhatsApp, e-mail",
+  },
+  {
+    id: "whatsapp",
+    label: "Templates WhatsApp",
+    shortLabel: "WhatsApp",
+    icon: <MessageSquare className="w-4 h-4" />,
+    description: "Mensagens prontas e automação",
+  },
+  {
+    id: "notifications",
+    label: "Notificações",
+    shortLabel: "Notif.",
+    icon: <Bell className="w-4 h-4" />,
+    description: "Alertas e destinatários",
+  },
+  {
+    id: "ai",
+    label: "IA & Automação",
+    shortLabel: "IA",
+    icon: <Sparkles className="w-4 h-4" />,
+    description: "Assistente e presets",
+  },
+];
 
 export default function SettingsPage() {
   const { tenant } = useImobi();
   const { toast } = useToast();
-  const [isSaving, setIsSaving] = useState(false);
-  const [formData, setFormData] = useState({
-    name: tenant?.name || "",
-    email: tenant?.email || "",
-    phone: tenant?.phone || "",
-    address: tenant?.address || "",
-    primaryColor: tenant?.primaryColor || "#0066cc",
-    secondaryColor: tenant?.secondaryColor || "#333333",
-    slug: tenant?.slug || "",
-  });
+  const [activeTab, setActiveTab] = useState<TabId>("general");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [users, setUsers] = useState<User[]>([]);
+  const [generalSettings, setGeneralSettings] = useState<Partial<TenantSettings> | null>(null);
+  const [brandSettings, setBrandSettings] = useState<Partial<BrandSettings> | null>(null);
+  const [aiSettings, setAISettings] = useState<Partial<AISettings> | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const handleSave = async () => {
-    setIsSaving(true);
+  useEffect(() => {
+    fetchAllSettings();
+  }, []);
+
+  const fetchAllSettings = async () => {
+    setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      toast({
-        title: "Configurações salvas",
-        description: "As alterações foram aplicadas com sucesso.",
-      });
+      await Promise.all([
+        fetchUsers(),
+        fetchGeneralSettings(),
+        fetchBrandSettings(),
+        fetchAISettings(),
+      ]);
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível salvar as configurações.",
-        variant: "destructive",
-      });
+      console.error("Error fetching settings:", error);
     } finally {
-      setIsSaving(false);
+      setLoading(false);
     }
   };
 
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch("/api/users", {
+        credentials: "include",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data);
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    }
+  };
+
+  const fetchGeneralSettings = async () => {
+    try {
+      const response = await fetch("/api/settings/general", {
+        credentials: "include",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setGeneralSettings(data);
+      }
+    } catch (error) {
+      console.error("Error fetching general settings:", error);
+    }
+  };
+
+  const fetchBrandSettings = async () => {
+    try {
+      const response = await fetch("/api/settings/brand", {
+        credentials: "include",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setBrandSettings(data);
+      }
+    } catch (error) {
+      console.error("Error fetching brand settings:", error);
+    }
+  };
+
+  const fetchAISettings = async () => {
+    try {
+      const response = await fetch("/api/settings/ai", {
+        credentials: "include",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setAISettings(data);
+      }
+    } catch (error) {
+      console.error("Error fetching AI settings:", error);
+    }
+  };
+
+  const handleSaveGeneral = async (data: Partial<TenantSettings>) => {
+    const response = await fetch("/api/settings/general", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Erro ao salvar configurações");
+    }
+
+    const updated = await response.json();
+    setGeneralSettings(updated);
+    return updated;
+  };
+
+  const handleSaveBrand = async (data: Partial<BrandSettings>) => {
+    const response = await fetch("/api/settings/brand", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Erro ao salvar configurações de marca");
+    }
+
+    const updated = await response.json();
+    setBrandSettings(updated);
+    return updated;
+  };
+
+  const handleSaveAI = async (data: Partial<AISettings>) => {
+    const response = await fetch("/api/settings/ai", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Erro ao salvar configurações de IA");
+    }
+
+    const updated = await response.json();
+    setAISettings(updated);
+    return updated;
+  };
+
+  const generalInitialData: Partial<TenantSettings> = {
+    name: generalSettings?.name || tenant?.name || "",
+    email: generalSettings?.email || tenant?.email || "",
+    phone: generalSettings?.phone || tenant?.phone || "",
+    address: generalSettings?.address || tenant?.address || "",
+    cnpj: generalSettings?.cnpj || "",
+    inscricaoMunicipal: generalSettings?.inscricaoMunicipal || "",
+    creci: generalSettings?.creci || "",
+    bankName: generalSettings?.bankName || "",
+    bankAgency: generalSettings?.bankAgency || "",
+    bankAccount: generalSettings?.bankAccount || "",
+    pixKey: generalSettings?.pixKey || "",
+    businessHoursStart: generalSettings?.businessHoursStart || "09:00",
+    businessHoursEnd: generalSettings?.businessHoursEnd || "18:00",
+  };
+
+  const brandInitialData: Partial<BrandSettings> = {
+    logoUrl: brandSettings?.logoUrl || tenant?.logo || "",
+    primaryColor: brandSettings?.primaryColor || tenant?.primaryColor || "#0066cc",
+    secondaryColor: brandSettings?.secondaryColor || tenant?.secondaryColor || "#333333",
+    subdomain: brandSettings?.subdomain || tenant?.slug || "",
+    customDomain: brandSettings?.customDomain || "",
+    facebookUrl: brandSettings?.facebookUrl || "",
+    instagramUrl: brandSettings?.instagramUrl || "",
+    linkedinUrl: brandSettings?.linkedinUrl || "",
+    youtubeUrl: brandSettings?.youtubeUrl || "",
+    footerText: brandSettings?.footerText || "",
+  };
+
+  const aiInitialData: Partial<AISettings> = {
+    aiActive: aiSettings?.aiActive ?? true,
+    language: aiSettings?.language || "pt-BR",
+    tone: aiSettings?.tone || "neutral",
+    modulePresets: aiSettings?.modulePresets || {},
+    brokersCanEdit: aiSettings?.brokersCanEdit ?? true,
+  };
+
+  // Filter nav items based on search
+  const filteredNavItems = searchQuery
+    ? NAV_ITEMS.filter(
+        (item) =>
+          item.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          item.description.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : NAV_ITEMS;
+
+  const currentNavItem = NAV_ITEMS.find((item) => item.id === activeTab);
+
+  const handleNavClick = (tabId: TabId) => {
+    setActiveTab(tabId);
+    setMobileNavOpen(false);
+    setSearchQuery("");
+  };
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case "general":
+        return <GeneralTab initialData={generalInitialData} onSave={handleSaveGeneral} />;
+      case "brand":
+        return <BrandTab initialData={brandInitialData} onSave={handleSaveBrand} />;
+      case "plans":
+        return <PlansTab />;
+      case "users":
+        return <UsersTab users={users} onRefresh={fetchUsers} />;
+      case "permissions":
+        return <PermissionsTab />;
+      case "integrations":
+        return <IntegrationsTab />;
+      case "whatsapp":
+        return <WhatsAppTab />;
+      case "notifications":
+        return <NotificationsTab />;
+      case "ai":
+        return <AITab initialData={aiInitialData} onSave={handleSaveAI} />;
+      default:
+        return null;
+    }
+  };
+
+  // Navigation sidebar component (reused for desktop and mobile)
+  const NavContent = ({ showSearch = true }: { showSearch?: boolean }) => (
+    <div className="flex flex-col h-full">
+      {showSearch && (
+        <div className="p-3 border-b">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar configuração..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 h-9 text-sm"
+            />
+          </div>
+        </div>
+      )}
+      <ScrollArea className="flex-1">
+        <nav className="p-2 space-y-1">
+          {filteredNavItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => handleNavClick(item.id)}
+              className={cn(
+                "w-full flex items-start gap-3 p-3 rounded-lg text-left transition-colors",
+                "hover:bg-accent hover:text-accent-foreground",
+                activeTab === item.id && "bg-primary/10 text-primary border border-primary/20"
+              )}
+            >
+              <div
+                className={cn(
+                  "p-2 rounded-md shrink-0",
+                  activeTab === item.id ? "bg-primary text-primary-foreground" : "bg-muted"
+                )}
+              >
+                {item.icon}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm">{item.label}</div>
+                <div className="text-xs text-muted-foreground line-clamp-1">{item.description}</div>
+              </div>
+              {activeTab === item.id && (
+                <ChevronRight className="w-4 h-4 shrink-0 mt-2 text-primary" />
+              )}
+            </button>
+          ))}
+        </nav>
+      </ScrollArea>
+    </div>
+  );
+
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-heading font-bold text-foreground">Configurações</h1>
-        <p className="text-muted-foreground text-sm sm:text-base">Gerencie os dados da sua imobiliária</p>
+    <div className="min-h-screen pb-safe">
+      {/* Header with breadcrumb */}
+      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
+        <div className="px-4 py-3 sm:px-6">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+            <span className="truncate max-w-[150px]">{tenant?.name || "Imobiliária"}</span>
+            <ChevronRight className="w-4 h-4 shrink-0" />
+            <span className="text-foreground font-medium">Configurações</span>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              {/* Mobile menu trigger */}
+              <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+                <SheetTrigger asChild className="lg:hidden">
+                  <Button variant="outline" size="icon" className="shrink-0 h-10 w-10">
+                    <Menu className="w-4 h-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-[85vw] max-w-[320px] p-0">
+                  <div className="flex items-center gap-2 p-4 border-b">
+                    <SettingsIcon className="w-5 h-5" />
+                    <span className="font-semibold">Configurações</span>
+                  </div>
+                  <NavContent />
+                </SheetContent>
+              </Sheet>
+
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-heading font-bold text-foreground flex items-center gap-2">
+                  <span className="shrink-0">{currentNavItem?.icon}</span>
+                  <span className="hidden sm:inline truncate">{currentNavItem?.label}</span>
+                  <span className="sm:hidden truncate">{currentNavItem?.shortLabel}</span>
+                </h1>
+                <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block truncate">
+                  {currentNavItem?.description}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile horizontal tabs - Alternative navigation */}
+        <div className="lg:hidden border-t overflow-x-auto scrollbar-hide">
+          <div className="flex px-2 min-w-max">
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => handleNavClick(item.id)}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                  activeTab === item.id
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {item.icon}
+                <span>{item.shortLabel}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
-          <TabsTrigger value="general">Geral</TabsTrigger>
-          <TabsTrigger value="branding">Marca & Site</TabsTrigger>
-          <TabsTrigger value="billing">Planos</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="general" className="space-y-4 mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">Dados da Empresa</CardTitle>
-              <CardDescription>
-                Informações básicas da sua imobiliária.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Nome da Imobiliária</Label>
-                <Input 
-                  id="name" 
-                  data-testid="input-tenant-name"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="phone">Telefone</Label>
-                  <Input 
-                    id="phone" 
-                    data-testid="input-tenant-phone"
-                    value={formData.phone}
-                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                    placeholder="(11) 99999-9999" 
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="email">E-mail de Contato</Label>
-                  <Input 
-                    id="email" 
-                    type="email" 
-                    data-testid="input-tenant-email"
-                    value={formData.email}
-                    onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="address">Endereço</Label>
-                <Input 
-                  id="address" 
-                  data-testid="input-tenant-address"
-                  value={formData.address}
-                  onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                  placeholder="Rua, número - Bairro, Cidade/UF"
-                />
-              </div>
-            </CardContent>
-            <CardFooter className="border-t px-6 py-4">
-              <Button onClick={handleSave} disabled={isSaving} className="ml-auto gap-2" data-testid="button-save-settings">
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Salvar Alterações
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
+      {/* Main content area */}
+      <div className="flex">
+        {/* Desktop sidebar */}
+        <aside className="hidden lg:block w-[280px] border-r bg-muted/30 shrink-0 sticky top-[85px] h-[calc(100vh-85px)]">
+          <NavContent />
+        </aside>
 
-        <TabsContent value="branding" className="space-y-4 mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">Identidade Visual</CardTitle>
-              <CardDescription>
-                Personalize como sua imobiliária aparece no sistema e no site.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
-                <div 
-                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg border-2 border-dashed flex items-center justify-center bg-muted/50 shrink-0"
-                  style={{ borderColor: formData.primaryColor }}
-                >
-                  {tenant?.logo ? (
-                    <img src={tenant.logo} alt="Logo" className="w-full h-full object-contain rounded-lg" />
-                  ) : (
-                    <Building className="w-8 h-8 opacity-20" />
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Logo da Empresa</Label>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm">Fazer Upload</Button>
-                    <Button variant="ghost" size="sm" className="text-destructive">Remover</Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Recomendado: 400x400px, PNG ou JPG.</p>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Cor Primária</Label>
-                  <div className="flex gap-2">
-                    <input 
-                      type="color"
-                      value={formData.primaryColor}
-                      onChange={(e) => setFormData(prev => ({ ...prev, primaryColor: e.target.value }))}
-                      className="w-10 h-10 rounded-md border shadow-sm cursor-pointer"
-                    />
-                    <Input 
-                      value={formData.primaryColor} 
-                      onChange={(e) => setFormData(prev => ({ ...prev, primaryColor: e.target.value }))}
-                      className="font-mono"
-                      data-testid="input-primary-color"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Cor Secundária</Label>
-                  <div className="flex gap-2">
-                    <input 
-                      type="color"
-                      value={formData.secondaryColor}
-                      onChange={(e) => setFormData(prev => ({ ...prev, secondaryColor: e.target.value }))}
-                      className="w-10 h-10 rounded-md border shadow-sm cursor-pointer"
-                    />
-                    <Input 
-                      value={formData.secondaryColor}
-                      onChange={(e) => setFormData(prev => ({ ...prev, secondaryColor: e.target.value }))}
-                      className="font-mono"
-                      data-testid="input-secondary-color"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Endereço do Site Público</Label>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                  <div className="bg-muted px-3 py-2 rounded-md text-sm text-muted-foreground border whitespace-nowrap">
-                    /e/
-                  </div>
-                  <Input 
-                    value={formData.slug}
-                    onChange={(e) => setFormData(prev => ({ ...prev, slug: e.target.value }))}
-                    className="max-w-[200px]"
-                    data-testid="input-tenant-slug"
-                  />
-                  <Button variant="ghost" size="icon" asChild>
-                    <a href={`/e/${tenant?.slug}`} target="_blank">
-                      <Globe className="w-4 h-4" />
-                    </a>
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="border-t px-6 py-4">
-              <Button onClick={handleSave} disabled={isSaving} className="ml-auto gap-2">
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Salvar Alterações
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="billing" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">Plano Atual</CardTitle>
-              <CardDescription>Gerencie sua assinatura</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-primary/5 rounded-lg border border-primary/20 gap-3">
-                <div>
-                  <h3 className="font-bold text-lg text-primary">Plano Profissional</h3>
-                  <p className="text-sm text-muted-foreground">Até 10 usuários • 2.000 imóveis</p>
-                </div>
-                <Badge className="bg-primary text-primary-foreground hover:bg-primary">Ativo</Badge>
-              </div>
-              
-              <div className="grid gap-2 text-sm">
-                <div className="flex justify-between py-2 border-b">
-                  <span>Próxima cobrança</span>
-                  <span className="font-medium">13/01/2026</span>
-                </div>
-                <div className="flex justify-between py-2 border-b">
-                  <span>Valor</span>
-                  <span className="font-medium">R$ 109,90/mês</span>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="border-t px-6 py-4 flex flex-col sm:flex-row justify-between gap-2">
-              <Button variant="link" className="text-muted-foreground px-0">Cancelar assinatura</Button>
-              <Button variant="outline">Alterar Plano</Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        {/* Content */}
+        <main className="flex-1 min-w-0">
+          <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto">
+            {renderTabContent()}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

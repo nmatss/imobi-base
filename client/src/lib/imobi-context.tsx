@@ -42,6 +42,7 @@ export type Property = {
   images: string[] | null;
   status: string;
   featured: boolean;
+  createdAt?: string;
 };
 
 export type LeadStatus = "new" | "qualification" | "visit" | "proposal" | "contract";
@@ -89,6 +90,7 @@ export type Contract = {
   value: string;
   terms: string | null;
   signedAt: Date | null;
+  createdAt?: string;
 };
 
 // --- Context ---

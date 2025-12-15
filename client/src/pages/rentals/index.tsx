@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useImobi } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,16 +9,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Home, 
-  Users, 
-  FileText, 
-  DollarSign, 
-  Plus, 
-  Loader2, 
-  MoreVertical, 
-  Phone, 
+import {
+  Home,
+  Users,
+  FileText,
+  DollarSign,
+  Plus,
+  Loader2,
+  MoreVertical,
+  Phone,
   Mail,
   Building2,
   Calendar,
@@ -33,7 +34,12 @@ import {
   X,
   RotateCcw,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  MessageCircle,
+  Sparkles,
+  Send,
+  ArrowRight,
+  CreditCard,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -49,413 +55,243 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts";
 
-type Owner = {
+import { RentalDashboard } from "./components/RentalDashboard";
+import { RentalAlerts } from "./components/RentalAlerts";
+import { LocadoresTab } from "./components/tabs/LocadoresTab";
+import { InquilinosTab } from "./components/tabs/InquilinosTab";
+import { RepassesTab } from "./components/tabs/RepassesTab";
+import { WhatsAppButton } from "@/components/whatsapp/WhatsAppButton";
+import { QuickSendModal } from "@/components/whatsapp/QuickSendModal";
+
+import type {
+  Owner,
+  Renter,
+  RentalContract,
+  RentalPayment,
+  RentalTransfer,
+  Property,
+  RentalMetrics,
+  ChartDataPoint,
+  RentalAlerts as RentalAlertsType,
+  OwnerForm,
+  RenterForm,
+  ContractForm,
+  PaymentForm,
+} from "./types";
+import { formatPrice, formatDate, formatMonth, getStatusColor, getStatusLabel, getDaysOverdue } from "./types";
+
+type Period = "currentMonth" | "lastMonth" | "year";
+type TabValue = "locadores" | "inquilinos" | "contratos" | "boletos" | "repasses" | "relatorios";
+
+// AI Templates for AITOPIA
+type RentalAIPrompt = {
   id: string;
-  tenantId: string;
-  name: string;
-  email: string | null;
-  phone: string;
-  cpfCnpj: string | null;
-  address: string | null;
-  bankName: string | null;
-  bankAgency: string | null;
-  bankAccount: string | null;
-  pixKey: string | null;
-  notes: string | null;
-  createdAt: string;
+  label: string;
+  icon: typeof MessageCircle;
+  template: (data: any) => string;
 };
 
-type Renter = {
-  id: string;
-  tenantId: string;
-  name: string;
-  email: string | null;
-  phone: string;
-  cpfCnpj: string | null;
-  rg: string | null;
-  profession: string | null;
-  income: string | null;
-  address: string | null;
-  emergencyContact: string | null;
-  emergencyPhone: string | null;
-  notes: string | null;
-  createdAt: string;
-};
-
-type RentalContract = {
-  id: string;
-  tenantId: string;
-  propertyId: string;
-  ownerId: string;
-  renterId: string;
-  rentValue: string;
-  condoFee: string | null;
-  iptuValue: string | null;
-  dueDay: number;
-  startDate: string;
-  endDate: string;
-  adjustmentIndex: string | null;
-  depositValue: string | null;
-  administrationFee: string | null;
-  status: string;
-  notes: string | null;
-  createdAt: string;
-};
-
-type RentalPayment = {
-  id: string;
-  tenantId: string;
-  rentalContractId: string;
-  referenceMonth: string;
-  dueDate: string;
-  rentValue: string;
-  condoFee: string | null;
-  iptuValue: string | null;
-  extraCharges: string | null;
-  discounts: string | null;
-  totalValue: string;
-  paidValue: string | null;
-  paidDate: string | null;
-  status: string;
-  paymentMethod: string | null;
-  notes: string | null;
-  createdAt: string;
-};
-
-function formatPrice(price: string | null) {
-  if (!price) return "-";
-  const num = parseFloat(price);
-  if (isNaN(num)) return price;
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(num);
-}
-
-function formatDate(date: string | null) {
-  if (!date) return "-";
-  return new Date(date).toLocaleDateString('pt-BR');
-}
+const RENTAL_AI_PROMPTS: RentalAIPrompt[] = [
+  {
+    id: "cobranca_amigavel",
+    label: "Cobranca amigavel",
+    icon: MessageCircle,
+    template: (data: { renterName: string; value: string; daysOverdue: number }) =>
+      `Ola ${data.renterName}! Esperamos que esteja bem. Identificamos que o aluguel no valor de ${data.value} esta com ${data.daysOverdue} dias de atraso. Sabemos que imprevistos acontecem, por isso gostaramos de verificar se ha algo em que possamos ajudar. Por favor, entre em contato conosco para regularizar a situacao. Estamos a disposicao!`,
+  },
+  {
+    id: "reajuste_explicacao",
+    label: "Explicar reajuste",
+    icon: TrendingUp,
+    template: (data: { renterName: string; oldValue: string; newValue: string; index: string }) =>
+      `Prezado(a) ${data.renterName}, informamos que conforme previsto em contrato, seu aluguel sera reajustado pelo indice ${data.index}. O valor atual de ${data.oldValue} passara para ${data.newValue} a partir do proximo mes. Qualquer duvida, estamos a disposicao.`,
+  },
+  {
+    id: "lembrete_vencimento",
+    label: "Lembrete de vencimento",
+    icon: Calendar,
+    template: (data: { renterName: string; value: string; dueDate: string }) =>
+      `Ola ${data.renterName}! Lembramos que o aluguel no valor de ${data.value} vence em ${data.dueDate}. Para sua comodidade, o pagamento pode ser realizado via PIX ou transferencia bancaria. Caso ja tenha efetuado o pagamento, desconsidere esta mensagem.`,
+  },
+  {
+    id: "boas_vindas",
+    label: "Boas-vindas",
+    icon: Home,
+    template: (data: { renterName: string; propertyTitle: string }) =>
+      `Seja bem-vindo(a) ${data.renterName}! E um prazer te-lo como inquilino do imovel ${data.propertyTitle}. Estamos a disposicao para qualquer necessidade. Desejamos que sua estadia seja muito agradavel!`,
+  },
+];
 
 export default function RentalsPage() {
   const { properties, tenant } = useImobi();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("owners");
-  
+
+  // Main state
+  const [activeTab, setActiveTab] = useState<TabValue>("locadores");
+  const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Data state
   const [owners, setOwners] = useState<Owner[]>([]);
   const [renters, setRenters] = useState<Renter[]>([]);
   const [rentalContracts, setRentalContracts] = useState<RentalContract[]>([]);
   const [payments, setPayments] = useState<RentalPayment[]>([]);
-  const [loading, setLoading] = useState(true);
-  
+  const [transfers, setTransfers] = useState<RentalTransfer[]>([]);
+
+  // Metrics state
+  const [metrics, setMetrics] = useState<RentalMetrics | null>(null);
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [alerts, setAlerts] = useState<RentalAlertsType | null>(null);
+  const [chartPeriod, setChartPeriod] = useState<Period>("currentMonth");
+
+  // Modal states
   const [isOwnerModalOpen, setIsOwnerModalOpen] = useState(false);
   const [isRenterModalOpen, setIsRenterModalOpen] = useState(false);
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const [ownerForm, setOwnerForm] = useState({
+  const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+
+  // Form states
+  const [ownerForm, setOwnerForm] = useState<OwnerForm>({
     name: "", email: "", phone: "", cpfCnpj: "", address: "",
     bankName: "", bankAgency: "", bankAccount: "", pixKey: "", notes: ""
   });
-  
-  const [renterForm, setRenterForm] = useState({
+
+  const [renterForm, setRenterForm] = useState<RenterForm>({
     name: "", email: "", phone: "", cpfCnpj: "", rg: "", profession: "",
     income: "", address: "", emergencyContact: "", emergencyPhone: "", notes: ""
   });
-  
-  const [contractForm, setContractForm] = useState({
+
+  const [contractForm, setContractForm] = useState<ContractForm>({
     propertyId: "", ownerId: "", renterId: "", rentValue: "", condoFee: "",
     iptuValue: "", dueDay: "10", startDate: "", endDate: "", adjustmentIndex: "IGPM",
     depositValue: "", administrationFee: "10", notes: ""
   });
-  
-  const [paymentForm, setPaymentForm] = useState({
+
+  const [paymentForm, setPaymentForm] = useState<PaymentForm>({
     rentalContractId: "", referenceMonth: "", dueDate: "", rentValue: "",
     condoFee: "", iptuValue: "", extraCharges: "", discounts: "", totalValue: "", notes: ""
   });
 
-  // Filtros para aba Contratos
+  // AI state
+  const [aiMessage, setAiMessage] = useState("");
+  const [aiContext, setAiContext] = useState<any>(null);
+
+  // Contract filters
   const [contractFilters, setContractFilters] = useState({
-    ownerId: "",
-    renterId: "",
-    propertyId: "",
-    status: "",
-    searchText: ""
+    ownerId: "", renterId: "", propertyId: "", status: "", searchText: ""
   });
 
-  // Filtros para aba Pagamentos
+  // Payment filters
   const [paymentFilters, setPaymentFilters] = useState({
-    status: "",
-    contractId: "",
-    periodPreset: "",
-    startDate: "",
-    endDate: "",
-    onlyOverdue: false
+    status: "", contractId: "", periodPreset: "", startDate: "", endDate: "", onlyOverdue: false
   });
 
+  // Report filters
   const [reportFilters, setReportFilters] = useState({
-    ownerId: "",
-    renterId: "",
-    status: "",
-    startDate: "",
-    endDate: "",
-    propertyId: "",
-    minValue: "",
-    maxValue: "",
-    onlyOverdue: false,
-    periodPreset: ""
+    ownerId: "", renterId: "", status: "", startDate: "", endDate: "",
+    propertyId: "", minValue: "", maxValue: "", onlyOverdue: false, periodPreset: ""
   });
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
+  // Report data
   const [ownerReport, setOwnerReport] = useState<any[]>([]);
   const [renterReport, setRenterReport] = useState<any[]>([]);
-  const [paymentsReport, setPaymentsReport] = useState<any[]>([]);
+  const [paymentsReport, setPaymentsReport] = useState<any>(null);
   const [overdueReport, setOverdueReport] = useState<any>(null);
-  const [loadingReports, setLoadingReports] = useState(false);
 
-  const periodPresets = [
-    { label: "Hoje", value: "today" },
-    { label: "Últimos 7 dias", value: "7days" },
-    { label: "Últimos 30 dias", value: "30days" },
-    { label: "Mês Atual", value: "currentMonth" },
-    { label: "Trimestre", value: "quarter" },
-    { label: "Ano Atual", value: "currentYear" },
-  ];
-
-  const applyPeriodPreset = (preset: string) => {
-    const today = new Date();
-    let startDate = "";
-    let endDate = today.toISOString().split("T")[0];
-
-    switch (preset) {
-      case "today":
-        startDate = endDate;
-        break;
-      case "7days":
-        startDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-        break;
-      case "30days":
-        startDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-        break;
-      case "currentMonth":
-        startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split("T")[0];
-        break;
-      case "quarter":
-        const quarterStart = Math.floor(today.getMonth() / 3) * 3;
-        startDate = new Date(today.getFullYear(), quarterStart, 1).toISOString().split("T")[0];
-        break;
-      case "currentYear":
-        startDate = new Date(today.getFullYear(), 0, 1).toISOString().split("T")[0];
-        break;
-    }
-
-    setReportFilters(prev => ({ ...prev, periodPreset: preset, startDate, endDate }));
-  };
-
-  const clearAllFilters = () => {
-    setReportFilters({
-      ownerId: "",
-      renterId: "",
-      status: "",
-      startDate: "",
-      endDate: "",
-      propertyId: "",
-      minValue: "",
-      maxValue: "",
-      onlyOverdue: false,
-      periodPreset: ""
-    });
-  };
-
-  const removeFilter = (key: keyof typeof reportFilters) => {
-    if (key === "startDate" || key === "endDate" || key === "periodPreset") {
-      setReportFilters(prev => ({ ...prev, startDate: "", endDate: "", periodPreset: "" }));
-    } else {
-      setReportFilters(prev => ({ ...prev, [key]: key === "onlyOverdue" ? false : "" }));
-    }
-  };
-
-  const getActiveFiltersCount = () => {
-    let count = 0;
-    if (reportFilters.ownerId) count++;
-    if (reportFilters.renterId) count++;
-    if (reportFilters.status) count++;
-    if (reportFilters.startDate || reportFilters.endDate) count++;
-    if (reportFilters.propertyId) count++;
-    if (reportFilters.minValue || reportFilters.maxValue) count++;
-    if (reportFilters.onlyOverdue) count++;
-    return count;
-  };
-
-  const getActiveFilterChips = () => {
-    const chips: { key: keyof typeof reportFilters; label: string }[] = [];
-    if (reportFilters.ownerId) {
-      const owner = owners.find(o => o.id === reportFilters.ownerId);
-      chips.push({ key: "ownerId", label: `Locador: ${owner?.name || ""}` });
-    }
-    if (reportFilters.renterId) {
-      const renter = renters.find(r => r.id === reportFilters.renterId);
-      chips.push({ key: "renterId", label: `Inquilino: ${renter?.name || ""}` });
-    }
-    if (reportFilters.status) {
-      const statusLabels: Record<string, string> = { paid: "Pagos", pending: "Pendentes" };
-      chips.push({ key: "status", label: `Status: ${statusLabels[reportFilters.status] || reportFilters.status}` });
-    }
-    if (reportFilters.startDate || reportFilters.endDate) {
-      const preset = periodPresets.find(p => p.value === reportFilters.periodPreset);
-      if (preset) {
-        chips.push({ key: "periodPreset", label: `Período: ${preset.label}` });
-      } else if (reportFilters.startDate && reportFilters.endDate) {
-        chips.push({ key: "startDate", label: `${formatDate(reportFilters.startDate)} - ${formatDate(reportFilters.endDate)}` });
-      } else if (reportFilters.startDate) {
-        chips.push({ key: "startDate", label: `A partir de ${formatDate(reportFilters.startDate)}` });
-      } else {
-        chips.push({ key: "endDate", label: `Até ${formatDate(reportFilters.endDate)}` });
-      }
-    }
-    if (reportFilters.propertyId) {
-      const property = properties.find(p => p.id === reportFilters.propertyId);
-      chips.push({ key: "propertyId", label: `Imóvel: ${property?.title || ""}` });
-    }
-    if (reportFilters.minValue || reportFilters.maxValue) {
-      if (reportFilters.minValue && reportFilters.maxValue) {
-        chips.push({ key: "minValue", label: `Valor: ${formatPrice(reportFilters.minValue)} - ${formatPrice(reportFilters.maxValue)}` });
-      } else if (reportFilters.minValue) {
-        chips.push({ key: "minValue", label: `Valor mín: ${formatPrice(reportFilters.minValue)}` });
-      } else {
-        chips.push({ key: "maxValue", label: `Valor máx: ${formatPrice(reportFilters.maxValue)}` });
-      }
-    }
-    if (reportFilters.onlyOverdue) {
-      chips.push({ key: "onlyOverdue", label: "Só vencidos" });
-    }
-    return chips;
-  };
-
-  // Funções auxiliares para filtros de contratos
-  const filteredContracts = rentalContracts.filter(contract => {
-    if (contractFilters.ownerId && contract.ownerId !== contractFilters.ownerId) return false;
-    if (contractFilters.renterId && contract.renterId !== contractFilters.renterId) return false;
-    if (contractFilters.propertyId && contract.propertyId !== contractFilters.propertyId) return false;
-    if (contractFilters.status && contract.status !== contractFilters.status) return false;
-    if (contractFilters.searchText) {
-      const search = contractFilters.searchText.toLowerCase();
-      const owner = owners.find(o => o.id === contract.ownerId);
-      const renter = renters.find(r => r.id === contract.renterId);
-      const property = properties.find(p => p.id === contract.propertyId);
-      const matchOwner = owner?.name.toLowerCase().includes(search);
-      const matchRenter = renter?.name.toLowerCase().includes(search);
-      const matchProperty = property?.title.toLowerCase().includes(search);
-      if (!matchOwner && !matchRenter && !matchProperty) return false;
-    }
-    return true;
-  });
-
-  const clearContractFilters = () => {
-    setContractFilters({ ownerId: "", renterId: "", propertyId: "", status: "", searchText: "" });
-  };
-
-  const getContractFiltersCount = () => {
-    let count = 0;
-    if (contractFilters.ownerId) count++;
-    if (contractFilters.renterId) count++;
-    if (contractFilters.propertyId) count++;
-    if (contractFilters.status) count++;
-    if (contractFilters.searchText) count++;
-    return count;
-  };
-
-  // Funções auxiliares para filtros de pagamentos
-  const applyPaymentPeriodPreset = (preset: string) => {
-    const today = new Date();
-    let startDate = "";
-    let endDate = today.toISOString().split("T")[0];
-
-    switch (preset) {
-      case "today":
-        startDate = endDate;
-        break;
-      case "7days":
-        startDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-        break;
-      case "30days":
-        startDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-        break;
-      case "currentMonth":
-        startDate = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split("T")[0];
-        break;
-      case "quarter":
-        const quarterStart = Math.floor(today.getMonth() / 3) * 3;
-        startDate = new Date(today.getFullYear(), quarterStart, 1).toISOString().split("T")[0];
-        break;
-      case "currentYear":
-        startDate = new Date(today.getFullYear(), 0, 1).toISOString().split("T")[0];
-        break;
-    }
-
-    setPaymentFilters(prev => ({ ...prev, periodPreset: preset, startDate, endDate }));
-  };
-
-  const filteredPayments = payments.filter(payment => {
-    if (paymentFilters.status && payment.status !== paymentFilters.status) return false;
-    if (paymentFilters.contractId && payment.rentalContractId !== paymentFilters.contractId) return false;
-    
-    if (paymentFilters.startDate) {
-      const paymentDate = new Date(payment.dueDate);
-      const startDate = new Date(paymentFilters.startDate);
-      if (paymentDate < startDate) return false;
-    }
-    if (paymentFilters.endDate) {
-      const paymentDate = new Date(payment.dueDate);
-      const endDate = new Date(paymentFilters.endDate);
-      if (paymentDate > endDate) return false;
-    }
-    
-    if (paymentFilters.onlyOverdue) {
-      const now = new Date();
-      const dueDate = new Date(payment.dueDate);
-      if (payment.status === "paid" || dueDate >= now) return false;
-    }
-    
-    return true;
-  });
-
-  const clearPaymentFilters = () => {
-    setPaymentFilters({ status: "", contractId: "", periodPreset: "", startDate: "", endDate: "", onlyOverdue: false });
-  };
-
-  const getPaymentFiltersCount = () => {
-    let count = 0;
-    if (paymentFilters.status) count++;
-    if (paymentFilters.contractId) count++;
-    if (paymentFilters.startDate || paymentFilters.endDate) count++;
-    if (paymentFilters.onlyOverdue) count++;
-    return count;
-  };
-
-  const fetchData = async () => {
-    setLoading(true);
+  // Fetch all data
+  const fetchData = useCallback(async () => {
     try {
-      const [ownersRes, rentersRes, contractsRes, paymentsRes] = await Promise.all([
+      setLoading(true);
+      const [ownersRes, rentersRes, contractsRes, paymentsRes, transfersRes, metricsRes, alertsRes] = await Promise.all([
         fetch("/api/owners", { credentials: "include" }),
         fetch("/api/renters", { credentials: "include" }),
         fetch("/api/rental-contracts", { credentials: "include" }),
         fetch("/api/rental-payments", { credentials: "include" }),
+        fetch("/api/rental-transfers", { credentials: "include" }),
+        fetch("/api/rentals/metrics", { credentials: "include" }),
+        fetch("/api/rentals/alerts", { credentials: "include" }),
       ]);
-      
+
       if (ownersRes.ok) setOwners(await ownersRes.json());
       if (rentersRes.ok) setRenters(await rentersRes.json());
       if (contractsRes.ok) setRentalContracts(await contractsRes.json());
       if (paymentsRes.ok) setPayments(await paymentsRes.json());
+      if (transfersRes.ok) setTransfers(await transfersRes.json());
+      if (metricsRes.ok) setMetrics(await metricsRes.json());
+      if (alertsRes.ok) setAlerts(await alertsRes.json());
     } catch (error) {
       console.error("Error fetching data:", error);
+      toast({ title: "Erro", description: "Erro ao carregar dados", variant: "destructive" });
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  // Fetch chart data
+  const fetchChartData = useCallback(async (period: Period) => {
+    try {
+      const res = await fetch(`/api/rentals/metrics/chart?period=${period}`, { credentials: "include" });
+      if (res.ok) {
+        setChartData(await res.json());
+      }
+    } catch (error) {
+      console.error("Error fetching chart data:", error);
+    }
+  }, []);
+
+  // Fetch reports
+  const fetchReports = useCallback(async () => {
+    try {
+      const params = new URLSearchParams();
+      if (reportFilters.ownerId) params.append("ownerId", reportFilters.ownerId);
+      if (reportFilters.renterId) params.append("renterId", reportFilters.renterId);
+      if (reportFilters.status) params.append("status", reportFilters.status);
+      if (reportFilters.startDate) params.append("startDate", reportFilters.startDate);
+      if (reportFilters.endDate) params.append("endDate", reportFilters.endDate);
+
+      const [ownerRes, renterRes, paymentsRes, overdueRes] = await Promise.all([
+        fetch(`/api/reports/owners?${params}`, { credentials: "include" }),
+        fetch(`/api/reports/renters?${params}`, { credentials: "include" }),
+        fetch(`/api/reports/payments-detailed?${params}`, { credentials: "include" }),
+        fetch(`/api/reports/overdue`, { credentials: "include" }),
+      ]);
+
+      if (ownerRes.ok) setOwnerReport(await ownerRes.json());
+      if (renterRes.ok) setRenterReport(await renterRes.json());
+      if (paymentsRes.ok) setPaymentsReport(await paymentsRes.json());
+      if (overdueRes.ok) setOverdueReport(await overdueRes.json());
+    } catch (error) {
+      console.error("Error fetching reports:", error);
+    }
+  }, [reportFilters]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
+  useEffect(() => {
+    fetchChartData(chartPeriod);
+  }, [chartPeriod, fetchChartData]);
+
+  useEffect(() => {
+    if (activeTab === "relatorios") {
+      fetchReports();
+    }
+  }, [activeTab, fetchReports]);
+
+  // CRUD Handlers
   const handleCreateOwner = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -464,21 +300,10 @@ export default function RentalsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          name: ownerForm.name,
-          phone: ownerForm.phone,
-          email: ownerForm.email || null,
-          cpfCnpj: ownerForm.cpfCnpj || null,
-          address: ownerForm.address || null,
-          bankName: ownerForm.bankName || null,
-          bankAgency: ownerForm.bankAgency || null,
-          bankAccount: ownerForm.bankAccount || null,
-          pixKey: ownerForm.pixKey || null,
-          notes: ownerForm.notes || null,
-        }),
+        body: JSON.stringify(ownerForm),
       });
       if (!res.ok) throw new Error("Erro ao criar locador");
-      toast({ title: "Locador criado", description: "O locador foi cadastrado com sucesso." });
+      toast({ title: "Sucesso", description: "Locador criado com sucesso" });
       setIsOwnerModalOpen(false);
       setOwnerForm({ name: "", email: "", phone: "", cpfCnpj: "", address: "", bankName: "", bankAgency: "", bankAccount: "", pixKey: "", notes: "" });
       fetchData();
@@ -497,22 +322,10 @@ export default function RentalsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          name: renterForm.name,
-          phone: renterForm.phone,
-          email: renterForm.email || null,
-          cpfCnpj: renterForm.cpfCnpj || null,
-          rg: renterForm.rg || null,
-          profession: renterForm.profession || null,
-          income: renterForm.income || null,
-          address: renterForm.address || null,
-          emergencyContact: renterForm.emergencyContact || null,
-          emergencyPhone: renterForm.emergencyPhone || null,
-          notes: renterForm.notes || null,
-        }),
+        body: JSON.stringify(renterForm),
       });
       if (!res.ok) throw new Error("Erro ao criar inquilino");
-      toast({ title: "Inquilino criado", description: "O inquilino foi cadastrado com sucesso." });
+      toast({ title: "Sucesso", description: "Inquilino criado com sucesso" });
       setIsRenterModalOpen(false);
       setRenterForm({ name: "", email: "", phone: "", cpfCnpj: "", rg: "", profession: "", income: "", address: "", emergencyContact: "", emergencyPhone: "", notes: "" });
       fetchData();
@@ -531,24 +344,10 @@ export default function RentalsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          propertyId: contractForm.propertyId,
-          ownerId: contractForm.ownerId,
-          renterId: contractForm.renterId,
-          rentValue: contractForm.rentValue,
-          condoFee: contractForm.condoFee || null,
-          iptuValue: contractForm.iptuValue || null,
-          dueDay: parseInt(contractForm.dueDay),
-          startDate: new Date(contractForm.startDate).toISOString(),
-          endDate: new Date(contractForm.endDate).toISOString(),
-          adjustmentIndex: contractForm.adjustmentIndex || null,
-          depositValue: contractForm.depositValue || null,
-          administrationFee: contractForm.administrationFee || null,
-          notes: contractForm.notes || null,
-        }),
+        body: JSON.stringify(contractForm),
       });
       if (!res.ok) throw new Error("Erro ao criar contrato");
-      toast({ title: "Contrato criado", description: "O contrato de aluguel foi criado com sucesso." });
+      toast({ title: "Sucesso", description: "Contrato criado com sucesso" });
       setIsContractModalOpen(false);
       setContractForm({ propertyId: "", ownerId: "", renterId: "", rentValue: "", condoFee: "", iptuValue: "", dueDay: "10", startDate: "", endDate: "", adjustmentIndex: "IGPM", depositValue: "", administrationFee: "10", notes: "" });
       fetchData();
@@ -567,21 +366,10 @@ export default function RentalsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          rentalContractId: paymentForm.rentalContractId,
-          referenceMonth: paymentForm.referenceMonth,
-          dueDate: new Date(paymentForm.dueDate).toISOString(),
-          rentValue: paymentForm.rentValue,
-          condoFee: paymentForm.condoFee || null,
-          iptuValue: paymentForm.iptuValue || null,
-          extraCharges: paymentForm.extraCharges || null,
-          discounts: paymentForm.discounts || null,
-          totalValue: paymentForm.totalValue,
-          notes: paymentForm.notes || null,
-        }),
+        body: JSON.stringify(paymentForm),
       });
       if (!res.ok) throw new Error("Erro ao criar pagamento");
-      toast({ title: "Pagamento criado", description: "O pagamento foi registrado com sucesso." });
+      toast({ title: "Sucesso", description: "Pagamento criado com sucesso" });
       setIsPaymentModalOpen(false);
       setPaymentForm({ rentalContractId: "", referenceMonth: "", dueDate: "", rentValue: "", condoFee: "", iptuValue: "", extraCharges: "", discounts: "", totalValue: "", notes: "" });
       fetchData();
@@ -592,1119 +380,895 @@ export default function RentalsPage() {
     }
   };
 
-  const handleMarkAsPaid = async (paymentId: string) => {
+  const handleMarkPaymentAsPaid = async (payment: RentalPayment) => {
     try {
-      const payment = payments.find(p => p.id === paymentId);
-      if (!payment) return;
-      
-      const res = await fetch(`/api/rental-payments/${paymentId}`, {
+      const res = await fetch(`/api/rental-payments/${payment.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          status: "paid",
-          paidValue: payment.totalValue,
-          paidDate: new Date().toISOString(),
-        }),
+        body: JSON.stringify({ status: "paid", paidValue: payment.totalValue, paidDate: new Date().toISOString() }),
       });
       if (!res.ok) throw new Error("Erro ao atualizar pagamento");
-      toast({ title: "Pagamento confirmado", description: "O pagamento foi marcado como pago." });
+      toast({ title: "Sucesso", description: "Pagamento marcado como pago" });
       fetchData();
     } catch (error: any) {
       toast({ title: "Erro", description: error.message, variant: "destructive" });
     }
   };
 
-  const getPaymentStatusBadge = (status: string, dueDate: string) => {
-    const now = new Date();
-    const due = new Date(dueDate);
-    
-    if (status === "paid") {
-      return <Badge className="bg-green-100 text-green-700 border-green-200"><CheckCircle2 className="w-3 h-3 mr-1" />Pago</Badge>;
-    }
-    if (due < now) {
-      return <Badge className="bg-red-100 text-red-700 border-red-200"><AlertCircle className="w-3 h-3 mr-1" />Atrasado</Badge>;
-    }
-    return <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200"><Clock className="w-3 h-3 mr-1" />Pendente</Badge>;
-  };
-
-  const getOwnerName = (ownerId: string) => owners.find(o => o.id === ownerId)?.name || "-";
-  const getRenterName = (renterId: string) => renters.find(r => r.id === renterId)?.name || "-";
-  const getPropertyTitle = (propertyId: string) => properties.find(p => p.id === propertyId)?.title || "-";
-
-  const fetchReports = async () => {
-    setLoadingReports(true);
+  const handleGenerateTransfers = async (referenceMonth: string) => {
     try {
-      const params = new URLSearchParams();
-      if (reportFilters.ownerId) params.set("ownerId", reportFilters.ownerId);
-      if (reportFilters.renterId) params.set("renterId", reportFilters.renterId);
-      if (reportFilters.status) params.set("status", reportFilters.status);
-      if (reportFilters.startDate) params.set("startDate", reportFilters.startDate);
-      if (reportFilters.endDate) params.set("endDate", reportFilters.endDate);
-      if (reportFilters.propertyId) params.set("propertyId", reportFilters.propertyId);
-      if (reportFilters.minValue) params.set("minValue", reportFilters.minValue);
-      if (reportFilters.maxValue) params.set("maxValue", reportFilters.maxValue);
-      if (reportFilters.onlyOverdue) params.set("onlyOverdue", "true");
-
-      const [ownersRes, rentersRes, paymentsRes, overdueRes] = await Promise.all([
-        fetch(`/api/reports/owners?${params}`, { credentials: "include" }),
-        fetch(`/api/reports/renters?${params}`, { credentials: "include" }),
-        fetch(`/api/reports/payments-detailed?${params}`, { credentials: "include" }),
-        fetch(`/api/reports/overdue?${params}`, { credentials: "include" }),
-      ]);
-
-      if (ownersRes.ok) setOwnerReport(await ownersRes.json());
-      if (rentersRes.ok) setRenterReport(await rentersRes.json());
-      if (paymentsRes.ok) setPaymentsReport(await paymentsRes.json());
-      if (overdueRes.ok) setOverdueReport(await overdueRes.json());
-    } catch (error) {
-      console.error("Error fetching reports:", error);
-      toast({ title: "Erro", description: "Erro ao carregar relatórios", variant: "destructive" });
-    } finally {
-      setLoadingReports(false);
+      const res = await fetch("/api/rental-transfers/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ referenceMonth }),
+      });
+      if (!res.ok) throw new Error("Erro ao gerar repasses");
+      const newTransfers = await res.json();
+      toast({ title: "Sucesso", description: `${newTransfers.length} repasses gerados` });
+      fetchData();
+    } catch (error: any) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
     }
   };
 
-  const exportToPDF = async (elementId: string, filename: string) => {
-    const element = document.getElementById(elementId);
-    if (!element) return;
-
+  const handleMarkTransferAsPaid = async (transfer: RentalTransfer) => {
     try {
-      const html2canvas = (await import("html2canvas")).default;
-      const jsPDF = (await import("jspdf")).default;
-
-      const canvas = await html2canvas(element, { scale: 2, useCORS: true });
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("l", "mm", "a4");
-      const imgWidth = 280;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
-      pdf.save(`${filename}.pdf`);
-      toast({ title: "PDF exportado", description: "Relatório salvo com sucesso." });
-    } catch (error) {
-      toast({ title: "Erro", description: "Erro ao exportar PDF", variant: "destructive" });
+      const res = await fetch(`/api/rental-transfers/${transfer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: "paid", paidDate: new Date().toISOString() }),
+      });
+      if (!res.ok) throw new Error("Erro ao atualizar repasse");
+      toast({ title: "Sucesso", description: "Repasse marcado como pago" });
+      fetchData();
+    } catch (error: any) {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
     }
   };
 
-  useEffect(() => {
-    if (activeTab === "reports") {
-      fetchReports();
-    }
-  }, [activeTab]);
+  // WhatsApp handler
+  const sendToWhatsApp = (phone?: string) => {
+    if (!phone || !aiMessage) return;
+    const cleanPhone = phone.replace(/\D/g, "");
+    const url = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(aiMessage)}`;
+    window.open(url, "_blank");
+  };
 
-  if (loading) {
+  // Filter helpers for contracts
+  const filteredContracts = rentalContracts.filter((contract) => {
+    if (contractFilters.ownerId && contract.ownerId !== contractFilters.ownerId) return false;
+    if (contractFilters.renterId && contract.renterId !== contractFilters.renterId) return false;
+    if (contractFilters.propertyId && contract.propertyId !== contractFilters.propertyId) return false;
+    if (contractFilters.status && contract.status !== contractFilters.status) return false;
+    if (contractFilters.searchText) {
+      const property = properties.find(p => p.id === contract.propertyId);
+      const owner = owners.find(o => o.id === contract.ownerId);
+      const renter = renters.find(r => r.id === contract.renterId);
+      const searchLower = contractFilters.searchText.toLowerCase();
+      if (
+        !property?.title.toLowerCase().includes(searchLower) &&
+        !owner?.name.toLowerCase().includes(searchLower) &&
+        !renter?.name.toLowerCase().includes(searchLower)
+      ) return false;
+    }
+    return true;
+  });
+
+  // Filter helpers for payments
+  const filteredPayments = payments.filter((payment) => {
+    if (paymentFilters.status && payment.status !== paymentFilters.status) return false;
+    if (paymentFilters.contractId && payment.rentalContractId !== paymentFilters.contractId) return false;
+    if (paymentFilters.onlyOverdue) {
+      if (payment.status !== "pending" || new Date(payment.dueDate) >= new Date()) return false;
+    }
+    if (paymentFilters.startDate && new Date(payment.dueDate) < new Date(paymentFilters.startDate)) return false;
+    if (paymentFilters.endDate && new Date(payment.dueDate) > new Date(paymentFilters.endDate)) return false;
+    return true;
+  });
+
+  // Get payment status badge
+  const getPaymentStatusBadge = (payment: RentalPayment) => {
+    if (payment.status === "paid") {
+      return (
+        <Badge className="bg-green-100 text-green-700 border-green-200">
+          <CheckCircle2 className="h-3 w-3 mr-1" />
+          Pago
+        </Badge>
+      );
+    }
+    const daysOverdue = getDaysOverdue(payment.dueDate);
+    if (daysOverdue > 0) {
+      return (
+        <Badge className="bg-red-100 text-red-700 border-red-200">
+          <AlertCircle className="h-3 w-3 mr-1" />
+          {daysOverdue}d atraso
+        </Badge>
+      );
+    }
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
+      <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">
+        <Clock className="h-3 w-3 mr-1" />
+        Pendente
+      </Badge>
     );
-  }
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 data-testid="text-rentals-title" className="text-2xl sm:text-3xl font-heading font-bold text-foreground">Administração de Aluguéis</h1>
-          <p className="text-muted-foreground text-sm sm:text-base">Gerencie locadores, inquilinos, contratos e pagamentos</p>
+          <h1 className="text-lg sm:text-2xl font-heading font-bold">Alugueis</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">
+            Gestao completa de locacoes, contratos e repasses
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-100">
-                <Home className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{owners.length}</p>
-                <p className="text-sm text-muted-foreground">Locadores</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-purple-100">
-                <Users className="h-5 w-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{renters.length}</p>
-                <p className="text-sm text-muted-foreground">Inquilinos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-green-100">
-                <FileText className="h-5 w-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{rentalContracts.filter(c => c.status === "active").length}</p>
-                <p className="text-sm text-muted-foreground">Contratos Ativos</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-orange-100">
-                <DollarSign className="h-5 w-5 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{payments.filter(p => p.status === "pending").length}</p>
-                <p className="text-sm text-muted-foreground">Pagamentos Pendentes</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Dashboard */}
+      <RentalDashboard
+        metrics={metrics}
+        chartData={chartData}
+        period={chartPeriod}
+        onPeriodChange={setChartPeriod}
+        loading={loading}
+      />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="owners" data-testid="tab-owners">Locadores</TabsTrigger>
-          <TabsTrigger value="renters" data-testid="tab-renters">Inquilinos</TabsTrigger>
-          <TabsTrigger value="contracts" data-testid="tab-contracts">Contratos</TabsTrigger>
-          <TabsTrigger value="payments" data-testid="tab-payments">Pagamentos</TabsTrigger>
-          <TabsTrigger value="reports" data-testid="tab-reports">Relatórios</TabsTrigger>
-        </TabsList>
+      {/* Alerts */}
+      <RentalAlerts
+        alerts={alerts}
+        loading={loading}
+        onPaymentClick={(payment) => {
+          setActiveTab("boletos");
+        }}
+        onContractClick={(contract) => {
+          setActiveTab("contratos");
+        }}
+      />
 
-        <TabsContent value="owners" className="space-y-4">
-          <div className="flex justify-end">
-            <Button data-testid="button-new-owner" onClick={() => setIsOwnerModalOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" /> Novo Locador
-            </Button>
-          </div>
-          {owners.length === 0 ? (
-            <div className="text-center py-16 bg-muted/20 rounded-xl border border-dashed">
-              <Home className="w-12 h-12 mx-auto text-muted-foreground opacity-30 mb-4" />
-              <h3 className="text-lg font-medium">Nenhum locador cadastrado</h3>
-              <p className="text-muted-foreground mb-4 text-sm">Cadastre os proprietários dos imóveis.</p>
-              <Button variant="outline" onClick={() => setIsOwnerModalOpen(true)}>Cadastrar Locador</Button>
-            </div>
-          ) : (
-            <Card>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Telefone</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>CPF/CNPJ</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {owners.map((owner) => (
-                    <TableRow key={owner.id} data-testid={`row-owner-${owner.id}`}>
-                      <TableCell className="font-medium">{owner.name}</TableCell>
-                      <TableCell>{owner.phone}</TableCell>
-                      <TableCell>{owner.email || "-"}</TableCell>
-                      <TableCell>{owner.cpfCnpj || "-"}</TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Ver Detalhes</DropdownMenuItem>
-                            <DropdownMenuItem>Editar</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Card>
-          )}
+      {/* Tabs - Mobile-First Scrollable */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)} className="space-y-4">
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
+          <TabsList className="w-full sm:w-auto inline-flex min-w-max border-b border-border bg-transparent h-auto p-0 gap-0">
+            <TabsTrigger
+              value="contratos"
+              className="text-xs sm:text-sm min-h-[44px] px-3 sm:px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              <FileText className="h-4 w-4 mr-1.5 hidden sm:inline" />
+              Contratos
+              <Badge variant="secondary" className="ml-1.5 text-[10px] hidden sm:inline-flex">{rentalContracts.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger
+              value="locadores"
+              className="text-xs sm:text-sm min-h-[44px] px-3 sm:px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              <Building2 className="h-4 w-4 mr-1.5 hidden sm:inline" />
+              Locadores
+              <Badge variant="secondary" className="ml-1.5 text-[10px] hidden sm:inline-flex">{owners.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger
+              value="inquilinos"
+              className="text-xs sm:text-sm min-h-[44px] px-3 sm:px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              <Users className="h-4 w-4 mr-1.5 hidden sm:inline" />
+              Inquilinos
+              <Badge variant="secondary" className="ml-1.5 text-[10px] hidden sm:inline-flex">{renters.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger
+              value="boletos"
+              className="text-xs sm:text-sm min-h-[44px] px-3 sm:px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              <DollarSign className="h-4 w-4 mr-1.5 hidden sm:inline" />
+              Pagamentos
+              <Badge variant="secondary" className="ml-1.5 text-[10px] hidden sm:inline-flex">{payments.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger
+              value="repasses"
+              className="text-xs sm:text-sm min-h-[44px] px-3 sm:px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              <CreditCard className="h-4 w-4 mr-1.5 hidden sm:inline" />
+              Repasses
+              <Badge variant="secondary" className="ml-1.5 text-[10px] hidden sm:inline-flex">{transfers.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger
+              value="relatorios"
+              className="text-xs sm:text-sm min-h-[44px] px-3 sm:px-4 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              <BarChart2 className="h-4 w-4 mr-1.5 hidden sm:inline" />
+              Relatorios
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* Locadores Tab */}
+        <TabsContent value="locadores" className="mt-4">
+          <LocadoresTab
+            owners={owners}
+            contracts={rentalContracts}
+            transfers={transfers}
+            properties={properties}
+            onCreateOwner={() => setIsOwnerModalOpen(true)}
+            onViewOwner={(owner) => toast({ title: "Em breve", description: "Detalhes do locador" })}
+            onEditOwner={(owner) => toast({ title: "Em breve", description: "Editar locador" })}
+            onGenerateTransfer={(owner) => {
+              const now = new Date();
+              const referenceMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+              handleGenerateTransfers(referenceMonth);
+            }}
+            loading={loading}
+          />
         </TabsContent>
 
-        <TabsContent value="renters" className="space-y-4">
-          <div className="flex justify-end">
-            <Button data-testid="button-new-renter" onClick={() => setIsRenterModalOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" /> Novo Inquilino
-            </Button>
-          </div>
-          {renters.length === 0 ? (
-            <div className="text-center py-16 bg-muted/20 rounded-xl border border-dashed">
-              <Users className="w-12 h-12 mx-auto text-muted-foreground opacity-30 mb-4" />
-              <h3 className="text-lg font-medium">Nenhum inquilino cadastrado</h3>
-              <p className="text-muted-foreground mb-4 text-sm">Cadastre os inquilinos para os contratos.</p>
-              <Button variant="outline" onClick={() => setIsRenterModalOpen(true)}>Cadastrar Inquilino</Button>
-            </div>
-          ) : (
-            <Card>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Telefone</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Profissão</TableHead>
-                    <TableHead className="w-[50px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {renters.map((renter) => (
-                    <TableRow key={renter.id} data-testid={`row-renter-${renter.id}`}>
-                      <TableCell className="font-medium">{renter.name}</TableCell>
-                      <TableCell>{renter.phone}</TableCell>
-                      <TableCell>{renter.email || "-"}</TableCell>
-                      <TableCell>{renter.profession || "-"}</TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical className="w-4 h-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Ver Detalhes</DropdownMenuItem>
-                            <DropdownMenuItem>Editar</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Card>
-          )}
+        {/* Inquilinos Tab */}
+        <TabsContent value="inquilinos" className="mt-4">
+          <InquilinosTab
+            renters={renters}
+            contracts={rentalContracts}
+            payments={payments}
+            onCreateRenter={() => setIsRenterModalOpen(true)}
+            onViewRenter={(renter) => toast({ title: "Em breve", description: "Detalhes do inquilino" })}
+            onEditRenter={(renter) => toast({ title: "Em breve", description: "Editar inquilino" })}
+            onSendCollection={(renter) => {
+              setAiContext({ renter });
+              setAiMessage(RENTAL_AI_PROMPTS[0].template({
+                renterName: renter.name,
+                value: "R$ 1.500,00",
+                daysOverdue: 5,
+              }));
+              setIsAIModalOpen(true);
+            }}
+            loading={loading}
+          />
         </TabsContent>
 
-        <TabsContent value="contracts" className="space-y-4">
-          <Card className="mb-4">
-            <CardContent className="pt-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                <div className="flex items-center gap-2">
-                  <Filter className="h-5 w-5 text-muted-foreground" />
-                  <span className="font-medium">Filtros</span>
-                  {getContractFiltersCount() > 0 && (
-                    <Badge variant="secondary">{getContractFiltersCount()} ativo{getContractFiltersCount() > 1 ? "s" : ""}</Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {getContractFiltersCount() > 0 && (
-                    <Button variant="ghost" size="sm" onClick={clearContractFilters} data-testid="button-clear-contract-filters">
-                      <RotateCcw className="h-4 w-4 mr-1" /> Limpar
-                    </Button>
-                  )}
-                  <Button data-testid="button-new-rental-contract" onClick={() => setIsContractModalOpen(true)} className="gap-2" disabled={owners.length === 0 || renters.length === 0}>
-                    <Plus className="h-4 w-4" /> Novo Contrato
+        {/* Contratos Tab */}
+        <TabsContent value="contratos" className="mt-4">
+          <div className="space-y-4">
+            {/* Filters */}
+            <Card className="rounded-xl">
+              <CardContent className="pt-4">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar contrato..."
+                      value={contractFilters.searchText}
+                      onChange={(e) => setContractFilters({ ...contractFilters, searchText: e.target.value })}
+                      className="pl-9 min-h-[44px]"
+                    />
+                  </div>
+                  <Select value={contractFilters.status} onValueChange={(v) => setContractFilters({ ...contractFilters, status: v })}>
+                    <SelectTrigger className="w-full sm:w-[150px] min-h-[44px]">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todos</SelectItem>
+                      <SelectItem value="active">Ativos</SelectItem>
+                      <SelectItem value="ended">Encerrados</SelectItem>
+                      <SelectItem value="cancelled">Cancelados</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={() => setIsContractModalOpen(true)} className="min-h-[44px]">
+                    <Plus className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">Novo Contrato</span>
+                    <span className="sm:hidden">Novo</span>
                   </Button>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <div className="md:col-span-2">
-                  <Input 
-                    placeholder="Buscar por locador, inquilino ou imóvel..." 
-                    value={contractFilters.searchText}
-                    onChange={(e) => setContractFilters(prev => ({ ...prev, searchText: e.target.value }))}
-                    data-testid="input-contract-search"
-                  />
-                </div>
-                <Select value={contractFilters.ownerId} onValueChange={(v) => setContractFilters(prev => ({ ...prev, ownerId: v === "all" ? "" : v }))}>
-                  <SelectTrigger data-testid="select-contract-owner"><SelectValue placeholder="Locador" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos Locadores</SelectItem>
-                    {owners.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={contractFilters.renterId} onValueChange={(v) => setContractFilters(prev => ({ ...prev, renterId: v === "all" ? "" : v }))}>
-                  <SelectTrigger data-testid="select-contract-renter"><SelectValue placeholder="Inquilino" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos Inquilinos</SelectItem>
-                    {renters.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={contractFilters.status} onValueChange={(v) => setContractFilters(prev => ({ ...prev, status: v === "all" ? "" : v }))}>
-                  <SelectTrigger data-testid="select-contract-status"><SelectValue placeholder="Status" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos Status</SelectItem>
-                    <SelectItem value="active">Ativo</SelectItem>
-                    <SelectItem value="ended">Encerrado</SelectItem>
-                    <SelectItem value="cancelled">Cancelado</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {filteredContracts.length === 0 ? (
-            <div className="text-center py-16 bg-muted/20 rounded-xl border border-dashed">
-              <FileText className="w-12 h-12 mx-auto text-muted-foreground opacity-30 mb-4" />
-              <h3 className="text-lg font-medium">
-                {rentalContracts.length === 0 ? "Nenhum contrato de aluguel" : "Nenhum contrato encontrado"}
-              </h3>
-              <p className="text-muted-foreground mb-4 text-sm">
-                {rentalContracts.length === 0 
-                  ? "Cadastre locadores e inquilinos primeiro." 
-                  : "Tente ajustar os filtros."}
-              </p>
-              {rentalContracts.length === 0 && owners.length > 0 && renters.length > 0 && (
-                <Button variant="outline" onClick={() => setIsContractModalOpen(true)}>Criar Contrato</Button>
-              )}
-              {rentalContracts.length > 0 && getContractFiltersCount() > 0 && (
-                <Button variant="outline" onClick={clearContractFilters}>Limpar Filtros</Button>
-              )}
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              <div className="text-sm text-muted-foreground">
-                Mostrando {filteredContracts.length} de {rentalContracts.length} contrato{rentalContracts.length !== 1 ? "s" : ""}
-              </div>
-              {filteredContracts.map((contract) => (
-                <Card key={contract.id} data-testid={`card-rental-contract-${contract.id}`} className="hover:shadow-lg transition-all">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-base">{getPropertyTitle(contract.propertyId)}</CardTitle>
-                        <CardDescription>
-                          {getOwnerName(contract.ownerId)} → {getRenterName(contract.renterId)}
-                        </CardDescription>
-                      </div>
-                      <Badge variant={contract.status === "active" ? "default" : "secondary"}>
-                        {contract.status === "active" ? "Ativo" : contract.status === "ended" ? "Encerrado" : "Cancelado"}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted-foreground">Aluguel</p>
-                        <p className="font-semibold">{formatPrice(contract.rentValue)}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Vencimento</p>
-                        <p className="font-medium">Dia {contract.dueDay}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Início</p>
-                        <p className="font-medium">{formatDate(contract.startDate)}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Término</p>
-                        <p className="font-medium">{formatDate(contract.endDate)}</p>
-                      </div>
-                    </div>
+            {/* Contracts List - Enhanced Mobile Cards */}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {loading ? (
+                <div className="col-span-full text-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                </div>
+              ) : filteredContracts.length === 0 ? (
+                <Card className="col-span-full rounded-xl">
+                  <CardContent className="py-8 text-center text-muted-foreground">
+                    Nenhum contrato encontrado
                   </CardContent>
                 </Card>
-              ))}
+              ) : (
+                filteredContracts.map((contract) => {
+                  const property = properties.find(p => p.id === contract.propertyId);
+                  const owner = owners.find(o => o.id === contract.ownerId);
+                  const renter = renters.find(r => r.id === contract.renterId);
+
+                  return (
+                    <Card key={contract.id} className="rounded-xl border-2 hover:shadow-md transition-all">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-base truncate">{property?.title || "Imovel"}</p>
+                            <p className="text-xs text-muted-foreground truncate mt-0.5">
+                              {renter?.name}
+                            </p>
+                          </div>
+                          <Badge className={`${getStatusColor(contract.status)} shrink-0`}>
+                            {getStatusLabel(contract.status)}
+                          </Badge>
+                        </div>
+
+                        <div className="flex items-center justify-between py-2 px-3 bg-muted/50 rounded-lg">
+                          <span className="text-xs text-muted-foreground">Valor do Aluguel</span>
+                          <span className="text-lg font-bold">{formatPrice(contract.rentValue)}</span>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div className="text-center p-2 bg-muted/30 rounded-lg">
+                            <p className="text-muted-foreground mb-1">Vencimento</p>
+                            <p className="font-semibold">Dia {contract.dueDay}</p>
+                          </div>
+                          <div className="text-center p-2 bg-muted/30 rounded-lg">
+                            <p className="text-muted-foreground mb-1">Inicio</p>
+                            <p className="font-semibold">{formatDate(contract.startDate)}</p>
+                          </div>
+                          <div className="text-center p-2 bg-muted/30 rounded-lg">
+                            <p className="text-muted-foreground mb-1">Fim</p>
+                            <p className="font-semibold">{formatDate(contract.endDate)}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-2 border-t">
+                          <Button variant="outline" size="sm" className="flex-1 min-h-[40px]">
+                            <FileText className="h-4 w-4 mr-1" />
+                            Ver
+                          </Button>
+                          <Button variant="outline" size="sm" className="flex-1 min-h-[40px]">
+                            <Phone className="h-4 w-4 mr-1" />
+                            Contato
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
             </div>
-          )}
+          </div>
         </TabsContent>
 
-        <TabsContent value="payments" className="space-y-4">
-          <Card className="mb-4">
-            <CardContent className="pt-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                <div className="flex items-center gap-2">
-                  <Filter className="h-5 w-5 text-muted-foreground" />
-                  <span className="font-medium">Filtros</span>
-                  {getPaymentFiltersCount() > 0 && (
-                    <Badge variant="secondary">{getPaymentFiltersCount()} ativo{getPaymentFiltersCount() > 1 ? "s" : ""}</Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {getPaymentFiltersCount() > 0 && (
-                    <Button variant="ghost" size="sm" onClick={clearPaymentFilters} data-testid="button-clear-payment-filters">
-                      <RotateCcw className="h-4 w-4 mr-1" /> Limpar
-                    </Button>
-                  )}
-                  <Button data-testid="button-new-payment" onClick={() => setIsPaymentModalOpen(true)} className="gap-2" disabled={rentalContracts.length === 0}>
-                    <Plus className="h-4 w-4" /> Novo Pagamento
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium text-muted-foreground">Período Rápido</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {periodPresets.map((preset) => (
-                      <Button
-                        key={preset.value}
-                        variant={paymentFilters.periodPreset === preset.value ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => applyPaymentPeriodPreset(preset.value)}
-                        data-testid={`button-payment-preset-${preset.value}`}
-                      >
-                        {preset.label}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                  <Select value={paymentFilters.status} onValueChange={(v) => setPaymentFilters(prev => ({ ...prev, status: v === "all" ? "" : v }))}>
-                    <SelectTrigger data-testid="select-payment-status"><SelectValue placeholder="Status" /></SelectTrigger>
+        {/* Boletos Tab */}
+        <TabsContent value="boletos" className="mt-4">
+          <div className="space-y-4">
+            {/* Filters */}
+            <Card className="rounded-xl">
+              <CardContent className="pt-4">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Select value={paymentFilters.status} onValueChange={(v) => setPaymentFilters({ ...paymentFilters, status: v })}>
+                    <SelectTrigger className="w-full sm:w-[150px] min-h-[44px]">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Todos Status</SelectItem>
-                      <SelectItem value="pending">Pendente</SelectItem>
-                      <SelectItem value="paid">Pago</SelectItem>
+                      <SelectItem value="">Todos</SelectItem>
+                      <SelectItem value="pending">Pendentes</SelectItem>
+                      <SelectItem value="paid">Pagos</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select value={paymentFilters.contractId} onValueChange={(v) => setPaymentFilters(prev => ({ ...prev, contractId: v === "all" ? "" : v }))}>
-                    <SelectTrigger data-testid="select-payment-contract"><SelectValue placeholder="Contrato" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos Contratos</SelectItem>
-                      {rentalContracts.map(c => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {getPropertyTitle(c.propertyId)} - {getRenterName(c.renterId)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input 
-                    type="date" 
-                    value={paymentFilters.startDate}
-                    onChange={(e) => setPaymentFilters(prev => ({ ...prev, startDate: e.target.value, periodPreset: "" }))}
-                    data-testid="input-payment-start-date"
-                  />
-                  <Input 
-                    type="date" 
-                    value={paymentFilters.endDate}
-                    onChange={(e) => setPaymentFilters(prev => ({ ...prev, endDate: e.target.value, periodPreset: "" }))}
-                    data-testid="input-payment-end-date"
-                  />
                   <Button
                     variant={paymentFilters.onlyOverdue ? "default" : "outline"}
-                    onClick={() => setPaymentFilters(prev => ({ ...prev, onlyOverdue: !prev.onlyOverdue }))}
-                    data-testid="button-payment-only-overdue"
+                    size="sm"
+                    onClick={() => setPaymentFilters({ ...paymentFilters, onlyOverdue: !paymentFilters.onlyOverdue })}
+                    className="min-h-[44px]"
                   >
                     <AlertCircle className="h-4 w-4 mr-2" />
-                    Só Vencidos
+                    <span className="hidden sm:inline">Apenas Atrasados</span>
+                    <span className="sm:hidden">Atrasados</span>
+                  </Button>
+                  <div className="flex-1" />
+                  <Button onClick={() => setIsPaymentModalOpen(true)} className="min-h-[44px]">
+                    <Plus className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">Novo Pagamento</span>
+                    <span className="sm:hidden">Novo</span>
                   </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {filteredPayments.length === 0 ? (
-            <div className="text-center py-16 bg-muted/20 rounded-xl border border-dashed">
-              <DollarSign className="w-12 h-12 mx-auto text-muted-foreground opacity-30 mb-4" />
-              <h3 className="text-lg font-medium">
-                {payments.length === 0 ? "Nenhum pagamento registrado" : "Nenhum pagamento encontrado"}
-              </h3>
-              <p className="text-muted-foreground mb-4 text-sm">
-                {payments.length === 0 ? "Registre os pagamentos dos aluguéis." : "Tente ajustar os filtros."}
-              </p>
-              {payments.length > 0 && getPaymentFiltersCount() > 0 && (
-                <Button variant="outline" onClick={clearPaymentFilters}>Limpar Filtros</Button>
+            {/* Payments Table - Desktop */}
+            <div className="hidden sm:block">
+              <Card>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Referencia</TableHead>
+                      <TableHead>Vencimento</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8">
+                          <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredPayments.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                          Nenhum pagamento encontrado
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredPayments.map((payment) => (
+                        <TableRow key={payment.id}>
+                          <TableCell>
+                            <Badge variant="outline">{formatMonth(payment.referenceMonth)}</Badge>
+                          </TableCell>
+                          <TableCell>{formatDate(payment.dueDate)}</TableCell>
+                          <TableCell className="text-right font-medium">
+                            {formatPrice(payment.totalValue)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {getPaymentStatusBadge(payment)}
+                          </TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {payment.status === "pending" && (
+                                  <DropdownMenuItem onClick={() => handleMarkPaymentAsPaid(payment)}>
+                                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                                    Marcar como Pago
+                                  </DropdownMenuItem>
+                                )}
+                                <DropdownMenuItem onClick={() => toast({ title: "Em breve", description: "Gerar 2a via" })}>
+                                  <FileText className="h-4 w-4 mr-2" />
+                                  Gerar 2a Via
+                                </DropdownMenuItem>
+                                {payment.status === "pending" && getDaysOverdue(payment.dueDate) > 0 && (
+                                  <DropdownMenuItem onClick={() => {
+                                    const contract = rentalContracts.find(c => c.id === payment.rentalContractId);
+                                    const renter = contract ? renters.find(r => r.id === contract.renterId) : null;
+                                    if (renter) {
+                                      setAiContext({ renter, payment });
+                                      setAiMessage(RENTAL_AI_PROMPTS[0].template({
+                                        renterName: renter.name,
+                                        value: formatPrice(payment.totalValue),
+                                        daysOverdue: getDaysOverdue(payment.dueDate),
+                                      }));
+                                      setIsAIModalOpen(true);
+                                    }
+                                  }}>
+                                    <MessageCircle className="h-4 w-4 mr-2" />
+                                    Enviar Cobranca
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </Card>
+            </div>
+
+            {/* Payments Cards - Mobile Enhanced */}
+            <div className="sm:hidden space-y-3">
+              {loading ? (
+                <div className="text-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                </div>
+              ) : filteredPayments.length === 0 ? (
+                <Card className="rounded-xl">
+                  <CardContent className="py-8 text-center text-muted-foreground">
+                    Nenhum pagamento encontrado
+                  </CardContent>
+                </Card>
+              ) : (
+                filteredPayments.map((payment) => {
+                  const contract = rentalContracts.find(c => c.id === payment.rentalContractId);
+                  const property = contract ? properties.find(p => p.id === contract.propertyId) : null;
+                  const renter = contract ? renters.find(r => r.id === contract.renterId) : null;
+                  const daysOverdue = getDaysOverdue(payment.dueDate);
+
+                  return (
+                    <Card key={payment.id} className="rounded-xl border-2 hover:shadow-md transition-all">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Badge variant="outline" className="text-xs">
+                                {formatMonth(payment.referenceMonth)}
+                              </Badge>
+                              {getPaymentStatusBadge(payment)}
+                            </div>
+                            <p className="font-medium text-sm truncate">{property?.title || "Imovel"}</p>
+                            <p className="text-xs text-muted-foreground truncate">{renter?.name}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between py-3 px-3 bg-muted/50 rounded-lg">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Valor Total</p>
+                            <p className="text-2xl font-bold">{formatPrice(payment.totalValue)}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-muted-foreground">Vencimento</p>
+                            <p className="text-sm font-medium">{formatDate(payment.dueDate)}</p>
+                            {payment.status === "pending" && daysOverdue > 0 && (
+                              <p className="text-xs text-red-600 font-medium">{daysOverdue}d atraso</p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-2 border-t">
+                          {payment.status === "pending" && (
+                            <Button
+                              size="sm"
+                              className="flex-1 min-h-[44px] bg-green-600 hover:bg-green-700"
+                              onClick={() => handleMarkPaymentAsPaid(payment)}
+                            >
+                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                              Marcar Pago
+                            </Button>
+                          )}
+                          <Button variant="outline" size="sm" className="flex-1 min-h-[44px]">
+                            <FileText className="h-4 w-4 mr-1" />
+                            Boleto
+                          </Button>
+                          {payment.status === "pending" && daysOverdue > 0 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="min-h-[44px] min-w-[44px] p-0"
+                              onClick={() => {
+                                const contract = rentalContracts.find(c => c.id === payment.rentalContractId);
+                                const renter = contract ? renters.find(r => r.id === contract.renterId) : null;
+                                if (renter) {
+                                  setAiContext({ renter, payment });
+                                  setAiMessage(RENTAL_AI_PROMPTS[0].template({
+                                    renterName: renter.name,
+                                    value: formatPrice(payment.totalValue),
+                                    daysOverdue: getDaysOverdue(payment.dueDate),
+                                  }));
+                                  setIsAIModalOpen(true);
+                                }
+                              }}
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })
               )}
             </div>
-          ) : (
-            <Card>
-              <div className="p-4 border-b">
-                <span className="text-sm text-muted-foreground">
-                  Mostrando {filteredPayments.length} de {payments.length} pagamento{payments.length !== 1 ? "s" : ""}
-                </span>
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Referência</TableHead>
-                    <TableHead>Vencimento</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-[100px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredPayments.map((payment) => (
-                    <TableRow key={payment.id} data-testid={`row-payment-${payment.id}`}>
-                      <TableCell className="font-medium">{payment.referenceMonth}</TableCell>
-                      <TableCell>{formatDate(payment.dueDate)}</TableCell>
-                      <TableCell>{formatPrice(payment.totalValue)}</TableCell>
-                      <TableCell>{getPaymentStatusBadge(payment.status, payment.dueDate)}</TableCell>
-                      <TableCell>
-                        {payment.status === "pending" && (
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => handleMarkAsPaid(payment.id)}
-                            data-testid={`button-mark-paid-${payment.id}`}
-                          >
-                            Pagar
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Card>
-          )}
+          </div>
         </TabsContent>
 
-        <TabsContent value="reports" className="space-y-6">
-          <Card>
-            <CardHeader className="pb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <Filter className="h-5 w-5 text-muted-foreground" />
-                  <CardTitle className="text-lg">Filtros</CardTitle>
-                  {getActiveFiltersCount() > 0 && (
-                    <Badge variant="secondary" className="ml-2">{getActiveFiltersCount()} ativo{getActiveFiltersCount() > 1 ? "s" : ""}</Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {getActiveFiltersCount() > 0 && (
-                    <Button variant="ghost" size="sm" onClick={clearAllFilters} data-testid="button-clear-filters">
-                      <RotateCcw className="h-4 w-4 mr-1" /> Limpar
-                    </Button>
-                  )}
-                  <Button onClick={fetchReports} disabled={loadingReports} data-testid="button-apply-filters">
-                    {loadingReports ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Aplicar Filtros
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <Label className="text-sm font-medium text-muted-foreground">Período Rápido</Label>
-                <div className="flex flex-wrap gap-2">
-                  {periodPresets.map((preset) => (
-                    <Button
-                      key={preset.value}
-                      variant={reportFilters.periodPreset === preset.value ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => applyPeriodPreset(preset.value)}
-                      data-testid={`button-preset-${preset.value}`}
-                    >
-                      {preset.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
+        {/* Repasses Tab */}
+        <TabsContent value="repasses" className="mt-4">
+          <RepassesTab
+            transfers={transfers}
+            owners={owners}
+            onGenerateTransfers={handleGenerateTransfers}
+            onMarkAsPaid={handleMarkTransferAsPaid}
+            onViewTransfer={(transfer) => toast({ title: "Em breve", description: "Detalhes do repasse" })}
+            onExportTransfer={(transfer) => toast({ title: "Em breve", description: "Exportar repasse" })}
+            loading={loading}
+          />
+        </TabsContent>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                <div className="space-y-2">
-                  <Label>Locador</Label>
-                  <Select value={reportFilters.ownerId} onValueChange={(v) => setReportFilters(prev => ({ ...prev, ownerId: v === "all" ? "" : v }))}>
-                    <SelectTrigger data-testid="select-report-owner"><SelectValue placeholder="Todos" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      {owners.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Inquilino</Label>
-                  <Select value={reportFilters.renterId} onValueChange={(v) => setReportFilters(prev => ({ ...prev, renterId: v === "all" ? "" : v }))}>
-                    <SelectTrigger data-testid="select-report-renter"><SelectValue placeholder="Todos" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      {renters.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select value={reportFilters.status} onValueChange={(v) => setReportFilters(prev => ({ ...prev, status: v === "all" ? "" : v }))}>
-                    <SelectTrigger data-testid="select-report-status"><SelectValue placeholder="Todos" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="paid">Pagos</SelectItem>
-                      <SelectItem value="pending">Pendentes</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Data Início</Label>
-                  <Input 
-                    type="date" 
-                    value={reportFilters.startDate} 
-                    onChange={(e) => setReportFilters(prev => ({ ...prev, startDate: e.target.value, periodPreset: "" }))} 
-                    data-testid="input-report-start-date" 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Data Fim</Label>
-                  <Input 
-                    type="date" 
-                    value={reportFilters.endDate} 
-                    onChange={(e) => setReportFilters(prev => ({ ...prev, endDate: e.target.value, periodPreset: "" }))} 
-                    data-testid="input-report-end-date" 
-                  />
-                </div>
-              </div>
-
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="w-full justify-center text-muted-foreground hover:text-foreground"
-                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                data-testid="button-toggle-advanced"
-              >
-                {showAdvancedFilters ? <ChevronUp className="h-4 w-4 mr-2" /> : <ChevronDown className="h-4 w-4 mr-2" />}
-                Filtros Avançados
-              </Button>
-
-              {showAdvancedFilters && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2 border-t">
-                  <div className="space-y-2">
-                    <Label>Imóvel</Label>
-                    <Select value={reportFilters.propertyId} onValueChange={(v) => setReportFilters(prev => ({ ...prev, propertyId: v === "all" ? "" : v }))}>
-                      <SelectTrigger data-testid="select-report-property"><SelectValue placeholder="Todos" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Valor Mínimo</Label>
-                    <Input 
-                      type="number" 
-                      placeholder="R$ 0,00" 
-                      value={reportFilters.minValue} 
-                      onChange={(e) => setReportFilters(prev => ({ ...prev, minValue: e.target.value }))} 
-                      data-testid="input-report-min-value" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Valor Máximo</Label>
-                    <Input 
-                      type="number" 
-                      placeholder="R$ 0,00" 
-                      value={reportFilters.maxValue} 
-                      onChange={(e) => setReportFilters(prev => ({ ...prev, maxValue: e.target.value }))} 
-                      data-testid="input-report-max-value" 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Só Vencidos</Label>
-                    <Button
-                      variant={reportFilters.onlyOverdue ? "default" : "outline"}
-                      className="w-full"
-                      onClick={() => setReportFilters(prev => ({ ...prev, onlyOverdue: !prev.onlyOverdue }))}
-                      data-testid="button-toggle-overdue"
-                    >
-                      <AlertCircle className="h-4 w-4 mr-2" />
-                      {reportFilters.onlyOverdue ? "Ativado" : "Desativado"}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {getActiveFilterChips().length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-3 border-t">
-                  {getActiveFilterChips().map((chip) => (
-                    <Badge 
-                      key={chip.key} 
-                      variant="secondary" 
-                      className="flex items-center gap-1 pl-3 pr-1 py-1"
-                      data-testid={`chip-filter-${chip.key}`}
-                    >
-                      {chip.label}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-4 w-4 ml-1 hover:bg-destructive/20"
-                        onClick={() => removeFilter(chip.key)}
-                        data-testid={`button-remove-filter-${chip.key}`}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {loadingReports ? (
-            <div className="flex items-center justify-center h-32">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <Card id="report-owners">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Home className="h-5 w-5 text-blue-600" />
-                      <CardTitle className="text-lg">Performance por Locador</CardTitle>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => exportToPDF("report-owners", "relatorio-locadores")} data-testid="button-export-owners">
-                      <Download className="h-4 w-4 mr-2" /> Exportar PDF
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {ownerReport.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">Nenhum dado disponível</p>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Locador</TableHead>
-                          <TableHead>Contratos Ativos</TableHead>
-                          <TableHead>Total Recebido</TableHead>
-                          <TableHead>Total Pendente</TableHead>
-                          <TableHead>Taxa Adimplência</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {ownerReport.map((row: any) => (
-                          <TableRow key={row.ownerId} data-testid={`row-report-owner-${row.ownerId}`}>
-                            <TableCell className="font-medium">{row.ownerName}</TableCell>
-                            <TableCell>{row.activeContracts}</TableCell>
-                            <TableCell className="text-green-600">{formatPrice(String(row.totalReceived))}</TableCell>
-                            <TableCell className="text-orange-600">{formatPrice(String(row.totalPending))}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                {row.paymentRate >= 80 ? (
-                                  <TrendingUp className="h-4 w-4 text-green-600" />
-                                ) : (
-                                  <TrendingDown className="h-4 w-4 text-red-600" />
-                                )}
-                                <span className={row.paymentRate >= 80 ? "text-green-600" : "text-red-600"}>
-                                  {row.paymentRate?.toFixed(1)}%
-                                </span>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card id="report-renters">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Users className="h-5 w-5 text-purple-600" />
-                      <CardTitle className="text-lg">Performance por Inquilino</CardTitle>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => exportToPDF("report-renters", "relatorio-inquilinos")} data-testid="button-export-renters">
-                      <Download className="h-4 w-4 mr-2" /> Exportar PDF
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {renterReport.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">Nenhum dado disponível</p>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Inquilino</TableHead>
-                          <TableHead>Contratos Ativos</TableHead>
-                          <TableHead>Total Pago</TableHead>
-                          <TableHead>Total Pendente</TableHead>
-                          <TableHead>Média Atraso (dias)</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {renterReport.map((row: any) => (
-                          <TableRow key={row.renterId} data-testid={`row-report-renter-${row.renterId}`}>
-                            <TableCell className="font-medium">{row.renterName}</TableCell>
-                            <TableCell>{row.activeContracts}</TableCell>
-                            <TableCell className="text-green-600">{formatPrice(String(row.totalPaid))}</TableCell>
-                            <TableCell className="text-orange-600">{formatPrice(String(row.totalPending))}</TableCell>
-                            <TableCell>
-                              <span className={row.avgDelayDays > 5 ? "text-red-600" : "text-green-600"}>
-                                {row.avgDelayDays?.toFixed(1) || "0"} dias
-                              </span>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card id="report-payments">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-5 w-5 text-green-600" />
-                      <CardTitle className="text-lg">Pagamentos Detalhados</CardTitle>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => exportToPDF("report-payments", "relatorio-pagamentos")} data-testid="button-export-payments">
-                      <Download className="h-4 w-4 mr-2" /> Exportar PDF
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {paymentsReport.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">Nenhum dado disponível</p>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Referência</TableHead>
-                          <TableHead>Imóvel</TableHead>
-                          <TableHead>Inquilino</TableHead>
-                          <TableHead>Locador</TableHead>
-                          <TableHead>Vencimento</TableHead>
-                          <TableHead>Valor</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paymentsReport.slice(0, 20).map((row: any) => (
-                          <TableRow key={row.paymentId} data-testid={`row-report-payment-${row.paymentId}`}>
-                            <TableCell className="font-medium">{row.referenceMonth}</TableCell>
-                            <TableCell>{row.propertyTitle}</TableCell>
-                            <TableCell>{row.renterName}</TableCell>
-                            <TableCell>{row.ownerName}</TableCell>
-                            <TableCell>{formatDate(row.dueDate)}</TableCell>
-                            <TableCell>{formatPrice(String(row.totalValue))}</TableCell>
-                            <TableCell>{getPaymentStatusBadge(row.status, row.dueDate)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                  {paymentsReport.length > 20 && (
-                    <p className="text-muted-foreground text-center text-sm mt-4">Mostrando 20 de {paymentsReport.length} registros</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card id="report-overdue">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="h-5 w-5 text-red-600" />
-                      <CardTitle className="text-lg">Inadimplência</CardTitle>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => exportToPDF("report-overdue", "relatorio-inadimplencia")} data-testid="button-export-overdue">
-                      <Download className="h-4 w-4 mr-2" /> Exportar PDF
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {!overdueReport ? (
-                    <p className="text-muted-foreground text-center py-8">Nenhum dado disponível</p>
-                  ) : (
-                    <div className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <Card className="border-orange-200 bg-orange-50">
-                          <CardContent className="pt-6">
-                            <div className="text-center">
-                              <p className="text-3xl font-bold text-orange-600">{formatPrice(String(overdueReport.range0to30?.total || 0))}</p>
-                              <p className="text-sm text-muted-foreground mt-1">0 a 30 dias</p>
-                              <p className="text-xs text-muted-foreground">{overdueReport.range0to30?.count || 0} pagamentos</p>
-                            </div>
-                          </CardContent>
-                        </Card>
-                        <Card className="border-red-200 bg-red-50">
-                          <CardContent className="pt-6">
-                            <div className="text-center">
-                              <p className="text-3xl font-bold text-red-600">{formatPrice(String(overdueReport.range31to60?.total || 0))}</p>
-                              <p className="text-sm text-muted-foreground mt-1">31 a 60 dias</p>
-                              <p className="text-xs text-muted-foreground">{overdueReport.range31to60?.count || 0} pagamentos</p>
-                            </div>
-                          </CardContent>
-                        </Card>
-                        <Card className="border-red-400 bg-red-100">
-                          <CardContent className="pt-6">
-                            <div className="text-center">
-                              <p className="text-3xl font-bold text-red-700">{formatPrice(String(overdueReport.range61plus?.total || 0))}</p>
-                              <p className="text-sm text-muted-foreground mt-1">61+ dias</p>
-                              <p className="text-xs text-muted-foreground">{overdueReport.range61plus?.count || 0} pagamentos</p>
-                            </div>
-                          </CardContent>
-                        </Card>
+        {/* Relatorios Tab */}
+        <TabsContent value="relatorios" className="mt-4">
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Relatorios de Locacao</CardTitle>
+                <CardDescription>Analise o desempenho da sua carteira de alugueis</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                          <Building2 className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Locadores</p>
+                          <p className="text-xl font-bold">{ownerReport.length}</p>
+                        </div>
                       </div>
-                      {overdueReport.details && overdueReport.details.length > 0 && (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Inquilino</TableHead>
-                              <TableHead>Imóvel</TableHead>
-                              <TableHead>Referência</TableHead>
-                              <TableHead>Vencimento</TableHead>
-                              <TableHead>Dias Atraso</TableHead>
-                              <TableHead>Valor</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {overdueReport.details.slice(0, 10).map((row: any, idx: number) => (
-                              <TableRow key={idx} data-testid={`row-overdue-${idx}`}>
-                                <TableCell className="font-medium">{row.renterName}</TableCell>
-                                <TableCell>{row.propertyTitle}</TableCell>
-                                <TableCell>{row.referenceMonth}</TableCell>
-                                <TableCell>{formatDate(row.dueDate)}</TableCell>
-                                <TableCell className="text-red-600 font-semibold">{row.daysOverdue} dias</TableCell>
-                                <TableCell>{formatPrice(String(row.totalValue))}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
+                          <Users className="h-5 w-5 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Inquilinos</p>
+                          <p className="text-xl font-bold">{renterReport.length}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-orange-100 flex items-center justify-center">
+                          <DollarSign className="h-5 w-5 text-orange-600" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Total Recebido</p>
+                          <p className="text-xl font-bold">{formatPrice(paymentsReport?.summary?.totalReceived || 0)}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-red-100 flex items-center justify-center">
+                          <AlertCircle className="h-5 w-5 text-red-600" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Inadimplencia</p>
+                          <p className="text-xl font-bold">{formatPrice(overdueReport?.summary?.totalOverdue || 0)}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
 
+      {/* Owner Modal */}
       <Dialog open={isOwnerModalOpen} onOpenChange={setIsOwnerModalOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Novo Locador</DialogTitle>
-            <DialogDescription>Cadastre um proprietário de imóvel.</DialogDescription>
+            <DialogDescription>Cadastre um novo locador (proprietario)</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreateOwner} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 space-y-2">
                 <Label>Nome *</Label>
-                <Input value={ownerForm.name} onChange={(e) => setOwnerForm(prev => ({ ...prev, name: e.target.value }))} required data-testid="input-owner-name" />
+                <Input value={ownerForm.name} onChange={(e) => setOwnerForm({ ...ownerForm, name: e.target.value })} required />
               </div>
               <div className="space-y-2">
                 <Label>Telefone *</Label>
-                <Input value={ownerForm.phone} onChange={(e) => setOwnerForm(prev => ({ ...prev, phone: e.target.value }))} required data-testid="input-owner-phone" />
+                <Input value={ownerForm.phone} onChange={(e) => setOwnerForm({ ...ownerForm, phone: e.target.value })} required />
               </div>
               <div className="space-y-2">
                 <Label>Email</Label>
-                <Input type="email" value={ownerForm.email} onChange={(e) => setOwnerForm(prev => ({ ...prev, email: e.target.value }))} data-testid="input-owner-email" />
+                <Input type="email" value={ownerForm.email} onChange={(e) => setOwnerForm({ ...ownerForm, email: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>CPF/CNPJ</Label>
-                <Input value={ownerForm.cpfCnpj} onChange={(e) => setOwnerForm(prev => ({ ...prev, cpfCnpj: e.target.value }))} data-testid="input-owner-cpf" />
+                <Input value={ownerForm.cpfCnpj} onChange={(e) => setOwnerForm({ ...ownerForm, cpfCnpj: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>PIX</Label>
-                <Input value={ownerForm.pixKey} onChange={(e) => setOwnerForm(prev => ({ ...prev, pixKey: e.target.value }))} data-testid="input-owner-pix" />
+                <Label>Endereco</Label>
+                <Input value={ownerForm.address} onChange={(e) => setOwnerForm({ ...ownerForm, address: e.target.value })} />
+              </div>
+              <div className="col-span-2 border-t pt-4">
+                <p className="text-sm font-medium mb-2">Dados Bancarios</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Banco</Label>
+                <Input value={ownerForm.bankName} onChange={(e) => setOwnerForm({ ...ownerForm, bankName: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Agencia</Label>
+                <Input value={ownerForm.bankAgency} onChange={(e) => setOwnerForm({ ...ownerForm, bankAgency: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Conta</Label>
+                <Input value={ownerForm.bankAccount} onChange={(e) => setOwnerForm({ ...ownerForm, bankAccount: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Chave PIX</Label>
+                <Input value={ownerForm.pixKey} onChange={(e) => setOwnerForm({ ...ownerForm, pixKey: e.target.value })} />
+              </div>
+              <div className="col-span-2 space-y-2">
+                <Label>Observacoes</Label>
+                <Textarea value={ownerForm.notes} onChange={(e) => setOwnerForm({ ...ownerForm, notes: e.target.value })} />
               </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOwnerModalOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={isSubmitting || !ownerForm.name || !ownerForm.phone} data-testid="button-submit-owner">
+              <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Cadastrar
+                Salvar
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
+      {/* Renter Modal */}
       <Dialog open={isRenterModalOpen} onOpenChange={setIsRenterModalOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Novo Inquilino</DialogTitle>
-            <DialogDescription>Cadastre um inquilino.</DialogDescription>
+            <DialogDescription>Cadastre um novo inquilino</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreateRenter} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 space-y-2">
                 <Label>Nome *</Label>
-                <Input value={renterForm.name} onChange={(e) => setRenterForm(prev => ({ ...prev, name: e.target.value }))} required data-testid="input-renter-name" />
+                <Input value={renterForm.name} onChange={(e) => setRenterForm({ ...renterForm, name: e.target.value })} required />
               </div>
               <div className="space-y-2">
                 <Label>Telefone *</Label>
-                <Input value={renterForm.phone} onChange={(e) => setRenterForm(prev => ({ ...prev, phone: e.target.value }))} required data-testid="input-renter-phone" />
+                <Input value={renterForm.phone} onChange={(e) => setRenterForm({ ...renterForm, phone: e.target.value })} required />
               </div>
               <div className="space-y-2">
                 <Label>Email</Label>
-                <Input type="email" value={renterForm.email} onChange={(e) => setRenterForm(prev => ({ ...prev, email: e.target.value }))} data-testid="input-renter-email" />
+                <Input type="email" value={renterForm.email} onChange={(e) => setRenterForm({ ...renterForm, email: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>CPF/CNPJ</Label>
-                <Input value={renterForm.cpfCnpj} onChange={(e) => setRenterForm(prev => ({ ...prev, cpfCnpj: e.target.value }))} data-testid="input-renter-cpf" />
+                <Input value={renterForm.cpfCnpj} onChange={(e) => setRenterForm({ ...renterForm, cpfCnpj: e.target.value })} />
               </div>
               <div className="space-y-2">
-                <Label>Profissão</Label>
-                <Input value={renterForm.profession} onChange={(e) => setRenterForm(prev => ({ ...prev, profession: e.target.value }))} data-testid="input-renter-profession" />
+                <Label>RG</Label>
+                <Input value={renterForm.rg} onChange={(e) => setRenterForm({ ...renterForm, rg: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Profissao</Label>
+                <Input value={renterForm.profession} onChange={(e) => setRenterForm({ ...renterForm, profession: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Renda</Label>
+                <Input value={renterForm.income} onChange={(e) => setRenterForm({ ...renterForm, income: e.target.value })} />
+              </div>
+              <div className="col-span-2 space-y-2">
+                <Label>Endereco</Label>
+                <Input value={renterForm.address} onChange={(e) => setRenterForm({ ...renterForm, address: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Contato de Emergencia</Label>
+                <Input value={renterForm.emergencyContact} onChange={(e) => setRenterForm({ ...renterForm, emergencyContact: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Tel. Emergencia</Label>
+                <Input value={renterForm.emergencyPhone} onChange={(e) => setRenterForm({ ...renterForm, emergencyPhone: e.target.value })} />
+              </div>
+              <div className="col-span-2 space-y-2">
+                <Label>Observacoes</Label>
+                <Textarea value={renterForm.notes} onChange={(e) => setRenterForm({ ...renterForm, notes: e.target.value })} />
               </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsRenterModalOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={isSubmitting || !renterForm.name || !renterForm.phone} data-testid="button-submit-renter">
+              <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Cadastrar
+                Salvar
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
+      {/* Contract Modal */}
       <Dialog open={isContractModalOpen} onOpenChange={setIsContractModalOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Novo Contrato de Aluguel</DialogTitle>
-            <DialogDescription>Crie um contrato vinculando imóvel, locador e inquilino.</DialogDescription>
+            <DialogTitle>Novo Contrato de Locacao</DialogTitle>
+            <DialogDescription>Crie um novo contrato de aluguel</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreateContract} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 space-y-2">
-                <Label>Imóvel *</Label>
-                <Select value={contractForm.propertyId} onValueChange={(v) => setContractForm(prev => ({ ...prev, propertyId: v }))}>
-                  <SelectTrigger data-testid="select-contract-property"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <Label>Imovel *</Label>
+                <Select value={contractForm.propertyId} onValueChange={(v) => setContractForm({ ...contractForm, propertyId: v })}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    {properties.map(p => <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>)}
+                    {properties.filter(p => p.category === "rent").map(p => (
+                      <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label>Locador *</Label>
-                <Select value={contractForm.ownerId} onValueChange={(v) => setContractForm(prev => ({ ...prev, ownerId: v }))}>
-                  <SelectTrigger data-testid="select-contract-owner"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <Select value={contractForm.ownerId} onValueChange={(v) => setContractForm({ ...contractForm, ownerId: v })}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    {owners.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
+                    {owners.map(o => (
+                      <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label>Inquilino *</Label>
-                <Select value={contractForm.renterId} onValueChange={(v) => setContractForm(prev => ({ ...prev, renterId: v }))}>
-                  <SelectTrigger data-testid="select-contract-renter"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                <Select value={contractForm.renterId} onValueChange={(v) => setContractForm({ ...contractForm, renterId: v })}>
+                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                   <SelectContent>
-                    {renters.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                    {renters.map(r => (
+                      <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label>Valor do Aluguel *</Label>
-                <Input type="number" step="0.01" value={contractForm.rentValue} onChange={(e) => setContractForm(prev => ({ ...prev, rentValue: e.target.value }))} required data-testid="input-contract-rent" />
+                <Input type="number" step="0.01" value={contractForm.rentValue} onChange={(e) => setContractForm({ ...contractForm, rentValue: e.target.value })} required />
+              </div>
+              <div className="space-y-2">
+                <Label>Condominio</Label>
+                <Input type="number" step="0.01" value={contractForm.condoFee} onChange={(e) => setContractForm({ ...contractForm, condoFee: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>IPTU</Label>
+                <Input type="number" step="0.01" value={contractForm.iptuValue} onChange={(e) => setContractForm({ ...contractForm, iptuValue: e.target.value })} />
               </div>
               <div className="space-y-2">
                 <Label>Dia Vencimento *</Label>
-                <Input type="number" min="1" max="31" value={contractForm.dueDay} onChange={(e) => setContractForm(prev => ({ ...prev, dueDay: e.target.value }))} required data-testid="input-contract-due-day" />
+                <Input type="number" min="1" max="31" value={contractForm.dueDay} onChange={(e) => setContractForm({ ...contractForm, dueDay: e.target.value })} required />
               </div>
               <div className="space-y-2">
-                <Label>Início *</Label>
-                <Input type="date" value={contractForm.startDate} onChange={(e) => setContractForm(prev => ({ ...prev, startDate: e.target.value }))} required data-testid="input-contract-start" />
+                <Label>Data Inicio *</Label>
+                <Input type="date" value={contractForm.startDate} onChange={(e) => setContractForm({ ...contractForm, startDate: e.target.value })} required />
               </div>
               <div className="space-y-2">
-                <Label>Término *</Label>
-                <Input type="date" value={contractForm.endDate} onChange={(e) => setContractForm(prev => ({ ...prev, endDate: e.target.value }))} required data-testid="input-contract-end" />
+                <Label>Data Fim *</Label>
+                <Input type="date" value={contractForm.endDate} onChange={(e) => setContractForm({ ...contractForm, endDate: e.target.value })} required />
+              </div>
+              <div className="space-y-2">
+                <Label>Indice Reajuste</Label>
+                <Select value={contractForm.adjustmentIndex} onValueChange={(v) => setContractForm({ ...contractForm, adjustmentIndex: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="IGPM">IGPM</SelectItem>
+                    <SelectItem value="IPCA">IPCA</SelectItem>
+                    <SelectItem value="INPC">INPC</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Taxa Administracao (%)</Label>
+                <Input type="number" step="0.1" value={contractForm.administrationFee} onChange={(e) => setContractForm({ ...contractForm, administrationFee: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Caucao</Label>
+                <Input type="number" step="0.01" value={contractForm.depositValue} onChange={(e) => setContractForm({ ...contractForm, depositValue: e.target.value })} />
+              </div>
+              <div className="col-span-2 space-y-2">
+                <Label>Observacoes</Label>
+                <Textarea value={contractForm.notes} onChange={(e) => setContractForm({ ...contractForm, notes: e.target.value })} />
               </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsContractModalOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={isSubmitting || !contractForm.propertyId || !contractForm.ownerId || !contractForm.renterId || !contractForm.rentValue} data-testid="button-submit-rental-contract">
+              <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Criar Contrato
+                Salvar
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
+      {/* Payment Modal */}
       <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Novo Pagamento</DialogTitle>
-            <DialogDescription>Registre um pagamento de aluguel.</DialogDescription>
+            <DialogDescription>Registre um novo pagamento de aluguel</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreatePayment} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -1712,44 +1276,131 @@ export default function RentalsPage() {
                 <Label>Contrato *</Label>
                 <Select value={paymentForm.rentalContractId} onValueChange={(v) => {
                   const contract = rentalContracts.find(c => c.id === v);
-                  setPaymentForm(prev => ({
-                    ...prev,
-                    rentalContractId: v,
-                    rentValue: contract?.rentValue || "",
-                    condoFee: contract?.condoFee || "",
-                    iptuValue: contract?.iptuValue || "",
-                    totalValue: String(Number(contract?.rentValue || 0) + Number(contract?.condoFee || 0) + Number(contract?.iptuValue || 0))
-                  }));
+                  if (contract) {
+                    setPaymentForm({
+                      ...paymentForm,
+                      rentalContractId: v,
+                      rentValue: contract.rentValue,
+                      condoFee: contract.condoFee || "",
+                      iptuValue: contract.iptuValue || "",
+                      totalValue: (Number(contract.rentValue || 0) + Number(contract.condoFee || 0) + Number(contract.iptuValue || 0)).toString(),
+                    });
+                  }
                 }}>
-                  <SelectTrigger data-testid="select-payment-contract"><SelectValue placeholder="Selecione" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Selecione o contrato" /></SelectTrigger>
                   <SelectContent>
-                    {rentalContracts.filter(c => c.status === "active").map(c => (
-                      <SelectItem key={c.id} value={c.id}>{getPropertyTitle(c.propertyId)} - {getRenterName(c.renterId)}</SelectItem>
-                    ))}
+                    {rentalContracts.filter(c => c.status === "active").map(c => {
+                      const property = properties.find(p => p.id === c.propertyId);
+                      return (
+                        <SelectItem key={c.id} value={c.id}>{property?.title || "Contrato"}</SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Mês Referência *</Label>
-                <Input placeholder="Ex: 2024-01" value={paymentForm.referenceMonth} onChange={(e) => setPaymentForm(prev => ({ ...prev, referenceMonth: e.target.value }))} required data-testid="input-payment-month" />
+                <Label>Mes Referencia *</Label>
+                <Input type="month" value={paymentForm.referenceMonth} onChange={(e) => setPaymentForm({ ...paymentForm, referenceMonth: e.target.value })} required />
               </div>
               <div className="space-y-2">
                 <Label>Vencimento *</Label>
-                <Input type="date" value={paymentForm.dueDate} onChange={(e) => setPaymentForm(prev => ({ ...prev, dueDate: e.target.value }))} required data-testid="input-payment-due" />
+                <Input type="date" value={paymentForm.dueDate} onChange={(e) => setPaymentForm({ ...paymentForm, dueDate: e.target.value })} required />
               </div>
               <div className="space-y-2">
                 <Label>Valor Total *</Label>
-                <Input type="number" step="0.01" value={paymentForm.totalValue} onChange={(e) => setPaymentForm(prev => ({ ...prev, totalValue: e.target.value }))} required data-testid="input-payment-total" />
+                <Input type="number" step="0.01" value={paymentForm.totalValue} onChange={(e) => setPaymentForm({ ...paymentForm, totalValue: e.target.value })} required />
+              </div>
+              <div className="col-span-2 space-y-2">
+                <Label>Observacoes</Label>
+                <Textarea value={paymentForm.notes} onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })} />
               </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsPaymentModalOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={isSubmitting || !paymentForm.rentalContractId || !paymentForm.referenceMonth || !paymentForm.totalValue} data-testid="button-submit-payment">
+              <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Registrar
+                Salvar
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Modal (AITOPIA) */}
+      <Dialog open={isAIModalOpen} onOpenChange={setIsAIModalOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-purple-600" />
+              AITOPIA - Assistente de Locacao
+            </DialogTitle>
+            <DialogDescription>
+              Mensagens prontas para comunicacao com inquilinos
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Mensagens prontas</Label>
+              <div className="grid gap-2">
+                {RENTAL_AI_PROMPTS.map((prompt) => (
+                  <Button
+                    key={prompt.id}
+                    variant="outline"
+                    className="h-auto p-3 justify-start text-left"
+                    onClick={() => {
+                      const renter = aiContext?.renter;
+                      const payment = aiContext?.payment;
+                      setAiMessage(prompt.template({
+                        renterName: renter?.name || "Cliente",
+                        value: payment ? formatPrice(payment.totalValue) : "R$ 1.500,00",
+                        daysOverdue: payment ? getDaysOverdue(payment.dueDate) : 5,
+                        oldValue: "R$ 1.500,00",
+                        newValue: "R$ 1.600,00",
+                        index: "IGPM",
+                        dueDate: payment ? formatDate(payment.dueDate) : "10/01/2025",
+                        propertyTitle: "Apartamento Centro",
+                      }));
+                    }}
+                  >
+                    <prompt.icon className="h-4 w-4 mr-2 shrink-0" />
+                    <span className="text-xs">{prompt.label}</span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {aiMessage && (
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Mensagem</Label>
+                <Textarea
+                  value={aiMessage}
+                  onChange={(e) => setAiMessage(e.target.value)}
+                  rows={6}
+                  className="text-sm"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    onClick={() => sendToWhatsApp(aiContext?.renter?.phone)}
+                  >
+                    <MessageCircle className="h-4 w-4 mr-1.5" />
+                    Enviar WhatsApp
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(aiMessage);
+                      toast({ title: "Copiado!", description: "Mensagem copiada." });
+                    }}
+                  >
+                    Copiar
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

@@ -1,0 +1,451 @@
+// Temporary file with comprehensive report implementations
+// These methods should be added to the DbStorage class in storage.ts
+
+  // Comprehensive Reports
+  async getSalesReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date; brokerId?: string }): Promise<any> {
+    const sales = await this.getPropertySalesByTenant(tenantId);
+    const properties = await this.getPropertiesByTenant(tenantId);
+    const leads = await this.getLeadsByTenant(tenantId);
+    const users = await this.getUsersByTenant(tenantId);
+
+    let filteredSales = sales;
+    if (filters?.startDate || filters?.endDate) {
+      filteredSales = filteredSales.filter(s => {
+        const saleDate = new Date(s.saleDate);
+        if (filters.startDate && saleDate < filters.startDate) return false;
+        if (filters.endDate && saleDate > filters.endDate) return false;
+        return true;
+      });
+    }
+    if (filters?.brokerId) {
+      filteredSales = filteredSales.filter(s => s.brokerId === filters.brokerId);
+    }
+
+    const propertiesMap = new Map(properties.map(p => [p.id, p]));
+    const leadsMap = new Map(leads.map(l => [l.id, l]));
+    const usersMap = new Map(users.map(u => [u.id, u]));
+
+    const totalSales = filteredSales.length;
+    const totalValue = filteredSales.reduce((sum, s) => sum + Number(s.saleValue || 0), 0);
+    const averageTicket = totalSales > 0 ? totalValue / totalSales : 0;
+
+    // Sales by month
+    const salesByMonth: Map<string, { count: number; value: number }> = new Map();
+    filteredSales.forEach(sale => {
+      const month = sale.saleDate.substring(0, 7);
+      const existing = salesByMonth.get(month) || { count: 0, value: 0 };
+      salesByMonth.set(month, {
+        count: existing.count + 1,
+        value: existing.value + Number(sale.saleValue || 0)
+      });
+    });
+
+    // Sales by property type
+    const salesByType: Map<string, { count: number; value: number }> = new Map();
+    filteredSales.forEach(sale => {
+      const property = propertiesMap.get(sale.propertyId);
+      if (property) {
+        const type = property.type;
+        const existing = salesByType.get(type) || { count: 0, value: 0 };
+        salesByType.set(type, {
+          count: existing.count + 1,
+          value: existing.value + Number(sale.saleValue || 0)
+        });
+      }
+    });
+
+    // Sales by city
+    const salesByCity: Map<string, { count: number; value: number }> = new Map();
+    filteredSales.forEach(sale => {
+      const property = propertiesMap.get(sale.propertyId);
+      if (property) {
+        const city = property.city;
+        const existing = salesByCity.get(city) || { count: 0, value: 0 };
+        salesByCity.set(city, {
+          count: existing.count + 1,
+          value: existing.value + Number(sale.saleValue || 0)
+        });
+      }
+    });
+
+    // Top broker
+    const salesByBroker: Map<string, number> = new Map();
+    filteredSales.forEach(sale => {
+      if (sale.brokerId) {
+        salesByBroker.set(sale.brokerId, (salesByBroker.get(sale.brokerId) || 0) + 1);
+      }
+    });
+    let topBroker = null;
+    let maxSales = 0;
+    salesByBroker.forEach((count, brokerId) => {
+      if (count > maxSales) {
+        maxSales = count;
+        topBroker = usersMap.get(brokerId);
+      }
+    });
+
+    // Conversion rate (contracts / leads)
+    const contractLeads = leads.filter(l => l.status === 'contract').length;
+    const conversionRate = leads.length > 0 ? (contractLeads / leads.length) * 100 : 0;
+
+    return {
+      kpis: {
+        totalSales,
+        totalValue,
+        averageTicket,
+        conversionRate,
+        topBroker: topBroker ? topBroker.name : 'N/A'
+      },
+      salesByMonth: Array.from(salesByMonth.entries()).map(([month, data]) => ({
+        month,
+        count: data.count,
+        value: data.value
+      })).sort((a, b) => a.month.localeCompare(b.month)),
+      salesByType: Array.from(salesByType.entries()).map(([type, data]) => ({
+        type,
+        count: data.count,
+        value: data.value
+      })),
+      salesByCity: Array.from(salesByCity.entries()).map(([city, data]) => ({
+        city,
+        count: data.count,
+        value: data.value
+      })),
+      sales: filteredSales.map(sale => ({
+        ...sale,
+        property: propertiesMap.get(sale.propertyId),
+        buyer: leadsMap.get(sale.buyerLeadId),
+        broker: sale.brokerId ? usersMap.get(sale.brokerId) : null
+      }))
+    };
+  }
+
+  async getLeadsFunnelReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date }): Promise<any> {
+    let leads = await this.getLeadsByTenant(tenantId);
+    const visits = await this.getVisitsByTenant(tenantId);
+
+    if (filters?.startDate || filters?.endDate) {
+      leads = leads.filter(l => {
+        const createdAt = new Date(l.createdAt);
+        if (filters.startDate && createdAt < filters.startDate) return false;
+        if (filters.endDate && createdAt > filters.endDate) return false;
+        return true;
+      });
+    }
+
+    const stages = ['new', 'qualification', 'visit', 'proposal', 'contract', 'lost'];
+    const stageData: Map<string, { count: number; avgDays: number; totalDays: number }> = new Map();
+
+    stages.forEach(stage => {
+      stageData.set(stage, { count: 0, avgDays: 0, totalDays: 0 });
+    });
+
+    const now = new Date();
+    leads.forEach(lead => {
+      const data = stageData.get(lead.status) || { count: 0, avgDays: 0, totalDays: 0 };
+      data.count++;
+      const updatedAt = new Date(lead.updatedAt);
+      const daysInStage = Math.floor((now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
+      data.totalDays += daysInStage;
+      stageData.set(lead.status, data);
+    });
+
+    stageData.forEach((data, stage) => {
+      if (data.count > 0) {
+        data.avgDays = Math.round(data.totalDays / data.count);
+      }
+    });
+
+    // Conversion rates
+    const conversionRates: { from: string; to: string; rate: number }[] = [];
+    for (let i = 0; i < stages.length - 1; i++) {
+      const fromStage = stages[i];
+      const toStage = stages[i + 1];
+      const fromCount = stages.slice(i).reduce((sum, s) => sum + (stageData.get(s)?.count || 0), 0);
+      const toCount = stages.slice(i + 1).reduce((sum, s) => sum + (stageData.get(s)?.count || 0), 0);
+      const rate = fromCount > 0 ? (toCount / fromCount) * 100 : 0;
+      conversionRates.push({ from: fromStage, to: toStage, rate });
+    }
+
+    // Lead source analysis
+    const sourceAnalysis: Map<string, number> = new Map();
+    leads.forEach(lead => {
+      sourceAnalysis.set(lead.source, (sourceAnalysis.get(lead.source) || 0) + 1);
+    });
+
+    const lostLeads = leads.filter(l => l.status === 'lost');
+
+    return {
+      funnel: Array.from(stageData.entries()).map(([stage, data]) => ({
+        stage,
+        count: data.count,
+        avgDays: data.avgDays
+      })),
+      conversionRates,
+      sourceAnalysis: Array.from(sourceAnalysis.entries()).map(([source, count]) => ({
+        source,
+        count
+      })),
+      lostLeads: lostLeads.length,
+      wonLeads: leads.filter(l => l.status === 'contract').length
+    };
+  }
+
+  async getBrokerPerformanceReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date }): Promise<any> {
+    const leads = await this.getLeadsByTenant(tenantId);
+    const visits = await this.getVisitsByTenant(tenantId);
+    const proposals = await this.getSaleProposalsByTenant(tenantId);
+    const sales = await this.getPropertySalesByTenant(tenantId);
+    const users = await this.getUsersByTenant(tenantId);
+
+    const brokerPerformance: Map<string, {
+      name: string;
+      leadsWorked: number;
+      visits: number;
+      proposals: number;
+      contractsClosed: number;
+      totalValue: number;
+      averageTicket: number;
+      conversionRate: number;
+    }> = new Map();
+
+    users.forEach(user => {
+      brokerPerformance.set(user.id, {
+        name: user.name,
+        leadsWorked: 0,
+        visits: 0,
+        proposals: 0,
+        contractsClosed: 0,
+        totalValue: 0,
+        averageTicket: 0,
+        conversionRate: 0
+      });
+    });
+
+    leads.forEach(lead => {
+      if (lead.assignedTo) {
+        const data = brokerPerformance.get(lead.assignedTo);
+        if (data) {
+          data.leadsWorked++;
+        }
+      }
+    });
+
+    visits.forEach(visit => {
+      if (visit.assignedTo) {
+        const data = brokerPerformance.get(visit.assignedTo);
+        if (data) {
+          data.visits++;
+        }
+      }
+    });
+
+    proposals.forEach(proposal => {
+      const lead = leads.find(l => l.id === proposal.leadId);
+      if (lead?.assignedTo) {
+        const data = brokerPerformance.get(lead.assignedTo);
+        if (data) {
+          data.proposals++;
+        }
+      }
+    });
+
+    sales.forEach(sale => {
+      if (sale.brokerId) {
+        const data = brokerPerformance.get(sale.brokerId);
+        if (data) {
+          data.contractsClosed++;
+          data.totalValue += Number(sale.saleValue || 0);
+        }
+      }
+    });
+
+    brokerPerformance.forEach(data => {
+      // Safely calculate averageTicket avoiding division by zero
+      data.averageTicket = data.contractsClosed > 0
+        ? Math.round(data.totalValue / data.contractsClosed)
+        : 0;
+      // Safely calculate conversionRate avoiding division by zero
+      data.conversionRate = data.leadsWorked > 0
+        ? Math.round((data.contractsClosed / data.leadsWorked) * 100 * 10) / 10
+        : 0;
+    });
+
+    return {
+      ranking: Array.from(brokerPerformance.values())
+        .sort((a, b) => b.contractsClosed - a.contractsClosed)
+    };
+  }
+
+  async getPropertiesReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date }): Promise<any> {
+    const properties = await this.getPropertiesByTenant(tenantId);
+    const visits = await this.getVisitsByTenant(tenantId);
+    const sales = await this.getPropertySalesByTenant(tenantId);
+    const rentalContracts = await this.getRentalContractsByTenant(tenantId);
+    const owners = await this.getOwnersByTenant(tenantId);
+
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // Visit counts per property
+    const visitCounts: Map<string, number> = new Map();
+    const lastVisitDates: Map<string, Date> = new Map();
+    visits.forEach(visit => {
+      visitCounts.set(visit.propertyId, (visitCounts.get(visit.propertyId) || 0) + 1);
+      const visitDate = new Date(visit.scheduledFor);
+      const lastDate = lastVisitDates.get(visit.propertyId);
+      if (!lastDate || visitDate > lastDate) {
+        lastVisitDates.set(visit.propertyId, visitDate);
+      }
+    });
+
+    // Most visited properties
+    const mostVisited = properties
+      .map(p => ({ property: p, visits: visitCounts.get(p.id) || 0 }))
+      .filter(item => item.visits > 0)
+      .sort((a, b) => b.visits - a.visits)
+      .slice(0, 10);
+
+    // Stagnant properties (no visits in 30 days)
+    const stagnant = properties
+      .filter(p => {
+        const lastVisit = lastVisitDates.get(p.id);
+        return !lastVisit || lastVisit < thirtyDaysAgo;
+      })
+      .filter(p => p.status === 'available');
+
+    // Average time to sell/rent by type
+    const timeToSellByType: Map<string, { total: number; count: number }> = new Map();
+    sales.forEach(sale => {
+      const property = properties.find(p => p.id === sale.propertyId);
+      if (property) {
+        const saleDate = new Date(sale.saleDate);
+        const createdAt = new Date(property.createdAt);
+        const days = Math.floor((saleDate.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+        const existing = timeToSellByType.get(property.type) || { total: 0, count: 0 };
+        timeToSellByType.set(property.type, {
+          total: existing.total + days,
+          count: existing.count + 1
+        });
+      }
+    });
+
+    // Inventory by status
+    const inventoryByStatus: Map<string, number> = new Map();
+    properties.forEach(p => {
+      inventoryByStatus.set(p.status, (inventoryByStatus.get(p.status) || 0) + 1);
+    });
+
+    // Per-owner reports
+    const ownerReports = owners.map(owner => {
+      const ownerContracts = rentalContracts.filter(c => c.ownerId === owner.id);
+      const activeContracts = ownerContracts.filter(c => c.status === 'active');
+      const ownerProperties = ownerContracts.length;
+
+      return {
+        owner,
+        activeProperties: ownerProperties,
+        activeContracts: activeContracts.length,
+        vacancyRate: ownerProperties > 0
+          ? ((ownerProperties - activeContracts.length) / ownerProperties) * 100
+          : 0
+      };
+    });
+
+    return {
+      mostVisited,
+      stagnant: stagnant.slice(0, 20),
+      timeToSellByType: Array.from(timeToSellByType.entries()).map(([type, data]) => ({
+        type,
+        avgDays: data.count > 0 ? Math.round(data.total / data.count) : 0
+      })),
+      inventoryByStatus: Array.from(inventoryByStatus.entries()).map(([status, count]) => ({
+        status,
+        count
+      })),
+      ownerReports: ownerReports.slice(0, 10)
+    };
+  }
+
+  async getFinancialReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date }): Promise<any> {
+    const financeEntries = await this.getFinanceEntriesByTenant(tenantId, filters);
+    const sales = await this.getPropertySalesByTenant(tenantId);
+    const rentalPayments = await this.getRentalPaymentsByTenant(tenantId);
+    const users = await this.getUsersByTenant(tenantId);
+
+    let filteredSales = sales;
+    let filteredPayments = rentalPayments;
+
+    if (filters?.startDate || filters?.endDate) {
+      filteredSales = filteredSales.filter(s => {
+        const date = new Date(s.saleDate);
+        if (filters.startDate && date < filters.startDate) return false;
+        if (filters.endDate && date > filters.endDate) return false;
+        return true;
+      });
+
+      filteredPayments = filteredPayments.filter(p => {
+        const date = new Date(p.dueDate);
+        if (filters.startDate && date < filters.startDate) return false;
+        if (filters.endDate && date > filters.endDate) return false;
+        return true;
+      });
+    }
+
+    // Sales revenue (commissions)
+    const salesRevenue = filteredSales.reduce((sum, s) => {
+      return sum + Number(s.commissionValue || Number(s.saleValue || 0) * Number(s.commissionRate || 6) / 100);
+    }, 0);
+
+    // Rental revenue (administration fees)
+    const rentalRevenue = filteredPayments
+      .filter(p => p.status === 'paid')
+      .reduce((sum, p) => {
+        return sum + Number(p.totalValue || 0) * 0.1;
+      }, 0);
+
+    // Income and expenses from finance entries
+    const income = financeEntries
+      .filter(e => e.flow === 'in')
+      .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+    const expenses = financeEntries
+      .filter(e => e.flow === 'out')
+      .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+    // Total revenues
+    const totalRevenue = salesRevenue + rentalRevenue + income;
+    const netProfit = totalRevenue - expenses;
+    const profitMargin = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+
+    // Margin by broker (from sales commissions)
+    const marginByBroker: Map<string, number> = new Map();
+    filteredSales.forEach(sale => {
+      if (sale.brokerId) {
+        const commission = Number(sale.commissionValue || Number(sale.saleValue || 0) * Number(sale.commissionRate || 6) / 100);
+        marginByBroker.set(sale.brokerId, (marginByBroker.get(sale.brokerId) || 0) + commission);
+      }
+    });
+
+    const usersMap = new Map(users.map(u => [u.id, u]));
+
+    return {
+      dre: {
+        salesRevenue,
+        rentalRevenue,
+        otherIncome: income,
+        totalRevenue,
+        operationalExpenses: expenses,
+        netProfit,
+        profitMargin
+      },
+      marginByChannel: [
+        { channel: 'Vendas', margin: salesRevenue },
+        { channel: 'Aluguéis', margin: rentalRevenue }
+      ],
+      marginByBroker: Array.from(marginByBroker.entries()).map(([brokerId, margin]) => ({
+        broker: usersMap.get(brokerId)?.name || 'N/A',
+        margin
+      })).sort((a, b) => b.margin - a.margin)
+    };
+  }

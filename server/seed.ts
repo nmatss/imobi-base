@@ -136,7 +136,7 @@ async function seed() {
     ];
 
     for (const prop of properties1) {
-      await storage.createProperty(prop);
+      await storage.createProperty(prop as any);
     }
 
     // Create Properties for Tenant 2
@@ -180,7 +180,7 @@ async function seed() {
     ];
 
     for (const prop of properties2) {
-      await storage.createProperty(prop);
+      await storage.createProperty(prop as any);
     }
 
     console.log("✅ Properties created");
@@ -240,7 +240,7 @@ async function seed() {
     ];
 
     for (const lead of leads1) {
-      await storage.createLead(lead);
+      await storage.createLead(lead as any);
     }
 
     // Create Leads for Tenant 2
@@ -268,7 +268,7 @@ async function seed() {
     ];
 
     for (const lead of leads2) {
-      await storage.createLead(lead);
+      await storage.createLead(lead as any);
     }
 
     console.log("✅ Leads created");

@@ -158,6 +158,34 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: "/settings", label: "Configurações", icon: Settings },
   ];
 
+  // Get current page name for breadcrumb
+  const currentPageName = useMemo(() => {
+    // Check if it's a property detail page
+    if (location.startsWith("/properties/")) {
+      return "Detalhes do Imóvel";
+    }
+    // Find the nav item that matches the current location
+    const navItem = navItems.find((item) => location.startsWith(item.href));
+    return navItem?.label || "Dashboard";
+  }, [location]);
+
+  // Keyboard shortcut for search (Ctrl+K or Cmd+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        const searchInput = document.querySelector<HTMLInputElement>('[data-testid="input-global-search"]');
+        if (searchInput) {
+          searchInput.focus();
+          setSearchOpen(true);
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
       <div className="p-6 flex items-center gap-2">
@@ -268,37 +296,108 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Main Content */}
       <div className="flex-1 lg:pl-64 flex flex-col min-h-screen transition-all duration-300">
-        <header className="h-16 border-b bg-card/50 backdrop-blur-md sticky top-0 z-40 px-6 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 lg:hidden">
-            <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
+        <header className="h-14 sm:h-16 border-b bg-card/50 backdrop-blur-md sticky top-0 z-40 px-3 sm:px-6 flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 lg:hidden">
+            <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="h-9 w-9 sm:h-10 sm:w-10">
               <Menu className="h-5 w-5" />
             </Button>
-            <span className="font-heading font-bold text-lg">ImobiBase</span>
+            <span className="font-heading font-bold text-base sm:text-lg">ImobiBase</span>
           </div>
 
           <div className="hidden lg:flex items-center text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">{tenant?.name}</span>
+            <Link href="/dashboard" className="font-medium text-foreground hover:text-primary transition-colors">
+              {tenant?.name}
+            </Link>
             <span className="mx-2">/</span>
-            <span>Dashboard</span>
+            <span className="text-foreground">{currentPageName}</span>
           </div>
 
-          <div className="flex items-center gap-4 ml-auto">
+          <div className="flex items-center gap-2 sm:gap-4 ml-auto">
+            {/* Mobile Search Button */}
             <Popover open={searchOpen} onOpenChange={setSearchOpen}>
               <PopoverTrigger asChild>
-                <div className="relative hidden md:block w-64">
+                <Button variant="ghost" size="icon" className="md:hidden h-9 w-9">
+                  <Search className="h-5 w-5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[calc(100vw-2rem)] sm:w-80 p-2" align="end">
+                <div className="relative">
                   {isSearching ? (
                     <Loader2 className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground animate-spin" />
                   ) : (
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                   )}
-                  <Input 
-                    placeholder="Buscar imóveis, leads..." 
-                    className="pl-9 h-9 bg-secondary/50 border-transparent focus:bg-background focus:border-input transition-all"
+                  <Input
+                    placeholder="Buscar..."
+                    className="pl-9 h-10 w-full"
+                    data-testid="input-global-search-mobile"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                {hasResults && (
+                  <div className="mt-2 max-h-60 overflow-y-auto">
+                    {searchResults.properties.length > 0 && (
+                      <div className="border-b pb-2 mb-2">
+                        <p className="text-xs font-medium text-muted-foreground px-2 py-1">Imóveis</p>
+                        {searchResults.properties.slice(0, 3).map((p) => (
+                          <button
+                            key={p.id}
+                            className="w-full text-left px-2 py-2 hover:bg-muted rounded-md flex items-center gap-2"
+                            onClick={() => handleSelectResult("property", p.id)}
+                          >
+                            <Building2 className="h-4 w-4 text-blue-500 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{p.title}</p>
+                              <p className="text-xs text-muted-foreground truncate">{p.city}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {searchResults.leads.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground px-2 py-1">Leads</p>
+                        {searchResults.leads.slice(0, 3).map((l) => (
+                          <button
+                            key={l.id}
+                            className="w-full text-left px-2 py-2 hover:bg-muted rounded-md flex items-center gap-2"
+                            onClick={() => handleSelectResult("lead", l.id)}
+                          >
+                            <Users className="h-4 w-4 text-purple-500 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{l.name}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
+
+            {/* Desktop Search */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <div className="relative hidden md:block w-48 lg:w-64">
+                  {isSearching ? (
+                    <Loader2 className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground animate-spin" />
+                  ) : (
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  )}
+                  <Input
+                    placeholder="Buscar... (⌘K)"
+                    className="pl-9 pr-12 lg:pr-16 h-9 bg-secondary/50 border-transparent focus:bg-background focus:border-input transition-all"
                     data-testid="input-global-search"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onFocus={() => hasResults && setSearchOpen(true)}
                   />
+                  <kbd className="absolute right-2 top-1.5 pointer-events-none hidden lg:inline-flex h-6 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+                    <span className="text-xs">⌘</span>K
+                  </kbd>
                 </div>
               </PopoverTrigger>
               {hasResults && (
@@ -415,8 +514,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </header>
 
-        <main className="flex-1 p-6 overflow-y-auto">
-          <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <main className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8 overflow-y-auto">
+          <div className="max-w-7xl 3xl:max-w-[1600px] mx-auto space-y-4 sm:space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {children}
           </div>
         </main>
