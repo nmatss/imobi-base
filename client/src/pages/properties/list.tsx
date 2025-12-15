@@ -477,9 +477,10 @@ export default function PropertiesList() {
             </p>
           </div>
           <PermissionGate permission="properties.create">
-            <Button className="gap-1.5 sm:gap-2 w-full xs:w-auto h-9 sm:h-10 text-sm active:scale-95 transition-transform duration-150" onClick={openCreateModal}>
+            <Button className="gap-1.5 sm:gap-2 w-full xs:w-auto h-10 sm:h-10 text-sm active:scale-95 transition-transform duration-150" onClick={openCreateModal}>
               <Plus className="h-4 w-4" />
-              <span>Novo Imóvel</span>
+              <span className="hidden xs:inline">Novo Imóvel</span>
+              <span className="xs:hidden">Novo</span>
             </Button>
           </PermissionGate>
         </div>
@@ -781,10 +782,9 @@ export default function PropertiesList() {
               key={property.id}
               className="group overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-1 hover:border-primary/20 cursor-pointer touch-manipulation"
               onClick={() => setLocation(`/properties/${property.id}`)}
-              style={{ minWidth: "280px" }}
             >
-              {/* Image Container - Fixed height h-48 with aspect-ratio 16/9 */}
-              <div className="h-48 aspect-video overflow-hidden relative">
+              {/* Image Container - Responsive height */}
+              <div className="h-40 xs:h-44 sm:h-48 overflow-hidden relative">
                 <img
                   src={property.images?.[0] || "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800"}
                   alt={property.title}
@@ -855,8 +855,8 @@ export default function PropertiesList() {
                   </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 shrink-0 -mr-1 hover:bg-muted rounded-full" aria-label="Mais opções" onClick={(e) => e.stopPropagation()}>
-                        <MoreVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                      <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 shrink-0 -mr-1.5 sm:-mr-1 hover:bg-muted rounded-full touch-manipulation" aria-label="Mais opções" onClick={(e) => e.stopPropagation()}>
+                        <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
@@ -888,23 +888,23 @@ export default function PropertiesList() {
                   </DropdownMenu>
                 </div>
 
-                <p className="text-xl sm:text-2xl font-bold text-primary mt-2">{formatPrice(property.price)}</p>
+                <p className="text-lg xs:text-xl sm:text-2xl font-bold text-primary mt-1.5 xs:mt-2">{formatPrice(property.price)}</p>
 
-                {/* Property Info with clear icons */}
-                <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
+                {/* Property Info with clear icons - Responsive */}
+                <div className="flex flex-wrap items-center gap-2 xs:gap-3 mt-1.5 xs:mt-2 text-xs xs:text-sm text-muted-foreground">
                   {property.bedrooms && (
-                    <span className="flex items-center gap-1">
-                      <Bed className="h-4 w-4" /> {property.bedrooms}
+                    <span className="flex items-center gap-0.5 xs:gap-1">
+                      <Bed className="h-3.5 w-3.5 xs:h-4 xs:w-4" /> {property.bedrooms}
                     </span>
                   )}
                   {property.bathrooms && (
-                    <span className="flex items-center gap-1">
-                      <Bath className="h-4 w-4" /> {property.bathrooms}
+                    <span className="flex items-center gap-0.5 xs:gap-1">
+                      <Bath className="h-3.5 w-3.5 xs:h-4 xs:w-4" /> {property.bathrooms}
                     </span>
                   )}
                   {property.area && (
-                    <span className="flex items-center gap-1">
-                      <Maximize2 className="h-4 w-4" /> {property.area}m²
+                    <span className="flex items-center gap-0.5 xs:gap-1">
+                      <Maximize2 className="h-3.5 w-3.5 xs:h-4 xs:w-4" /> {property.area}m²
                     </span>
                   )}
                 </div>
@@ -920,12 +920,12 @@ export default function PropertiesList() {
                   <Progress value={property.score} className="h-1.5" />
                 </div>
 
-                {/* Action Buttons - Always visible */}
-                <div className="flex gap-2 mt-3 pt-3 border-t">
+                {/* Action Buttons - Always visible, touch-friendly (min 44px) */}
+                <div className="flex gap-2 mt-2 xs:mt-3 pt-2 xs:pt-3 border-t">
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-1 h-9"
+                    className="flex-1 h-10 xs:h-9 text-xs xs:text-sm active:scale-95 transition-transform"
                     onClick={(e) => { e.stopPropagation(); setLocation(`/properties/${property.id}`); }}
                   >
                     <Eye className="h-4 w-4 mr-1" /> Ver
@@ -933,7 +933,7 @@ export default function PropertiesList() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="flex-1 h-9"
+                    className="flex-1 h-10 xs:h-9 text-xs xs:text-sm active:scale-95 transition-transform"
                     onClick={(e) => { e.stopPropagation(); openEditModal(property); }}
                   >
                     <Pencil className="h-4 w-4 mr-1" /> Editar
@@ -989,11 +989,11 @@ export default function PropertiesList() {
                         </p>
                       </div>
 
-                      {/* Actions Dropdown - Touch-friendly */}
+                      {/* Actions Dropdown - Touch-friendly (min 44px) */}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 shrink-0 -mr-1 -mt-0.5">
-                            <MoreVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 shrink-0 -mr-1 -mt-0.5 touch-manipulation">
+                            <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44 sm:w-48">
