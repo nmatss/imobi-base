@@ -42,8 +42,11 @@ import {
   Maximize,
   Sparkles,
   TrendingUp,
-  Eye
+  Eye,
+  Video
 } from "lucide-react";
+import { PropertyLocationMap } from "@/components/maps/PropertyMap";
+import { VirtualTourPlayer } from "@/components/properties/VirtualTourPlayer";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -346,6 +349,10 @@ export default function PropertyDetailsPage() {
               <TabsTrigger value="location" className="text-xs sm:text-sm">
                 Localização
               </TabsTrigger>
+              <TabsTrigger value="tour" className="text-xs sm:text-sm">
+                <Video className="w-3 h-3 mr-1" />
+                Tour 360°
+              </TabsTrigger>
               <TabsTrigger value="documents" className="text-xs sm:text-sm">
                 Documentos
               </TabsTrigger>
@@ -424,17 +431,30 @@ export default function PropertyDetailsPage() {
                       </div>
                     </div>
 
-                    <div className="aspect-video rounded-lg bg-muted/50 flex items-center justify-center border border-dashed">
-                      <div className="text-center p-4">
-                        <MapPin className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
-                        <p className="text-sm text-muted-foreground">
-                          Mapa em breve
-                        </p>
+                    {property.latitude && property.longitude ? (
+                      <PropertyLocationMap
+                        latitude={property.latitude}
+                        longitude={property.longitude}
+                        title={property.title}
+                        height="300px"
+                      />
+                    ) : (
+                      <div className="aspect-video rounded-lg bg-muted/50 flex items-center justify-center border border-dashed">
+                        <div className="text-center p-4">
+                          <MapPin className="w-8 h-8 mx-auto text-muted-foreground/30 mb-2" />
+                          <p className="text-sm text-muted-foreground">
+                            Coordenadas não cadastradas
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="tour" className="mt-4">
+              <VirtualTourPlayer propertyId={property.id} editable={false} />
             </TabsContent>
 
             <TabsContent value="documents" className="mt-4">

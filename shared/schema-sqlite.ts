@@ -591,3 +591,326 @@ export const savedReports = sqliteTable("saved_reports", {
 export const insertSavedReportSchema = createInsertSchema(savedReports).omit({ id: true, createdAt: true });
 export type InsertSavedReport = z.infer<typeof insertSavedReportSchema>;
 export type SavedReport = typeof savedReports.$inferSelect;
+
+// ==================== SECURITY & COMPLIANCE ====================
+
+/**
+ * TWO FACTOR AUTHENTICATION
+ * TOTP-based 2FA for enhanced security
+ */
+export const twoFactorAuth = sqliteTable("two_factor_auth", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id).unique(),
+  secret: text("secret").notNull(), // Encrypted TOTP secret
+  backupCodes: text("backup_codes"), // JSON array of hashed backup codes
+  isEnabled: integer("is_enabled", { mode: "boolean" }).default(false),
+  verifiedAt: text("verified_at"),
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertTwoFactorAuthSchema = createInsertSchema(twoFactorAuth).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTwoFactorAuth = z.infer<typeof insertTwoFactorAuthSchema>;
+export type TwoFactorAuth = typeof twoFactorAuth.$inferSelect;
+
+/**
+ * AUDIT LOGS
+ * Complete audit trail for all system actions
+ */
+export const auditLogs = sqliteTable("audit_logs", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id").references(() => users.id),
+  action: text("action").notNull(), // create, update, delete, view, login, logout, export
+  entityType: text("entity_type").notNull(), // property, lead, contract, user, etc.
+  entityId: text("entity_id"),
+  oldValues: text("old_values"), // JSON of previous values
+  newValues: text("new_values"), // JSON of new values
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  metadata: text("metadata"), // Additional context as JSON
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;
+
+// ==================== LEAD INTELLIGENCE ====================
+
+/**
+ * LEAD SCORES
+ * Automated lead scoring based on behavior and profile
+ */
+export const leadScores = sqliteTable("lead_scores", {
+  id: text("id").primaryKey(),
+  leadId: text("lead_id").notNull().references(() => leads.id).unique(),
+  totalScore: integer("total_score").notNull().default(0), // 0-100
+  budgetScore: integer("budget_score").default(0),
+  engagementScore: integer("engagement_score").default(0),
+  profileScore: integer("profile_score").default(0),
+  urgencyScore: integer("urgency_score").default(0),
+  behaviorScore: integer("behavior_score").default(0),
+  temperature: text("temperature").default("cold"), // cold, warm, hot
+  lastCalculated: text("last_calculated").notNull().default(now()),
+  scoreHistory: text("score_history"), // JSON array of score changes over time
+  predictedConversion: real("predicted_conversion"), // 0.0 to 1.0 probability
+  nextBestAction: text("next_best_action"), // Recommended action
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertLeadScoreSchema = createInsertSchema(leadScores).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertLeadScore = z.infer<typeof insertLeadScoreSchema>;
+export type LeadScore = typeof leadScores.$inferSelect;
+
+/**
+ * DRIP CAMPAIGNS
+ * Automated email/message sequences for lead nurturing
+ */
+export const dripCampaigns = sqliteTable("drip_campaigns", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  triggerType: text("trigger_type").notNull(), // lead_created, status_change, tag_added, manual
+  triggerConditions: text("trigger_conditions"), // JSON conditions
+  isActive: integer("is_active", { mode: "boolean" }).default(true),
+  totalEnrolled: integer("total_enrolled").default(0),
+  totalCompleted: integer("total_completed").default(0),
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertDripCampaignSchema = createInsertSchema(dripCampaigns).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDripCampaign = z.infer<typeof insertDripCampaignSchema>;
+export type DripCampaign = typeof dripCampaigns.$inferSelect;
+
+/**
+ * CAMPAIGN STEPS
+ * Individual steps within a drip campaign
+ */
+export const campaignSteps = sqliteTable("campaign_steps", {
+  id: text("id").primaryKey(),
+  campaignId: text("campaign_id").notNull().references(() => dripCampaigns.id),
+  stepOrder: integer("step_order").notNull(),
+  delayDays: integer("delay_days").notNull().default(0),
+  delayHours: integer("delay_hours").notNull().default(0),
+  channel: text("channel").notNull(), // email, whatsapp, sms
+  subject: text("subject"),
+  content: text("content").notNull(),
+  templateVariables: text("template_variables"), // JSON
+  conditions: text("conditions"), // JSON - skip conditions
+  isActive: integer("is_active", { mode: "boolean" }).default(true),
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+export const insertCampaignStepSchema = createInsertSchema(campaignSteps).omit({ id: true, createdAt: true });
+export type InsertCampaignStep = z.infer<typeof insertCampaignStepSchema>;
+export type CampaignStep = typeof campaignSteps.$inferSelect;
+
+/**
+ * CAMPAIGN ENROLLMENTS
+ * Tracks leads enrolled in campaigns
+ */
+export const campaignEnrollments = sqliteTable("campaign_enrollments", {
+  id: text("id").primaryKey(),
+  campaignId: text("campaign_id").notNull().references(() => dripCampaigns.id),
+  leadId: text("lead_id").notNull().references(() => leads.id),
+  currentStep: integer("current_step").default(0),
+  status: text("status").notNull().default("active"), // active, completed, paused, exited
+  enrolledAt: text("enrolled_at").notNull().default(now()),
+  completedAt: text("completed_at"),
+  lastStepAt: text("last_step_at"),
+  nextStepAt: text("next_step_at"),
+});
+
+export const insertCampaignEnrollmentSchema = createInsertSchema(campaignEnrollments).omit({ id: true });
+export type InsertCampaignEnrollment = z.infer<typeof insertCampaignEnrollmentSchema>;
+export type CampaignEnrollment = typeof campaignEnrollments.$inferSelect;
+
+// ==================== PROPERTY ENHANCEMENTS ====================
+
+/**
+ * PROPERTY COORDINATES
+ * Geolocation data for map visualization
+ */
+export const propertyCoordinates = sqliteTable("property_coordinates", {
+  id: text("id").primaryKey(),
+  propertyId: text("property_id").notNull().references(() => properties.id).unique(),
+  latitude: real("latitude").notNull(),
+  longitude: real("longitude").notNull(),
+  geocodedAddress: text("geocoded_address"),
+  geocodedAt: text("geocoded_at"),
+  manuallySet: integer("manually_set", { mode: "boolean" }).default(false),
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertPropertyCoordinatesSchema = createInsertSchema(propertyCoordinates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPropertyCoordinates = z.infer<typeof insertPropertyCoordinatesSchema>;
+export type PropertyCoordinates = typeof propertyCoordinates.$inferSelect;
+
+/**
+ * VIRTUAL TOURS
+ * 360° virtual tour links and configurations
+ */
+export const virtualTours = sqliteTable("virtual_tours", {
+  id: text("id").primaryKey(),
+  propertyId: text("property_id").notNull().references(() => properties.id),
+  tourType: text("tour_type").notNull(), // matterport, 360_photos, video, iframe
+  tourUrl: text("tour_url").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  title: text("title"),
+  description: text("description"),
+  sortOrder: integer("sort_order").default(0),
+  isActive: integer("is_active", { mode: "boolean" }).default(true),
+  viewCount: integer("view_count").default(0),
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+export const insertVirtualTourSchema = createInsertSchema(virtualTours).omit({ id: true, createdAt: true });
+export type InsertVirtualTour = z.infer<typeof insertVirtualTourSchema>;
+export type VirtualTour = typeof virtualTours.$inferSelect;
+
+/**
+ * PROPERTY COMPARISONS
+ * Saved property comparisons by users/leads
+ */
+export const propertyComparisons = sqliteTable("property_comparisons", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id").references(() => users.id),
+  leadId: text("lead_id").references(() => leads.id),
+  sessionId: text("session_id"), // For anonymous users
+  propertyIds: text("property_ids").notNull(), // JSON array of property IDs
+  notes: text("notes"),
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertPropertyComparisonSchema = createInsertSchema(propertyComparisons).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPropertyComparison = z.infer<typeof insertPropertyComparisonSchema>;
+export type PropertyComparison = typeof propertyComparisons.$inferSelect;
+
+// ==================== DIGITAL SIGNATURES ====================
+
+/**
+ * DIGITAL SIGNATURES
+ * E-signature workflow for contracts
+ */
+export const digitalSignatures = sqliteTable("digital_signatures", {
+  id: text("id").primaryKey(),
+  contractId: text("contract_id").notNull().references(() => contracts.id),
+  signerType: text("signer_type").notNull(), // client, owner, broker, witness
+  signerName: text("signer_name").notNull(),
+  signerEmail: text("signer_email").notNull(),
+  signerDocument: text("signer_document"), // CPF/CNPJ
+  signatureData: text("signature_data"), // Base64 signature image or hash
+  signatureHash: text("signature_hash"), // SHA-256 hash for verification
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  geoLocation: text("geo_location"), // JSON with lat/lng
+  status: text("status").notNull().default("pending"), // pending, sent, viewed, signed, declined, expired
+  sentAt: text("sent_at"),
+  viewedAt: text("viewed_at"),
+  signedAt: text("signed_at"),
+  expiresAt: text("expires_at"),
+  token: text("token").unique(), // Unique token for signing link
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+export const insertDigitalSignatureSchema = createInsertSchema(digitalSignatures).omit({ id: true, createdAt: true });
+export type InsertDigitalSignature = z.infer<typeof insertDigitalSignatureSchema>;
+export type DigitalSignature = typeof digitalSignatures.$inferSelect;
+
+/**
+ * CONTRACT DOCUMENTS
+ * Generated PDF documents for contracts
+ */
+export const contractDocuments = sqliteTable("contract_documents", {
+  id: text("id").primaryKey(),
+  contractId: text("contract_id").notNull().references(() => contracts.id),
+  documentType: text("document_type").notNull(), // contract, addendum, receipt, notice
+  version: integer("version").notNull().default(1),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url"),
+  fileHash: text("file_hash"), // SHA-256 hash for integrity
+  generatedBy: text("generated_by").references(() => users.id),
+  isFinalized: integer("is_finalized", { mode: "boolean" }).default(false),
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+export const insertContractDocumentSchema = createInsertSchema(contractDocuments).omit({ id: true, createdAt: true });
+export type InsertContractDocument = z.infer<typeof insertContractDocumentSchema>;
+export type ContractDocument = typeof contractDocuments.$inferSelect;
+
+// ==================== CLIENT PORTAL ====================
+
+/**
+ * CLIENT PORTAL ACCESS
+ * Self-service portal access for owners and renters
+ */
+export const clientPortalAccess = sqliteTable("client_portal_access", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  clientType: text("client_type").notNull(), // owner, renter, buyer, lead
+  clientId: text("client_id").notNull(), // Reference to owner/renter/lead ID
+  email: text("email").notNull(),
+  passwordHash: text("password_hash"),
+  isActive: integer("is_active", { mode: "boolean" }).default(true),
+  lastLogin: text("last_login"),
+  loginCount: integer("login_count").default(0),
+  resetToken: text("reset_token"),
+  resetTokenExpires: text("reset_token_expires"),
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertClientPortalAccessSchema = createInsertSchema(clientPortalAccess).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertClientPortalAccess = z.infer<typeof insertClientPortalAccessSchema>;
+export type ClientPortalAccess = typeof clientPortalAccess.$inferSelect;
+
+// ==================== DASHBOARD CUSTOMIZATION ====================
+
+/**
+ * DASHBOARD LAYOUTS
+ * Custom dashboard configurations per user
+ */
+export const dashboardLayouts = sqliteTable("dashboard_layouts", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  name: text("name").notNull().default("Principal"),
+  isDefault: integer("is_default", { mode: "boolean" }).default(false),
+  layout: text("layout").notNull(), // JSON grid layout config
+  widgets: text("widgets").notNull(), // JSON array of widget configs
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertDashboardLayoutSchema = createInsertSchema(dashboardLayouts).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDashboardLayout = z.infer<typeof insertDashboardLayoutSchema>;
+export type DashboardLayout = typeof dashboardLayouts.$inferSelect;
+
+/**
+ * WIDGET TYPES
+ * Available widget definitions
+ */
+export const widgetTypes = sqliteTable("widget_types", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  category: text("category").notNull(), // metrics, charts, lists, calendar, map
+  component: text("component").notNull(), // React component name
+  defaultConfig: text("default_config"), // JSON default settings
+  minWidth: integer("min_width").default(1),
+  minHeight: integer("min_height").default(1),
+  maxWidth: integer("max_width"),
+  maxHeight: integer("max_height"),
+  requiredPermissions: text("required_permissions"), // JSON array
+  isActive: integer("is_active", { mode: "boolean" }).default(true),
+});
+
+export const insertWidgetTypeSchema = createInsertSchema(widgetTypes).omit({ id: true });
+export type InsertWidgetType = z.infer<typeof insertWidgetTypeSchema>;
+export type WidgetType = typeof widgetTypes.$inferSelect;

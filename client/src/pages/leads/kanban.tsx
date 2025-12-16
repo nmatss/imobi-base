@@ -1347,42 +1347,40 @@ export default function LeadsKanban() {
   }
 
   return (
-    <div className="h-[calc(100vh-6rem)] sm:h-[calc(100vh-8rem)] flex flex-col">
+    <div className="h-full flex flex-col overflow-hidden" style={{ minHeight: 0 }}>
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:gap-4 mb-3 sm:mb-4">
-        <div className="flex items-start sm:items-center justify-between gap-3">
+      <div className="flex flex-col gap-2 sm:gap-3 mb-2 sm:mb-3 shrink-0">
+        <div className="flex items-center justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg sm:text-2xl font-heading font-bold truncate">CRM de Vendas</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground">
+            <h1 className="text-base sm:text-xl md:text-2xl font-heading font-bold truncate">CRM de Vendas</h1>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
               {filteredLeads.length} lead{filteredLeads.length !== 1 ? "s" : ""} {hasActiveFilters && "(filtrado)"}
             </p>
           </div>
-          <div className="flex gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex gap-1 sm:gap-2 shrink-0">
             {/* Bulk Mode Toggle - Touch Optimized */}
             <Button
               variant={isBulkMode ? "secondary" : "outline"}
               size="sm"
-              className="gap-1.5 h-9 sm:h-10 min-w-[44px] active:scale-95 transition-transform"
+              className="gap-1 h-8 sm:h-9 px-2 sm:px-3 active:scale-95 transition-transform"
               onClick={toggleBulkMode}
             >
               {isBulkMode ? (
-                <CheckCircle2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                <CheckCircle2 className="h-4 w-4" />
               ) : (
-                <div className="h-4 w-4 sm:h-3.5 sm:w-3.5 rounded-sm border border-current" />
+                <div className="h-4 w-4 rounded-sm border border-current" />
               )}
-              <span className="hidden sm:inline">{isBulkMode ? "Sair seleção" : "Selecionar"}</span>
+              <span className="hidden md:inline text-xs">{isBulkMode ? "Sair" : "Selecionar"}</span>
             </Button>
 
             {/* Filters Sheet - Mobile First */}
             <Sheet open={showFilters} onOpenChange={setShowFilters}>
               <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-1.5 h-9 sm:h-10 min-w-[44px] active:scale-95 transition-transform relative">
+                <Button variant="outline" size="sm" className="gap-1 h-8 sm:h-9 px-2 sm:px-3 active:scale-95 transition-transform relative">
                   <SlidersHorizontal className="h-4 w-4" />
-                  <span className="hidden sm:inline">Filtros</span>
+                  <span className="hidden md:inline text-xs">Filtros</span>
                   {hasActiveFilters && (
-                    <Badge variant="destructive" className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px] sm:static sm:h-5 sm:w-auto sm:px-1.5">
-                      <span className="hidden sm:inline">!</span>
-                    </Badge>
+                    <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-destructive" />
                   )}
                 </Button>
               </SheetTrigger>
@@ -1394,72 +1392,71 @@ export default function LeadsKanban() {
                 <FilterPanel />
               </SheetContent>
             </Sheet>
-            <Button className="gap-1.5 h-9" onClick={() => setIsCreateModalOpen(true)}>
+            <Button className="gap-1 h-8 sm:h-9 px-2 sm:px-3" onClick={() => setIsCreateModalOpen(true)}>
               <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Novo Lead</span>
+              <span className="hidden sm:inline text-xs">Novo Lead</span>
             </Button>
           </div>
         </div>
 
         {/* SLA Alerts */}
         {slaAlerts.total > 0 && (
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
+          <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0">
             {slaAlerts.newLeadsNoContact > 0 && (
-              <Badge variant="destructive" className="shrink-0 gap-1.5 py-1 px-2.5">
-                <AlertCircle className="h-3.5 w-3.5" />
-                <span className="text-xs">{slaAlerts.newLeadsNoContact} leads novos sem contato</span>
+              <Badge variant="destructive" className="shrink-0 gap-1 py-0.5 px-2 text-[10px] sm:text-xs">
+                <AlertCircle className="h-3 w-3" />
+                <span>{slaAlerts.newLeadsNoContact} sem contato</span>
               </Badge>
             )}
             {slaAlerts.leadsWithoutUpdate > 0 && (
-              <Badge variant="outline" className="shrink-0 gap-1.5 py-1 px-2.5 text-amber-600 border-amber-300">
-                <Timer className="h-3.5 w-3.5" />
-                <span className="text-xs">{slaAlerts.leadsWithoutUpdate} sem atualização há 3+ dias</span>
+              <Badge variant="outline" className="shrink-0 gap-1 py-0.5 px-2 text-[10px] sm:text-xs text-amber-600 border-amber-300">
+                <Timer className="h-3 w-3" />
+                <span>{slaAlerts.leadsWithoutUpdate} parados</span>
               </Badge>
             )}
             {slaAlerts.overdueFollowUps > 0 && (
-              <Badge variant="outline" className="shrink-0 gap-1.5 py-1 px-2.5 text-red-600 border-red-300">
-                <Bell className="h-3.5 w-3.5" />
-                <span className="text-xs">{slaAlerts.overdueFollowUps} lembretes atrasados</span>
+              <Badge variant="outline" className="shrink-0 gap-1 py-0.5 px-2 text-[10px] sm:text-xs text-red-600 border-red-300">
+                <Bell className="h-3 w-3" />
+                <span>{slaAlerts.overdueFollowUps} atrasados</span>
               </Badge>
             )}
           </div>
         )}
 
-        {/* Hot Leads Section - Touch Optimized */}
+        {/* Hot Leads Section - Collapsed on Mobile */}
         {hotLeads.length > 0 && (
-          <div className="space-y-2 sm:space-y-3">
+          <div className="hidden sm:block space-y-2">
             <div className="flex items-center gap-2">
-              <Flame className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
-              <span className="text-sm sm:text-base font-medium">Leads Quentes</span>
+              <Flame className="h-4 w-4 text-orange-500" />
+              <span className="text-sm font-medium">Leads Quentes</span>
               <Badge variant="secondary" className="text-[10px] h-5 px-1.5">{hotLeads.length}</Badge>
             </div>
-            <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
               {hotLeads.map((lead) => (
                 <div
                   key={lead.id}
-                  className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg border bg-orange-50 border-orange-200 min-w-[220px] sm:min-w-[260px] shrink-0 cursor-pointer hover:bg-orange-100 active:bg-orange-200 transition-colors active:scale-[0.98]"
+                  className="flex items-center gap-2 p-2 rounded-lg border bg-orange-50 border-orange-200 min-w-[200px] shrink-0 cursor-pointer hover:bg-orange-100 active:bg-orange-200 transition-colors"
                   onClick={() => openLeadDetail(lead)}
                 >
                   <div
-                    className="h-10 w-10 sm:h-12 sm:w-12 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0"
+                    className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
                     style={{ backgroundColor: COLUMNS.find((c) => c.id === lead.status)?.color }}
                   >
                     {lead.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm sm:text-base font-medium truncate">{lead.name}</p>
-                    <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                    <p className="text-xs font-medium truncate">{lead.name}</p>
+                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                       {lead.budget && <span className="font-medium text-orange-600">{formatBudgetShort(lead.budget)}</span>}
-                      <span className="truncate">{COLUMNS.find((c) => c.id === lead.status)?.label}</span>
                     </div>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 sm:h-8 sm:w-8 shrink-0 text-green-600 hover:bg-green-100 active:bg-green-200"
+                    className="h-7 w-7 shrink-0 text-green-600 hover:bg-green-100"
                     onClick={(e) => { e.stopPropagation(); openWhatsApp(lead); }}
                   >
-                    <MessageSquare className="h-4 w-4" />
+                    <MessageSquare className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               ))}
@@ -1467,25 +1464,17 @@ export default function LeadsKanban() {
           </div>
         )}
 
-        {/* Column Stats - Mobile Optimized */}
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-5 md:gap-3">
+        {/* Column Stats - Compact on Mobile */}
+        <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-2 px-2 sm:mx-0 sm:px-0">
           {columnStats.map((col) => (
             <div
               key={col.id}
-              className="flex items-center gap-2 sm:gap-2.5 p-2 sm:p-2.5 rounded-lg border bg-card min-w-[110px] sm:min-w-0 shrink-0 sm:shrink hover:border-primary/20 transition-colors"
+              className="flex items-center gap-1.5 p-1.5 sm:p-2 rounded-lg border bg-card min-w-[80px] sm:min-w-[100px] shrink-0 hover:border-primary/20 transition-colors"
             >
-              <div className={`h-9 w-9 sm:h-10 sm:w-10 rounded-lg ${col.bgColor} flex items-center justify-center shrink-0 shadow-sm`}>
-                <span className="text-white text-sm sm:text-base font-bold">{col.count}</span>
+              <div className={`h-7 w-7 sm:h-8 sm:w-8 rounded-md ${col.bgColor} flex items-center justify-center shrink-0`}>
+                <span className="text-white text-xs sm:text-sm font-bold">{col.count}</span>
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs sm:text-sm text-muted-foreground truncate font-medium">{col.label}</p>
-                {col.change !== 0 && (
-                  <div className={`flex items-center gap-0.5 text-[10px] ${col.change > 0 ? "text-green-600" : "text-red-600"}`}>
-                    {col.change > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                    {Math.abs(col.change)}
-                  </div>
-                )}
-              </div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground truncate font-medium">{col.label}</p>
             </div>
           ))}
         </div>
@@ -1493,35 +1482,34 @@ export default function LeadsKanban() {
 
       {/* Mobile: Horizontal Scroll Kanban with Snap Points */}
       <div className="block md:hidden flex-1 overflow-hidden pb-4">
-        {/* Swipe Indicator */}
-        <div className="flex items-center justify-center gap-1.5 mb-3">
-          {COLUMNS.map((col) => (
-            <div
-              key={col.id}
-              className={`h-1.5 rounded-full transition-all ${
-                col.id === "new" ? "w-6 opacity-100" : "w-1.5 opacity-40"
-              }`}
-              style={{ backgroundColor: col.color }}
-            />
-          ))}
-        </div>
-
-        {/* Horizontal Scroll Container */}
-        <ScrollArea className="w-full h-full">
-          <div className="flex gap-3 pb-4 px-1">
+        {/* Horizontal Scroll Container with native scroll snap */}
+        <div
+          className="w-full h-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-hide"
+          style={{
+            WebkitOverflowScrolling: 'touch',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none'
+          }}
+        >
+          <div className="flex gap-3 pb-4 px-3 h-full" style={{ minWidth: 'max-content' }}>
             {COLUMNS.map((column) => {
               const columnLeads = getLeadsByStatus(column.id);
 
               return (
                 <div
                   key={column.id}
-                  className="snap-center min-w-[85vw] xs:min-w-[90vw] shrink-0 flex flex-col rounded-xl border bg-muted/30 border-border/50 max-h-full"
+                  className="snap-center flex flex-col rounded-xl border bg-muted/30 border-border/50 h-full overflow-hidden"
+                  style={{
+                    width: 'calc(100vw - 2rem)',
+                    minWidth: 'calc(100vw - 2rem)',
+                    maxWidth: 'calc(100vw - 2rem)'
+                  }}
                   onDragOver={(e) => handleDragOver(e, column.id)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, column.id)}
                 >
                   {/* Sticky Column Header */}
-                  <div className="sticky top-0 z-20 p-3 border-b border-border/50 flex items-center justify-between bg-card/95 backdrop-blur-sm rounded-t-xl">
+                  <div className="sticky top-0 z-20 p-3 border-b border-border/50 flex items-center justify-between bg-card/95 backdrop-blur-sm rounded-t-xl shrink-0">
                     <div className="flex items-center gap-2">
                       <div className={`w-3 h-3 rounded-full ${column.bgColor} shrink-0`} />
                       <span className="font-semibold text-sm truncate">{column.label}</span>
@@ -1529,10 +1517,13 @@ export default function LeadsKanban() {
                         {columnLeads.length}
                       </Badge>
                     </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setIsCreateModalOpen(true)}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
                   </div>
 
-                  {/* Column Content */}
-                  <div className="p-2 space-y-2 overflow-y-auto flex-1 min-h-0">
+                  {/* Column Content - Scrollable */}
+                  <div className="p-2 space-y-2 overflow-y-auto flex-1 overscroll-contain">
                     {columnLeads.map((lead) => (
                       <LeadCard key={lead.id} lead={lead} isMobile />
                     ))}
@@ -1547,99 +1538,72 @@ export default function LeadsKanban() {
               );
             })}
           </div>
-          <ScrollBar orientation="horizontal" className="h-2" />
-        </ScrollArea>
+        </div>
       </div>
 
       {/* Tablet/Desktop: Kanban */}
-      <div className="hidden md:block flex-1 overflow-hidden">
-        <ScrollArea className="h-full w-full">
-          <div className="flex h-full gap-3 pb-4 min-w-max md:grid md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 md:min-w-0">
-            {COLUMNS.map((column) => (
-              <div
-                key={column.id}
-                className={`flex flex-col md:w-auto w-[280px] xl:w-[300px] rounded-xl border shrink-0 md:shrink transition-all ${
-                  dragOverColumn === column.id
-                    ? "bg-primary/5 border-primary border-2"
-                    : "bg-muted/30 border-border/50"
-                }`}
-                onDragOver={(e) => handleDragOver(e, column.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, column.id)}
-              >
-                <div className="p-3 border-b border-border/50 flex items-center justify-between bg-card/95 rounded-t-xl backdrop-blur-sm sticky top-0 z-20">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <div className={`w-3 h-3 rounded-full ${column.bgColor} shrink-0`} />
-                    <span className="font-semibold text-sm truncate">{column.label}</span>
-                    <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0">
-                      {getLeadsByStatus(column.id).length}
-                    </Badge>
-                  </div>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setIsCreateModalOpen(true)}>
-                    <Plus className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-
-                <div className="p-2 space-y-2 overflow-y-auto flex-1 min-h-0">
-                  {getLeadsByStatus(column.id).map((lead) => (
-                    <LeadCard key={lead.id} lead={lead} />
-                  ))}
-                  {getLeadsByStatus(column.id).length === 0 && (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <div className={`w-12 h-12 rounded-full ${column.bgColor} opacity-20 mx-auto mb-3`} />
-                      <p className="text-xs">Arraste leads aqui</p>
-                    </div>
-                  )}
-                </div>
+      <div className="hidden md:flex flex-1 overflow-hidden gap-3">
+        {COLUMNS.map((column) => (
+          <div
+            key={column.id}
+            className={`flex flex-col flex-1 min-w-0 rounded-xl border transition-all ${
+              dragOverColumn === column.id
+                ? "bg-primary/5 border-primary border-2"
+                : "bg-muted/30 border-border/50"
+            }`}
+            onDragOver={(e) => handleDragOver(e, column.id)}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, column.id)}
+          >
+            <div className="p-3 border-b border-border/50 flex items-center justify-between bg-card/95 rounded-t-xl backdrop-blur-sm shrink-0">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className={`w-3 h-3 rounded-full ${column.bgColor} shrink-0`} />
+                <span className="font-semibold text-sm truncate">{column.label}</span>
+                <Badge variant="secondary" className="text-[10px] h-5 px-1.5 shrink-0">
+                  {getLeadsByStatus(column.id).length}
+                </Badge>
               </div>
-            ))}
+              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setIsCreateModalOpen(true)}>
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+
+            <div className="p-2 space-y-2 overflow-y-auto flex-1 min-h-0">
+              {getLeadsByStatus(column.id).map((lead) => (
+                <LeadCard key={lead.id} lead={lead} />
+              ))}
+              {getLeadsByStatus(column.id).length === 0 && (
+                <div className="text-center py-12 text-muted-foreground">
+                  <div className={`w-12 h-12 rounded-full ${column.bgColor} opacity-20 mx-auto mb-3`} />
+                  <p className="text-xs">Arraste leads aqui</p>
+                </div>
+              )}
+            </div>
           </div>
-          <ScrollBar orientation="horizontal" className="h-2" />
-        </ScrollArea>
+        ))}
       </div>
 
       {/* Bulk Actions Bar - Mobile Optimized */}
       {isBulkMode && selectedLeads.size > 0 && (
-        <div className="fixed bottom-4 left-4 right-4 sm:left-1/2 sm:-translate-x-1/2 sm:right-auto z-50 animate-in slide-in-from-bottom-4 fade-in duration-200">
+        <div className="fixed bottom-2 left-2 right-2 sm:bottom-4 sm:left-1/2 sm:-translate-x-1/2 sm:right-auto z-50 animate-in slide-in-from-bottom-4 fade-in duration-200" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           <Card className="shadow-2xl border-2 border-primary/20 bg-background/98 backdrop-blur-md">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <CardContent className="p-2 sm:p-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 {/* Selection Info */}
-                <div className="flex items-center gap-2 justify-between sm:justify-start">
-                  <Badge variant="secondary" className="gap-1.5 text-xs sm:text-sm h-8 px-3">
-                    <Check className="h-3.5 w-3.5" />
-                    {selectedLeads.size} selecionado{selectedLeads.size !== 1 ? "s" : ""}
-                  </Badge>
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-xs hidden sm:inline-flex"
-                      onClick={selectAllVisible}
-                    >
-                      Todos ({filteredLeads.length})
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-xs"
-                      onClick={clearSelection}
-                    >
-                      Limpar
-                    </Button>
-                  </div>
-                </div>
+                <Badge variant="secondary" className="gap-1 text-[10px] sm:text-xs h-7 px-2 shrink-0">
+                  <Check className="h-3 w-3" />
+                  {selectedLeads.size}
+                </Badge>
 
-                <Separator orientation="vertical" className="h-6 hidden sm:block" />
-                <Separator className="w-full sm:hidden" />
+                <Separator orientation="vertical" className="h-5 hidden sm:block" />
 
                 {/* Actions */}
-                <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap justify-center">
+                <div className="flex items-center gap-1 flex-1 justify-end sm:justify-start">
                   {/* Move to Status */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs sm:text-sm">
-                        <ArrowRight className="h-3.5 w-3.5" />
+                      <Button variant="outline" size="sm" className="h-7 sm:h-8 gap-1 px-2 sm:px-3 text-[10px] sm:text-xs">
+                        <ArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                         <span className="hidden sm:inline">Mover</span>
                       </Button>
                     </DropdownMenuTrigger>
@@ -1660,8 +1624,8 @@ export default function LeadsKanban() {
                   {/* Add Tags */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs sm:text-sm">
-                        <Tag className="h-3.5 w-3.5" />
+                      <Button variant="outline" size="sm" className="h-7 sm:h-8 gap-1 px-2 sm:px-3 text-[10px] sm:text-xs">
+                        <Tag className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                         <span className="hidden sm:inline">Tags</span>
                       </Button>
                     </DropdownMenuTrigger>
@@ -1722,8 +1686,8 @@ export default function LeadsKanban() {
                   {/* WhatsApp */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs sm:text-sm bg-green-50 hover:bg-green-100 border-green-200">
-                        <MessageSquare className="h-3.5 w-3.5 text-green-600" />
+                      <Button variant="outline" size="sm" className="h-7 sm:h-8 gap-1 px-2 sm:px-3 text-[10px] sm:text-xs bg-green-50 hover:bg-green-100 border-green-200">
+                        <MessageSquare className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-green-600" />
                         <span className="hidden sm:inline text-green-700">WhatsApp</span>
                       </Button>
                     </DropdownMenuTrigger>
@@ -1746,12 +1710,11 @@ export default function LeadsKanban() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-8 gap-1.5 text-xs sm:text-sm text-destructive hover:text-destructive hover:bg-destructive/10"
+                    className="h-7 sm:h-8 gap-1 px-2 sm:px-3 text-[10px] sm:text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
                     onClick={handleBulkArchive}
                     disabled={bulkActionLoading}
                   >
-                    <X className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Arquivar</span>
+                    <X className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                   </Button>
                 </div>
 
@@ -1759,16 +1722,16 @@ export default function LeadsKanban() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 shrink-0"
+                  className="h-7 w-7 sm:h-8 sm:w-8 shrink-0"
                   onClick={() => { setIsBulkMode(false); setSelectedLeads(new Set()); }}
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3.5 w-3.5" />
                 </Button>
               </div>
 
               {bulkActionLoading && (
-                <div className="mt-2 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                <div className="mt-2 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   Processando...
                 </div>
               )}
@@ -1875,48 +1838,49 @@ export default function LeadsKanban() {
       <Sheet open={isDetailOpen} onOpenChange={setIsDetailOpen}>
         <SheetContent
           side="right"
-          className="w-full sm:w-[500px] lg:w-[600px] xl:w-[700px] p-0 flex flex-col h-full max-h-screen md:max-h-[95vh]"
+          className="w-full sm:w-[450px] md:w-[500px] lg:w-[550px] p-0 flex flex-col"
+          style={{ height: '100dvh', maxHeight: '100dvh' }}
         >
           {selectedLead && (
             <>
-              {/* Header */}
-              <div className="p-4 sm:p-6 border-b bg-muted/30">
-                <div className="flex items-start gap-3">
+              {/* Header - Compact */}
+              <div className="p-3 sm:p-4 border-b bg-muted/30 shrink-0">
+                <div className="flex items-start gap-2.5">
                   <div
-                    className="h-12 w-12 rounded-full flex items-center justify-center text-white text-lg font-bold shrink-0"
+                    className="h-10 w-10 sm:h-12 sm:w-12 rounded-full flex items-center justify-center text-white text-sm sm:text-lg font-bold shrink-0"
                     style={{ backgroundColor: COLUMNS.find((c) => c.id === selectedLead.status)?.color }}
                   >
                     {selectedLead.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h2 className="text-lg font-bold truncate">{selectedLead.name}</h2>
-                    <div className="flex items-center gap-2 flex-wrap mt-1">
-                      <Badge style={{ backgroundColor: COLUMNS.find((c) => c.id === selectedLead.status)?.color }}>
+                    <h2 className="text-base sm:text-lg font-bold truncate">{selectedLead.name}</h2>
+                    <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                      <Badge className="text-[10px] sm:text-xs h-5" style={{ backgroundColor: COLUMNS.find((c) => c.id === selectedLead.status)?.color }}>
                         {COLUMNS.find((c) => c.id === selectedLead.status)?.label}
                       </Badge>
-                      <Badge variant="outline" className="text-xs">{selectedLead.source}</Badge>
+                      <Badge variant="outline" className="text-[10px] sm:text-xs h-5">{selectedLead.source}</Badge>
                       {isHotLead(selectedLead, followUps, allInteractions) && (
-                        <Badge className="bg-orange-500 gap-1">
-                          <Flame className="h-3 w-3" /> Quente
+                        <Badge className="bg-orange-500 gap-0.5 text-[10px] sm:text-xs h-5">
+                          <Flame className="h-2.5 w-2.5" /> Quente
                         </Badge>
                       )}
                     </div>
                   </div>
                 </div>
 
-                {/* Quick Actions */}
-                <div className="flex gap-2 mt-4 flex-wrap">
-                  <Button size="sm" className="gap-1.5 bg-green-600 hover:bg-green-700" onClick={() => openWhatsApp(selectedLead)}>
-                    <MessageSquare className="h-4 w-4" /> WhatsApp
+                {/* Quick Actions - Compact */}
+                <div className="flex gap-1.5 mt-3 flex-wrap">
+                  <Button size="sm" className="gap-1 h-8 text-xs bg-green-600 hover:bg-green-700" onClick={() => openWhatsApp(selectedLead)}>
+                    <MessageSquare className="h-3.5 w-3.5" /> WhatsApp
                   </Button>
-                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => window.open(`tel:${selectedLead.phone}`)}>
-                    <Phone className="h-4 w-4" /> Ligar
+                  <Button size="sm" variant="outline" className="gap-1 h-8 text-xs" onClick={() => window.open(`tel:${selectedLead.phone}`)}>
+                    <Phone className="h-3.5 w-3.5" /> Ligar
                   </Button>
-                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setLocation("/calendar")}>
-                    <Calendar className="h-4 w-4" /> Agendar
+                  <Button size="sm" variant="outline" className="gap-1 h-8 text-xs" onClick={() => setLocation("/calendar")}>
+                    <Calendar className="h-3.5 w-3.5" /> Agendar
                   </Button>
-                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setLocation("/contracts")}>
-                    <FileText className="h-4 w-4" /> Proposta
+                  <Button size="sm" variant="outline" className="gap-1 h-8 text-xs hidden sm:flex" onClick={() => setLocation("/contracts")}>
+                    <FileText className="h-3.5 w-3.5" /> Proposta
                   </Button>
                 </div>
               </div>

@@ -174,18 +174,6 @@ export default function FinancialTabs({
           />
         </TabsContent>
 
-        <TabsContent value="commissions" className="m-0">
-          <TransactionTable
-            transactions={commissionsTransactions}
-            onMarkAsPaid={onMarkAsPaid}
-            onEdit={onEdit}
-            onDuplicate={onDuplicate}
-            onViewOrigin={onViewOrigin}
-            isLoading={isLoading}
-            title="Comissões Recebidas"
-          />
-        </TabsContent>
-
         <TabsContent value="broker-commissions" className="m-0">
           <CommissionsTab period={period} />
         </TabsContent>

@@ -30,9 +30,10 @@ import { IntegrationsTab } from "./tabs/IntegrationsTab";
 import { NotificationsTab } from "./tabs/NotificationsTab";
 import { AITab } from "./tabs/AITab";
 import { WhatsAppTab } from "./tabs/WhatsAppTab";
+import { SecurityTab } from "./tabs/SecurityTab";
 import type { TenantSettings, BrandSettings, AISettings, User } from "./types";
 
-type TabId = "general" | "brand" | "plans" | "users" | "permissions" | "integrations" | "notifications" | "ai" | "whatsapp";
+type TabId = "general" | "brand" | "plans" | "users" | "permissions" | "security" | "integrations" | "notifications" | "ai" | "whatsapp";
 
 interface NavItem {
   id: TabId;
@@ -77,6 +78,13 @@ const NAV_ITEMS: NavItem[] = [
     shortLabel: "Permissões",
     icon: <Shield className="w-4 h-4" />,
     description: "Matriz de permissões por cargo",
+  },
+  {
+    id: "security",
+    label: "Segurança",
+    shortLabel: "Segurança",
+    icon: <Shield className="w-4 h-4" />,
+    description: "2FA, senhas e auditoria",
   },
   {
     id: "integrations",
@@ -316,6 +324,8 @@ export default function SettingsPage() {
         return <UsersTab users={users} onRefresh={fetchUsers} />;
       case "permissions":
         return <PermissionsTab />;
+      case "security":
+        return <SecurityTab />;
       case "integrations":
         return <IntegrationsTab />;
       case "whatsapp":

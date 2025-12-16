@@ -307,6 +307,7 @@ export function formatMonth(month: string): string {
 
 export function getDaysOverdue(dueDate: string): number {
   const due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const diff = today.getTime() - due.getTime();

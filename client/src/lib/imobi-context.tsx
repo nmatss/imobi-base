@@ -35,6 +35,7 @@ export type Property = {
   city: string;
   state: string;
   zipCode: string | null;
+  neighborhood: string | null;
   bedrooms: number | null;
   bathrooms: number | null;
   area: number | null;
@@ -42,6 +43,8 @@ export type Property = {
   images: string[] | null;
   status: string;
   featured: boolean;
+  latitude: number | null;
+  longitude: number | null;
   createdAt?: string;
 };
 

@@ -13,6 +13,8 @@ import connectPg from "connect-pg-simple";
 import pkg from "pg";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+import { registerSecurityRoutes } from "./routes-security";
+import { registerFeatureRoutes } from "./routes-features";
 const { Pool } = pkg;
 
 // ===== VALIDATION HELPERS =====
@@ -2070,6 +2072,10 @@ export async function registerRoutes(
       res.status(500).json({ error: "Erro ao excluir comissão" });
     }
   });
+
+  // Register additional feature routes
+  registerSecurityRoutes(app);
+  registerFeatureRoutes(app);
 
   return httpServer;
 }
