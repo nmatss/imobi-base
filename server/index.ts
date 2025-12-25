@@ -1,10 +1,25 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
+import { registerESignatureRoutes } from "./routes-esignature";
+import { registerWhatsAppRoutes } from "./routes-whatsapp";
+import { registerComplianceRoutes } from "./compliance/routes-compliance";
+import { registerEmailRoutes } from "./routes-email";
+import { registerJobRoutes } from "./routes-jobs";
+import { registerAuthenticationRoutes } from "./auth";
+import { registerFileRoutes } from "./routes-files";
+// import smsRoutes from "./routes-sms"; // Disabled - SMS schema not defined
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { initializeSentry, addSentryErrorHandler } from "./monitoring/sentry";
+import { initializeRedis, closeRedis } from "./cache/redis-client";
+import { initializeJobs, shutdownJobs } from "./jobs";
+import { sanitizeResponse, shouldSkipDetailedLogging } from "./utils/log-sanitizer";
 
 const app = express();
 const httpServer = createServer(app);
+
+// Initialize Sentry FIRST (before any other middleware)
+initializeSentry(app);
 
 declare module "http" {
   interface IncomingMessage {
@@ -36,7 +51,7 @@ export function log(message: string, source = "express") {
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  let capturedJsonResponse: Record<string, unknown> | undefined = undefined;
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
@@ -48,8 +63,11 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+
+      // Only log response details for non-sensitive endpoints
+      if (capturedJsonResponse && !shouldSkipDetailedLogging(path)) {
+        const sanitized = sanitizeResponse(capturedJsonResponse, 500);
+        logLine += ` :: ${sanitized}`;
       }
 
       log(logLine);
@@ -62,12 +80,36 @@ app.use((req, res, next) => {
 (async () => {
   await registerRoutes(httpServer, app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  // Register e-signature routes
+  registerESignatureRoutes(app);
+
+  // Register WhatsApp routes
+  registerWhatsAppRoutes(app);
+
+  // Register compliance routes (LGPD/GDPR)
+  registerComplianceRoutes(app);
+
+  // Register email routes
+  registerEmailRoutes(app);
+
+  // Register authentication routes (password reset, OAuth, etc.)
+  registerAuthenticationRoutes(app);
+
+  // Register file upload routes
+  registerFileRoutes(app);
+
+  // Register SMS routes
+  // app.use('/api/sms', smsRoutes); // Disabled - SMS schema not defined
+
+  // Add Sentry error handler (must be before custom error handlers)
+  addSentryErrorHandler(app);
+
+  app.use((err: Error & { status?: number; statusCode?: number }, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
+    console.error('Error handled:', err);
     res.status(status).json({ message });
-    throw err;
   });
 
   // importantly only setup vite in development and after

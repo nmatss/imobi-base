@@ -1,43 +1,37 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useImobi } from "@/lib/imobi-context";
 import {
-  Building2, Users, DollarSign, CalendarCheck, Plus, Eye, Clock, MapPin, Phone,
-  Bell, AlertCircle, CheckCircle2, TrendingUp, TrendingDown, Home, UserPlus,
-  FileText, Handshake, AlertTriangle, ArrowRight, MessageSquare, PhoneCall,
-  Calendar, Target, Activity, Banknote, CircleDollarSign, Timer, ChevronRight,
-  BarChart3, PieChart as PieChartIcon, Sparkles, RefreshCw, Send, Menu
+  Building2, UserPlus, CalendarCheck, Handshake, Plus, Home,
+  AlertTriangle, AlertCircle, CheckCircle2, MessageSquare, PhoneCall,
+  Calendar, ArrowRight, ChevronRight, CircleDollarSign, Users, Bell,
+  FileText
 } from "lucide-react";
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Cell } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useMemo, useState, useEffect } from "react";
+import { useState, useMemo, lazy, Suspense } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocation } from "wouter";
-import { format, isToday, isPast, isTomorrow, differenceInDays, startOfDay, endOfDay, isWithinInterval, addDays } from "date-fns";
+import { format, isPast } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { useDashboardData } from "@/hooks/useDashboardData";
+import { DashboardMetrics } from "@/components/dashboard/DashboardMetrics";
+import { DashboardPipeline } from "@/components/dashboard/DashboardPipeline";
 
-type FollowUp = {
-  id: string;
-  tenantId: string;
-  leadId: string;
-  assignedTo: string | null;
-  dueAt: string;
-  type: string;
-  status: string;
-  notes: string | null;
-  completedAt: string | null;
-  createdAt: string;
-};
+// Lazy load Recharts components to reduce initial bundle size
+const Bar = lazy(() => import("recharts").then(m => ({ default: m.Bar })));
+const BarChart = lazy(() => import("recharts").then(m => ({ default: m.BarChart })));
+const ResponsiveContainer = lazy(() => import("recharts").then(m => ({ default: m.ResponsiveContainer })));
+const XAxis = lazy(() => import("recharts").then(m => ({ default: m.XAxis })));
+const YAxis = lazy(() => import("recharts").then(m => ({ default: m.YAxis })));
+const Tooltip = lazy(() => import("recharts").then(m => ({ default: m.Tooltip })));
 
+// Constantes
 const FOLLOW_UP_TYPE_LABELS: Record<string, string> = {
   call: "Ligar",
   email: "E-mail",
@@ -84,8 +78,16 @@ function parseCurrencyValue(value: string | null | undefined): number {
   return isNaN(parsed) ? 0 : parsed;
 }
 
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+    minimumFractionDigits: 0,
+  }).format(value);
+}
+
 export default function Dashboard() {
-  const { tenant, properties, leads, contracts, visits, refetchLeads } = useImobi();
+  const { tenant, refetchLeads, contracts, leads } = useImobi();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [newLeadOpen, setNewLeadOpen] = useState(false);
@@ -96,24 +98,17 @@ export default function Dashboard() {
     source: "website",
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [actionsSheetOpen, setActionsSheetOpen] = useState(false);
 
-  useEffect(() => {
-    fetchFollowUps();
-  }, []);
-
-  const fetchFollowUps = async () => {
-    try {
-      const res = await fetch("/api/follow-ups?status=pending", { credentials: "include" });
-      if (res.ok) {
-        const data = await res.json();
-        setFollowUps(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch follow-ups:", error);
-    }
-  };
+  // Hook customizado com toda a lógica de dados
+  const {
+    metrics,
+    pendencies,
+    propertyInsights,
+    recentLeads,
+    todayTimeline,
+    refetchFollowUps,
+  } = useDashboardData();
 
   const handleCompleteFollowUp = async (id: string) => {
     try {
@@ -125,226 +120,40 @@ export default function Dashboard() {
       });
       if (res.ok) {
         toast({ title: "Lembrete concluído", description: "O lembrete foi marcado como concluído." });
-        fetchFollowUps();
+        refetchFollowUps();
       }
     } catch (error) {
       toast({ title: "Erro", description: "Não foi possível concluir o lembrete.", variant: "destructive" });
     }
   };
 
-  // ==================== MÉTRICAS OPERACIONAIS ====================
 
-  const operationalMetrics = useMemo(() => {
-    const now = new Date();
-    const today = startOfDay(now);
-    const todayEnd = endOfDay(now);
-
-    // Leads por status
-    const newLeads = leads.filter(l => l.status === "new").length;
-    const inContactLeads = leads.filter(l => l.status === "qualification").length;
-    const inVisitLeads = leads.filter(l => l.status === "visit").length;
-    const proposalLeads = leads.filter(l => l.status === "proposal").length;
-    const closedLeads = leads.filter(l => l.status === "contract").length;
-
-    // Visitas
-    const todayVisits = visits.filter(v => {
-      const visitDate = new Date(v.scheduledFor);
-      return isWithinInterval(visitDate, { start: today, end: todayEnd }) && v.status === "scheduled";
-    }).length;
-    const scheduledVisits = visits.filter(v => v.status === "scheduled").length;
-    const completedVisits = visits.filter(v => v.status === "completed").length;
-
-    // Propostas
-    const draftContracts = contracts.filter(c => c.status === "draft").length;
-    const sentContracts = contracts.filter(c => c.status === "sent").length;
-    const signedContracts = contracts.filter(c => c.status === "signed").length;
-
-    // Imóveis
-    const availableProperties = properties.filter(p => p.status === "available").length;
-    const featuredProperties = properties.filter(p => p.featured).length;
-    const rentProperties = properties.filter(p => p.category === "rent" && p.status === "available").length;
-    const saleProperties = properties.filter(p => p.category === "sale" && p.status === "available").length;
-
-    // Taxas de conversão
-    const totalLeads = leads.length || 1;
-    const conversionToVisit = Math.round(((inVisitLeads + proposalLeads + closedLeads) / totalLeads) * 100);
-    const conversionToProposal = Math.round(((proposalLeads + closedLeads) / totalLeads) * 100);
-    const conversionToClosed = Math.round((closedLeads / totalLeads) * 100);
-
-    return {
-      newLeads,
-      inContactLeads,
-      inVisitLeads,
-      proposalLeads,
-      closedLeads,
-      todayVisits,
-      scheduledVisits,
-      completedVisits,
-      draftContracts,
-      sentContracts,
-      signedContracts,
-      availableProperties,
-      featuredProperties,
-      rentProperties,
-      saleProperties,
-      conversionToVisit,
-      conversionToProposal,
-      conversionToClosed,
-      totalLeads: leads.length,
-    };
-  }, [leads, visits, contracts, properties]);
-
-  // ==================== PENDÊNCIAS DE HOJE ====================
-
-  const todayPendencies = useMemo(() => {
-    const now = new Date();
-    const today = startOfDay(now);
-    const todayEnd = endOfDay(now);
-
-    // Leads sem contato há mais de 2 dias
-    const leadsWithoutContact = leads.filter(l => {
-      if (l.status === "contract") return false;
-      const daysSinceUpdate = differenceInDays(now, new Date(l.updatedAt));
-      return daysSinceUpdate >= 2;
-    });
-
-    // Visitas de hoje
-    const todayVisitsList = visits.filter(v => {
-      const visitDate = new Date(v.scheduledFor);
-      return isWithinInterval(visitDate, { start: today, end: todayEnd }) && v.status === "scheduled";
-    }).map(visit => ({
-      ...visit,
-      property: properties.find(p => p.id === visit.propertyId),
-      lead: leads.find(l => l.id === visit.leadId),
-    }));
-
-    // Follow-ups atrasados
-    const overdueFollowUps = followUps.filter(f => {
-      const dueDate = new Date(f.dueAt);
-      return f.status === "pending" && isPast(dueDate) && !isToday(dueDate);
-    }).map(f => ({
-      ...f,
-      lead: leads.find(l => l.id === f.leadId),
-    }));
-
-    // Follow-ups de hoje
-    const todayFollowUps = followUps.filter(f => {
-      const dueDate = new Date(f.dueAt);
-      return f.status === "pending" && isToday(dueDate);
-    }).map(f => ({
-      ...f,
-      lead: leads.find(l => l.id === f.leadId),
-    }));
-
-    return {
-      leadsWithoutContact,
-      todayVisitsList,
-      overdueFollowUps,
-      todayFollowUps,
-      totalUrgent: overdueFollowUps.length + leadsWithoutContact.filter(l => l.status === "new").length,
-    };
-  }, [leads, visits, followUps, properties]);
-
-  // ==================== PIPELINE DE LEADS ====================
-
-  const pipelineData = useMemo(() => {
+  // Pipeline de leads - Formato para DashboardPipeline component
+  const pipelineStages = useMemo(() => {
     const stages = [
-      { key: "new", label: "Novo", color: "#3b82f6", icon: UserPlus },
-      { key: "qualification", label: "Em Contato", color: "#8b5cf6", icon: MessageSquare },
-      { key: "visit", label: "Em Visita", color: "#f97316", icon: Calendar },
-      { key: "proposal", label: "Proposta", color: "#eab308", icon: FileText },
-      { key: "contract", label: "Fechado", color: "#22c55e", icon: Handshake },
+      { id: "new", name: "Novo", color: "#3b82f6" },
+      { id: "qualification", name: "Em Contato", color: "#8b5cf6" },
+      { id: "visit", name: "Em Visita", color: "#f97316" },
+      { id: "proposal", name: "Proposta", color: "#eab308" },
+      { id: "contract", name: "Fechado", color: "#22c55e" },
     ];
 
     return stages.map(stage => ({
       ...stage,
-      count: leads.filter(l => l.status === stage.key).length,
-      leads: leads.filter(l => l.status === stage.key).slice(0, 3),
+      leads: leads
+        .filter(l => l.status === stage.id)
+        .map(l => ({
+          id: l.id,
+          name: l.name,
+          propertyInterest: l.interests?.[0] || undefined,
+          daysInStage: Math.floor(
+            (new Date().getTime() - new Date(l.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
+          ),
+        })),
     }));
   }, [leads]);
 
-  // ==================== ÚLTIMOS LEADS COM TIMELINE ====================
-
-  const recentLeads = useMemo(() => {
-    return leads
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      .slice(0, 5)
-      .map(lead => {
-        const daysSinceCreated = differenceInDays(new Date(), new Date(lead.createdAt));
-        const daysSinceUpdate = differenceInDays(new Date(), new Date(lead.updatedAt));
-
-        let nextAction = "Fazer primeiro contato";
-        if (lead.status === "qualification") nextAction = "Agendar visita";
-        if (lead.status === "visit") nextAction = "Enviar proposta";
-        if (lead.status === "proposal") nextAction = "Aguardar retorno";
-        if (lead.status === "contract") nextAction = "Concluído";
-
-        return {
-          ...lead,
-          daysSinceCreated,
-          daysSinceUpdate,
-          nextAction,
-          needsAttention: daysSinceUpdate >= 2 && lead.status !== "contract",
-        };
-      });
-  }, [leads]);
-
-  // ==================== VISITAS DO DIA (TIMELINE) ====================
-
-  const todayTimeline = useMemo(() => {
-    const now = new Date();
-    const today = startOfDay(now);
-    const todayEnd = endOfDay(now);
-
-    return visits
-      .filter(v => {
-        const visitDate = new Date(v.scheduledFor);
-        return isWithinInterval(visitDate, { start: today, end: todayEnd });
-      })
-      .sort((a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime())
-      .map(visit => ({
-        ...visit,
-        property: properties.find(p => p.id === visit.propertyId),
-        lead: leads.find(l => l.id === visit.leadId),
-        isPast: isPast(new Date(visit.scheduledFor)),
-      }));
-  }, [visits, properties, leads]);
-
-  // ==================== IMÓVEIS INTELIGENTES ====================
-
-  const propertyInsights = useMemo(() => {
-    const available = properties.filter(p => p.status === "available");
-    const withoutImages = available.filter(p => !p.images || p.images.length === 0);
-    const withoutDescription = available.filter(p => !p.description || p.description.length < 50);
-
-    // Imóveis por tipo com insights
-    const byType: Record<string, { total: number; available: number; rent: number; sale: number }> = {};
-    properties.forEach(prop => {
-      const type = prop.type === "house" ? "Casa" :
-                   prop.type === "apartment" ? "Apto" :
-                   prop.type === "land" ? "Terreno" :
-                   prop.type === "commercial" ? "Comercial" : prop.type;
-      if (!byType[type]) byType[type] = { total: 0, available: 0, rent: 0, sale: 0 };
-      byType[type].total++;
-      if (prop.status === "available") {
-        byType[type].available++;
-        if (prop.category === "rent") byType[type].rent++;
-        if (prop.category === "sale") byType[type].sale++;
-      }
-    });
-
-    return {
-      total: properties.length,
-      available: available.length,
-      withoutImages: withoutImages.length,
-      withoutDescription: withoutDescription.length,
-      needsAttention: withoutImages.length + withoutDescription.length,
-      byType: Object.entries(byType).map(([name, data]) => ({ name, ...data })),
-    };
-  }, [properties]);
-
-  // ==================== HANDLERS ====================
-
+  // Handlers
   async function handleCreateLead(e: React.FormEvent) {
     e.preventDefault();
     if (!newLeadForm.name || !newLeadForm.email || !newLeadForm.phone) return;
@@ -376,14 +185,6 @@ export default function Dashboard() {
     } finally {
       setIsSubmitting(false);
     }
-  }
-
-  function formatCurrency(value: number) {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-      minimumFractionDigits: 0,
-    }).format(value);
   }
 
   const totalContractValue = useMemo(() => {
@@ -505,7 +306,7 @@ export default function Dashboard() {
   );
 
   return (
-    <main className="space-y-4 sm:space-y-6 lg:space-y-8">
+    <main className="space-y-6 sm:space-y-8 lg:space-y-10">
       {/* ==================== ACTION BAR ==================== */}
       <header className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
@@ -542,7 +343,7 @@ export default function Dashboard() {
       </header>
 
       {/* ==================== PENDÊNCIAS DE HOJE (URGENTE) ==================== */}
-      {(todayPendencies.totalUrgent > 0 || todayPendencies.todayVisitsList.length > 0 || todayPendencies.todayFollowUps.length > 0) && (
+      {(pendencies.totalUrgent > 0 || pendencies.todayVisitsList.length > 0 || pendencies.todayFollowUps.length > 0) && (
         <section aria-labelledby="pendencies-title">
           <Card className="border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 transition-all duration-200 hover:shadow-lg">
             <CardHeader className="p-4 xs:p-5 sm:p-6 pb-3">
@@ -555,8 +356,8 @@ export default function Dashboard() {
                     Pendências de Hoje
                   </CardTitle>
                   <CardDescription className="text-amber-700 text-sm xs:text-base mt-0.5">
-                    {todayPendencies.overdueFollowUps.length > 0 && `${todayPendencies.overdueFollowUps.length} atrasado • `}
-                    {todayPendencies.todayVisitsList.length} visita(s) • {todayPendencies.todayFollowUps.length} tarefa(s)
+                    {pendencies.overdueFollowUps.length > 0 && `${pendencies.overdueFollowUps.length} atrasado • `}
+                    {pendencies.todayVisitsList.length} visita(s) • {pendencies.todayFollowUps.length} tarefa(s)
                   </CardDescription>
                 </div>
               </div>
@@ -566,14 +367,14 @@ export default function Dashboard() {
               <ScrollArea className="sm:overflow-visible">
                 <div className="flex gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
                   {/* Atrasados */}
-                  {todayPendencies.overdueFollowUps.length > 0 && (
+                  {pendencies.overdueFollowUps.length > 0 && (
                     <div className="p-3 xs:p-4 sm:p-5 rounded-lg bg-red-100/50 border border-red-200 min-w-[200px] xs:min-w-[220px] sm:min-w-0 shrink-0 sm:shrink transition-all duration-200 hover:shadow-md">
                       <div className="flex items-center gap-2 mb-3">
                         <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
                         <span className="text-sm sm:text-base font-semibold text-red-700">Atrasados</span>
                       </div>
                       <div className="space-y-2">
-                        {todayPendencies.overdueFollowUps.slice(0, 2).map(f => (
+                        {pendencies.overdueFollowUps.slice(0, 2).map(f => (
                           <div key={f.id} className="flex items-center justify-between gap-2 text-sm">
                             <span className="truncate flex-1">{f.lead?.name || "Lead"}</span>
                             <Button
@@ -592,14 +393,14 @@ export default function Dashboard() {
                   )}
 
                   {/* Visitas de Hoje */}
-                  {todayPendencies.todayVisitsList.length > 0 && (
+                  {pendencies.todayVisitsList.length > 0 && (
                     <div className="p-3 xs:p-4 sm:p-5 rounded-lg bg-blue-100/50 border border-blue-200 min-w-[200px] xs:min-w-[220px] sm:min-w-0 shrink-0 sm:shrink transition-all duration-200 hover:shadow-md">
                       <div className="flex items-center gap-2 mb-3">
                         <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                         <span className="text-sm sm:text-base font-semibold text-blue-700">Visitas Hoje</span>
                       </div>
                       <div className="space-y-2">
-                        {todayPendencies.todayVisitsList.slice(0, 2).map(v => (
+                        {pendencies.todayVisitsList.slice(0, 2).map(v => (
                           <div key={v.id} className="text-sm">
                             <span className="font-medium">{format(new Date(v.scheduledFor), "HH:mm")}</span>
                             <span className="text-muted-foreground ml-1.5 truncate block sm:inline">
@@ -612,14 +413,14 @@ export default function Dashboard() {
                   )}
 
                   {/* Tarefas de Hoje */}
-                  {todayPendencies.todayFollowUps.length > 0 && (
+                  {pendencies.todayFollowUps.length > 0 && (
                     <div className="p-3 xs:p-4 sm:p-5 rounded-lg bg-purple-100/50 border border-purple-200 min-w-[200px] xs:min-w-[220px] sm:min-w-0 shrink-0 sm:shrink transition-all duration-200 hover:shadow-md">
                       <div className="flex items-center gap-2 mb-3">
                         <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
                         <span className="text-sm sm:text-base font-semibold text-purple-700">Tarefas</span>
                       </div>
                       <div className="space-y-2">
-                        {todayPendencies.todayFollowUps.slice(0, 2).map(f => (
+                        {pendencies.todayFollowUps.slice(0, 2).map(f => (
                           <div key={f.id} className="flex items-center justify-between gap-2 text-sm">
                             <span className="truncate flex-1">{f.lead?.name || "Lead"}</span>
                             <Badge variant="secondary" className="text-xs shrink-0 px-2 py-0.5">
@@ -638,251 +439,24 @@ export default function Dashboard() {
         </section>
       )}
 
-      {/* ==================== KPIs DO FUNIL ==================== */}
+      {/* ==================== KPIs PRINCIPAIS - COMPONENTE NOVO ==================== */}
       <section aria-labelledby="kpis-title" className="sr-only">
         <h2 id="kpis-title">Indicadores principais</h2>
       </section>
-      <ScrollArea className="sm:overflow-visible">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 lg:gap-6">
-          {/* Imóveis Ativos */}
-          <Card
-            className="transition-all duration-200 hover:shadow-lg hover:-translate-y-1 cursor-pointer active:scale-95 touch-manipulation"
-            onClick={() => setLocation("/properties")}
-            role="button"
-            tabIndex={0}
-            aria-label="Ver imóveis ativos"
-            onKeyDown={(e) => e.key === 'Enter' && setLocation("/properties")}
-          >
-            <CardContent className="p-4 xs:p-5 sm:p-6">
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div className="min-h-[44px] min-w-[44px] xs:h-11 xs:w-11 sm:h-12 sm:w-12 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-                  <Building2 className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
-                </div>
-                <Badge variant="secondary" className="text-xs px-2 py-0.5 shrink-0">
-                  {operationalMetrics.featuredProperties} dest.
-                </Badge>
-              </div>
-              <div>
-                <p className="text-2xl xs:text-3xl sm:text-4xl font-bold text-foreground">
-                  {operationalMetrics.availableProperties}
-                </p>
-                <p className="text-xs xs:text-sm text-muted-foreground mt-1">Imóveis Ativos</p>
-              </div>
-            </CardContent>
-          </Card>
+      <DashboardMetrics
+        metrics={{
+          properties: { value: metrics.availableProperties },
+          leads: { value: metrics.totalLeads },
+          visits: { value: metrics.scheduledVisits },
+          contracts: { value: metrics.signedContracts },
+        }}
+      />
 
-          {/* Leads Totais */}
-          <Card
-            className="transition-all duration-200 hover:shadow-lg hover:-translate-y-1 cursor-pointer active:scale-95 touch-manipulation"
-            onClick={() => setLocation("/leads")}
-            role="button"
-            tabIndex={0}
-            aria-label="Ver leads totais"
-            onKeyDown={(e) => e.key === 'Enter' && setLocation("/leads")}
-          >
-            <CardContent className="p-4 xs:p-5 sm:p-6">
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div className="min-h-[44px] min-w-[44px] xs:h-11 xs:w-11 sm:h-12 sm:w-12 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
-                  <UserPlus className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
-                </div>
-                {operationalMetrics.newLeads > 0 && (
-                  <Badge className="bg-green-500 text-white text-xs px-2 py-0.5 shrink-0">
-                    {operationalMetrics.newLeads} novo
-                  </Badge>
-                )}
-              </div>
-              <div>
-                <p className="text-2xl xs:text-3xl sm:text-4xl font-bold text-foreground">
-                  {operationalMetrics.totalLeads}
-                </p>
-                <p className="text-xs xs:text-sm text-muted-foreground mt-1">Leads Totais</p>
-              </div>
-            </CardContent>
-          </Card>
+      {/* Seção de Indicadores removida - informação redundante com KPIs principais */}
 
-          {/* Em Atendimento */}
-          <Card
-            className="transition-all duration-200 hover:shadow-lg hover:-translate-y-1 cursor-pointer active:scale-95 touch-manipulation"
-            onClick={() => setLocation("/leads")}
-            role="button"
-            tabIndex={0}
-            aria-label="Ver leads em atendimento"
-            onKeyDown={(e) => e.key === 'Enter' && setLocation("/leads")}
-          >
-            <CardContent className="p-4 xs:p-5 sm:p-6">
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div className="min-h-[44px] min-w-[44px] xs:h-11 xs:w-11 sm:h-12 sm:w-12 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
-                  <MessageSquare className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
-                </div>
-              </div>
-              <div>
-                <p className="text-2xl xs:text-3xl sm:text-4xl font-bold text-foreground">
-                  {operationalMetrics.inContactLeads}
-                </p>
-                <p className="text-xs xs:text-sm text-muted-foreground mt-1">Em Atendimento</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Visitas Agendadas */}
-          <Card
-            className="transition-all duration-200 hover:shadow-lg hover:-translate-y-1 cursor-pointer active:scale-95 touch-manipulation"
-            onClick={() => setLocation("/calendar")}
-            role="button"
-            tabIndex={0}
-            aria-label="Ver visitas agendadas"
-            onKeyDown={(e) => e.key === 'Enter' && setLocation("/calendar")}
-          >
-            <CardContent className="p-4 xs:p-5 sm:p-6">
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div className="min-h-[44px] min-w-[44px] xs:h-11 xs:w-11 sm:h-12 sm:w-12 rounded-lg bg-orange-100 flex items-center justify-center shrink-0">
-                  <CalendarCheck className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600" />
-                </div>
-                {operationalMetrics.todayVisits > 0 && (
-                  <Badge className="bg-orange-500 text-white text-xs px-2 py-0.5 shrink-0">
-                    {operationalMetrics.todayVisits} hoje
-                  </Badge>
-                )}
-              </div>
-              <div>
-                <p className="text-2xl xs:text-3xl sm:text-4xl font-bold text-foreground">
-                  {operationalMetrics.scheduledVisits}
-                </p>
-                <p className="text-xs xs:text-sm text-muted-foreground mt-1">Visitas Agendadas</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Propostas Ativas */}
-          <Card
-            className="transition-all duration-200 hover:shadow-lg hover:-translate-y-1 cursor-pointer active:scale-95 touch-manipulation"
-            onClick={() => setLocation("/contracts")}
-            role="button"
-            tabIndex={0}
-            aria-label="Ver propostas ativas"
-            onKeyDown={(e) => e.key === 'Enter' && setLocation("/contracts")}
-          >
-            <CardContent className="p-4 xs:p-5 sm:p-6">
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div className="min-h-[44px] min-w-[44px] xs:h-11 xs:w-11 sm:h-12 sm:w-12 rounded-lg bg-yellow-100 flex items-center justify-center shrink-0">
-                  <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-600" />
-                </div>
-              </div>
-              <div>
-                <p className="text-2xl xs:text-3xl sm:text-4xl font-bold text-foreground">
-                  {operationalMetrics.draftContracts + operationalMetrics.sentContracts}
-                </p>
-                <p className="text-xs xs:text-sm text-muted-foreground mt-1">Propostas Ativas</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Contratos Fechados */}
-          <Card
-            className="transition-all duration-200 hover:shadow-lg hover:-translate-y-1 cursor-pointer active:scale-95 touch-manipulation"
-            onClick={() => setLocation("/contracts")}
-            role="button"
-            tabIndex={0}
-            aria-label="Ver contratos fechados"
-            onKeyDown={(e) => e.key === 'Enter' && setLocation("/contracts")}
-          >
-            <CardContent className="p-4 xs:p-5 sm:p-6">
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div className="min-h-[44px] min-w-[44px] xs:h-11 xs:w-11 sm:h-12 sm:w-12 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
-                  <Handshake className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
-                </div>
-              </div>
-              <div>
-                <p className="text-2xl xs:text-3xl sm:text-4xl font-bold text-foreground">
-                  {operationalMetrics.signedContracts}
-                </p>
-                <p className="text-xs xs:text-sm text-muted-foreground mt-1">Contratos Fechados</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </ScrollArea>
-
-      {/* ==================== INDICADORES DE SAÚDE ==================== */}
-      <section aria-labelledby="health-title">
-        <h2 id="health-title" className="sr-only">Indicadores de saúde do negócio</h2>
-        <div className="grid gap-3 xs:gap-4 sm:gap-6 grid-cols-1 xs:grid-cols-2 lg:grid-cols-4">
-          <Card className="transition-all duration-200 hover:shadow-md">
-            <CardContent className="p-4 xs:p-5 sm:p-6">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className="min-h-[44px] min-w-[44px] xs:h-12 xs:w-12 sm:h-14 sm:w-14 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                  <Target className="h-6 w-6 sm:h-7 sm:w-7 text-blue-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs xs:text-sm text-muted-foreground truncate">Lead → Visita</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <p className="text-xl xs:text-2xl sm:text-3xl font-bold">{operationalMetrics.conversionToVisit}%</p>
-                    <Progress value={operationalMetrics.conversionToVisit} className="h-2 flex-1 hidden lg:flex" />
-                  </div>
-                  <Progress value={operationalMetrics.conversionToVisit} className="h-2 mt-2 lg:hidden" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="transition-all duration-200 hover:shadow-md">
-            <CardContent className="p-4 xs:p-5 sm:p-6">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className="min-h-[44px] min-w-[44px] xs:h-12 xs:w-12 sm:h-14 sm:w-14 rounded-full bg-yellow-100 flex items-center justify-center shrink-0">
-                  <FileText className="h-6 w-6 sm:h-7 sm:w-7 text-yellow-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs xs:text-sm text-muted-foreground truncate">Lead → Proposta</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <p className="text-xl xs:text-2xl sm:text-3xl font-bold">{operationalMetrics.conversionToProposal}%</p>
-                    <Progress value={operationalMetrics.conversionToProposal} className="h-2 flex-1 hidden lg:flex" />
-                  </div>
-                  <Progress value={operationalMetrics.conversionToProposal} className="h-2 mt-2 lg:hidden" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="transition-all duration-200 hover:shadow-md">
-            <CardContent className="p-4 xs:p-5 sm:p-6">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className="min-h-[44px] min-w-[44px] xs:h-12 xs:w-12 sm:h-14 sm:w-14 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                  <Handshake className="h-6 w-6 sm:h-7 sm:w-7 text-green-600" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs xs:text-sm text-muted-foreground truncate">Lead → Fechamento</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <p className="text-xl xs:text-2xl sm:text-3xl font-bold">{operationalMetrics.conversionToClosed}%</p>
-                    <Progress value={operationalMetrics.conversionToClosed} className="h-2 flex-1 hidden lg:flex" />
-                  </div>
-                  <Progress value={operationalMetrics.conversionToClosed} className="h-2 mt-2 lg:hidden" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className={`transition-all duration-200 hover:shadow-md ${propertyInsights.needsAttention > 0 ? "border-amber-200 bg-amber-50/20" : ""}`}>
-            <CardContent className="p-4 xs:p-5 sm:p-6">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className={`min-h-[44px] min-w-[44px] xs:h-12 xs:w-12 sm:h-14 sm:w-14 rounded-full flex items-center justify-center shrink-0 ${propertyInsights.needsAttention > 0 ? "bg-amber-100" : "bg-gray-100"}`}>
-                  <AlertTriangle className={`h-6 w-6 sm:h-7 sm:w-7 ${propertyInsights.needsAttention > 0 ? "text-amber-600" : "text-gray-400"}`} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs xs:text-sm text-muted-foreground truncate">Imóveis Incompletos</p>
-                  <p className="text-xl xs:text-2xl sm:text-3xl font-bold mt-1">{propertyInsights.needsAttention}</p>
-                  {propertyInsights.needsAttention > 0 && (
-                    <p className="text-xs text-amber-600 truncate mt-1">{propertyInsights.withoutImages} sem fotos</p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
-
-      {/* ==================== CONTEÚDO PRINCIPAL ==================== */}
-      <div className="grid gap-4 xs:gap-6 lg:grid-cols-3 lg:gap-8">
-        {/* PIPELINE VISUAL */}
+      {/* ==================== CONTEÚDO PRINCIPAL - COM DASHBOARD PIPELINE ==================== */}
+      <div className="grid gap-6 sm:gap-8 lg:grid-cols-3 lg:gap-10">
+        {/* PIPELINE VISUAL - NOVO COMPONENTE */}
         <section aria-labelledby="pipeline-title" className="lg:col-span-2">
           <Card className="transition-all duration-200 hover:shadow-md">
             <CardHeader className="p-4 xs:p-5 sm:p-6 pb-3">
@@ -906,40 +480,11 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent className="p-4 xs:p-5 sm:p-6 pt-0">
-              <ScrollArea className="sm:overflow-visible">
-                <div className="flex gap-3 sm:gap-4">
-                  {pipelineData.map((stage, i) => (
-                    <div
-                      key={stage.key}
-                      className="flex-1 min-w-[130px] xs:min-w-[150px] sm:min-w-[160px] p-3 xs:p-4 rounded-lg border-2 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 shrink-0 sm:shrink"
-                      style={{ borderColor: stage.color + "40", backgroundColor: stage.color + "10" }}
-                    >
-                      <div className="flex items-center justify-between mb-2 sm:mb-3">
-                        <div className="flex items-center gap-2">
-                          <stage.icon className="h-4 w-4 sm:h-5 sm:w-5" style={{ color: stage.color }} />
-                          <span className="text-xs sm:text-sm font-semibold">{stage.label}</span>
-                        </div>
-                        <span className="text-lg sm:text-xl font-bold" style={{ color: stage.color }}>
-                          {stage.count}
-                        </span>
-                      </div>
-                      <div className="space-y-1.5">
-                        {stage.leads.slice(0, 2).map(lead => (
-                          <div key={lead.id} className="text-xs p-1.5 rounded bg-white/80 truncate shadow-sm">
-                            {lead.name}
-                          </div>
-                        ))}
-                        {stage.count > 2 && (
-                          <div className="text-xs text-muted-foreground text-center pt-1">
-                            +{stage.count - 2} mais
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <ScrollBar orientation="horizontal" className="sm:hidden" />
-              </ScrollArea>
+              <DashboardPipeline
+                stages={pipelineStages}
+                onLeadClick={(leadId) => setLocation(`/leads/${leadId}`)}
+                maxCardsVisible={3}
+              />
             </CardContent>
           </Card>
         </section>
@@ -1029,8 +574,8 @@ export default function Dashboard() {
         </section>
       </div>
 
-      {/* ==================== LEADS E IMÓVEIS ==================== */}
-      <div className="grid gap-4 xs:gap-6 lg:grid-cols-2 lg:gap-8">
+      {/* ==================== LEADS E IMÓVEIS - COM MAIS ESPAÇO ==================== */}
+      <div className="grid gap-6 sm:gap-8 lg:grid-cols-2 lg:gap-10">
         {/* ÚLTIMOS LEADS COM TIMELINE */}
         <section aria-labelledby="recent-leads-title">
           <Card className="transition-all duration-200 hover:shadow-md">
@@ -1171,44 +716,50 @@ export default function Dashboard() {
             <CardContent className="p-4 xs:p-5 sm:p-6 pt-0">
               {propertyInsights.byType.length > 0 ? (
                 <>
-                  <ResponsiveContainer width="100%" height={160} className="xs:!h-[180px] sm:!h-[200px] lg:!h-[220px]">
-                    <BarChart data={propertyInsights.byType} layout="vertical">
-                      <XAxis type="number" hide />
-                      <YAxis
-                        dataKey="name"
-                        type="category"
-                        width={70}
-                        tick={{ fontSize: 12 }}
-                        className="text-xs xs:text-sm"
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: '8px',
-                          border: 'none',
-                          boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                          fontSize: '13px'
-                        }}
-                        formatter={(value: number, name: string) => {
-                          if (name === "sale") return [value, "Venda"];
-                          if (name === "rent") return [value, "Aluguel"];
-                          return [value, name];
-                        }}
-                      />
-                      <Bar dataKey="sale" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} name="Venda" />
-                      <Bar dataKey="rent" stackId="a" fill="#22c55e" radius={[0, 4, 4, 0]} name="Aluguel" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <Suspense fallback={
+                    <div className="h-[160px] xs:h-[180px] sm:h-[200px] lg:h-[220px] flex items-center justify-center">
+                      <div className="animate-pulse text-muted-foreground text-sm">Carregando gráfico...</div>
+                    </div>
+                  }>
+                    <ResponsiveContainer width="100%" height={160} className="xs:!h-[180px] sm:!h-[200px] lg:!h-[220px]">
+                      <BarChart data={propertyInsights.byType} layout="vertical">
+                        <XAxis type="number" hide />
+                        <YAxis
+                          dataKey="name"
+                          type="category"
+                          width={70}
+                          tick={{ fontSize: 12 }}
+                          className="text-xs xs:text-sm"
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            borderRadius: '8px',
+                            border: 'none',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                            fontSize: '13px'
+                          }}
+                          formatter={(value: number, name: string) => {
+                            if (name === "sale") return [value, "Venda"];
+                            if (name === "rent") return [value, "Aluguel"];
+                            return [value, name];
+                          }}
+                        />
+                        <Bar dataKey="sale" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} name="Venda" />
+                        <Bar dataKey="rent" stackId="a" fill="#22c55e" radius={[0, 4, 4, 0]} name="Aluguel" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Suspense>
                   <div className="flex justify-center gap-4 xs:gap-6 mt-4" role="list" aria-label="Legenda do gráfico">
                     <div className="flex items-center gap-2" role="listitem">
                       <div className="w-3 h-3 rounded bg-blue-500" aria-hidden="true" />
                       <span className="text-xs xs:text-sm text-muted-foreground">
-                        Venda ({operationalMetrics.saleProperties})
+                        Venda ({metrics.saleProperties})
                       </span>
                     </div>
                     <div className="flex items-center gap-2" role="listitem">
                       <div className="w-3 h-3 rounded bg-green-500" aria-hidden="true" />
                       <span className="text-xs xs:text-sm text-muted-foreground">
-                        Aluguel ({operationalMetrics.rentProperties})
+                        Aluguel ({metrics.rentProperties})
                       </span>
                     </div>
                   </div>
@@ -1246,7 +797,7 @@ export default function Dashboard() {
                     {formatCurrency(totalContractValue)}
                   </p>
                   <p className="text-emerald-200 text-sm xs:text-base sm:text-lg mt-2 sm:mt-3">
-                    {operationalMetrics.signedContracts} contrato(s) assinado(s)
+                    {metrics.signedContracts} contrato(s) assinado(s)
                   </p>
                 </div>
                 <div className="min-h-[64px] min-w-[64px] xs:h-20 xs:w-20 sm:h-24 sm:w-24 lg:h-28 lg:w-28 rounded-full bg-white/20 flex items-center justify-center shrink-0 backdrop-blur-sm">
