@@ -1,0 +1,48 @@
+# ImobiBase - Robots.txt
+# Sistema de Gestão Imobiliária
+# Última atualização: 25/12/2024
+
+User-agent: *
+Allow: /
+Allow: /properties
+Allow: /properties/*
+Allow: /sobre
+Allow: /contato
+
+# Bloquear rotas privadas
+Disallow: /dashboard
+Disallow: /leads
+Disallow: /calendar
+Disallow: /financial
+Disallow: /rentals
+Disallow: /vendas
+Disallow: /settings
+Disallow: /api/
+Disallow: /admin/
+
+# Bloquear arquivos sensíveis
+Disallow: /*.json$
+Disallow: /*.xml$
+Disallow: /health.json
+
+# Arquivos de build
+Disallow: /assets/*.map
+
+# Sitemap
+Sitemap: https://imobibase.com/sitemap.xml
+
+# Crawl delay para bots agressivos
+User-agent: AhrefsBot
+Crawl-delay: 10
+
+User-agent: SemrushBot
+Crawl-delay: 10
+
+User-agent: DotBot
+Crawl-delay: 10
+
+# Bloquear bots maliciosos conhecidos
+User-agent: MJ12bot
+User-agent: AhrefsBot
+User-agent: SemrushBot
+Disallow: /

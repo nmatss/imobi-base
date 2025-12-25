@@ -36,15 +36,15 @@ import type {
 const generateId = () => nanoid();
 
 // Helper to convert arrays to/from JSON for SQLite
-const toJson = (arr: any[] | null | undefined): string | null => {
+const toJson = <T>(arr: T[] | null | undefined): string | null => {
   if (!arr) return null;
   return JSON.stringify(arr);
 };
 
-const fromJson = (str: string | null | undefined): any[] | null => {
+const fromJson = <T>(str: string | null | undefined): T[] | null => {
   if (!str) return null;
   try {
-    return JSON.parse(str);
+    return JSON.parse(str) as T[];
   } catch {
     return null;
   }
@@ -147,11 +147,34 @@ export interface IStorage {
   updateFollowUp(id: string, followUp: Partial<InsertFollowUp>): Promise<FollowUp | undefined>;
   deleteFollowUp(id: string): Promise<boolean>;
   getMatchedProperties(leadId: string, tenantId: string): Promise<{ property: Property; score: number; matchReasons: string[] }[]>;
-  getRentalReportData(tenantId: string, startDate: Date, endDate: Date): Promise<any>;
-  getOwnerReport(tenantId: string, filters?: { ownerId?: string; startDate?: Date; endDate?: Date }): Promise<any>;
-  getRenterReport(tenantId: string, filters?: { renterId?: string; startDate?: Date; endDate?: Date }): Promise<any>;
-  getPaymentDetailedReport(tenantId: string, filters?: { ownerId?: string; renterId?: string; status?: string; startDate?: Date; endDate?: Date }): Promise<any>;
-  getOverdueReport(tenantId: string): Promise<any>;
+  getRentalReportData(tenantId: string, startDate: Date, endDate: Date): Promise<{
+    totalReceived: number;
+    totalPending: number;
+    totalOverdue: number;
+    overdueCount: number;
+    payments: RentalPayment[];
+  }>;
+  getOwnerReport(tenantId: string, filters?: { ownerId?: string; startDate?: Date; endDate?: Date }): Promise<{
+    totalProperties: number;
+    activeContracts: number;
+    totalRevenue: number;
+    properties: Array<{ id: string; address: string; contractCount: number; revenue: number }>;
+  }>;
+  getRenterReport(tenantId: string, filters?: { renterId?: string; startDate?: Date; endDate?: Date }): Promise<{
+    totalContracts: number;
+    totalPaid: number;
+    totalPending: number;
+    contracts: Array<{ id: string; propertyAddress: string; monthlyRent: string; status: string }>;
+  }>;
+  getPaymentDetailedReport(tenantId: string, filters?: { ownerId?: string; renterId?: string; status?: string; startDate?: Date; endDate?: Date }): Promise<{
+    payments: Array<{ id: string; propertyAddress: string; renterName: string; ownerName: string; totalValue: string; status: string }>;
+    summary: { totalAmount: number; paidAmount: number; pendingAmount: number };
+  }>;
+  getOverdueReport(tenantId: string): Promise<{
+    totalOverdue: number;
+    overdueCount: number;
+    payments: Array<{ id: string; renterName: string; propertyAddress: string; totalValue: string; daysOverdue: number }>;
+  }>;
   // Rental Transfers (Repasses)
   getRentalTransfer(id: string): Promise<RentalTransfer | undefined>;
   getRentalTransfersByTenant(tenantId: string, filters?: { ownerId?: string; status?: string; referenceMonth?: string }): Promise<RentalTransfer[]>;
@@ -180,8 +203,17 @@ export interface IStorage {
     contractsAdjusting: RentalContract[];
     vacantProperties: Property[];
   }>;
-  getOwnerStatement(ownerId: string, tenantId: string, startDate?: Date, endDate?: Date): Promise<any>;
-  getRenterPaymentHistory(renterId: string, tenantId: string): Promise<any>;
+  getOwnerStatement(ownerId: string, tenantId: string, startDate?: Date, endDate?: Date): Promise<{
+    owner: Owner;
+    properties: Array<{ property: Property; payments: RentalPayment[] }>;
+    summary: { totalRevenue: number; totalPaid: number; totalPending: number };
+  }>;
+  getRenterPaymentHistory(renterId: string, tenantId: string): Promise<{
+    renter: Renter;
+    contracts: RentalContract[];
+    payments: RentalPayment[];
+    summary: { totalPaid: number; totalPending: number; onTimePayments: number; latePayments: number };
+  }>;
   // Financial Module Methods
   getFinancialMetrics(tenantId: string, startDate?: Date, endDate?: Date, previousPeriodStart?: Date, previousPeriodEnd?: Date): Promise<{
     commissionsReceived: number;
@@ -199,18 +231,40 @@ export interface IStorage {
     origin?: string;
     startDate?: Date;
     endDate?: Date;
-  }): Promise<any[]>;
+  }): Promise<FinanceEntry[]>;
   getFinancialChartData(tenantId: string, period: 'month' | 'quarter' | 'year'): Promise<{
     byMonth: { month: string; revenue: number; expenses: number }[];
     byCategory: { category: string; amount: number; type: string }[];
     byOrigin: { origin: string; amount: number }[];
   }>;
   // Comprehensive Reports
-  getSalesReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date; brokerId?: string }): Promise<any>;
-  getLeadsFunnelReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date }): Promise<any>;
-  getBrokerPerformanceReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date }): Promise<any>;
-  getPropertiesReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date }): Promise<any>;
-  getFinancialSummaryReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date }): Promise<any>;
+  getSalesReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date; brokerId?: string }): Promise<{
+    totalSales: number;
+    totalValue: number;
+    totalCommissions: number;
+    salesList: Array<{ sale: PropertySale; property: Property; buyer: Lead }>;
+  }>;
+  getLeadsFunnelReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date }): Promise<{
+    totalLeads: number;
+    conversionRate: number;
+    byStage: Record<string, number>;
+    bySource: Record<string, number>;
+  }>;
+  getBrokerPerformanceReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date }): Promise<{
+    brokers: Array<{ user: User; totalLeads: number; convertedLeads: number; conversionRate: number }>;
+  }>;
+  getPropertiesReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date }): Promise<{
+    totalProperties: number;
+    availableProperties: number;
+    byType: Record<string, number>;
+    byStatus: Record<string, number>;
+  }>;
+  getFinancialSummaryReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date }): Promise<{
+    totalRevenue: number;
+    totalExpenses: number;
+    netIncome: number;
+    byMonth: Array<{ month: string; revenue: number; expenses: number }>;
+  }>;
   // Settings Module Methods
   getTenantSettings(tenantId: string): Promise<TenantSettings | undefined>;
   createOrUpdateTenantSettings(tenantId: string, data: Partial<InsertTenantSettings>): Promise<TenantSettings>;
@@ -223,16 +277,16 @@ export interface IStorage {
   deleteUserRole(id: string): Promise<boolean>;
   seedDefaultRoles(tenantId: string): Promise<UserRole[]>;
   getDefaultRoles(tenantId: string): Promise<UserRole[]>;
-  getBrandSettings(tenantId: string): Promise<any | undefined>;
-  createOrUpdateBrandSettings(tenantId: string, data: any): Promise<any>;
+  getBrandSettings(tenantId: string): Promise<Record<string, unknown> | undefined>;
+  createOrUpdateBrandSettings(tenantId: string, data: Record<string, unknown>): Promise<Record<string, unknown>>;
   getAISettings(tenantId: string): Promise<AISettings | undefined>;
   createOrUpdateAISettings(tenantId: string, data: Partial<InsertAISettings>): Promise<AISettings>;
   getIntegrationsByTenant(tenantId: string): Promise<IntegrationConfig[]>;
   getIntegrationByName(tenantId: string, name: string): Promise<IntegrationConfig | undefined>;
-  createOrUpdateIntegration(tenantId: string, name: string, data: any): Promise<IntegrationConfig>;
+  createOrUpdateIntegration(tenantId: string, name: string, data: Partial<InsertIntegrationConfig>): Promise<IntegrationConfig>;
   getNotificationPreferencesByTenant(tenantId: string): Promise<NotificationPreference[]>;
   getNotificationPreference(tenantId: string, eventType: string, channel: string): Promise<NotificationPreference | undefined>;
-  createOrUpdateNotificationPreference(tenantId: string, eventType: string, data: any): Promise<NotificationPreference>;
+  createOrUpdateNotificationPreference(tenantId: string, eventType: string, data: Partial<InsertNotificationPreference>): Promise<NotificationPreference>;
   getSavedReportsByTenant(tenantId: string): Promise<SavedReport[]>;
   getSavedReport(id: string): Promise<SavedReport | undefined>;
   createSavedReport(data: InsertSavedReport): Promise<SavedReport>;
@@ -240,6 +294,7 @@ export interface IStorage {
   deleteSavedReport(id: string): Promise<boolean>;
   toggleReportFavorite(id: string): Promise<SavedReport | undefined>;
   seedDefaultCategories(tenantId: string): Promise<FinanceCategory[]>;
+  checkDatabaseConnection(): Promise<boolean>;
 }
 
 export class DbStorage implements IStorage {
@@ -3098,6 +3153,205 @@ export class DbStorage implements IStorage {
       limit,
     };
   }
+
+  /**
+   * Check database connection health
+   * Used by health check endpoint for monitoring
+   * @returns true if database is connected and responsive
+   */
+  async checkDatabaseConnection(): Promise<boolean> {
+    try {
+      // Simple query to test database connectivity
+      // Queries the tenants table which should always exist
+      await db.select({ id: schema.tenants.id }).from(schema.tenants).limit(1);
+      return true;
+    } catch (error) {
+      console.error("Database connection check failed:", error);
+      return false;
+    }
+  }
+
+  // ============== PAYMENT & SUBSCRIPTION METHODS ==============
+
+  /**
+   * Get tenant subscription
+   */
+  async getTenantSubscription(tenantId: string) {
+    const [subscription] = await db
+      .select()
+      .from(schema.tenantSubscriptions)
+      .where(eq(schema.tenantSubscriptions.tenantId, tenantId))
+      .limit(1);
+    return subscription || null;
+  }
+
+  /**
+   * Update tenant subscription
+   */
+  async updateTenantSubscription(tenantId: string, data: any) {
+    const [updated] = await db
+      .update(schema.tenantSubscriptions)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(schema.tenantSubscriptions.tenantId, tenantId))
+      .returning();
+    return updated;
+  }
+
+  /**
+   * Create tenant subscription
+   */
+  async createTenantSubscription(data: any) {
+    const [subscription] = await db
+      .insert(schema.tenantSubscriptions)
+      .values(data)
+      .returning();
+    return subscription;
+  }
+
+  /**
+   * Get plan by ID
+   */
+  async getPlan(planId: string) {
+    const [plan] = await db
+      .select()
+      .from(schema.plans)
+      .where(eq(schema.plans.id, planId))
+      .limit(1);
+    return plan || null;
+  }
+
+  /**
+   * Get all active plans
+   */
+  async getActivePlans() {
+    return await db
+      .select()
+      .from(schema.plans)
+      .where(eq(schema.plans.isActive, true))
+      .orderBy(schema.plans.price);
+  }
+
+  /**
+   * Get tenant user count
+   */
+  async getTenantUserCount(tenantId: string): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.users)
+      .where(eq(schema.users.tenantId, tenantId));
+    return result[0]?.count || 0;
+  }
+
+  /**
+   * Get tenant property count
+   */
+  async getTenantPropertyCount(tenantId: string): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.properties)
+      .where(eq(schema.properties.tenantId, tenantId));
+    return result[0]?.count || 0;
+  }
+
+  /**
+   * Get tenant integration count
+   */
+  async getTenantIntegrationCount(tenantId: string): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.integrationConfigs)
+      .where(
+        and(
+          eq(schema.integrationConfigs.tenantId, tenantId),
+          eq(schema.integrationConfigs.status, 'connected')
+        )
+      );
+    return result[0]?.count || 0;
+  }
+
+  /**
+   * Get tenant by ID
+   */
+  async getTenantById(tenantId: string) {
+    const [tenant] = await db
+      .select()
+      .from(schema.tenants)
+      .where(eq(schema.tenants.id, tenantId))
+      .limit(1);
+    return tenant || null;
+  }
+
+  /**
+   * Get tenant settings
+   */
+  async getTenantSettings(tenantId: string) {
+    const [settings] = await db
+      .select()
+      .from(schema.tenantSettings)
+      .where(eq(schema.tenantSettings.tenantId, tenantId))
+      .limit(1);
+    return settings || null;
+  }
+
+  // File management methods
+  async createFile(file: any): Promise<any> {
+    const id = generateId();
+    const [created] = await db.insert(schema.files).values({ ...file, id, createdAt: now(), updatedAt: now() }).returning();
+    return created;
+  }
+
+  async getFile(id: string): Promise<any | undefined> {
+    const [file] = await db.select().from(schema.files).where(eq(schema.files.id, id));
+    return file;
+  }
+
+  async getFilesByTenant(tenantId: string): Promise<any[]> {
+    return db.select().from(schema.files).where(eq(schema.files.tenantId, tenantId));
+  }
+
+  async getFilesByUser(userId: string): Promise<any[]> {
+    return db.select().from(schema.files).where(eq(schema.files.userId, userId));
+  }
+
+  async deleteFile(id: string): Promise<boolean> {
+    await db.delete(schema.files).where(eq(schema.files.id, id));
+    return true;
+  }
+
+  /**
+   * Get properties for sitemap generation (SEO)
+   * Returns public properties (available for sale/rent) with minimal data
+   */
+  async getPropertiesForSitemap(): Promise<Array<{ id: string; createdAt: Date; updatedAt: Date | null }>> {
+    const properties = await db
+      .select({
+        id: schema.properties.id,
+        createdAt: schema.properties.createdAt,
+        updatedAt: schema.properties.updatedAt,
+      })
+      .from(schema.properties)
+      .where(eq(schema.properties.status, 'available'))
+      .orderBy(desc(schema.properties.updatedAt));
+
+    return properties;
+  }
+
+  // Table accessors for direct database access (needed by compliance and other modules)
+  get users() { return schema.users; }
+  get leads() { return schema.leads; }
+  get owners() { return schema.owners; }
+  get renters() { return schema.renters; }
+  get visits() { return schema.visits; }
+  get interactions() { return schema.interactions; }
+  get userSessions() { return schema.userSessions; }
+  get userConsents() { return schema.userConsents; }
+  get complianceAuditLog() { return schema.complianceAuditLog; }
+  get accountDeletionRequests() { return schema.accountDeletionRequests; }
+  get dataExportRequests() { return schema.dataExportRequests; }
+  get dataBreachIncidents() { return schema.dataBreachIncidents; }
+  get cookiePreferences() { return schema.cookiePreferences; }
+  get dataProcessingActivities() { return schema.dataProcessingActivities; }
+  get rentalContracts() { return schema.rentalContracts; }
 }
 
 export const storage = new DbStorage();

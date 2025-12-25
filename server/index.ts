@@ -7,6 +7,7 @@ import { registerEmailRoutes } from "./routes-email";
 import { registerJobRoutes } from "./routes-jobs";
 import { registerAuthenticationRoutes } from "./auth";
 import { registerFileRoutes } from "./routes-files";
+import { registerSitemapRoutes } from "./routes-sitemap";
 // import smsRoutes from "./routes-sms"; // Disabled - SMS schema not defined
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -97,6 +98,9 @@ app.use((req, res, next) => {
 
   // Register file upload routes
   registerFileRoutes(app);
+
+  // Register sitemap routes (SEO)
+  registerSitemapRoutes(app);
 
   // Register SMS routes
   // app.use('/api/sms', smsRoutes); // Disabled - SMS schema not defined
