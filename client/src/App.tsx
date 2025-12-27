@@ -1,32 +1,57 @@
+import React, { useEffect, useState, lazy, Suspense } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { ImobiProvider, useImobi } from "@/lib/imobi-context";
+import { AccessibilityProvider } from "@/lib/accessibility-context";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { GlobalSearch } from "@/components/GlobalSearch";
+import { TimeoutWarning } from "@/components/TimeoutWarning";
 import DashboardLayout from "@/components/layout/dashboard-layout";
-import Dashboard from "@/pages/dashboard";
-import PropertiesList from "@/pages/properties/list";
-import PropertyDetailsPage from "@/pages/properties/details";
-import LeadsKanban from "@/pages/leads/kanban";
-import CalendarPage from "@/pages/calendar";
-import ContractsPage from "@/pages/contracts";
-import RentalsPage from "@/pages/rentals";
-import VendasPage from "@/pages/vendas";
-import FinanceiroPage from "@/pages/financeiro";
-import ReportsPage from "@/pages/reports";
-import SettingsPage from "@/pages/settings";
-import TenantLanding from "@/pages/public/landing";
-import PropertyDetails from "@/pages/public/property-details";
-import PublicProperties from "@/pages/public/properties";
-import ProductLanding from "@/pages/public/product-landing";
-import NotFound from "@/pages/not-found";
-import AdminDashboard from "@/pages/admin";
-import TenantsPage from "@/pages/admin/tenants";
-import PlansPage from "@/pages/admin/plans";
-import LogsPage from "@/pages/admin/logs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Toaster } from "@/components/ui/sonner";
 import { Building2 } from "lucide-react";
-import { useEffect, useState } from "react";
+
+// Lazy-loaded components for better code splitting
+const Dashboard = lazy(() => import("@/pages/dashboard"));
+const PropertiesList = lazy(() => import("@/pages/properties/list"));
+const PropertyDetailsPage = lazy(() => import("@/pages/properties/details"));
+const LeadsKanban = lazy(() => import("@/pages/leads/kanban"));
+const CalendarPage = lazy(() => import("@/pages/calendar"));
+const ContractsPage = lazy(() => import("@/pages/contracts"));
+const RentalsPage = lazy(() => import("@/pages/rentals"));
+const VendasPage = lazy(() => import("@/pages/vendas"));
+const FinanceiroPage = lazy(() => import("@/pages/financeiro"));
+const ReportsPage = lazy(() => import("@/pages/reports"));
+const SettingsPage = lazy(() => import("@/pages/settings"));
+const TenantLanding = lazy(() => import("@/pages/public/landing"));
+const PropertyDetails = lazy(() => import("@/pages/public/property-details"));
+const PublicProperties = lazy(() => import("@/pages/public/properties"));
+const ProductLanding = lazy(() => import("@/pages/public/product-landing"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+const AdminDashboard = lazy(() => import("@/pages/admin"));
+const TenantsPage = lazy(() => import("@/pages/admin/tenants"));
+const PlansPage = lazy(() => import("@/pages/admin/plans"));
+const LogsPage = lazy(() => import("@/pages/admin/logs"));
+
+// Loading fallback component with improved UX
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="flex flex-col items-center gap-4 px-4">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-primary/20 rounded-full" />
+          <div className="absolute inset-0 w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+        <div className="text-center space-y-1">
+          <p className="text-sm font-medium text-foreground">Carregando...</p>
+          <p className="text-xs text-muted-foreground">Preparando a página para você</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function LoginPage() {
   const { login, user, loading } = useImobi();
@@ -49,8 +74,9 @@ function LoginPage() {
     
     try {
       await login(email, password);
-    } catch (error: any) {
-      setError(error.message || "Email ou senha incorretos");
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Email ou senha incorretos";
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -83,10 +109,10 @@ function LoginPage() {
           <div className="flex items-center gap-4 pt-4">
             <div className="flex -space-x-2">
               {[1,2,3,4].map(i => (
-                <img 
-                  key={i} 
-                  src={`https://i.pravatar.cc/40?img=${i+20}`} 
-                  alt="" 
+                <img
+                  key={i}
+                  src={`https://i.pravatar.cc/40?img=${i+20}`}
+                  alt={`Usuário ${i}`}
                   className="w-10 h-10 rounded-full border-2 border-white/20"
                 />
               ))}
@@ -184,17 +210,38 @@ function LoginPage() {
 }
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { user } = useImobi();
+  const { user, logout } = useImobi();
   const [, setLocation] = useLocation();
 
+  // Redirect to login if not authenticated (useEffect to avoid setState during render)
+  useEffect(() => {
+    if (!user) {
+      setLocation("/login");
+    }
+  }, [user, setLocation]);
+
+  // Show loader while checking auth or redirecting
   if (!user) {
-    setLocation("/login");
-    return null;
+    return <PageLoader />;
   }
 
   return (
     <DashboardLayout>
-      <Component />
+      <GlobalSearch />
+      <TimeoutWarning
+        sessionTimeout={30 * 60 * 1000} // 30 minutes
+        warningTime={5 * 60 * 1000} // 5 minutes warning
+        onSessionExpired={() => {
+          logout();
+          setLocation("/login");
+        }}
+        onContinueSession={() => {
+          // Session extended - could refresh auth token here if needed
+        }}
+      />
+      <ErrorBoundary>
+        <Component />
+      </ErrorBoundary>
     </DashboardLayout>
   );
 }
@@ -203,63 +250,77 @@ function SuperAdminRoute({ component: Component }: { component: React.ComponentT
   const { user } = useImobi();
   const [, setLocation] = useLocation();
 
-  if (!user) {
-    setLocation("/login");
-    return null;
-  }
+  // Redirect to login if not authenticated (useEffect to avoid setState during render)
+  useEffect(() => {
+    if (!user) {
+      setLocation("/login");
+    } else if (user.role !== "superadmin") {
+      setLocation("/dashboard");
+    }
+  }, [user, setLocation]);
 
-  if (user.role !== "superadmin") {
-    setLocation("/dashboard");
-    return null;
+  // Show loader while checking auth or redirecting
+  if (!user || user.role !== "superadmin") {
+    return <PageLoader />;
   }
 
   return (
     <DashboardLayout>
-      <Component />
+      <GlobalSearch />
+      <ErrorBoundary>
+        <Component />
+      </ErrorBoundary>
     </DashboardLayout>
   );
 }
 
 function Router() {
   return (
-    <Switch>
-      {/* Public Tenant Routes */}
-      <Route path="/e/:slug/imoveis" component={PublicProperties} />
-      <Route path="/e/:slug/imovel/:propertyId" component={PropertyDetails} />
-      <Route path="/e/:rest*" component={TenantLanding} />
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        {/* Public Tenant Routes */}
+        <Route path="/e/:slug/imoveis" component={() => <ErrorBoundary><PublicProperties /></ErrorBoundary>} />
+        <Route path="/e/:slug/imovel/:propertyId" component={() => <ErrorBoundary><PropertyDetails /></ErrorBoundary>} />
+        <Route path="/e/:rest*" component={() => <ErrorBoundary><TenantLanding /></ErrorBoundary>} />
 
-      {/* App Routes */}
-      <Route path="/" component={ProductLanding} />
-      <Route path="/login" component={LoginPage} />
-      <Route path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
-      <Route path="/properties" component={() => <ProtectedRoute component={PropertiesList} />} />
-      <Route path="/properties/:id" component={() => <ProtectedRoute component={PropertyDetailsPage} />} />
-      <Route path="/leads" component={() => <ProtectedRoute component={LeadsKanban} />} />
-      <Route path="/calendar" component={() => <ProtectedRoute component={CalendarPage} />} />
-      <Route path="/contracts" component={() => <ProtectedRoute component={ContractsPage} />} />
-      <Route path="/rentals" component={() => <ProtectedRoute component={RentalsPage} />} />
-      <Route path="/vendas" component={() => <ProtectedRoute component={VendasPage} />} />
-      <Route path="/financeiro" component={() => <ProtectedRoute component={FinanceiroPage} />} />
-      <Route path="/reports" component={() => <ProtectedRoute component={ReportsPage} />} />
-      <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
+        {/* App Routes */}
+        <Route path="/" component={() => <ErrorBoundary><ProductLanding /></ErrorBoundary>} />
+        <Route path="/login" component={() => <ErrorBoundary><LoginPage /></ErrorBoundary>} />
+        <Route path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
+        <Route path="/properties" component={() => <ProtectedRoute component={PropertiesList} />} />
+        <Route path="/properties/:id" component={() => <ProtectedRoute component={PropertyDetailsPage} />} />
+        <Route path="/leads" component={() => <ProtectedRoute component={LeadsKanban} />} />
+        <Route path="/calendar" component={() => <ProtectedRoute component={CalendarPage} />} />
+        <Route path="/contracts" component={() => <ProtectedRoute component={ContractsPage} />} />
+        <Route path="/rentals" component={() => <ProtectedRoute component={RentalsPage} />} />
+        <Route path="/vendas" component={() => <ProtectedRoute component={VendasPage} />} />
+        <Route path="/financeiro" component={() => <ProtectedRoute component={FinanceiroPage} />} />
+        <Route path="/reports" component={() => <ProtectedRoute component={ReportsPage} />} />
+        <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
 
-      {/* Admin Routes (SuperAdmin only) */}
-      <Route path="/admin" component={() => <SuperAdminRoute component={AdminDashboard} />} />
-      <Route path="/admin/tenants" component={() => <SuperAdminRoute component={TenantsPage} />} />
-      <Route path="/admin/plans" component={() => <SuperAdminRoute component={PlansPage} />} />
-      <Route path="/admin/logs" component={() => <SuperAdminRoute component={LogsPage} />} />
+        {/* Admin Routes (SuperAdmin only) */}
+        <Route path="/admin" component={() => <SuperAdminRoute component={AdminDashboard} />} />
+        <Route path="/admin/tenants" component={() => <SuperAdminRoute component={TenantsPage} />} />
+        <Route path="/admin/plans" component={() => <SuperAdminRoute component={PlansPage} />} />
+        <Route path="/admin/logs" component={() => <SuperAdminRoute component={LogsPage} />} />
 
-      {/* Fallback */}
-      <Route component={NotFound} />
-    </Switch>
+        {/* Fallback */}
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 
 function App() {
   return (
-    <ImobiProvider>
-       <Router />
-    </ImobiProvider>
+    <ErrorBoundary>
+      <AccessibilityProvider>
+        <ImobiProvider>
+          <Router />
+          <Toaster position="top-right" richColors closeButton />
+        </ImobiProvider>
+      </AccessibilityProvider>
+    </ErrorBoundary>
   );
 }
 
