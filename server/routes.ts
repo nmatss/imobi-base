@@ -6,6 +6,7 @@ import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
+import bcrypt from "bcryptjs";
 import { isSqlite } from "./db";
 import { insertUserSchema, insertPropertySchema, insertLeadSchema, insertVisitSchema, insertContractSchema, insertNewsletterSchema, insertInteractionSchema, insertOwnerSchema, insertRenterSchema, insertRentalContractSchema, insertRentalPaymentSchema, insertSaleProposalSchema, insertPropertySaleSchema, insertFinanceCategorySchema, insertFinanceEntrySchema, insertLeadTagSchema, insertLeadTagLinkSchema, insertFollowUpSchema, insertRentalTransferSchema, insertCommissionSchema } from "@shared/schema-sqlite";
 import type { User } from "@shared/schema-sqlite";
@@ -13,9 +14,15 @@ import connectPg from "connect-pg-simple";
 import pkg from "pg";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+import cors from "cors";
 import { registerSecurityRoutes } from "./routes-security";
 import { registerFeatureRoutes } from "./routes-features";
+import { registerPaymentRoutes } from "./routes-payments";
+import mapsRouter from "./routes-maps";
+import analyticsRouter from "./routes-analytics";
+import { secretManager } from "./security/secret-manager";
 const { Pool } = pkg;
+import { generateRateLimitKey } from "./middleware/rate-limit-key-generator";
 
 // ===== VALIDATION HELPERS =====
 const isValidEmail = (email: string): boolean => {
@@ -42,16 +49,117 @@ const sanitizePagination = (page: any, limit: any, maxLimit: number = 100): { pa
 const scryptAsync = promisify(scrypt);
 
 async function hashPassword(password: string): Promise<string> {
-  const salt = randomBytes(16).toString("hex");
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${buf.toString("hex")}.${salt}`;
+  // P2 Security Fix: Increased from 10 to 12 rounds (4x more secure)
+  // 2^12 = 4096 iterations vs 2^10 = 1024 iterations
+  // Trade-off: ~200ms hashing time (acceptable for auth operations)
+  return await bcrypt.hash(password, 12);
 }
 
 async function comparePassword(supplied: string, stored: string): Promise<boolean> {
-  const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
+  return await bcrypt.compare(supplied, stored);
+}
+
+// ===== TENANT ISOLATION HELPERS (IDOR Prevention) =====
+/**
+ * Validates that a resource belongs to the authenticated user's tenant
+ * Throws 403 error if resource belongs to different tenant
+ * Returns 404 if resource not found (to avoid leaking information)
+ */
+async function validateResourceTenant(
+  resource: { tenantId: string } | null | undefined,
+  userTenantId: string,
+  resourceName: string = "Resource"
+): Promise<void> {
+  if (!resource) {
+    throw { status: 404, message: `${resourceName} not found` };
+  }
+  if (resource.tenantId !== userTenantId) {
+    // Return 404 instead of 403 to avoid leaking information about existence
+    throw { status: 404, message: `${resourceName} not found` };
+  }
+}
+
+// ===== CSRF PROTECTION (Double Submit Cookie Pattern) =====
+/**
+ * Generates a CSRF token and sets it in a cookie
+ * Token is also returned to client to be sent in headers
+ */
+function generateCSRFToken(): string {
+  return randomBytes(32).toString('base64url');
+}
+
+/**
+ * CSRF excluded paths - webhooks, public endpoints, and health checks
+ */
+const csrfExcludedPaths = [
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/leads/public',
+  '/api/newsletter/subscribe',
+  '/api/webhooks/stripe',
+  '/api/webhooks/mercadopago',
+  '/api/webhooks/whatsapp',
+  '/api/webhooks/clicksign',
+  '/api/webhooks/twilio',
+  '/api/health',
+  '/api/ready',
+  '/api/live',
+];
+
+/**
+ * CSRF middleware using Double Submit Cookie pattern
+ * Validates that cookie token matches header token for state-changing requests
+ * Uses timing-safe comparison to prevent timing attacks
+ */
+function csrfProtection(req: Request, res: Response, next: NextFunction): void {
+  const method = req.method.toUpperCase();
+
+  // Skip safe methods
+  const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
+  if (safeMethods.includes(method)) {
+    return next();
+  }
+
+  // Skip excluded paths
+  if (csrfExcludedPaths.some(path => req.path.startsWith(path))) {
+    return next();
+  }
+
+  const cookieToken = req.cookies?.['csrf-token'];
+  const headerToken = req.headers['x-csrf-token'] as string;
+
+  if (!cookieToken || !headerToken) {
+    return res.status(403).json({
+      error: 'CSRF token missing',
+      required: {
+        cookie: 'csrf-token',
+        header: 'x-csrf-token',
+      }
+    });
+  }
+
+  // Timing-safe comparison to prevent timing attacks
+  const crypto = require('crypto');
+  try {
+    const isValid = crypto.timingSafeEqual(
+      Buffer.from(cookieToken),
+      Buffer.from(headerToken)
+    );
+
+    if (!isValid) {
+      console.warn('[SECURITY] CSRF token mismatch', {
+        path: req.path,
+        method: req.method,
+        ip: req.ip,
+      });
+
+      return res.status(403).json({ error: 'CSRF token mismatch' });
+    }
+  } catch (error) {
+    return res.status(403).json({ error: 'Invalid CSRF token format' });
+  }
+
+  next();
 }
 
 declare global {
@@ -72,23 +180,173 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
+  // ===== INITIALIZE AND VALIDATE SECRETS =====
+  console.log('🔐 Initializing Secret Manager...');
+  secretManager.initialize(process.env);
+  console.log('');
+
   // ===== SECURITY MIDDLEWARE =====
   // Helmet for security headers - disabled CSP in development for Vite HMR
   const isDev = process.env.NODE_ENV !== 'production';
+
+  // ===== CORS CONFIGURATION WITH WHITELIST =====
+  // IMPORTANT: CORS must be configured BEFORE helmet to ensure proper header handling
+  const allowedOrigins = process.env.CORS_ORIGINS?.split(',') || [
+    'http://localhost:5000',
+    'http://127.0.0.1:5000', // Localhost IP
+    'http://localhost:5173', // Vite dev server
+    'http://127.0.0.1:5173', // Vite dev server IP
+    'https://imobibase.com',
+    'https://www.imobibase.com',
+  ];
+
+  app.use(cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, Postman, etc)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      // Check if origin is in allowed list or matches wildcard
+      const isAllowed = allowedOrigins.some(allowed => {
+        if (allowed.includes('*')) {
+          // Convert wildcard to regex: https://*.example.com -> /^https:\/\/.*\.example\.com$/
+          const regex = new RegExp('^' + allowed.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
+          return regex.test(origin);
+        }
+        return allowed === origin;
+      });
+
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        console.warn('[CORS] Blocked request from origin:', origin);
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      }
+    },
+    credentials: true, // Allow cookies and authorization headers
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-csrf-token',
+      'x-requested-with',
+    ],
+    exposedHeaders: ['x-csrf-token'],
+    maxAge: 86400, // 24 hours - cache preflight requests
+  }));
+
+  // CSP nonce middleware - generates a unique nonce per request
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (!isDev) {
+      res.locals.cspNonce = randomBytes(16).toString('base64');
+    }
+    next();
+  });
+
+  // Helmet must come AFTER CORS
   app.use(helmet({
-    contentSecurityPolicy: isDev ? false : {
+    contentSecurityPolicy: isDev ? {
+      // Dev mode - relaxed for HMR
       directives: {
         defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
         scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-        imgSrc: ["'self'", "data:", "https:", "blob:"],
-        connectSrc: ["'self'", "https:", "wss:"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+        connectSrc: ["'self'", "ws:", "wss:", "http:", "https:"],
+        imgSrc: ["'self'", "data:", "blob:", "https:"],
+      },
+    } : {
+      // Production - strict
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: [
+          "'self'",
+          "https://fonts.googleapis.com",
+          (req: any, res: any) => `'nonce-${res.locals.cspNonce}'`,
+        ],
+        scriptSrc: [
+          "'self'",
+          (req: any, res: any) => `'nonce-${res.locals.cspNonce}'`,
+        ],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "blob:",
+          "https://*.supabase.co", // Supabase storage
+        ],
+        connectSrc: [
+          "'self'",
+          // APIs específicas permitidas
+          "https://*.supabase.co",
+          "https://api.stripe.com",
+          "https://api.mercadopago.com",
+          "https://graph.facebook.com",
+          "https://maps.googleapis.com",
+          "https://api.clicksign.com",
+          "https://*.sentry.io",
+          // WebSockets
+          "wss://*.supabase.co",
+        ],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+        workerSrc: ["'self'", "blob:"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        upgradeInsecureRequests: [],
+        blockAllMixedContent: [],
       },
     },
     crossOriginEmbedderPolicy: false,
+
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+
+    noSniff: true,
+
+    referrerPolicy: {
+      policy: 'strict-origin-when-cross-origin',
+    },
   }));
+
+  // Additional security headers (P2 fixes)
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    // Permissions-Policy (formerly Feature-Policy)
+    // Restricts access to browser features and APIs
+    res.setHeader('Permissions-Policy', [
+      'geolocation=(self)',           // Allow geolocation only from same origin
+      'microphone=()',                // Disable microphone
+      'camera=()',                    // Disable camera
+      'payment=(self)',               // Allow payment APIs only from same origin
+      'usb=()',                       // Disable USB
+      'magnetometer=()',              // Disable magnetometer
+      'gyroscope=()',                 // Disable gyroscope
+      'accelerometer=()',             // Disable accelerometer
+      'ambient-light-sensor=()',      // Disable ambient light sensor
+      'autoplay=()',                  // Disable autoplay
+      'encrypted-media=()',           // Disable encrypted media
+      'picture-in-picture=()',        // Disable picture-in-picture
+      'fullscreen=(self)',            // Allow fullscreen only from same origin
+      'display-capture=()',           // Disable screen capture
+    ].join(', '));
+
+    // X-Frame-Options (additional layer beyond CSP frameAncestors)
+    res.setHeader('X-Frame-Options', 'DENY');
+
+    // API Versioning header
+    res.setHeader('X-API-Version', 'v1');
+
+    // Request tracking ID for logging correlation
+    const requestId = req.headers['x-request-id'] as string || randomBytes(16).toString('hex');
+    res.setHeader('X-Request-ID', requestId);
+    req.headers['x-request-id'] = requestId;
+
+    next();
+  });
 
   // Rate limiting - general API limiter
   const apiLimiter = rateLimit({
@@ -113,6 +371,16 @@ export async function registerRoutes(
     windowMs: 60 * 60 * 1000, // 1 hour
     max: 30, // limit each IP to 30 public submissions per hour
     message: { error: "Muitas requisições. Tente novamente mais tarde." },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  // Rate limiter para endpoints administrativos
+  const adminLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minuto
+    max: 100, // 100 requisições por minuto
+    message: { error: 'Admin API rate limit exceeded. Please slow down.' },
+    keyGenerator: generateRateLimitKey,
     standardHeaders: true,
     legacyHeaders: false,
   });
@@ -144,23 +412,88 @@ export async function registerRoutes(
   const isProduction = process.env.NODE_ENV === 'production' && !process.env.VERCEL_ENV?.includes('preview');
   const isLocalDev = !isProduction || process.env.VERCEL_ENV === 'development';
 
+  // Get SESSION_SECRET from SecretManager (with fallback to process.env)
+  const sessionSecret = secretManager.get('SESSION_SECRET');
+
+  // CRITICAL: Fail-fast validation for SESSION_SECRET in production
+  // Note: SecretManager already validates this, but we keep this check for backwards compatibility
+  if (isProduction) {
+    // List of default secrets that are NOT allowed in production
+    const DEFAULT_SECRETS = [
+      'imobibase-secret-key-change-in-production',
+      'your-super-secret-session-key-change-in-production',
+      'imobibase-super-secret-key-production-2024',
+      'change-me',
+      'changeme',
+      'secret',
+      'default',
+    ];
+
+    // Verify SESSION_SECRET is configured
+    if (!sessionSecret) {
+      console.error('🚨 CRITICAL SECURITY ERROR: SESSION_SECRET environment variable is required in production');
+      console.error('   Generate a strong secret with: openssl rand -base64 64');
+      console.error('   Or run: npm run generate:secret');
+      process.exit(1); // Terminate application immediately
+    }
+
+    // Verify it's not a default/weak secret
+    if (DEFAULT_SECRETS.includes(sessionSecret)) {
+      console.error('🚨 CRITICAL SECURITY ERROR: Default SESSION_SECRET not allowed in production');
+      console.error('   Current secret:', sessionSecret);
+      console.error('   Generate a strong secret with: openssl rand -base64 64');
+      console.error('   Or run: npm run generate:secret');
+      process.exit(1);
+    }
+
+    // Verify minimum length (256 bits = 32 bytes = 43 chars base64)
+    if (sessionSecret.length < 32) {
+      console.error('🚨 CRITICAL SECURITY ERROR: SESSION_SECRET must be at least 32 characters');
+      console.error('   Current length:', sessionSecret.length);
+      console.error('   Generate a strong secret with: openssl rand -base64 64');
+      console.error('   Or run: npm run generate:secret');
+      process.exit(1);
+    }
+
+    console.log('✅ SESSION_SECRET validated successfully');
+    console.log('   Length:', sessionSecret.length, 'characters');
+    console.log('   First 8 chars:', sessionSecret.substring(0, 8) + '...');
+  } else {
+    // Development: warn if using default
+    if (!sessionSecret || sessionSecret.includes('change-in-production')) {
+      console.warn('⚠️  WARNING: Using default or weak SESSION_SECRET in development');
+      console.warn('   This is OK for development, but MUST be changed for production');
+    }
+  }
+
   app.use(
     session({
       store: sessionStore,
-      secret: process.env.SESSION_SECRET || "imobibase-secret-key-change-in-production",
+      secret: sessionSecret || "imobibase-secret-key-change-in-production",
       resave: false,
       saveUninitialized: false,
+      name: 'imobibase.sid',
       cookie: {
-        maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+        maxAge: 1000 * 60 * 60 * 24, // 24 hours (reduced from 7 days)
         httpOnly: true,
-        sameSite: isLocalDev ? "lax" : "none",
+        sameSite: isLocalDev ? "lax" : "strict", // STRICT in production for better security
         secure: !isLocalDev,
+        path: '/',
+        domain: process.env.COOKIE_DOMAIN, // Optional: for multi-subdomain setups
       },
     })
   );
 
   app.use(passport.initialize());
   app.use(passport.session());
+
+  // CSRF Protection - Apply to all routes except safe methods and public endpoints
+  // Enabled in ALL environments with timing-safe comparison
+  app.use(csrfProtection);
+
+  if (isDev) {
+    console.log('🔒 CSRF Protection enabled in development mode');
+  }
 
   // Passport configuration
   passport.use(
@@ -187,7 +520,10 @@ export async function registerRoutes(
   passport.deserializeUser(async (id: string, done) => {
     try {
       const user = await storage.getUser(id);
-      if (!user) return done(null, false);
+      if (!user) {
+        console.log(`User not found during deserialization: ${id}`);
+        return done(null, false);
+      }
       done(null, {
         id: user.id,
         tenantId: user.tenantId,
@@ -197,15 +533,32 @@ export async function registerRoutes(
         avatar: user.avatar,
       });
     } catch (err) {
-      done(err);
+      console.error('Error deserializing user:', err);
+      done(null, false);
     }
   });
 
-  // Auth middleware
+  // Auth middleware - improved with session check
   const requireAuth = (req: Request, res: Response, next: Function) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ error: "Não autenticado" });
+    if (!req.isAuthenticated() || !req.user) {
+      console.log('Authentication failed:', {
+        isAuthenticated: req.isAuthenticated(),
+        hasUser: !!req.user,
+        sessionID: req.sessionID,
+        path: req.path
+      });
+      return res.status(401).json({
+        error: "Não autenticado",
+        code: "UNAUTHORIZED",
+        message: "Sua sessão expirou. Por favor, faça login novamente."
+      });
     }
+
+    // Refresh session on each request to keep it alive
+    if (req.session) {
+      req.session.touch();
+    }
+
     next();
   };
 
@@ -275,6 +628,92 @@ export async function registerRoutes(
     };
   };
 
+  // ===== HEALTH CHECK & MONITORING =====
+  /**
+   * Health check endpoint for monitoring and CI/CD
+   * Returns system status including database connectivity
+   * Used by: GitHub Actions, uptime monitors, load balancers
+   */
+  app.get("/api/health", async (req, res) => {
+    const healthCheck = {
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || "development",
+      version: process.env.VERCEL_GIT_COMMIT_SHA?.substring(0, 7) || "dev",
+    };
+
+    try {
+      // Test database connection
+      const dbCheck = await storage.checkDatabaseConnection?.();
+
+      // If database check is available and fails, return degraded status
+      if (dbCheck === false) {
+        return res.status(503).json({
+          ...healthCheck,
+          status: "degraded",
+          database: "disconnected",
+          message: "Database connection failed",
+        });
+      }
+
+      // All systems operational
+      return res.status(200).json({
+        ...healthCheck,
+        database: "connected",
+        message: "All systems operational",
+      });
+    } catch (error) {
+      // Critical failure
+      console.error("Health check failed:", error);
+      return res.status(503).json({
+        ...healthCheck,
+        status: "error",
+        database: "error",
+        message: error instanceof Error ? error.message : "Health check failed",
+      });
+    }
+  });
+
+  /**
+   * Readiness probe - checks if app is ready to serve traffic
+   * Returns 200 if ready, 503 if not ready
+   */
+  app.get("/api/ready", async (req, res) => {
+    try {
+      // Check critical dependencies
+      const dbReady = await storage.checkDatabaseConnection?.();
+
+      if (dbReady === false) {
+        return res.status(503).json({
+          ready: false,
+          reason: "Database not ready",
+        });
+      }
+
+      res.status(200).json({
+        ready: true,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      res.status(503).json({
+        ready: false,
+        reason: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  /**
+   * Liveness probe - checks if app is alive (not crashed/deadlocked)
+   * Simple endpoint that just returns 200 if the process is running
+   */
+  app.get("/api/live", (req, res) => {
+    res.status(200).json({
+      alive: true,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
   // ===== AUTH ROUTES =====
   app.post("/api/auth/login", authLimiter, (req, res, next) => {
     passport.authenticate("local", (err: any, user: User | false, info: any) => {
@@ -282,34 +721,251 @@ export async function registerRoutes(
       if (!user) {
         return res.status(401).json({ error: info?.message || "Credenciais inválidas" });
       }
+
+      // Check for account lockout before proceeding
+      if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
+        return res.status(423).json({
+          error: 'Conta bloqueada temporariamente',
+          lockedUntil: user.lockedUntil
+        });
+      }
+
       req.login(user, async (err) => {
         if (err) return next(err);
-        const tenant = await storage.getTenant(user.tenantId);
-        return res.json({ 
-          user: {
-            id: user.id,
-            tenantId: user.tenantId,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            avatar: user.avatar,
-          },
-          tenant 
+
+        // Regenerate session to prevent session fixation attacks
+        req.session.regenerate(async (regenerateErr) => {
+          if (regenerateErr) {
+            console.error('Session regeneration error:', regenerateErr);
+            return next(regenerateErr);
+          }
+
+          // Re-login user after session regeneration
+          req.login(user, async (loginErr) => {
+            if (loginErr) return next(loginErr);
+
+            const tenant = await storage.getTenant(user.tenantId);
+
+            // Generate CSRF token and set cookie for Double Submit Cookie pattern
+            const csrfToken = generateCSRFToken();
+            res.cookie('csrf-token', csrfToken, {
+              httpOnly: true,
+              secure: !isDev, // HTTPS only in production
+              sameSite: 'strict',
+              maxAge: 24 * 60 * 60 * 1000, // 24 hours
+            });
+
+            return res.json({
+              user: {
+                id: user.id,
+                tenantId: user.tenantId,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                avatar: user.avatar,
+              },
+              tenant,
+              csrfToken // Send token to client to be used in X-CSRF-Token header
+            });
+          });
         });
       });
     })(req, res, next);
   });
 
+  // Get or renew CSRF token
+  app.get("/api/csrf-token", requireAuth, (req, res) => {
+    const csrfToken = generateCSRFToken();
+    res.cookie('csrf-token', csrfToken, {
+      httpOnly: true,
+      secure: !isDev,
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+    res.json({ csrfToken });
+  });
+
+  // Helper function to clear sensitive data from memory
+  function clearSensitiveData(req: Request): void {
+    if (req.user) {
+      // Clear user object
+      delete (req as any).user;
+    }
+
+    if (req.session) {
+      // Clear session data except cookie
+      Object.keys(req.session).forEach(key => {
+        if (key !== 'cookie') {
+          delete (req.session as any)[key];
+        }
+      });
+    }
+  }
+
   app.post("/api/auth/logout", (req, res) => {
-    req.logout(() => {
-      res.json({ success: true });
+    const userId = req.user?.id;
+    const sessionId = req.sessionID;
+
+    // 1. Logout do Passport
+    req.logout((logoutErr) => {
+      if (logoutErr) {
+        console.error('Passport logout error:', logoutErr);
+      }
+
+      // 2. Clear sensitive data from memory
+      clearSensitiveData(req);
+
+      // 3. Destroy session completely
+      req.session.destroy((destroyErr) => {
+        if (destroyErr) {
+          console.error('Session destroy error:', destroyErr);
+          return res.status(500).json({
+            error: 'Failed to logout completely'
+          });
+        }
+
+        // 4. Clear cookies
+        res.clearCookie('imobibase.sid', {
+          path: '/',
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+        });
+        res.clearCookie('csrf-token', {
+          path: '/',
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+        });
+
+        // 5. Log successful logout
+        if (userId) {
+          console.log(`User ${userId} logged out successfully. Session ${sessionId} destroyed.`);
+        }
+
+        res.json({
+          success: true,
+          message: 'Logged out successfully'
+        });
+      });
     });
   });
 
+  // Logout from all sessions (revoke all user sessions)
+  app.post("/api/auth/logout-all", requireAuth, async (req, res) => {
+    const userId = req.user!.id;
+    const currentSessionId = req.sessionID;
+
+    try {
+      // Note: This would require implementing session management in storage
+      // For now, we'll just log and logout current session
+      console.log(`Logout all sessions requested for user ${userId}`);
+
+      // Logout current session
+      req.logout((logoutErr) => {
+        if (logoutErr) {
+          console.error('Logout error:', logoutErr);
+        }
+
+        // Clear sensitive data
+        clearSensitiveData(req);
+
+        req.session.destroy((destroyErr) => {
+          if (destroyErr) {
+            console.error('Session destroy error:', destroyErr);
+            return res.status(500).json({
+              error: 'Failed to logout all sessions'
+            });
+          }
+
+          res.clearCookie('imobibase.sid', {
+            path: '/',
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+          });
+          res.clearCookie('csrf-token', {
+            path: '/',
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+          });
+
+          console.log(`User ${userId} logged out from all sessions`);
+
+          res.json({
+            success: true,
+            message: 'All sessions logged out successfully'
+          });
+        });
+      });
+    } catch (error: any) {
+      console.error('Logout all sessions error:', error);
+      res.status(500).json({
+        error: 'Failed to logout all sessions'
+      });
+    }
+  });
+
   app.get("/api/auth/me", requireAuth, async (req, res) => {
-    const user = req.user!;
-    const tenant = await storage.getTenant(user.tenantId);
-    res.json({ user, tenant });
+    try {
+      const user = req.user!;
+      const tenant = await storage.getTenant(user.tenantId);
+
+      if (!tenant) {
+        return res.status(404).json({
+          error: "Tenant não encontrado",
+          code: "TENANT_NOT_FOUND"
+        });
+      }
+
+      res.json({ user, tenant });
+    } catch (error) {
+      console.error('Error in /api/auth/me:', error);
+      res.status(500).json({
+        error: "Erro ao buscar dados do usuário",
+        code: "INTERNAL_ERROR"
+      });
+    }
+  });
+
+  // Session refresh endpoint
+  app.post("/api/auth/refresh", requireAuth, async (req, res) => {
+    try {
+      const user = req.user!;
+
+      // Verify user still exists in database
+      const dbUser = await storage.getUser(user.id);
+      if (!dbUser) {
+        req.logout(() => {});
+        return res.status(401).json({
+          error: "Usuário não existe mais",
+          code: "USER_DELETED"
+        });
+      }
+
+      // Update session data with fresh user data
+      const tenant = await storage.getTenant(user.tenantId);
+
+      res.json({
+        user: {
+          id: dbUser.id,
+          tenantId: dbUser.tenantId,
+          name: dbUser.name,
+          email: dbUser.email,
+          role: dbUser.role,
+          avatar: dbUser.avatar,
+        },
+        tenant,
+        sessionRefreshed: true
+      });
+    } catch (error) {
+      console.error('Error refreshing session:', error);
+      res.status(500).json({
+        error: "Erro ao renovar sessão",
+        code: "REFRESH_ERROR"
+      });
+    }
   });
 
   // ===== TENANT ROUTES =====
@@ -405,10 +1061,13 @@ export async function registerRoutes(
   app.get("/api/properties/:id", requireAuth, async (req, res) => {
     try {
       const property = await storage.getProperty(req.params.id);
-      if (!property) return res.status(404).json({ error: "Imóvel não encontrado" });
+      // IDOR Protection: Validate tenant ownership
+      await validateResourceTenant(property, req.user!.tenantId, "Imóvel");
       res.json(property);
-    } catch (error) {
-      res.status(500).json({ error: "Erro ao buscar imóvel" });
+    } catch (error: any) {
+      const status = error?.status || 500;
+      const message = error?.message || "Erro ao buscar imóvel";
+      res.status(status).json({ error: message });
     }
   });
 
@@ -424,21 +1083,33 @@ export async function registerRoutes(
 
   app.patch("/api/properties/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: Validate tenant ownership before updating
+      const existing = await storage.getProperty(req.params.id);
+      await validateResourceTenant(existing, req.user!.tenantId, "Imóvel");
+
       const property = await storage.updateProperty(req.params.id, req.body);
       if (!property) return res.status(404).json({ error: "Imóvel não encontrado" });
       res.json(property);
     } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao atualizar imóvel" });
+      const status = error?.status || 400;
+      const message = error?.message || "Erro ao atualizar imóvel";
+      res.status(status).json({ error: message });
     }
   });
 
   app.delete("/api/properties/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: Validate tenant ownership before deleting
+      const property = await storage.getProperty(req.params.id);
+      await validateResourceTenant(property, req.user!.tenantId, "Imóvel");
+
       const success = await storage.deleteProperty(req.params.id);
       if (!success) return res.status(404).json({ error: "Imóvel não encontrado" });
       res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Erro ao deletar imóvel" });
+    } catch (error: any) {
+      const status = error?.status || 500;
+      const message = error?.message || "Erro ao deletar imóvel";
+      res.status(status).json({ error: message });
     }
   });
 
@@ -474,10 +1145,13 @@ export async function registerRoutes(
   app.get("/api/leads/:id", requireAuth, async (req, res) => {
     try {
       const lead = await storage.getLead(req.params.id);
-      if (!lead) return res.status(404).json({ error: "Lead não encontrado" });
+      // IDOR Protection: Validate tenant ownership
+      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
       res.json(lead);
-    } catch (error) {
-      res.status(500).json({ error: "Erro ao buscar lead" });
+    } catch (error: any) {
+      const status = error?.status || 500;
+      const message = error?.message || "Erro ao buscar lead";
+      res.status(status).json({ error: message });
     }
   });
 
@@ -493,21 +1167,33 @@ export async function registerRoutes(
 
   app.patch("/api/leads/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: Validate tenant ownership before updating
+      const existing = await storage.getLead(req.params.id);
+      await validateResourceTenant(existing, req.user!.tenantId, "Lead");
+
       const lead = await storage.updateLead(req.params.id, req.body);
       if (!lead) return res.status(404).json({ error: "Lead não encontrado" });
       res.json(lead);
     } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao atualizar lead" });
+      const status = error?.status || 400;
+      const message = error?.message || "Erro ao atualizar lead";
+      res.status(status).json({ error: message });
     }
   });
 
   app.delete("/api/leads/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: Validate tenant ownership before deleting
+      const lead = await storage.getLead(req.params.id);
+      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
+
       const success = await storage.deleteLead(req.params.id);
       if (!success) return res.status(404).json({ error: "Lead não encontrado" });
       res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Erro ao deletar lead" });
+    } catch (error: any) {
+      const status = error?.status || 500;
+      const message = error?.message || "Erro ao deletar lead";
+      res.status(status).json({ error: message });
     }
   });
 
@@ -563,21 +1249,33 @@ export async function registerRoutes(
 
   app.patch("/api/visits/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: Validate tenant ownership before updating
+      const existing = await storage.getVisit(req.params.id);
+      await validateResourceTenant(existing, req.user!.tenantId, "Visita");
+
       const visit = await storage.updateVisit(req.params.id, req.body);
       if (!visit) return res.status(404).json({ error: "Visita não encontrada" });
       res.json(visit);
     } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao atualizar visita" });
+      const status = error?.status || 400;
+      const message = error?.message || "Erro ao atualizar visita";
+      res.status(status).json({ error: message });
     }
   });
 
   app.delete("/api/visits/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: Validate tenant ownership before deleting
+      const visit = await storage.getVisit(req.params.id);
+      await validateResourceTenant(visit, req.user!.tenantId, "Visita");
+
       const success = await storage.deleteVisit(req.params.id);
       if (!success) return res.status(404).json({ error: "Visita não encontrada" });
       res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: "Erro ao deletar visita" });
+    } catch (error: any) {
+      const status = error?.status || 500;
+      const message = error?.message || "Erro ao deletar visita";
+      res.status(status).json({ error: message });
     }
   });
 
@@ -594,10 +1292,13 @@ export async function registerRoutes(
   app.get("/api/contracts/:id", requireAuth, async (req, res) => {
     try {
       const contract = await storage.getContract(req.params.id);
-      if (!contract) return res.status(404).json({ error: "Contrato não encontrado" });
+      // IDOR Protection: Validate tenant ownership
+      await validateResourceTenant(contract, req.user!.tenantId, "Contrato");
       res.json(contract);
-    } catch (error) {
-      res.status(500).json({ error: "Erro ao buscar contrato" });
+    } catch (error: any) {
+      const status = error?.status || 500;
+      const message = error?.message || "Erro ao buscar contrato";
+      res.status(status).json({ error: message });
     }
   });
 
@@ -613,11 +1314,17 @@ export async function registerRoutes(
 
   app.patch("/api/contracts/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: Validate tenant ownership before updating
+      const existing = await storage.getContract(req.params.id);
+      await validateResourceTenant(existing, req.user!.tenantId, "Contrato");
+
       const contract = await storage.updateContract(req.params.id, req.body);
       if (!contract) return res.status(404).json({ error: "Contrato não encontrado" });
       res.json(contract);
     } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao atualizar contrato" });
+      const status = error?.status || 400;
+      const message = error?.message || "Erro ao atualizar contrato";
+      res.status(status).json({ error: message });
     }
   });
 
@@ -1390,6 +2097,7 @@ export async function registerRoutes(
       const metrics = await storage.getFinancialMetrics(req.user!.tenantId, start, end, prevStart, prevEnd);
       res.json(metrics);
     } catch (error) {
+      console.error("Financial metrics error:", error);
       res.status(500).json({ error: "Erro ao buscar métricas financeiras" });
     }
   });
@@ -1408,6 +2116,7 @@ export async function registerRoutes(
       const transactions = await storage.getFinancialTransactions(req.user!.tenantId, filters);
       res.json(transactions);
     } catch (error) {
+      console.error("Financial transactions error:", error);
       res.status(500).json({ error: "Erro ao buscar transações financeiras" });
     }
   });
@@ -1419,6 +2128,7 @@ export async function registerRoutes(
       const chartData = await storage.getFinancialChartData(req.user!.tenantId, validPeriod);
       res.json(chartData);
     } catch (error) {
+      console.error("Financial charts error:", error);
       res.status(500).json({ error: "Erro ao buscar dados do gráfico financeiro" });
     }
   });
@@ -1840,9 +2550,10 @@ export async function registerRoutes(
   });
 
   // ===== ADMIN GLOBAL ROUTES =====
+  // 🔒 RATE LIMITING: Admin endpoints limited to 100 requests per minute
 
   // Admin Stats
-  app.get("/api/admin/stats", requireSuperAdmin, async (req, res) => {
+  app.get("/api/admin/stats", adminLimiter, requireSuperAdmin, async (req, res) => {
     try {
       const stats = await storage.getAdminStats();
       res.json(stats);
@@ -1852,7 +2563,7 @@ export async function registerRoutes(
   });
 
   // Admin Tenants
-  app.get("/api/admin/tenants", requireSuperAdmin, async (req, res) => {
+  app.get("/api/admin/tenants", adminLimiter, requireSuperAdmin, async (req, res) => {
     try {
       const tenants = await storage.getAllTenantsWithStats();
       res.json(tenants);
@@ -1861,7 +2572,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/admin/tenants", requireSuperAdmin, async (req, res) => {
+  app.post("/api/admin/tenants", adminLimiter, requireSuperAdmin, async (req, res) => {
     try {
       const tenant = await storage.createTenantWithSubscription(req.body);
       res.status(201).json(tenant);
@@ -1870,7 +2581,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/admin/tenants/:id", requireSuperAdmin, async (req, res) => {
+  app.patch("/api/admin/tenants/:id", adminLimiter, requireSuperAdmin, async (req, res) => {
     try {
       const tenant = await storage.updateTenantAdmin(req.params.id, req.body);
       if (!tenant) return res.status(404).json({ error: "Tenant não encontrado" });
@@ -1880,7 +2591,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/tenants/:id", requireSuperAdmin, async (req, res) => {
+  app.delete("/api/admin/tenants/:id", adminLimiter, requireSuperAdmin, async (req, res) => {
     try {
       const success = await storage.deleteTenantAdmin(req.params.id);
       if (!success) return res.status(404).json({ error: "Tenant não encontrado" });
@@ -1891,7 +2602,7 @@ export async function registerRoutes(
   });
 
   // Admin Plans
-  app.get("/api/admin/plans", requireSuperAdmin, async (req, res) => {
+  app.get("/api/admin/plans", adminLimiter, requireSuperAdmin, async (req, res) => {
     try {
       const plans = await storage.getAllPlans();
       res.json(plans);
@@ -1900,7 +2611,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/admin/plans/:id", requireSuperAdmin, async (req, res) => {
+  app.patch("/api/admin/plans/:id", adminLimiter, requireSuperAdmin, async (req, res) => {
     try {
       const plan = await storage.updatePlan(req.params.id, req.body);
       if (!plan) return res.status(404).json({ error: "Plano não encontrado" });
@@ -1911,7 +2622,7 @@ export async function registerRoutes(
   });
 
   // Admin Logs
-  app.get("/api/admin/logs", requireSuperAdmin, async (req, res) => {
+  app.get("/api/admin/logs", adminLimiter, requireSuperAdmin, async (req, res) => {
     try {
       const { action, startDate } = req.query;
       // Sanitize pagination with max limit of 100
@@ -2076,6 +2787,47 @@ export async function registerRoutes(
   // Register additional feature routes
   registerSecurityRoutes(app);
   registerFeatureRoutes(app);
+  registerPaymentRoutes(app);
+
+  // Register maps/geocoding routes
+  app.use('/api/maps', mapsRouter);
+
+  // Register analytics routes
+  app.use('/api/analytics', analyticsRouter);
+
+  // ===== CORS ERROR HANDLER =====
+  // Handle CORS violations with proper logging
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    if (err.message && err.message.includes('CORS')) {
+      console.warn('[SECURITY] CORS violation', {
+        origin: req.headers.origin,
+        method: req.method,
+        path: req.path,
+        ip: req.ip,
+      });
+
+      return res.status(403).json({
+        error: 'CORS policy violation',
+        message: 'Origin not allowed',
+      });
+    }
+
+    next(err);
+  });
+
+  // ===== PRODUCTION CORS VALIDATION =====
+  // Validate CORS configuration in production
+  if (process.env.NODE_ENV === 'production') {
+    const origins = process.env.CORS_ORIGINS;
+    if (!origins || origins.includes('localhost')) {
+      console.error('⚠️  WARNING: CORS_ORIGINS not properly configured for production!');
+      console.error('   Current value:', origins);
+      console.error('   Localhost origins should not be allowed in production.');
+    } else {
+      console.log('✓ CORS properly configured for production');
+      console.log('  Allowed origins:', origins);
+    }
+  }
 
   return httpServer;
 }

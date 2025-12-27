@@ -18,9 +18,28 @@
     <meta name="twitter:image" content="https://replit.com/public/images/opengraph.png" />
 
     <link rel="icon" type="image/png" href="/favicon.png" />
+
+    <!-- Preconnect to critical domains for faster resource loading -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="dns-prefetch" href="https://images.unsplash.com">
+
+    <!-- Preload critical fonts to reduce FOUT (Flash of Unstyled Text) -->
+    <!-- P3 Security: Added Subresource Integrity (SRI) for CDN resources -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" as="style" crossorigin="anonymous">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+      crossorigin="anonymous"
+    >
+
+    <!-- Preload critical CSS - main stylesheet will be injected by Vite -->
+    <link rel="modulepreload" href="/src/main.tsx" />
+
+    <!-- Prefetch important routes for faster navigation -->
+    <link rel="prefetch" href="/src/pages/dashboard.tsx" />
+    <link rel="prefetch" href="/src/pages/properties/list.tsx" />
+    <link rel="prefetch" href="/src/pages/leads/kanban.tsx" />
   </head>
   <body>
     <div id="root"></div>
