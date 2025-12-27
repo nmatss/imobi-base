@@ -323,15 +323,7 @@ export async function registerRoutes(
       'camera=()',                    // Disable camera
       'payment=(self)',               // Allow payment APIs only from same origin
       'usb=()',                       // Disable USB
-      'magnetometer=()',              // Disable magnetometer
-      'gyroscope=()',                 // Disable gyroscope
-      'accelerometer=()',             // Disable accelerometer
-      'ambient-light-sensor=()',      // Disable ambient light sensor
-      'autoplay=()',                  // Disable autoplay
-      'encrypted-media=()',           // Disable encrypted media
-      'picture-in-picture=()',        // Disable picture-in-picture
       'fullscreen=(self)',            // Allow fullscreen only from same origin
-      'display-capture=()',           // Disable screen capture
     ].join(', '));
 
     // X-Frame-Options (additional layer beyond CSP frameAncestors)
