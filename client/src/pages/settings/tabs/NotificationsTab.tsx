@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { SettingsCard } from "../components/SettingsCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -296,43 +296,57 @@ export function NotificationsTab() {
 
   return (
     <div className="space-y-6">
+      {/* Header Info */}
+      <div className="bg-muted/50 rounded-lg p-4 border">
+        <div className="flex items-start gap-3">
+          <Bell className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="font-semibold mb-1">Central de Notificações</h3>
+            <p className="text-sm text-muted-foreground">
+              Configure como e quando você quer receber alertas sobre eventos importantes
+              no sistema. Escolha os canais de notificação para cada tipo de evento.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Channel Summary */}
-      <div className="grid grid-cols-3 gap-3">
-        <Card>
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
+        <Card className="hover:shadow-md transition-shadow">
           <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 rounded-lg bg-blue-100 text-blue-600 hidden sm:block">
-                <Mail className="w-4 h-4" />
+            <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 rounded-lg bg-gradient-to-br from-blue-100 to-blue-50 text-blue-600">
+                <Mail className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <div>
+              <div className="text-center sm:text-left">
                 <p className="text-xl sm:text-2xl font-bold">{activeChannels.email}</p>
-                <p className="text-xs text-muted-foreground">E-mails</p>
+                <p className="text-xs text-muted-foreground">E-mails ativos</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:shadow-md transition-shadow">
           <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 rounded-lg bg-green-100 text-green-600 hidden sm:block">
-                <MessageSquare className="w-4 h-4" />
+            <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 rounded-lg bg-gradient-to-br from-green-100 to-green-50 text-green-600">
+                <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <div>
+              <div className="text-center sm:text-left">
                 <p className="text-xl sm:text-2xl font-bold">{activeChannels.whatsapp}</p>
-                <p className="text-xs text-muted-foreground">WhatsApp</p>
+                <p className="text-xs text-muted-foreground">WhatsApp ativos</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:shadow-md transition-shadow">
           <CardContent className="p-3 sm:p-4">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 rounded-lg bg-purple-100 text-purple-600 hidden sm:block">
-                <Smartphone className="w-4 h-4" />
+            <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3">
+              <div className="p-2 sm:p-3 rounded-lg bg-gradient-to-br from-purple-100 to-purple-50 text-purple-600">
+                <Smartphone className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-              <div>
+              <div className="text-center sm:text-left">
                 <p className="text-xl sm:text-2xl font-bold">{activeChannels.appPush}</p>
-                <p className="text-xs text-muted-foreground">Push</p>
+                <p className="text-xs text-muted-foreground">Push ativos</p>
               </div>
             </div>
           </CardContent>

@@ -1,0 +1,210 @@
+
+Running 12 tests using 12 workers
+
+Root innerHTML length: [33m5813[39m
+Root first 500 chars: <div class="min-h-screen flex items-center justify-center p-4 bg-muted/30"><div class="rounded-xl border bg-card text-card-foreground shadow max-w-2xl w-full"><div class="flex flex-col space-y-1.5 p-6 text-center"><div class="mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class
+Root innerHTML length: [33m5813[39m
+Root first 500 chars: <div class="min-h-screen flex items-center justify-center p-4 bg-muted/30"><div class="rounded-xl border bg-card text-card-foreground shadow max-w-2xl w-full"><div class="flex flex-col space-y-1.5 p-6 text-center"><div class="mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class
+Root innerHTML length: [33m5813[39m
+Root first 500 chars: <div class="min-h-screen flex items-center justify-center p-4 bg-muted/30"><div class="rounded-xl border bg-card text-card-foreground shadow max-w-2xl w-full"><div class="flex flex-col space-y-1.5 p-6 text-center"><div class="mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class
+Root innerHTML length: [33m5813[39m
+Root first 500 chars: <div class="min-h-screen flex items-center justify-center p-4 bg-muted/30"><div class="rounded-xl border bg-card text-card-foreground shadow max-w-2xl w-full"><div class="flex flex-col space-y-1.5 p-6 text-center"><div class="mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class
+Root innerHTML length: [33m5813[39m
+Root first 500 chars: <div class="min-h-screen flex items-center justify-center p-4 bg-muted/30"><div class="rounded-xl border bg-card text-card-foreground shadow max-w-2xl w-full"><div class="flex flex-col space-y-1.5 p-6 text-center"><div class="mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class
+Root innerHTML length: [33m5813[39m
+Root first 500 chars: <div class="min-h-screen flex items-center justify-center p-4 bg-muted/30"><div class="rounded-xl border bg-card text-card-foreground shadow max-w-2xl w-full"><div class="flex flex-col space-y-1.5 p-6 text-center"><div class="mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class
+Root innerHTML length: [33m5754[39m
+Root first 500 chars: <div class="min-h-screen flex items-center justify-center p-4 bg-muted/30"><div class="rounded-xl border bg-card text-card-foreground shadow max-w-2xl w-full"><div class="flex flex-col space-y-1.5 p-6 text-center"><div class="mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class
+Body has text: [33mtrue[39m
+  ✓   5 [Desktop Medium (1280x720)] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application (4.0s)
+Body has text: [33mtrue[39m
+  ✓   3 [iPad] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application (4.2s)
+Body has text: [33mtrue[39m
+Body has text: [33mtrue[39m
+  ✓   7 [chromium] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application (4.3s)
+Body has text: [33mtrue[39m
+  ✓   4 [Samsung Internet] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application (4.5s)
+Body has text: [33mtrue[39m
+  ✓   8 [Mobile Chrome] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application (4.6s)
+  ✓  11 [edge] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application (4.6s)
+Body has text: [33mtrue[39m
+  ✓  12 [firefox] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application (4.5s)
+  ✘   1 [Mobile Small (375x667)] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application (7.6s)
+  ✘   9 [Mobile Safari] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application (7.6s)
+  ✘   6 [Mobile Large (428x926)] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application (7.6s)
+  ✘  10 [Tablet (768x1024)] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application (7.7s)
+  ✘   2 [webkit] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application (7.9s)
+
+
+  1) [webkit] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application ───────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator:  locator('#root')
+    Expected: visible
+    Received: hidden
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('#root')[22m
+    [2m    9 × locator resolved to <div id="root"></div>[22m
+    [2m      - unexpected value "hidden"[22m
+
+
+      14 |     // Check if root div exists
+      15 |     const root = await page.locator('#root');
+    > 16 |     await expect(root).toBeVisible();
+         |                        ^
+      17 |
+      18 |     // Check if React rendered something
+      19 |     const rootContent = await root.innerHTML();
+        at /home/nic20/ProjetosWeb/ImobiBase/tests/test-app.spec.ts:16:24
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/test-app-ImobiBase-App-should-load-the-application-webkit/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/test-app-ImobiBase-App-should-load-the-application-webkit/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [Mobile Safari] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application ────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator:  locator('#root')
+    Expected: visible
+    Received: hidden
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('#root')[22m
+    [2m    9 × locator resolved to <div id="root"></div>[22m
+    [2m      - unexpected value "hidden"[22m
+
+
+      14 |     // Check if root div exists
+      15 |     const root = await page.locator('#root');
+    > 16 |     await expect(root).toBeVisible();
+         |                        ^
+      17 |
+      18 |     // Check if React rendered something
+      19 |     const rootContent = await root.innerHTML();
+        at /home/nic20/ProjetosWeb/ImobiBase/tests/test-app.spec.ts:16:24
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/test-app-ImobiBase-App-should-load-the-application-Mobile-Safari/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/test-app-ImobiBase-App-should-load-the-application-Mobile-Safari/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [Mobile Small (375x667)] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator:  locator('#root')
+    Expected: visible
+    Received: hidden
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('#root')[22m
+    [2m    9 × locator resolved to <div id="root"></div>[22m
+    [2m      - unexpected value "hidden"[22m
+
+
+      14 |     // Check if root div exists
+      15 |     const root = await page.locator('#root');
+    > 16 |     await expect(root).toBeVisible();
+         |                        ^
+      17 |
+      18 |     // Check if React rendered something
+      19 |     const rootContent = await root.innerHTML();
+        at /home/nic20/ProjetosWeb/ImobiBase/tests/test-app.spec.ts:16:24
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/test-app-ImobiBase-App-should-load-the-application-Mobile-Small-375x667-/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/test-app-ImobiBase-App-should-load-the-application-Mobile-Small-375x667-/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) [Mobile Large (428x926)] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator:  locator('#root')
+    Expected: visible
+    Received: hidden
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('#root')[22m
+    [2m    9 × locator resolved to <div id="root"></div>[22m
+    [2m      - unexpected value "hidden"[22m
+
+
+      14 |     // Check if root div exists
+      15 |     const root = await page.locator('#root');
+    > 16 |     await expect(root).toBeVisible();
+         |                        ^
+      17 |
+      18 |     // Check if React rendered something
+      19 |     const rootContent = await root.innerHTML();
+        at /home/nic20/ProjetosWeb/ImobiBase/tests/test-app.spec.ts:16:24
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/test-app-ImobiBase-App-should-load-the-application-Mobile-Large-428x926-/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/test-app-ImobiBase-App-should-load-the-application-Mobile-Large-428x926-/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5) [Tablet (768x1024)] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator:  locator('#root')
+    Expected: visible
+    Received: hidden
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 5000ms[22m
+    [2m  - waiting for locator('#root')[22m
+    [2m    9 × locator resolved to <div id="root"></div>[22m
+    [2m      - unexpected value "hidden"[22m
+
+
+      14 |     // Check if root div exists
+      15 |     const root = await page.locator('#root');
+    > 16 |     await expect(root).toBeVisible();
+         |                        ^
+      17 |
+      18 |     // Check if React rendered something
+      19 |     const rootContent = await root.innerHTML();
+        at /home/nic20/ProjetosWeb/ImobiBase/tests/test-app.spec.ts:16:24
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/test-app-ImobiBase-App-should-load-the-application-Tablet-768x1024-/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/test-app-ImobiBase-App-should-load-the-application-Tablet-768x1024-/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5 failed
+    [webkit] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application ────────────
+    [Mobile Safari] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application ─────
+    [Mobile Small (375x667)] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application 
+    [Mobile Large (428x926)] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application 
+    [Tablet (768x1024)] › tests/test-app.spec.ts:4:3 › ImobiBase App › should load the application ─
+  7 passed (8.6s)

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assinatura Expirando</title>
+    <style>
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f3f4f6; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+        .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 40px 20px; text-align: center; color: #ffffff; }
+        .header-title { font-size: 24px; font-weight: bold; margin: 0; }
+        .content { padding: 40px 30px; }
+        .countdown-box { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 12px; padding: 25px; text-align: center; margin: 25px 0; }
+        .days-remaining { font-size: 48px; font-weight: bold; color: #d97706; }
+        .cta-button { display: inline-block; background-color: #f59e0b; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; margin: 10px 0; }
+        .footer { background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header"><h1 class="header-title">⏰ Sua Assinatura está Expirando</h1></div>
+        <div class="content">
+            <p style="font-size: 16px; color: #4b5563; text-align: center;">Olá, <strong>{{userName}}</strong>!</p>
+            <div class="countdown-box">
+                <div class="days-remaining">{{daysRemaining}}</div>
+                <div style="font-size: 14px; color: #92400e;">dias restantes</div>
+            </div>
+            <p style="font-size: 16px; color: #4b5563; text-align: center;">Sua assinatura do plano <strong>{{planName}}</strong> expira em {{expirationDate}}.</p>
+            <center><a href="{{renewUrl}}" class="cta-button">Renovar Assinatura</a></center>
+            <p style="font-size: 14px; color: #6b7280; margin-top: 25px; text-align: center;">Continue aproveitando todos os recursos sem interrupção!</p>
+        </div>
+        <div class="footer"><p>&copy; {{currentYear}} {{branding.companyName}}</p></div>
+    </div>
+</body>
+</html>

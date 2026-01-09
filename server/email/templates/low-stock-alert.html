@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alerta de Estoque Baixo</title>
+    <style>
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f3f4f6; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+        .header { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); padding: 30px 20px; text-align: center; color: #ffffff; }
+        .header-title { font-size: 22px; font-weight: bold; margin: 0; }
+        .content { padding: 30px; }
+        .alert-item { background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 15px 0; border-radius: 4px; }
+        .cta-button { display: inline-block; background-color: #f59e0b; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; margin: 10px 0; }
+        .footer { background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header"><h1 class="header-title">⚠️ Alerta: Poucos Imóveis Disponíveis</h1></div>
+        <div class="content">
+            <p style="font-size: 16px; color: #4b5563;">Olá, <strong>{{userName}}</strong>!</p>
+            <p style="font-size: 16px; color: #4b5563;">Identificamos que você tem poucas propriedades disponíveis no sistema:</p>
+            {{#each categories}}
+            <div class="alert-item">
+                <strong style="color: #92400e;">{{item.type}}</strong><br>
+                <span style="font-size: 14px; color: #92400e;">Apenas {{item.count}} imóveis disponíveis</span>
+            </div>
+            {{/each}}
+            <center><a href="{{addPropertyUrl}}" class="cta-button">Adicionar Novos Imóveis</a></center>
+            <p style="font-size: 14px; color: #6b7280; margin-top: 20px;">Mantenha seu portfólio sempre atualizado para não perder oportunidades!</p>
+        </div>
+        <div class="footer"><p>&copy; {{currentYear}} {{branding.companyName}}</p></div>
+    </div>
+</body>
+</html>

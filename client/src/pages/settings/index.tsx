@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useImobi } from "@/lib/imobi-context";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import {
   Building2,
@@ -20,6 +20,10 @@ import {
   ChevronRight,
   Settings as SettingsIcon,
   MessageSquare,
+  User as UserIcon,
+  Eye,
+  Sliders,
+  Info,
 } from "lucide-react";
 import { GeneralTab } from "./tabs/GeneralTab";
 import { BrandTab } from "./tabs/BrandTab";
@@ -31,9 +35,21 @@ import { NotificationsTab } from "./tabs/NotificationsTab";
 import { AITab } from "./tabs/AITab";
 import { WhatsAppTab } from "./tabs/WhatsAppTab";
 import { SecurityTab } from "./tabs/SecurityTab";
+import { AccessibilityTab } from "./tabs/AccessibilityTab";
+
+// Import new improved sections
+import {
+  ProfileSettings,
+  SecuritySettings,
+  NotificationSettings,
+  CompanySettings,
+  PreferencesSettings,
+  AboutSettings,
+} from "@/components/settings/sections";
+
 import type { TenantSettings, BrandSettings, AISettings, User } from "./types";
 
-type TabId = "general" | "brand" | "plans" | "users" | "permissions" | "security" | "integrations" | "notifications" | "ai" | "whatsapp";
+type TabId = "general" | "brand" | "plans" | "users" | "permissions" | "security" | "integrations" | "notifications" | "ai" | "whatsapp" | "profile" | "securityNew" | "notificationsNew" | "company" | "accessibility" | "preferences" | "about";
 
 interface NavItem {
   id: TabId;
@@ -45,18 +61,39 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   {
-    id: "general",
-    label: "Geral",
-    shortLabel: "Geral",
+    id: "profile",
+    label: "Perfil",
+    shortLabel: "Perfil",
+    icon: <UserIcon className="w-4 h-4" />,
+    description: "Dados pessoais e foto de perfil",
+  },
+  {
+    id: "company",
+    label: "Empresa",
+    shortLabel: "Empresa",
     icon: <Building2 className="w-4 h-4" />,
-    description: "Dados da empresa, CNPJ, CRECI",
+    description: "Dados da imobiliária e redes sociais",
+  },
+  {
+    id: "securityNew",
+    label: "Segurança",
+    shortLabel: "Segurança",
+    icon: <Shield className="w-4 h-4" />,
+    description: "Senha, 2FA e sessões ativas",
+  },
+  {
+    id: "notificationsNew",
+    label: "Notificações",
+    shortLabel: "Notificações",
+    icon: <Bell className="w-4 h-4" />,
+    description: "Preferências de alertas e horários",
   },
   {
     id: "brand",
     label: "Marca & Site",
     shortLabel: "Marca",
     icon: <Palette className="w-4 h-4" />,
-    description: "Logo, cores, domínio, redes sociais",
+    description: "Logo, cores, domínio",
   },
   {
     id: "plans",
@@ -77,21 +114,14 @@ const NAV_ITEMS: NavItem[] = [
     label: "Permissões",
     shortLabel: "Permissões",
     icon: <Shield className="w-4 h-4" />,
-    description: "Matriz de permissões por cargo",
-  },
-  {
-    id: "security",
-    label: "Segurança",
-    shortLabel: "Segurança",
-    icon: <Shield className="w-4 h-4" />,
-    description: "2FA, senhas e auditoria",
+    description: "Controle de acesso por cargo",
   },
   {
     id: "integrations",
     label: "Integrações",
     shortLabel: "Integrações",
     icon: <Plug className="w-4 h-4" />,
-    description: "Portais, WhatsApp, e-mail",
+    description: "Conectar portais e serviços",
   },
   {
     id: "whatsapp",
@@ -101,27 +131,42 @@ const NAV_ITEMS: NavItem[] = [
     description: "Mensagens prontas e automação",
   },
   {
-    id: "notifications",
-    label: "Notificações",
-    shortLabel: "Notif.",
-    icon: <Bell className="w-4 h-4" />,
-    description: "Alertas e destinatários",
-  },
-  {
     id: "ai",
     label: "IA & Automação",
     shortLabel: "IA",
     icon: <Sparkles className="w-4 h-4" />,
-    description: "Assistente e presets",
+    description: "Assistente inteligente",
+  },
+  {
+    id: "accessibility",
+    label: "Acessibilidade",
+    shortLabel: "Acess.",
+    icon: <Eye className="w-4 h-4" />,
+    description: "Opções de acessibilidade",
+  },
+  {
+    id: "preferences",
+    label: "Preferências",
+    shortLabel: "Prefer.",
+    icon: <Sliders className="w-4 h-4" />,
+    description: "Interface, tema e idioma",
+  },
+  {
+    id: "about",
+    label: "Sobre",
+    shortLabel: "Sobre",
+    icon: <Info className="w-4 h-4" />,
+    description: "Versão e informações do sistema",
   },
 ];
 
 export default function SettingsPage() {
   const { tenant } = useImobi();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<TabId>("general");
+  const [activeTab, setActiveTab] = useState<TabId>("profile");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showAIDrawer, setShowAIDrawer] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [generalSettings, setGeneralSettings] = useState<Partial<TenantSettings> | null>(null);
   const [brandSettings, setBrandSettings] = useState<Partial<BrandSettings> | null>(null);
@@ -314,6 +359,23 @@ export default function SettingsPage() {
 
   const renderTabContent = () => {
     switch (activeTab) {
+      // New improved sections
+      case "profile":
+        return <ProfileSettings />;
+      case "company":
+        return <CompanySettings />;
+      case "securityNew":
+        return <SecuritySettings />;
+      case "notificationsNew":
+        return <NotificationSettings />;
+      case "accessibility":
+        return <AccessibilityTab />;
+      case "preferences":
+        return <PreferencesSettings />;
+      case "about":
+        return <AboutSettings />;
+
+      // Existing tabs
       case "general":
         return <GeneralTab initialData={generalInitialData} onSave={handleSaveGeneral} />;
       case "brand":
@@ -362,25 +424,28 @@ export default function SettingsPage() {
               key={item.id}
               onClick={() => handleNavClick(item.id)}
               className={cn(
-                "w-full flex items-start gap-3 p-3 rounded-lg text-left transition-colors",
+                "w-full flex items-start gap-3 p-3 rounded-lg text-left transition-all duration-200",
                 "hover:bg-accent hover:text-accent-foreground",
-                activeTab === item.id && "bg-primary/10 text-primary border border-primary/20"
+                "border-l-4 transition-all",
+                activeTab === item.id
+                  ? "bg-blue-50 text-blue-700 border-blue-600 shadow-sm"
+                  : "border-transparent hover:border-blue-200"
               )}
             >
               <div
                 className={cn(
-                  "p-2 rounded-md shrink-0",
-                  activeTab === item.id ? "bg-primary text-primary-foreground" : "bg-muted"
+                  "p-2 rounded-md shrink-0 transition-all",
+                  activeTab === item.id ? "bg-blue-600 text-white" : "bg-muted"
                 )}
               >
                 {item.icon}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-sm">{item.label}</div>
+                <div className={cn("font-medium text-sm", activeTab === item.id && "font-semibold")}>{item.label}</div>
                 <div className="text-xs text-muted-foreground line-clamp-1">{item.description}</div>
               </div>
               {activeTab === item.id && (
-                <ChevronRight className="w-4 h-4 shrink-0 mt-2 text-primary" />
+                <ChevronRight className="w-4 h-4 shrink-0 mt-2 text-blue-600" />
               )}
             </button>
           ))}
@@ -439,14 +504,14 @@ export default function SettingsPage() {
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+                  "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap",
                   activeTab === item.id
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
+                    ? "border-blue-600 text-blue-700 bg-blue-50/50"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-blue-200"
                 )}
               >
                 {item.icon}
-                <span>{item.shortLabel}</span>
+                <span className={cn(activeTab === item.id && "font-semibold")}>{item.shortLabel}</span>
               </button>
             ))}
           </div>
@@ -467,6 +532,94 @@ export default function SettingsPage() {
           </div>
         </main>
       </div>
+
+      {/* AITOPIA Floating Drawer */}
+      <Sheet open={showAIDrawer} onOpenChange={setShowAIDrawer}>
+        <SheetTrigger asChild>
+          <Button
+            variant="default"
+            size="lg"
+            className="fixed bottom-6 right-6 rounded-full shadow-lg gap-2 h-14 px-6 z-40"
+          >
+            <Sparkles className="w-5 h-5" />
+            <span className="hidden sm:inline">Assistente IA</span>
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="right" className="w-full sm:w-96 p-0">
+          <SheetHeader className="p-6 border-b">
+            <SheetTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              AITOPIA
+            </SheetTitle>
+            <SheetDescription>
+              IA Especializada em Imobiliário
+            </SheetDescription>
+          </SheetHeader>
+          <div className="p-6 space-y-4">
+            <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg p-4 border border-primary/20">
+              <p className="text-sm text-muted-foreground">
+                Olá! Sou o assistente de IA do ImobiBase. Como posso ajudar você com as configurações?
+              </p>
+            </div>
+            <div className="space-y-3">
+              <Button
+                variant="outline"
+                className="w-full justify-start h-auto py-3 px-4"
+                onClick={() => {
+                  setShowAIDrawer(false);
+                  toast({
+                    title: "Sugestão aplicada",
+                    description: "Otimizando suas configurações...",
+                  });
+                }}
+              >
+                <div className="text-left">
+                  <div className="font-semibold text-sm">Otimizar Perfil</div>
+                  <div className="text-xs text-muted-foreground">
+                    Preencher campos vazios automaticamente
+                  </div>
+                </div>
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start h-auto py-3 px-4"
+                onClick={() => {
+                  setShowAIDrawer(false);
+                  toast({
+                    title: "Análise iniciada",
+                    description: "Verificando integrações...",
+                  });
+                }}
+              >
+                <div className="text-left">
+                  <div className="font-semibold text-sm">Verificar Integrações</div>
+                  <div className="text-xs text-muted-foreground">
+                    Analisar conexões com portais
+                  </div>
+                </div>
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start h-auto py-3 px-4"
+                onClick={() => {
+                  setShowAIDrawer(false);
+                  toast({
+                    title: "Dicas carregadas",
+                    description: "Visualize as sugestões de melhoria",
+                  });
+                }}
+              >
+                <div className="text-left">
+                  <div className="font-semibold text-sm">Dicas de Configuração</div>
+                  <div className="text-xs text-muted-foreground">
+                    Recomendações personalizadas
+                  </div>
+                </div>
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

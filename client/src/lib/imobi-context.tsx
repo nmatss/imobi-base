@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { useLocation } from "wouter";
+import { setCSRFToken, clearCSRFToken } from "@/lib/queryClient";
 
 // --- Types ---
 export type User = {
@@ -68,8 +69,8 @@ export type Lead = {
   preferredNeighborhood: string | null;
   minBedrooms: number | null;
   maxBedrooms: number | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Date | string;
+  updatedAt: Date | string;
 };
 
 export type Visit = {
@@ -128,46 +129,81 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [, setLocation] = useLocation();
 
-  // Check auth on mount
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  // Fetch data when user/tenant changes
-  useEffect(() => {
-    if (user && tenant) {
-      fetchAllData();
-    }
-  }, [user, tenant]);
-
-  async function checkAuth() {
+  // Memoized refetch functions para evitar re-criação em cada render
+  const refetchProperties = useCallback(async () => {
     try {
-      const res = await fetch("/api/auth/me", {
+      const res = await fetch("/api/properties", {
         credentials: "include",
       });
-      
       if (res.ok) {
         const data = await res.json();
-        setUser(data.user);
-        setTenant(data.tenant);
-        
-        // Fetch all tenants
-        const tenantsRes = await fetch("/api/tenants", {
-          credentials: "include",
-        });
-        if (tenantsRes.ok) {
-          const tenantsData = await tenantsRes.json();
-          setTenants(tenantsData);
-        }
+        setProperties(data);
+      } else if (res.status === 401) {
+        // Session expired, redirect to login
+        setUser(null);
+        setTenant(null);
+        setLocation("/login");
       }
     } catch (error) {
-      console.error("Auth check failed:", error);
-    } finally {
-      setLoading(false);
+      console.error("Failed to fetch properties:", error);
     }
-  }
+  }, [setLocation]);
 
-  async function fetchAllData() {
+  const refetchLeads = useCallback(async () => {
+    try {
+      const res = await fetch("/api/leads", {
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLeads(data);
+      } else if (res.status === 401) {
+        setUser(null);
+        setTenant(null);
+        setLocation("/login");
+      }
+    } catch (error) {
+      console.error("Failed to fetch leads:", error);
+    }
+  }, [setLocation]);
+
+  const refetchVisits = useCallback(async () => {
+    try {
+      const res = await fetch("/api/visits", {
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setVisits(data);
+      } else if (res.status === 401) {
+        setUser(null);
+        setTenant(null);
+        setLocation("/login");
+      }
+    } catch (error) {
+      console.error("Failed to fetch visits:", error);
+    }
+  }, [setLocation]);
+
+  const refetchContracts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/contracts", {
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setContracts(data);
+      } else if (res.status === 401) {
+        setUser(null);
+        setTenant(null);
+        setLocation("/login");
+      }
+    } catch (error) {
+      console.error("Failed to fetch contracts:", error);
+    }
+  }, [setLocation]);
+
+  const fetchAllData = useCallback(async () => {
     try {
       await Promise.all([
         refetchProperties(),
@@ -178,63 +214,77 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Failed to fetch data:", error);
     }
-  }
+  }, [refetchProperties, refetchLeads, refetchVisits, refetchContracts]);
 
-  async function refetchProperties() {
+  const checkAuth = useCallback(async () => {
+    let mounted = true; // Controle de componente montado para evitar race conditions
+
     try {
-      const res = await fetch("/api/properties", {
+      const res = await fetch("/api/auth/me", {
         credentials: "include",
       });
-      if (res.ok) {
-        const data = await res.json();
-        setProperties(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch properties:", error);
-    }
-  }
 
-  async function refetchLeads() {
-    try {
-      const res = await fetch("/api/leads", {
-        credentials: "include",
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setLeads(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch leads:", error);
-    }
-  }
+      if (!mounted) return; // Verifica se o componente ainda está montado antes de setState
 
-  async function refetchVisits() {
-    try {
-      const res = await fetch("/api/visits", {
-        credentials: "include",
-      });
       if (res.ok) {
         const data = await res.json();
-        setVisits(data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch visits:", error);
-    }
-  }
+        if (mounted) {
+          setUser(data.user);
+          setTenant(data.tenant);
+        }
 
-  async function refetchContracts() {
-    try {
-      const res = await fetch("/api/contracts", {
-        credentials: "include",
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setContracts(data);
+        // Fetch all tenants
+        const tenantsRes = await fetch("/api/tenants", {
+          credentials: "include",
+        });
+        if (tenantsRes.ok && mounted) {
+          const tenantsData = await tenantsRes.json();
+          if (mounted) {
+            setTenants(tenantsData);
+          }
+        }
+      } else if (res.status === 401) {
+        // Session expired, clear state
+        if (mounted) {
+          setUser(null);
+          setTenant(null);
+          setTenants([]);
+          setProperties([]);
+          setLeads([]);
+          setVisits([]);
+          setContracts([]);
+        }
       }
     } catch (error) {
-      console.error("Failed to fetch contracts:", error);
+      console.error("Auth check failed:", error);
+      // On network error, try to maintain state but mark as potentially stale
+    } finally {
+      if (mounted) {
+        setLoading(false);
+      }
     }
-  }
+
+    return () => {
+      mounted = false; // Cleanup function para marcar componente como desmontado
+    };
+  }, []);
+
+  // Check auth on mount
+  useEffect(() => {
+    const cleanup = checkAuth();
+    return () => {
+      if (cleanup instanceof Promise) {
+        cleanup.then((fn) => fn && fn());
+      }
+    };
+  }, [checkAuth]);
+
+  // Fetch data when user/tenant changes
+  useEffect(() => {
+    if (user && tenant) {
+      fetchAllData();
+    }
+  }, [user, tenant, fetchAllData]);
 
   async function login(email: string, password: string) {
     const res = await fetch("/api/auth/login", {
@@ -253,6 +303,11 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
     setTenant(data.tenant);
 
+    // Store CSRF token from login response
+    if (data.csrfToken) {
+      setCSRFToken(data.csrfToken);
+    }
+
     // Fetch all tenants
     const tenantsRes = await fetch("/api/tenants", {
       credentials: "include",
@@ -270,6 +325,10 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
       method: "POST",
       credentials: "include",
     });
+
+    // Clear CSRF token on logout
+    clearCSRFToken();
+
     setUser(null);
     setTenant(null);
     setTenants([]);

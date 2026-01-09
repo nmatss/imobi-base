@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -120,17 +120,19 @@ export function LocadoresTab({
       {/* Table - Desktop */}
       <div className="hidden sm:block">
         <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>CPF/CNPJ</TableHead>
-                <TableHead className="text-center">Imóveis</TableHead>
-                <TableHead className="text-right">Repasse Pendente</TableHead>
-                <TableHead>Conta Bancária</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <div className="inline-block min-w-full align-middle">
+              <Table className="min-w-[700px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>CPF/CNPJ</TableHead>
+                    <TableHead className="text-center">Imóveis</TableHead>
+                    <TableHead className="text-right">Repasse Pendente</TableHead>
+                    <TableHead>Conta Bancária</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
@@ -216,7 +218,9 @@ export function LocadoresTab({
                 ))
               )}
             </TableBody>
-          </Table>
+              </Table>
+            </div>
+          </div>
         </Card>
       </div>
 

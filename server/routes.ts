@@ -252,7 +252,7 @@ export async function registerRoutes(
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "https://r2cdn.perplexity.ai", "data:"],
         connectSrc: ["'self'", "ws:", "wss:", "http:", "https:"],
         imgSrc: ["'self'", "data:", "blob:", "https:"],
       },
@@ -288,7 +288,7 @@ export async function registerRoutes(
           // WebSockets
           "wss://*.supabase.co",
         ],
-        fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com", "https://r2cdn.perplexity.ai", "data:"],
         workerSrc: ["'self'", "blob:"],
         objectSrc: ["'none'"],
         baseUri: ["'self'"],

@@ -1,0 +1,95 @@
+# Dependabot configuration for automated dependency updates
+# P2 Security Fix: Automated dependency scanning and updates
+# See: https://docs.github.com/en/code-security/dependabot
+
+version: 2
+updates:
+  # Enable version updates for npm
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+    # Security updates only (no feature updates)
+    open-pull-requests-limit: 10
+
+    # Grouping strategy
+    groups:
+      # Group all security patches together
+      security-patches:
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+
+      # Group minor updates separately
+      minor-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+
+    # Commit message configuration
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+    # Labels for PRs
+    labels:
+      - "dependencies"
+      - "security"
+      - "automated"
+
+    # Reviewers (update with your team)
+    reviewers:
+      - "security-team"
+
+    # Allow specific dependencies to be updated
+    allow:
+      # Security-related packages
+      - dependency-name: "helmet"
+      - dependency-name: "express"
+      - dependency-name: "bcrypt"
+      - dependency-name: "jsonwebtoken"
+      - dependency-name: "cors"
+
+      # All direct dependencies
+      - dependency-type: "direct"
+
+      # Critical security updates for dev dependencies
+      - dependency-type: "development"
+        update-types: ["security"]
+
+    # Ignore specific dependencies (if needed)
+    ignore:
+      # Example: Ignore major version updates for stable packages
+      # - dependency-name: "express"
+      #   update-types: ["version-update:semver-major"]
+
+    # Pull request branch name prefix
+    pull-request-branch-name:
+      separator: "/"
+
+    # Increase pull request limit for security updates
+    versioning-strategy: increase-if-necessary
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "github-actions"
+      - "dependencies"
+    commit-message:
+      prefix: "ci"
+
+  # Docker (if you use Docker)
+  # - package-ecosystem: "docker"
+  #   directory: "/"
+  #   schedule:
+  #     interval: "weekly"
+  #   labels:
+  #     - "docker"
+  #     - "dependencies"

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import { useImobi } from "@/lib/imobi-context";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Separator } from "@/components/ui/separator";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
 import { useToast } from "@/hooks/use-toast";
+import { PropertySchema } from "@/components/seo/PropertySchema";
+import { OpenGraphTags } from "@/components/seo/OpenGraphTags";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   ArrowLeft,
   MapPin,
@@ -80,11 +83,15 @@ function getStatusConfig(status: string) {
 export default function PropertyDetailsPage() {
   const [match, params] = useRoute("/properties/:id");
   const [, setLocation] = useLocation();
-  const { properties, leads, visits } = useImobi();
+  const { properties, leads, visits, loading: contextLoading } = useImobi();
   const { toast } = useToast();
 
   const propertyId = params?.id;
   const property = properties.find((p) => p.id === propertyId);
+
+  // Loading and error states
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Lightbox state
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -95,6 +102,29 @@ export default function PropertyDetailsPage() {
 
   // WhatsApp message state
   const [showWhatsAppSheet, setShowWhatsAppSheet] = useState(false);
+
+  // Button loading states
+  const [isSharing, setIsSharing] = useState(false);
+  const [isOpeningWhatsApp, setIsOpeningWhatsApp] = useState(false);
+
+  // Effect to handle loading state with timeout
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+      if (!property && !contextLoading) {
+        setError("Imóvel não encontrado");
+      }
+    }, 500);
+
+    if (!contextLoading && properties.length > 0) {
+      setIsLoading(false);
+      if (!property) {
+        setError("Imóvel não encontrado");
+      }
+    }
+
+    return () => clearTimeout(timer);
+  }, [property, contextLoading, properties.length]);
 
   // Get property images or placeholder
   const images = property?.images && property.images.length > 0
@@ -126,34 +156,81 @@ export default function PropertyDetailsPage() {
   }, []);
 
   // Share property
-  const handleShare = useCallback(() => {
-    const url = window.location.href;
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    toast({ title: "Link copiado!", description: "O link do imóvel foi copiado para a área de transferência." });
-    setTimeout(() => setCopied(false), 2000);
-  }, [toast]);
+  const handleShare = useCallback(async () => {
+    if (isSharing) return;
+
+    setIsSharing(true);
+    try {
+      const url = window.location.href;
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      toast({ title: "Link copiado!", description: "O link do imóvel foi copiado para a área de transferência." });
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      console.error("Erro ao copiar link:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível copiar o link. Tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setTimeout(() => setIsSharing(false), 500);
+    }
+  }, [toast, isSharing]);
 
   // Open WhatsApp with property info
   const openWhatsApp = useCallback((lead?: typeof leads[0], customMessage?: string) => {
-    if (!property) return;
+    if (isOpeningWhatsApp) return;
 
-    const message = customMessage || `Olá! Gostaria de mais informações sobre o imóvel:\n\n*${property.title}*\n📍 ${property.address}, ${property.city}\n💰 ${formatCurrency(property.price)}\n🛏️ ${property.bedrooms || "-"} quartos | 🚿 ${property.bathrooms || "-"} banheiros | 📐 ${property.area || "-"}m²`;
+    setIsOpeningWhatsApp(true);
+    try {
+      if (!property) return;
 
-    const phone = lead?.phone?.replace(/\D/g, "") || "";
-    const formattedPhone = phone.startsWith("55") ? phone : `55${phone}`;
-    const url = phone
-      ? `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`
-      : `https://wa.me/?text=${encodeURIComponent(message)}`;
-    window.open(url, "_blank");
-  }, [property]);
+      const message = customMessage || `Olá! Gostaria de mais informações sobre o imóvel:\n\n*${property.title}*\n📍 ${property.address}, ${property.city}\n💰 ${formatCurrency(property.price)}\n🛏️ ${property.bedrooms || "-"} quartos | 🚿 ${property.bathrooms || "-"} banheiros | 📐 ${property.area || "-"}m²`;
 
-  if (!property) {
+      const phone = lead?.phone?.replace(/\D/g, "") || "";
+      const formattedPhone = phone.startsWith("55") ? phone : `55${phone}`;
+      const url = phone
+        ? `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`
+        : `https://wa.me/?text=${encodeURIComponent(message)}`;
+      window.open(url, "_blank");
+
+      toast({
+        title: "WhatsApp aberto",
+        description: "Abrindo conversa no WhatsApp..."
+      });
+    } catch (error) {
+      console.error("Erro ao abrir WhatsApp:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível abrir o WhatsApp. Tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setTimeout(() => setIsOpeningWhatsApp(false), 1000);
+    }
+  }, [property, toast, isOpeningWhatsApp]);
+
+  // Loading state
+  if (isLoading || contextLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[50vh] p-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4" />
+        <h2 className="text-xl sm:text-2xl font-bold mb-2">Carregando imóvel...</h2>
+        <p className="text-muted-foreground text-sm">Por favor, aguarde.</p>
+      </div>
+    );
+  }
+
+  // Error or not found state
+  if (error || !property) {
     return (
       <div className="flex flex-col items-center justify-center h-[50vh] p-4">
         <Home className="w-12 h-12 text-muted-foreground/30 mb-4" />
         <h2 className="text-xl sm:text-2xl font-bold mb-2">Imóvel não encontrado</h2>
-        <p className="text-muted-foreground text-sm mb-4">O imóvel que você procura não existe ou foi removido.</p>
+        <p className="text-muted-foreground text-sm mb-4">
+          {error || "O imóvel que você procura não existe ou foi removido."}
+        </p>
         <Link href="/properties">
           <Button variant="outline">Voltar para a lista</Button>
         </Link>
@@ -165,13 +242,27 @@ export default function PropertyDetailsPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-8">
+      {/* Schema.org structured data for SEO */}
+      <PropertySchema property={property} />
+      {/* Open Graph meta tags for social sharing */}
+      <OpenGraphTags property={property} />
+
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
           <Link href="/properties">
-            <Button variant="ghost" size="icon" className="shrink-0 h-9 w-9 sm:h-10 sm:w-10">
-              <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="shrink-0 h-9 w-9 sm:h-10 sm:w-10" aria-label="Voltar para lista de imóveis">
+                    <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Voltar para lista</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </Link>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
@@ -201,14 +292,25 @@ export default function PropertyDetailsPage() {
             size="sm"
             className="gap-1.5 h-9"
             onClick={handleShare}
+            disabled={isSharing}
           >
-            {copied ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
-            <span className="hidden sm:inline">{copied ? "Copiado" : "Compartilhar"}</span>
+            {isSharing ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
+            ) : copied ? (
+              <Check className="w-4 h-4" />
+            ) : (
+              <Share2 className="w-4 h-4" />
+            )}
+            <span className="hidden sm:inline">
+              {isSharing ? "Copiando..." : copied ? "Copiado" : "Compartilhar"}
+            </span>
           </Button>
-          <Button size="sm" className="gap-1.5 h-9">
-            <Edit className="w-4 h-4" />
-            <span className="hidden sm:inline">Editar</span>
-          </Button>
+          <Link href={`/properties?edit=${propertyId}`}>
+            <Button size="sm" className="gap-1.5 h-9">
+              <Edit className="w-4 h-4" />
+              <span className="hidden sm:inline">Editar</span>
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -487,9 +589,14 @@ export default function PropertyDetailsPage() {
               <Button
                 className="w-full justify-start gap-2 bg-green-600 hover:bg-green-700"
                 onClick={() => openWhatsApp()}
+                disabled={isOpeningWhatsApp}
               >
-                <MessageSquare className="w-4 h-4" />
-                Compartilhar via WhatsApp
+                {isOpeningWhatsApp ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                ) : (
+                  <MessageSquare className="w-4 h-4" />
+                )}
+                {isOpeningWhatsApp ? "Abrindo..." : "Compartilhar via WhatsApp"}
               </Button>
               <Button
                 variant="outline"

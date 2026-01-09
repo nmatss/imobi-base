@@ -15,11 +15,16 @@ import { initializeSentry, addSentryErrorHandler } from "./monitoring/sentry";
 import { initializeRedis, closeRedis } from "./cache/redis-client";
 import { initializeJobs, shutdownJobs } from "./jobs";
 import { sanitizeResponse, shouldSkipDetailedLogging } from "./utils/log-sanitizer";
+import { secretManager } from "./security/secret-manager";
 
 const app = express();
 const httpServer = createServer(app);
 
-// Initialize Sentry FIRST (before any other middleware)
+// Initialize and validate secrets FIRST (critical security)
+// This will fail-fast in production if required secrets are missing or invalid
+secretManager.initialize(process.env);
+
+// Initialize Sentry (before any other middleware)
 initializeSentry(app);
 
 declare module "http" {

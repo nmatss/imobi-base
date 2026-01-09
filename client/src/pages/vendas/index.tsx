@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useImobi, User as UserType, Lead, Property } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -93,6 +93,7 @@ import {
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { SalesDashboard, SalesCharts } from "./components";
 
 // Types
 type SaleProposal = {
@@ -144,20 +145,20 @@ function formatPrice(price: string | number) {
 
 // Proposal status config
 const PROPOSAL_STATUS = {
-  pending: { label: "Pendente", color: "bg-amber-100 text-amber-700 border-amber-300", icon: Clock, stage: "proposta" },
-  sent: { label: "Enviada", color: "bg-blue-100 text-blue-700 border-blue-300", icon: Send, stage: "negociacao" },
-  negotiating: { label: "Em Negociação", color: "bg-purple-100 text-purple-700 border-purple-300", icon: MessageCircle, stage: "negociacao" },
-  accepted: { label: "Aceita", color: "bg-green-100 text-green-700 border-green-300", icon: CheckCircle, stage: "documentacao" },
-  rejected: { label: "Recusada", color: "bg-red-100 text-red-700 border-red-300", icon: XCircle, stage: "rejected" },
-  expired: { label: "Vencida", color: "bg-gray-100 text-gray-700 border-gray-300", icon: AlertTriangle, stage: "expired" },
+  pending: { label: "Pendente", color: "badge-warning", icon: Clock, stage: "proposta" },
+  sent: { label: "Enviada", color: "badge-info", icon: Send, stage: "negociacao" },
+  negotiating: { label: "Em Negociação", color: "bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400", icon: MessageCircle, stage: "negociacao" },
+  accepted: { label: "Aceita", color: "badge-success", icon: CheckCircle, stage: "documentacao" },
+  rejected: { label: "Recusada", color: "badge-error", icon: XCircle, stage: "rejected" },
+  expired: { label: "Vencida", color: "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-900/30 dark:text-gray-400", icon: AlertTriangle, stage: "expired" },
 };
 
 // Pipeline stages
 const PIPELINE_STAGES = [
-  { id: "proposta", label: "Proposta", icon: FileText, color: "text-amber-600" },
-  { id: "negociacao", label: "Negociação", icon: Handshake, color: "text-blue-600" },
-  { id: "documentacao", label: "Documentação", icon: FileCheck, color: "text-purple-600" },
-  { id: "fechado", label: "Fechado", icon: CheckCircle, color: "text-green-600" },
+  { id: "proposta", label: "Proposta", icon: FileText, color: "text-warning" },
+  { id: "negociacao", label: "Negociação", icon: Handshake, color: "text-info" },
+  { id: "documentacao", label: "Documentação", icon: FileCheck, color: "text-status-qualification" },
+  { id: "fechado", label: "Fechado", icon: CheckCircle, color: "text-success" },
 ];
 
 // Period options
@@ -352,14 +353,27 @@ export default function VendasPage() {
     return { ...sale, lead, property, broker };
   }, [leads, properties, users]);
 
-  // Calculate KPIs
+  // Calculate KPIs with comparison to previous period
   const kpis = useMemo(() => {
     const range = getPeriodRange(filters.period);
+
+    // Calculate previous period range
+    const periodDiff = range.end.getTime() - range.start.getTime();
+    const prevRange = {
+      start: new Date(range.start.getTime() - periodDiff),
+      end: range.start
+    };
 
     // Filter sales by period
     const periodSales = sales.filter(s => {
       const saleDate = new Date(s.saleDate);
       return isAfter(saleDate, range.start) && isBefore(saleDate, range.end);
+    });
+
+    // Filter sales by previous period
+    const prevPeriodSales = sales.filter(s => {
+      const saleDate = new Date(s.saleDate);
+      return isAfter(saleDate, prevRange.start) && isBefore(saleDate, prevRange.end);
     });
 
     // Filter proposals by period
@@ -368,14 +382,29 @@ export default function VendasPage() {
       return isAfter(createdAt, range.start) && isBefore(createdAt, range.end);
     });
 
-    // Total sales value
+    // Current period metrics
     const totalSalesValue = periodSales.reduce((acc, s) => acc + parseFloat(s.saleValue || "0"), 0);
-
-    // Total commissions
     const totalCommissions = periodSales.reduce((acc, s) => acc + parseFloat(s.commissionValue || "0"), 0);
-
-    // Average ticket
     const avgTicket = periodSales.length > 0 ? totalSalesValue / periodSales.length : 0;
+
+    // Previous period metrics
+    const prevTotalSalesValue = prevPeriodSales.reduce((acc, s) => acc + parseFloat(s.saleValue || "0"), 0);
+    const prevTotalCommissions = prevPeriodSales.reduce((acc, s) => acc + parseFloat(s.commissionValue || "0"), 0);
+    const prevAvgTicket = prevPeriodSales.length > 0 ? prevTotalSalesValue / prevPeriodSales.length : 0;
+
+    // Calculate trends
+    const salesValueTrend = prevTotalSalesValue > 0
+      ? ((totalSalesValue - prevTotalSalesValue) / prevTotalSalesValue) * 100
+      : 0;
+    const salesCountTrend = prevPeriodSales.length > 0
+      ? ((periodSales.length - prevPeriodSales.length) / prevPeriodSales.length) * 100
+      : 0;
+    const avgTicketTrend = prevAvgTicket > 0
+      ? ((avgTicket - prevAvgTicket) / prevAvgTicket) * 100
+      : 0;
+    const commissionsTrend = prevTotalCommissions > 0
+      ? ((totalCommissions - prevTotalCommissions) / prevTotalCommissions) * 100
+      : 0;
 
     // Conversion rate: accepted proposals / total proposals (excluding pending)
     const finishedProposals = periodProposals.filter(p => ["accepted", "rejected", "expired"].includes(p.status));
@@ -392,6 +421,11 @@ export default function VendasPage() {
       conversionRate: conversionRate.toFixed(1),
       pendingProposals: periodProposals.filter(p => p.status === "pending").length,
       acceptedProposals: acceptedProposals.length,
+      // Trends
+      salesValueTrend: salesValueTrend.toFixed(1),
+      salesCountTrend: salesCountTrend.toFixed(1),
+      avgTicketTrend: avgTicketTrend.toFixed(1),
+      commissionsTrend: commissionsTrend.toFixed(1),
     };
   }, [sales, proposals, filters.period, getPeriodRange]);
 
@@ -885,7 +919,7 @@ export default function VendasPage() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6 pb-20 sm:pb-6">
+    <div className="space-y-6 sm:space-y-8 pb-20 sm:pb-6">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -894,16 +928,19 @@ export default function VendasPage() {
             <p className="text-muted-foreground text-sm mt-0.5">Gerencie propostas e vendas de imóveis</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Select value={filters.period} onValueChange={(v) => setFilters(f => ({ ...f, period: v }))}>
-              <SelectTrigger className="w-[140px] h-9 text-xs sm:text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PERIOD_OPTIONS.map(opt => (
-                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex gap-1 bg-muted p-1 rounded-lg">
+              {PERIOD_OPTIONS.map(opt => (
+                <Button
+                  key={opt.value}
+                  variant={filters.period === opt.value ? "default" : "ghost"}
+                  size="sm"
+                  className="h-8 text-xs px-3"
+                  onClick={() => setFilters(f => ({ ...f, period: opt.value }))}
+                >
+                  {opt.label}
+                </Button>
+              ))}
+            </div>
 
             <Sheet open={isFilterOpen} onOpenChange={setIsFilterOpen}>
               <SheetTrigger asChild>
@@ -1000,18 +1037,31 @@ export default function VendasPage() {
         </div>
 
         {/* KPI Cards - 2x2 grid on mobile */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 gap-6 sm:gap-8">
           <Card className="bg-gradient-to-br from-green-50 to-green-100/50 border-green-200">
             <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 sm:p-2.5 bg-green-500 rounded-xl shrink-0">
-                  <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 sm:p-2.5 bg-green-500 rounded-xl shrink-0">
+                    <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-green-600 font-medium mb-0.5">Total em Vendas</p>
+                    <p className="text-base sm:text-xl font-bold text-green-700 truncate">
+                      {formatPrice(kpis.totalSalesValue)}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-green-600 font-medium mb-0.5">Total em Vendas</p>
-                  <p className="text-base sm:text-xl font-bold text-green-700 truncate">
-                    {formatPrice(kpis.totalSalesValue)}
-                  </p>
+                <div className={cn(
+                  "flex items-center gap-1 text-xs font-semibold",
+                  parseFloat(kpis.salesValueTrend) >= 0 ? "text-green-600" : "text-red-600"
+                )}>
+                  {parseFloat(kpis.salesValueTrend) >= 0 ? (
+                    <TrendingUp className="w-4 h-4" />
+                  ) : (
+                    <TrendingDown className="w-4 h-4" />
+                  )}
+                  <span>{Math.abs(parseFloat(kpis.salesValueTrend))}%</span>
                 </div>
               </div>
             </CardContent>
@@ -1019,13 +1069,26 @@ export default function VendasPage() {
 
           <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-200">
             <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 sm:p-2.5 bg-blue-500 rounded-xl shrink-0">
-                  <Target className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 sm:p-2.5 bg-blue-500 rounded-xl shrink-0">
+                    <Target className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-blue-600 font-medium mb-0.5">Vendas</p>
+                    <p className="text-xl sm:text-2xl font-bold text-blue-700">{kpis.totalSales}</p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-blue-600 font-medium mb-0.5">Vendas</p>
-                  <p className="text-xl sm:text-2xl font-bold text-blue-700">{kpis.totalSales}</p>
+                <div className={cn(
+                  "flex items-center gap-1 text-xs font-semibold",
+                  parseFloat(kpis.salesCountTrend) >= 0 ? "text-green-600" : "text-red-600"
+                )}>
+                  {parseFloat(kpis.salesCountTrend) >= 0 ? (
+                    <TrendingUp className="w-4 h-4" />
+                  ) : (
+                    <TrendingDown className="w-4 h-4" />
+                  )}
+                  <span>{Math.abs(parseFloat(kpis.salesCountTrend))}%</span>
                 </div>
               </div>
             </CardContent>
@@ -1033,15 +1096,28 @@ export default function VendasPage() {
 
           <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50 border-purple-200">
             <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 sm:p-2.5 bg-purple-500 rounded-xl shrink-0">
-                  <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 sm:p-2.5 bg-purple-500 rounded-xl shrink-0">
+                    <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-purple-600 font-medium mb-0.5">Ticket Médio</p>
+                    <p className="text-base sm:text-xl font-bold text-purple-700 truncate">
+                      {formatPrice(kpis.avgTicket)}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-purple-600 font-medium mb-0.5">Ticket Médio</p>
-                  <p className="text-base sm:text-xl font-bold text-purple-700 truncate">
-                    {formatPrice(kpis.avgTicket)}
-                  </p>
+                <div className={cn(
+                  "flex items-center gap-1 text-xs font-semibold",
+                  parseFloat(kpis.avgTicketTrend) >= 0 ? "text-green-600" : "text-red-600"
+                )}>
+                  {parseFloat(kpis.avgTicketTrend) >= 0 ? (
+                    <TrendingUp className="w-4 h-4" />
+                  ) : (
+                    <TrendingDown className="w-4 h-4" />
+                  )}
+                  <span>{Math.abs(parseFloat(kpis.avgTicketTrend))}%</span>
                 </div>
               </div>
             </CardContent>
@@ -1063,15 +1139,28 @@ export default function VendasPage() {
 
           <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-200 col-span-2 sm:col-span-1">
             <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 sm:p-2.5 bg-emerald-500 rounded-xl shrink-0">
-                  <Percent className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 sm:p-2.5 bg-emerald-500 rounded-xl shrink-0">
+                    <Percent className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-emerald-600 font-medium mb-0.5">Comissões</p>
+                    <p className="text-base sm:text-xl font-bold text-emerald-700 truncate">
+                      {formatPrice(kpis.totalCommissions)}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-emerald-600 font-medium mb-0.5">Comissões</p>
-                  <p className="text-base sm:text-xl font-bold text-emerald-700 truncate">
-                    {formatPrice(kpis.totalCommissions)}
-                  </p>
+                <div className={cn(
+                  "flex items-center gap-1 text-xs font-semibold",
+                  parseFloat(kpis.commissionsTrend) >= 0 ? "text-green-600" : "text-red-600"
+                )}>
+                  {parseFloat(kpis.commissionsTrend) >= 0 ? (
+                    <TrendingUp className="w-4 h-4" />
+                  ) : (
+                    <TrendingDown className="w-4 h-4" />
+                  )}
+                  <span>{Math.abs(parseFloat(kpis.commissionsTrend))}%</span>
                 </div>
               </div>
             </CardContent>
@@ -1120,9 +1209,13 @@ export default function VendasPage() {
       </div>
 
       {/* Main Content - Pipeline Kanban or List */}
-      <Tabs defaultValue="pipeline" className="space-y-4">
+      <Tabs defaultValue="dashboard" className="space-y-6 sm:space-y-8">
         <div className="flex items-center justify-between">
           <TabsList className="w-auto">
+            <TabsTrigger value="dashboard" className="gap-1.5 text-xs sm:text-sm">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Dashboard</span>
+            </TabsTrigger>
             <TabsTrigger value="pipeline" className="gap-1.5 text-xs sm:text-sm">
               <Handshake className="h-4 w-4" />
               <span className="hidden sm:inline">Pipeline</span>
@@ -1135,8 +1228,52 @@ export default function VendasPage() {
           </TabsList>
         </div>
 
+        {/* Dashboard Tab - Analytics & Charts */}
+        <TabsContent value="dashboard" className="mt-6 sm:mt-8 space-y-6 sm:space-y-8">
+          {/* KPI Dashboard */}
+          <SalesDashboard kpis={kpis} period={filters.period} />
+
+          {/* Charts */}
+          <SalesCharts
+            salesByMonth={(() => {
+              // Process sales data by month for chart
+              const monthMap: Record<string, { value: number; count: number }> = {};
+              sales.forEach(sale => {
+                const date = new Date(sale.saleDate);
+                const monthKey = format(date, "MMM/yy", { locale: ptBR });
+                if (!monthMap[monthKey]) {
+                  monthMap[monthKey] = { value: 0, count: 0 };
+                }
+                monthMap[monthKey].value += parseFloat(sale.saleValue || "0");
+                monthMap[monthKey].count++;
+              });
+              return Object.entries(monthMap)
+                .map(([month, data]) => ({ month, ...data }))
+                .sort((a, b) => {
+                  const [aMonth, aYear] = a.month.split("/");
+                  const [bMonth, bYear] = b.month.split("/");
+                  return new Date(`20${aYear}-${aMonth}-01`).getTime() - new Date(`20${bYear}-${bMonth}-01`).getTime();
+                });
+            })()}
+            conversionFunnel={PIPELINE_STAGES.map(stage => {
+              const stageProposals = proposalsByStage[stage.id] || [];
+              return {
+                stage: stage.label,
+                count: stageProposals.length,
+                value: stageProposals.reduce((acc, p) => acc + parseFloat(p.proposedValue || "0"), 0),
+              };
+            })}
+            sourcePerformance={sourcePerformance.map(s => ({
+              source: LEAD_SOURCES.find(ls => ls.value === s.source)?.label || s.source,
+              count: s.count,
+              value: s.value,
+            }))}
+            brokerPerformance={brokerPerformance}
+          />
+        </TabsContent>
+
         {/* Pipeline View - Kanban */}
-        <TabsContent value="pipeline" className="mt-4 space-y-4">
+        <TabsContent value="pipeline" className="mt-6 sm:mt-8 space-y-6 sm:space-y-8">
           {/* Mobile: Horizontal scroll kanban */}
           <div className="lg:hidden">
             <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-4 -mx-4 px-4">
@@ -1269,7 +1406,7 @@ export default function VendasPage() {
           </div>
 
           {/* Desktop: Full kanban board */}
-          <div className="hidden lg:grid lg:grid-cols-4 gap-4">
+          <div className="hidden lg:grid lg:grid-cols-4 gap-6 sm:gap-8">
             {PIPELINE_STAGES.map(stage => {
               const StageIcon = stage.icon;
               const stageProposals = proposalsByStage[stage.id] || [];
@@ -1585,7 +1722,7 @@ export default function VendasPage() {
       </Tabs>
 
       {/* Performance Cards - Below main content */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
         {/* Broker Performance */}
         <Card>
           <CardHeader className="p-4 pb-3">

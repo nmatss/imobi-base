@@ -1,3 +1,4 @@
+import React from "react";
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -97,7 +98,7 @@ export function TemplatePreview({ template, className }: TemplatePreviewProps) {
 
         <div className="border rounded-lg overflow-hidden">
           {/* WhatsApp-style header */}
-          <div className="bg-[#075E54] text-white p-3 flex items-center gap-2">
+          <div className="bg-emerald-700 text-white p-3 flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
               <Smartphone className="w-4 h-4" />
             </div>
@@ -108,7 +109,7 @@ export function TemplatePreview({ template, className }: TemplatePreviewProps) {
           </div>
 
           {/* WhatsApp-style message bubble */}
-          <div className="bg-[#E5DDD5] p-4 min-h-[120px]">
+          <div className="bg-gray-100 p-4 min-h-[120px]">
             <div className="max-w-[85%] bg-white rounded-lg rounded-tl-none p-3 shadow-sm">
               <p className="text-sm whitespace-pre-wrap break-words">{renderedTemplate}</p>
               <p className="text-xs text-gray-500 mt-2 text-right">

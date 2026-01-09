@@ -1,0 +1,198 @@
+client/src/components/leads/AdvancedFiltersExample.tsx(119,19): error TS2322: Type 'string | null' is not assignable to type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+client/src/components/leads/AdvancedFiltersExample.tsx(121,19): error TS2322: Type 'string | Date' is not assignable to type 'string'.
+  Type 'Date' is not assignable to type 'string'.
+client/src/components/leads/AdvancedFiltersExample.tsx(122,28): error TS7006: Parameter 'id' implicitly has an 'any' type.
+client/src/components/leads/AdvancedFiltersExample.tsx(124,30): error TS7006: Parameter 'id' implicitly has an 'any' type.
+client/src/components/leads/AdvancedFiltersExample.tsx(125,36): error TS7006: Parameter 'id' implicitly has an 'any' type.
+client/src/components/leads/AdvancedFiltersExample.tsx(125,40): error TS7006: Parameter 'status' implicitly has an 'any' type.
+client/src/components/leads/AdvancedFiltersExample.tsx(127,32): error TS7006: Parameter 'id' implicitly has an 'any' type.
+client/src/examples/CachingExamples.tsx(85,21): error TS2322: Type 'string' is not assignable to type 'LeadStatus'.
+client/src/examples/MonitoringExample.tsx(119,15): error TS2322: Type '{ children: Element; id: string; name: string; }' is not assignable to type 'IntrinsicAttributes & IntrinsicClassAttributes<Profiler> & Readonly<ProfilerProps>'.
+  Property 'id' does not exist on type 'IntrinsicAttributes & IntrinsicClassAttributes<Profiler> & Readonly<ProfilerProps>'.
+client/src/examples/MonitoringExample.tsx(146,5): error TS2339: Property 'trackSearch' does not exist on type '{ track: (eventName: string, properties?: Record<string, any> | undefined) => void; trackFeatureUsage: (featureName: string, action: string, metadata?: Record<string, any> | undefined) => void; ... 5 more ...; reset: () => void; }'.
+client/src/hooks/useLeads-improved.ts(228,22): error TS4104: The type 'readonly ["leads", "list"]' is 'readonly' and cannot be assigned to the mutable type 'string[]'.
+client/src/hooks/useLeads-improved.ts(243,22): error TS4104: The type 'readonly ["leads", "list"]' is 'readonly' and cannot be assigned to the mutable type 'string[]'.
+client/src/hooks/useLeads-improved.ts(262,22): error TS4104: The type 'readonly ["leads", "list"]' is 'readonly' and cannot be assigned to the mutable type 'string[]'.
+client/src/hooks/useLeads-improved.ts(279,22): error TS4104: The type 'readonly ["leads", "list"]' is 'readonly' and cannot be assigned to the mutable type 'string[]'.
+client/src/lib/cache-manager.ts(316,19): error TS2339: Property 'isStale' does not exist on type 'QueryState<unknown, Error>'.
+client/src/lib/cache-manager.ts(359,51): error TS2339: Property 'isStale' does not exist on type 'QueryState<unknown, Error>'.
+client/src/lib/cache-manager.ts(389,32): error TS2339: Property 'isStale' does not exist on type 'QueryState<unknown, Error>'.
+client/src/pages/dashboard.tsx(27,24): error TS2322: Type 'Promise<{ default: never; } | { default: typeof Bar; }>' is not assignable to type 'Promise<{ default: ComponentType<any>; }>'.
+  Type '{ default: never; } | { default: typeof Bar; }' is not assignable to type '{ default: ComponentType<any>; }'.
+    Type '{ default: typeof Bar; }' is not assignable to type '{ default: ComponentType<any>; }'.
+      Types of property 'default' are incompatible.
+        Type 'typeof Bar' is not assignable to type 'ComponentType<any>'.
+          Type 'typeof Bar' is not assignable to type 'ComponentClass<any, any>'.
+            Types of property 'getDerivedStateFromProps' are incompatible.
+              Type '(nextProps: Props, prevState: State) => State' is not assignable to type 'GetDerivedStateFromProps<any, any>'.
+                Types of parameters 'nextProps' and 'nextProps' are incompatible.
+                  Type 'Readonly<any>' is not assignable to type 'Props'.
+                    Property 'dataKey' is missing in type 'Readonly<any>' but required in type 'BarProps'.
+client/src/pages/dashboard.tsx(741,27): error TS2322: Type '(value: number, name: string) => [number, string]' is not assignable to type 'Formatter<ValueType, NameType>'.
+  Types of parameters 'value' and 'value' are incompatible.
+    Type 'ValueType' is not assignable to type 'number'.
+      Type 'string' is not assignable to type 'number'.
+server/compliance/routes-compliance.ts(44,5): error TS2322: Type '(req: Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>) => string | undefined' is not assignable to type 'ValueDeterminingMiddleware<string>'.
+  Type 'string | undefined' is not assignable to type 'string | Promise<string>'.
+    Type 'undefined' is not assignable to type 'string | Promise<string>'.
+server/middleware/__tests__/auth.test.ts(17,7): error TS2322: Type 'Mock<Procedure>' is not assignable to type '(() => this is AuthenticatedRequest) | undefined'.
+  Type 'Mock<Procedure>' is not assignable to type '() => this is AuthenticatedRequest'.
+    Signature '(...args: any[]): any' must be a type predicate.
+server/middleware/__tests__/auth.test.ts(24,7): error TS2322: Type 'Mock<Procedure | Constructable>' is not assignable to type '((code: number) => Response<any, Record<string, any>>) | undefined'.
+  Type 'MockInstance<Procedure | Constructable> & (new (...args: any[]) => any) & {}' is not assignable to type '((code: number) => Response<any, Record<string, any>>) | undefined'.
+server/middleware/__tests__/auth.test.ts(25,7): error TS2322: Type 'Mock<Procedure | Constructable>' is not assignable to type 'Send<any, Response<any, Record<string, any>>> | undefined'.
+  Type 'MockInstance<Procedure | Constructable> & (new (...args: any[]) => any) & {}' is not assignable to type 'Send<any, Response<any, Record<string, any>>> | undefined'.
+server/middleware/__tests__/auth.test.ts(33,7): error TS2322: Type 'Mock<() => boolean>' is not assignable to type '(() => this is AuthenticatedRequest) | undefined'.
+  Type 'Mock<() => boolean>' is not assignable to type '() => this is AuthenticatedRequest'.
+    Signature '(): boolean' must be a type predicate.
+server/middleware/__tests__/auth.test.ts(47,7): error TS2322: Type 'Mock<() => boolean>' is not assignable to type '(() => this is AuthenticatedRequest) | undefined'.
+  Type 'Mock<() => boolean>' is not assignable to type '() => this is AuthenticatedRequest'.
+    Signature '(): boolean' must be a type predicate.
+server/middleware/__tests__/auth.test.ts(60,7): error TS2322: Type 'Mock<() => boolean>' is not assignable to type '(() => this is AuthenticatedRequest) | undefined'.
+  Type 'Mock<() => boolean>' is not assignable to type '() => this is AuthenticatedRequest'.
+    Signature '(): boolean' must be a type predicate.
+server/middleware/__tests__/auth.test.ts(77,7): error TS2322: Type 'Mock<() => boolean>' is not assignable to type '(() => this is AuthenticatedRequest) | undefined'.
+  Type 'Mock<() => boolean>' is not assignable to type '() => this is AuthenticatedRequest'.
+    Signature '(): boolean' must be a type predicate.
+server/middleware/__tests__/auth.test.ts(89,7): error TS2322: Type 'Mock<() => boolean>' is not assignable to type '(() => this is AuthenticatedRequest) | undefined'.
+  Type 'Mock<() => boolean>' is not assignable to type '() => this is AuthenticatedRequest'.
+    Signature '(): boolean' must be a type predicate.
+server/middleware/__tests__/auth.test.ts(103,7): error TS2322: Type 'Mock<() => boolean>' is not assignable to type '(() => this is AuthenticatedRequest) | undefined'.
+  Type 'Mock<() => boolean>' is not assignable to type '() => this is AuthenticatedRequest'.
+    Signature '(): boolean' must be a type predicate.
+server/middleware/__tests__/auth.test.ts(117,7): error TS2322: Type 'Mock<() => boolean>' is not assignable to type '(() => this is AuthenticatedRequest) | undefined'.
+  Type 'Mock<() => boolean>' is not assignable to type '() => this is AuthenticatedRequest'.
+    Signature '(): boolean' must be a type predicate.
+server/middleware/__tests__/auth.test.ts(135,7): error TS2322: Type 'Mock<() => boolean>' is not assignable to type '(() => this is AuthenticatedRequest) | undefined'.
+  Type 'Mock<() => boolean>' is not assignable to type '() => this is AuthenticatedRequest'.
+    Signature '(): boolean' must be a type predicate.
+server/middleware/__tests__/auth.test.ts(146,7): error TS2322: Type 'Mock<() => boolean>' is not assignable to type '(() => this is AuthenticatedRequest) | undefined'.
+  Type 'Mock<() => boolean>' is not assignable to type '() => this is AuthenticatedRequest'.
+    Signature '(): boolean' must be a type predicate.
+server/middleware/__tests__/auth.test.ts(160,7): error TS2322: Type 'Mock<() => boolean>' is not assignable to type '(() => this is AuthenticatedRequest) | undefined'.
+  Type 'Mock<() => boolean>' is not assignable to type '() => this is AuthenticatedRequest'.
+    Signature '(): boolean' must be a type predicate.
+server/middleware/__tests__/auth.test.ts(178,7): error TS2322: Type 'Mock<() => boolean>' is not assignable to type '(() => this is AuthenticatedRequest) | undefined'.
+  Type 'Mock<() => boolean>' is not assignable to type '() => this is AuthenticatedRequest'.
+    Signature '(): boolean' must be a type predicate.
+server/middleware/__tests__/auth.test.ts(192,7): error TS2322: Type 'Mock<() => boolean>' is not assignable to type '(() => this is AuthenticatedRequest) | undefined'.
+  Type 'Mock<() => boolean>' is not assignable to type '() => this is AuthenticatedRequest'.
+    Signature '(): boolean' must be a type predicate.
+server/middleware/__tests__/error-handler.test.ts(46,7): error TS2322: Type 'Mock<Procedure | Constructable>' is not assignable to type '((code: number) => Response<any, Record<string, any>>) | undefined'.
+  Type 'MockInstance<Procedure | Constructable> & (new (...args: any[]) => any) & {}' is not assignable to type '((code: number) => Response<any, Record<string, any>>) | undefined'.
+server/middleware/__tests__/error-handler.test.ts(47,7): error TS2322: Type 'Mock<Procedure | Constructable>' is not assignable to type 'Send<any, Response<any, Record<string, any>>> | undefined'.
+  Type 'MockInstance<Procedure | Constructable> & (new (...args: any[]) => any) & {}' is not assignable to type 'Send<any, Response<any, Record<string, any>>> | undefined'.
+server/middleware/auth.ts(20,5): error TS2322: Type 'Response<any, Record<string, any>>' is not assignable to type 'void'.
+server/middleware/auth.ts(29,5): error TS2322: Type 'Response<any, Record<string, any>>' is not assignable to type 'void'.
+server/middleware/auth.ts(44,5): error TS2322: Type 'Response<any, Record<string, any>>' is not assignable to type 'void'.
+server/middleware/auth.ts(56,5): error TS2322: Type 'Response<any, Record<string, any>>' is not assignable to type 'void'.
+server/middleware/auth.ts(71,5): error TS2322: Type 'Response<any, Record<string, any>>' is not assignable to type 'void'.
+server/middleware/auth.ts(83,5): error TS2322: Type 'Response<any, Record<string, any>>' is not assignable to type 'void'.
+server/middleware/compression.ts(7,25): error TS7016: Could not find a declaration file for module 'compression'. '/home/nic20/ProjetosWeb/ImobiBase/node_modules/compression/index.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/compression` if it exists or add a new declaration (.d.ts) file containing `declare module 'compression';`
+server/middleware/request-limits.ts(8,19): error TS7016: Could not find a declaration file for module 'bytes'. '/home/nic20/ProjetosWeb/ImobiBase/node_modules/bytes/index.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/bytes` if it exists or add a new declaration (.d.ts) file containing `declare module 'bytes';`
+server/middleware/security-headers.ts(146,38): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string | number | readonly string[]'.
+  Type 'undefined' is not assignable to type 'string | number | readonly string[]'.
+server/middleware/security-headers.ts(151,38): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string | number | readonly string[]'.
+  Type 'undefined' is not assignable to type 'string | number | readonly string[]'.
+server/middleware/security-headers.ts(236,5): error TS2322: Type 'Response<any, Record<string, any>>' is not assignable to type 'void'.
+server/middleware/structured-logger.ts(107,7): error TS2353: Object literal may only specify known properties, and 'security' does not exist in type 'Partial<LogContext>'.
+server/routes-jobs.ts(52,5): error TS2322: Type '(req: Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>) => string | undefined' is not assignable to type 'ValueDeterminingMiddleware<string>'.
+  Type 'string | undefined' is not assignable to type 'string | Promise<string>'.
+    Type 'undefined' is not assignable to type 'string | Promise<string>'.
+server/routes.ts(131,5): error TS2322: Type 'Response<any, Record<string, any>>' is not assignable to type 'void'.
+server/routes.ts(155,7): error TS2322: Type 'Response<any, Record<string, any>>' is not assignable to type 'void'.
+server/routes.ts(158,5): error TS2322: Type 'Response<any, Record<string, any>>' is not assignable to type 'void'.
+server/routes.ts(378,5): error TS2322: Type '(req: Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>) => string | undefined' is not assignable to type 'ValueDeterminingMiddleware<string>'.
+  Type 'string | undefined' is not assignable to type 'string | Promise<string>'.
+    Type 'undefined' is not assignable to type 'string | Promise<string>'.
+server/schemas/email.ts(38,19): error TS2554: Expected 2-3 arguments, but got 1.
+server/schemas/email.ts(42,15): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(values: readonly ["high", "normal", "low"], params?: string | { error?: string | $ZodErrorMap<$ZodIssueInvalidValue<unknown>> | undefined; message?: string | undefined; } | undefined): ZodEnum<...>', gave the following error.
+    Object literal may only specify known properties, and 'errorMap' does not exist in type '{ error?: string | $ZodErrorMap<$ZodIssueInvalidValue<unknown>> | undefined; message?: string | undefined; }'.
+  Overload 2 of 2, '(entries: Readonly<Record<string, EnumValue>>, params?: string | { error?: string | $ZodErrorMap<$ZodIssueInvalidValue<unknown>> | undefined; message?: string | undefined; } | undefined): ZodEnum<...>', gave the following error.
+    Argument of type 'string[]' is not assignable to parameter of type 'Readonly<Record<string, EnumValue>>'.
+      Index signature for type 'string' is missing in type 'string[]'.
+server/schemas/email.ts(59,19): error TS2554: Expected 2-3 arguments, but got 1.
+server/schemas/email.ts(87,11): error TS2554: Expected 2-3 arguments, but got 1.
+server/schemas/maps.ts(76,11): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(values: readonly ["driving", "walking", "bicycling", "transit"], params?: string | { error?: string | $ZodErrorMap<$ZodIssueInvalidValue<unknown>> | undefined; message?: string | undefined; } | undefined): ZodEnum<...>', gave the following error.
+    Object literal may only specify known properties, and 'errorMap' does not exist in type '{ error?: string | $ZodErrorMap<$ZodIssueInvalidValue<unknown>> | undefined; message?: string | undefined; }'.
+  Overload 2 of 2, '(entries: Readonly<Record<string, EnumValue>>, params?: string | { error?: string | $ZodErrorMap<$ZodIssueInvalidValue<unknown>> | undefined; message?: string | undefined; } | undefined): ZodEnum<...>', gave the following error.
+    Argument of type 'string[]' is not assignable to parameter of type 'Readonly<Record<string, EnumValue>>'.
+      Index signature for type 'string' is missing in type 'string[]'.
+server/schemas/maps.ts(87,11): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(values: readonly ["driving", "walking", "bicycling", "transit"], params?: string | { error?: string | $ZodErrorMap<$ZodIssueInvalidValue<unknown>> | undefined; message?: string | undefined; } | undefined): ZodEnum<...>', gave the following error.
+    Object literal may only specify known properties, and 'errorMap' does not exist in type '{ error?: string | $ZodErrorMap<$ZodIssueInvalidValue<unknown>> | undefined; message?: string | undefined; }'.
+  Overload 2 of 2, '(entries: Readonly<Record<string, EnumValue>>, params?: string | { error?: string | $ZodErrorMap<$ZodIssueInvalidValue<unknown>> | undefined; message?: string | undefined; } | undefined): ZodEnum<...>', gave the following error.
+    Argument of type 'string[]' is not assignable to parameter of type 'Readonly<Record<string, EnumValue>>'.
+      Index signature for type 'string' is missing in type 'string[]'.
+server/schemas/maps.ts(100,11): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(values: readonly ["driving", "walking", "bicycling", "transit"], params?: string | { error?: string | $ZodErrorMap<$ZodIssueInvalidValue<unknown>> | undefined; message?: string | undefined; } | undefined): ZodEnum<...>', gave the following error.
+    Object literal may only specify known properties, and 'errorMap' does not exist in type '{ error?: string | $ZodErrorMap<$ZodIssueInvalidValue<unknown>> | undefined; message?: string | undefined; }'.
+  Overload 2 of 2, '(entries: Readonly<Record<string, EnumValue>>, params?: string | { error?: string | $ZodErrorMap<$ZodIssueInvalidValue<unknown>> | undefined; message?: string | undefined; } | undefined): ZodEnum<...>', gave the following error.
+    Argument of type 'string[]' is not assignable to parameter of type 'Readonly<Record<string, EnumValue>>'.
+      Index signature for type 'string' is missing in type 'string[]'.
+server/security/svg-sanitizer.ts(14,23): error TS7016: Could not find a declaration file for module 'jsdom'. '/home/nic20/ProjetosWeb/ImobiBase/node_modules/jsdom/lib/api.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/jsdom` if it exists or add a new declaration (.d.ts) file containing `declare module 'jsdom';`
+server/security/svg-sanitizer.ts(19,26): error TS2345: Argument of type 'Window' is not assignable to parameter of type 'WindowLike'.
+  Type 'Window' is missing the following properties from type 'Pick<typeof globalThis, "DocumentFragment" | "HTMLTemplateElement" | "Node" | "Element" | "NodeFilter" | "NamedNodeMap" | "HTMLFormElement" | "DOMParser">': DocumentFragment, HTMLTemplateElement, Node, Element, and 4 more.
+server/security/webhooks.ts(324,13): error TS2352: Conversion of type '{ id: string; type: "test_webhook"; severity: "low"; timestamp: Date; message: string; metadata: {}; }' to type 'SecurityEvent' may be a mistake because neither type sufficiently overlaps with the other. If this was intentional, convert the expression to 'unknown' first.
+  Types of property 'type' are incompatible.
+    Type '"test_webhook"' is not comparable to type 'SecurityEventType'.
+tests/integration/security/auth-flow.test.ts(51,13): error TS7006: Parameter 'sid' implicitly has an 'any' type.
+tests/integration/security/auth-flow.test.ts(51,18): error TS7006: Parameter 'callback' implicitly has an 'any' type.
+tests/integration/security/auth-flow.test.ts(54,13): error TS7006: Parameter 'sid' implicitly has an 'any' type.
+tests/integration/security/auth-flow.test.ts(54,18): error TS7006: Parameter 'session' implicitly has an 'any' type.
+tests/integration/security/auth-flow.test.ts(54,27): error TS7006: Parameter 'callback' implicitly has an 'any' type.
+tests/integration/security/auth-flow.test.ts(58,17): error TS7006: Parameter 'sid' implicitly has an 'any' type.
+tests/integration/security/auth-flow.test.ts(58,22): error TS7006: Parameter 'callback' implicitly has an 'any' type.
+tests/integration/security/auth-flow.test.ts(62,15): error TS7006: Parameter 'sid' implicitly has an 'any' type.
+tests/integration/security/auth-flow.test.ts(62,20): error TS7006: Parameter 'session' implicitly has an 'any' type.
+tests/integration/security/auth-flow.test.ts(62,29): error TS7006: Parameter 'callback' implicitly has an 'any' type.
+tests/integration/security/auth-flow.test.ts(112,25): error TS2345: Argument of type '{ id: string; email: string; name: string; tenantId: string; }' is not assignable to parameter of type 'false | User | undefined'.
+  Type '{ id: string; email: string; name: string; tenantId: string; }' is missing the following properties from type 'User': role, avatar
+tests/integration/security/auth-flow.test.ts(129,27): error TS2345: Argument of type '{ id: string; email: string; name: string; tenantId: string; }' is not assignable to parameter of type 'false | User | null | undefined'.
+  Type '{ id: string; email: string; name: string; tenantId: string; }' is missing the following properties from type 'User': role, avatar
+tests/integration/security/auth-flow.test.ts(265,5): error TS2322: Type 'TestAgent<Test>' is not assignable to type 'SuperAgentTest'.
+  Type 'TestAgent<Test>' is not assignable to type 'RequestMethods<Test>'.
+    Types of property 'copy' are incompatible.
+      Type '(url: string) => Test' is not assignable to type 'HttpMethod<Test>'.
+        Type '(url: string) => Test' is not assignable to type '(url: URLType, callback?: CBHandler | undefined) => Test'.
+          Types of parameters 'url' and 'url' are incompatible.
+            Type 'URLType' is not assignable to type 'string'.
+              Type 'URL' is not assignable to type 'string'.
+tests/integration/security/csrf-protection.test.ts(44,13): error TS7006: Parameter 'sid' implicitly has an 'any' type.
+tests/integration/security/csrf-protection.test.ts(44,18): error TS7006: Parameter 'callback' implicitly has an 'any' type.
+tests/integration/security/csrf-protection.test.ts(45,13): error TS7006: Parameter 'sid' implicitly has an 'any' type.
+tests/integration/security/csrf-protection.test.ts(45,18): error TS7006: Parameter 'session' implicitly has an 'any' type.
+tests/integration/security/csrf-protection.test.ts(45,27): error TS7006: Parameter 'callback' implicitly has an 'any' type.
+tests/integration/security/csrf-protection.test.ts(49,17): error TS7006: Parameter 'sid' implicitly has an 'any' type.
+tests/integration/security/csrf-protection.test.ts(49,22): error TS7006: Parameter 'callback' implicitly has an 'any' type.
+tests/integration/security/csrf-protection.test.ts(53,15): error TS7006: Parameter 'sid' implicitly has an 'any' type.
+tests/integration/security/csrf-protection.test.ts(53,20): error TS7006: Parameter 'session' implicitly has an 'any' type.
+tests/integration/security/csrf-protection.test.ts(53,29): error TS7006: Parameter 'callback' implicitly has an 'any' type.
+tests/integration/security/csrf-protection.test.ts(171,5): error TS2322: Type 'TestAgent<Test>' is not assignable to type 'SuperAgentTest'.
+  Type 'TestAgent<Test>' is not assignable to type 'RequestMethods<Test>'.
+    Types of property 'copy' are incompatible.
+      Type '(url: string) => Test' is not assignable to type 'HttpMethod<Test>'.
+        Type '(url: string) => Test' is not assignable to type '(url: URLType, callback?: CBHandler | undefined) => Test'.
+          Types of parameters 'url' and 'url' are incompatible.
+            Type 'URLType' is not assignable to type 'string'.
+              Type 'URL' is not assignable to type 'string'.
+tests/unit/backend/whatsapp-webhook.test.ts(137,47): error TS2367: This comparison appears to be unintentional because the types '"wrong-token"' and '"test-verify-token-67890"' have no overlap.
+tests/unit/backend/whatsapp-webhook.test.ts(148,23): error TS2367: This comparison appears to be unintentional because the types '"invalid-mode"' and '"subscribe"' have no overlap.
+tests/unit/backend/whatsapp-webhook.test.ts(159,23): error TS2367: This comparison appears to be unintentional because the types '""' and '"subscribe"' have no overlap.
+tests/unit/backend/whatsapp-webhook.test.ts(159,47): error TS2367: This comparison appears to be unintentional because the types '""' and '"test-verify-token-67890"' have no overlap.
+tests/unit/backend/whatsapp-webhook.test.ts(406,45): error TS2367: This comparison appears to be unintentional because the types '"wrong-token"' and '"correct-token"' have no overlap.
+vite.config.ts(10,29): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type '({ mode }: ConfigEnv) => { plugins: (false | "" | Plugin$1<any> | Plugin<any> | Plugin$1<any>[] | undefined)[]; resolve: { alias: { "@": string; "@shared": string; "@assets": string; }; }; ... 4 more ...; optimizeDeps: { ...; }; }' is not assignable to parameter of type 'UserConfigExport'.
+      Type '({ mode }: ConfigEnv) => { plugins: (false | "" | Plugin$1<any> | Plugin<any> | Plugin$1<any>[] | undefined)[]; resolve: { alias: { "@": string; "@shared": string; "@assets": string; }; }; ... 4 more ...; optimizeDeps: { ...; }; }' is not assignable to type 'UserConfigFnObject'.
+        Call signature return types '{ plugins: (false | "" | Plugin$1<any> | Plugin<any> | Plugin$1<any>[] | undefined)[]; resolve: { alias: { "@": string; "@shared": string; "@assets": string; }; }; css: { postcss: { ...; }; }; root: string; build: { ...; }; server: { ...; }; optimizeDeps: { ...; }; }' and 'UserConfig' are incompatible.
+          The types of 'plugins' are incompatible between these types.
+            Type '(false | "" | Plugin$1<any> | Plugin<any> | Plugin$1<any>[] | undefined)[]' is not assignable to type 'PluginOption[]'.
+              Type 'false | "" | Plugin$1<any> | Plugin<any> | Plugin$1<any>[] | undefined' is not assignable to type 'PluginOption'.
+                Type '""' is not assignable to type 'PluginOption'.

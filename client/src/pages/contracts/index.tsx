@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { useImobi, Contract, Lead, Property } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -66,12 +66,13 @@ import {
   Ban,
   ChevronRight,
   ChevronLeft,
+  ChevronUp,
+  ChevronDown,
   History,
   FileWarning,
   AlertCircle,
   Receipt,
-  X,
-  ChevronDown
+  X
 } from "lucide-react";
 import {
   format,
@@ -213,6 +214,10 @@ export default function ContractsPage() {
   const [selectedItem, setSelectedItem] = useState<ProposalDetails | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
+  // Sorting state
+  const [sortBy, setSortBy] = useState<"date" | "value" | "lead">("date");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
   // AI Chat state
   const [aiMessage, setAiMessage] = useState("");
 
@@ -267,6 +272,16 @@ export default function ContractsPage() {
     };
   }, [contracts, filters.period]);
 
+  // Handle sorting
+  const handleSort = (column: "date" | "value" | "lead") => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(column);
+      setSortOrder("desc");
+    }
+  };
+
   // Filter proposals (draft, sent, analyzing, rejected, expired)
   const filteredProposals = useMemo(() => {
     const proposalStatuses = ["draft", "sent", "analyzing", "rejected", "expired"];
@@ -297,8 +312,25 @@ export default function ContractsPage() {
       }
 
       return true;
-    }).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-  }, [contracts, filters, getItemDetails]);
+    }).sort((a, b) => {
+      // Apply sorting
+      let comparison = 0;
+
+      if (sortBy === "date") {
+        comparison = new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      } else if (sortBy === "value") {
+        comparison = parseFloat(b.value || "0") - parseFloat(a.value || "0");
+      } else if (sortBy === "lead") {
+        const aDetails = getItemDetails(a);
+        const bDetails = getItemDetails(b);
+        const aName = aDetails.lead?.name || "";
+        const bName = bDetails.lead?.name || "";
+        comparison = aName.localeCompare(bName);
+      }
+
+      return sortOrder === "asc" ? -comparison : comparison;
+    });
+  }, [contracts, filters, getItemDetails, sortBy, sortOrder]);
 
   // Filter contracts (approved, signed)
   const filteredContracts = useMemo(() => {
@@ -871,12 +903,42 @@ export default function ContractsPage() {
                       <TableHeader>
                         <TableRow>
                           <TableHead className="w-[100px]">Código</TableHead>
-                          <TableHead>Lead</TableHead>
+                          <TableHead
+                            className="cursor-pointer hover:bg-muted/50 select-none"
+                            onClick={() => handleSort("lead")}
+                          >
+                            <div className="flex items-center gap-2">
+                              Lead
+                              {sortBy === "lead" && (
+                                sortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                              )}
+                            </div>
+                          </TableHead>
                           <TableHead>Imóvel</TableHead>
                           <TableHead>Tipo</TableHead>
-                          <TableHead className="text-right">Valor</TableHead>
+                          <TableHead
+                            className="text-right cursor-pointer hover:bg-muted/50 select-none"
+                            onClick={() => handleSort("value")}
+                          >
+                            <div className="flex items-center justify-end gap-2">
+                              Valor
+                              {sortBy === "value" && (
+                                sortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                              )}
+                            </div>
+                          </TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Data</TableHead>
+                          <TableHead
+                            className="cursor-pointer hover:bg-muted/50 select-none"
+                            onClick={() => handleSort("date")}
+                          >
+                            <div className="flex items-center gap-2">
+                              Data
+                              {sortBy === "date" && (
+                                sortOrder === "asc" ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                              )}
+                            </div>
+                          </TableHead>
                           <TableHead className="w-[80px]">Ações</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -889,13 +951,13 @@ export default function ContractsPage() {
                           return (
                             <TableRow
                               key={contract.id}
-                              className="cursor-pointer hover:bg-muted/50"
+                              className="cursor-pointer hover:bg-muted/50 transition-colors"
                               onClick={() => openDetailPanel(contract)}
                             >
-                              <TableCell className="font-mono text-xs">
+                              <TableCell className="font-mono text-xs py-4">
                                 #{contract.id.slice(0, 8).toUpperCase()}
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="py-4">
                                 <div className="flex items-center gap-2">
                                   <User className="h-4 w-4 text-muted-foreground shrink-0" />
                                   <span className="font-medium truncate max-w-[150px]">
@@ -903,7 +965,7 @@ export default function ContractsPage() {
                                   </span>
                                 </div>
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="py-4">
                                 <div className="flex items-center gap-2">
                                   <Home className="h-4 w-4 text-muted-foreground shrink-0" />
                                   <span className="truncate max-w-[200px]">
@@ -911,21 +973,21 @@ export default function ContractsPage() {
                                   </span>
                                 </div>
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="py-4">
                                 <Badge variant="outline" className="text-xs">
                                   {contract.type === "sale" ? "Venda" : "Locação"}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="text-right font-bold">
+                              <TableCell className="text-right font-bold py-4">
                                 {formatPrice(contract.value)}
                               </TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className={cn("text-xs", statusConfig.color)}>
-                                  <StatusIcon className="h-3 w-3 mr-1" />
+                              <TableCell className="py-4">
+                                <Badge variant="outline" className={cn("text-xs gap-1.5", statusConfig.color)}>
+                                  <StatusIcon className="h-3 w-3" />
                                   {statusConfig.label}
                                 </Badge>
                               </TableCell>
-                              <TableCell className="text-xs text-muted-foreground">
+                              <TableCell className="text-xs text-muted-foreground py-4">
                                 {contract.createdAt ? format(new Date(contract.createdAt), "dd/MM/yyyy") : "—"}
                               </TableCell>
                               <TableCell>

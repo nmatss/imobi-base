@@ -1,3 +1,4 @@
+import React from "react";
 import { useState, useEffect } from "react";
 import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "./button";
@@ -12,6 +13,19 @@ interface ImageLightboxProps {
 export function ImageLightbox({ images, initialIndex = 0, isOpen, onClose }: ImageLightboxProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [zoom, setZoom] = useState(1);
+
+  const goToPrevious = () => {
+    setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+    setZoom(1);
+  };
+
+  const goToNext = () => {
+    setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+    setZoom(1);
+  };
+
+  const handleZoomIn = () => setZoom((z) => Math.min(z + 0.5, 3));
+  const handleZoomOut = () => setZoom((z) => Math.max(z - 0.5, 0.5));
 
   useEffect(() => {
     setCurrentIndex(initialIndex);
@@ -38,20 +52,10 @@ export function ImageLightbox({ images, initialIndex = 0, isOpen, onClose }: Ima
     return () => { document.body.style.overflow = ""; };
   }, [isOpen]);
 
-  if (!isOpen || images.length === 0) return null;
-
-  const goToPrevious = () => {
-    setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
-    setZoom(1);
-  };
-
-  const goToNext = () => {
-    setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
-    setZoom(1);
-  };
-
-  const handleZoomIn = () => setZoom((z) => Math.min(z + 0.5, 3));
-  const handleZoomOut = () => setZoom((z) => Math.max(z - 0.5, 0.5));
+  // Early return AFTER hooks to avoid violating rules of hooks
+  if (!isOpen || !Array.isArray(images) || images.length === 0) {
+    return null;
+  }
 
   return (
     <div 
@@ -63,7 +67,7 @@ export function ImageLightbox({ images, initialIndex = 0, isOpen, onClose }: Ima
         variant="ghost"
         size="icon"
         className="absolute top-4 right-4 text-white hover:bg-white/20 z-50"
-        onClick={onClose}
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
         data-testid="button-close-lightbox"
       >
         <X className="h-6 w-6" />

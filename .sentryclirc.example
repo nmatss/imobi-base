@@ -1,0 +1,32 @@
+[defaults]
+# Sentry CLI Configuration
+# This file configures the Sentry CLI for source map uploads and release management
+# Documentation: https://docs.sentry.io/product/cli/configuration/
+
+# Organization slug (found in Sentry Settings -> General Settings)
+org=your-organization-slug
+
+# Project slug (found in Project Settings -> General)
+project=imobibase
+
+[auth]
+# Authentication token (DO NOT commit this file with real token)
+# Instead, use environment variable: SENTRY_AUTH_TOKEN
+# Generate at: https://sentry.io/settings/account/api/auth-tokens/
+# Required scopes: project:read, project:releases, org:read
+token=
+
+[http]
+# Disable SSL verification for self-hosted Sentry (not recommended for production)
+# verify_ssl=false
+
+# Custom Sentry instance URL (only for self-hosted)
+# url=https://sentry.example.com/
+
+[log]
+# Log level: trace, debug, info, warn, error
+level=warn
+
+[ui]
+# Disable progress bars in CI environments
+# enable=false

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useImobi, Property } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -15,6 +15,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   BedDouble, Bath, Ruler, MapPin, Search, Filter, Plus, Pencil, Trash2, Loader2,
   Share2, Images, Building2, Home, CheckCircle2, AlertTriangle, XCircle, Eye,
@@ -44,6 +46,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { PropertyCard, PropertyCardSkeleton } from "@/components/properties";
+import { Spinner } from "@/components/ui/spinner";
 
 function formatPrice(price: string) {
   const num = parseFloat(price);
@@ -77,26 +81,7 @@ function calculateScore(property: Property): { score: number; missing: string[] 
   return { score: Math.round((score / total) * 100), missing };
 }
 
-// Property Card Skeleton Component
-function PropertyCardSkeleton() {
-  return (
-    <Card className="overflow-hidden">
-      <div className="aspect-[16/10] sm:aspect-[4/3] bg-muted animate-pulse" />
-      <CardContent className="p-2.5 sm:p-3 space-y-2">
-        <div className="h-4 bg-muted rounded animate-pulse w-3/4" />
-        <div className="h-6 bg-muted rounded animate-pulse w-1/2" />
-        <div className="flex gap-2">
-          <div className="h-3 bg-muted rounded animate-pulse w-16" />
-          <div className="h-3 bg-muted rounded animate-pulse w-16" />
-          <div className="h-3 bg-muted rounded animate-pulse w-16" />
-        </div>
-        <div className="pt-2 border-t">
-          <div className="h-1.5 bg-muted rounded animate-pulse" />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+// Property Card Skeleton Component - moved to PropertyCard.tsx
 
 type PropertyFormData = {
   title: string;
@@ -175,6 +160,7 @@ export default function PropertiesList() {
   const [formStep, setFormStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Lightbox
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
@@ -187,6 +173,9 @@ export default function PropertiesList() {
   // WhatsApp Modal State
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [whatsAppProperty, setWhatsAppProperty] = useState<Property | null>(null);
+
+  // Loading states for individual actions
+  const [togglingFeatured, setTogglingFeatured] = useState<string | null>(null);
 
   // ==================== PORTFOLIO STATS ====================
   const portfolioStats = useMemo(() => {
@@ -355,38 +344,43 @@ export default function PropertiesList() {
         throw new Error(error.error || "Erro ao salvar imóvel");
       }
 
-      toast({
-        title: editingProperty ? "Imóvel atualizado" : "Imóvel criado",
-        description: editingProperty ? "O imóvel foi atualizado com sucesso." : "O imóvel foi cadastrado com sucesso.",
-      });
+      if (editingProperty) {
+        toast.crud.updated("Imóvel");
+      } else {
+        toast.crud.created("Imóvel");
+      }
 
       setIsModalOpen(false);
       setFormData(initialFormData);
       setEditingProperty(null);
       await refetchProperties();
     } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      toast.errors.operation("salvar o imóvel");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDelete = async (id: string) => {
+    setIsDeleting(true);
     try {
       const res = await fetch(`/api/properties/${id}`, { method: "DELETE", credentials: "include" });
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || "Erro ao excluir imóvel");
       }
-      toast({ title: "Imóvel excluído", description: "O imóvel foi removido com sucesso." });
+      toast.crud.deleted("Imóvel");
       setDeleteConfirmId(null);
       await refetchProperties();
     } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      toast.errors.operation("excluir o imóvel");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   const handleToggleFeatured = async (property: Property) => {
+    setTogglingFeatured(property.id);
     try {
       const res = await fetch(`/api/properties/${property.id}`, {
         method: "PATCH",
@@ -395,14 +389,17 @@ export default function PropertiesList() {
         body: JSON.stringify({ featured: !property.featured }),
       });
       if (res.ok) {
-        toast({
-          title: property.featured ? "Removido dos destaques" : "Adicionado aos destaques",
-          description: property.featured ? "O imóvel não aparece mais em destaque." : "O imóvel agora aparece em destaque no site.",
-        });
+        if (property.featured) {
+          toast.success("Removido dos destaques", "O imóvel não aparece mais em destaque.");
+        } else {
+          toast.action.favorited("Imóvel");
+        }
         await refetchProperties();
       }
     } catch (error) {
-      toast({ title: "Erro", description: "Não foi possível alterar o destaque.", variant: "destructive" });
+      toast.errors.operation("alterar o destaque");
+    } finally {
+      setTogglingFeatured(null);
     }
   };
 
@@ -414,7 +411,7 @@ export default function PropertiesList() {
   const copyLink = (property: Property) => {
     const url = `${window.location.origin}/e/${tenant?.slug}/imovel/${property.id}`;
     navigator.clipboard.writeText(url);
-    toast({ title: "Link copiado", description: "O link do imóvel foi copiado para a área de transferência." });
+    toast.action.linkCopied();
   };
 
   const handleImageAdd = () => {
@@ -463,17 +460,15 @@ export default function PropertiesList() {
 
   // ==================== RENDER ====================
   return (
-    <div className="space-y-3 sm:space-y-4 md:space-y-6">
+    <div className="container-responsive space-responsive">
       {/* ==================== HEADER COM STATS ==================== */}
-      <div className="flex flex-col gap-3 sm:gap-4">
-        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 sm:gap-3">
+      <div className="space-responsive">
+        <div className="action-bar">
           <div className="min-w-0">
-            <h1 className="text-lg xs:text-xl sm:text-2xl font-heading font-bold text-foreground truncate">Imóveis</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground">
-              <span className="hidden xs:inline">Gerencie seu portfólio de </span>
-              <span className="font-medium">{portfolioStats.total}</span>
-              <span className="xs:hidden"> imóveis</span>
-              <span className="hidden xs:inline"> imóveis</span>
+            <h1 className="text-responsive-xl font-heading font-bold text-foreground truncate">Imóveis</h1>
+            <p className="text-responsive-xs text-muted-foreground">
+              <span className="hide-mobile">Gerencie seu portfólio de </span>
+              <span className="font-medium">{portfolioStats.total}</span> imóveis
             </p>
           </div>
           <PermissionGate permission="properties.create">
@@ -485,18 +480,18 @@ export default function PropertiesList() {
           </PermissionGate>
         </div>
 
-        {/* Stats Cards - Horizontal scroll on mobile, grid on larger screens */}
-        <div className="flex gap-2 overflow-x-auto pb-2 -mx-3 px-3 sm:-mx-0 sm:px-0 sm:grid sm:grid-cols-3 lg:grid-cols-6 scrollbar-hide snap-x snap-mandatory">
-          <Card className="min-w-[100px] xs:min-w-[110px] sm:min-w-0 border-l-4 border-l-blue-500 shrink-0 sm:shrink snap-start">
-            <CardContent className="p-2 sm:p-3">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <Building2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500 shrink-0" />
-                <span className="text-[10px] sm:text-xs text-muted-foreground truncate">Total</span>
+        {/* Stats Cards - 4 CARDS PRINCIPAIS - Grid responsivo: 1 col mobile → 2 tablet → 4 desktop */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          <Card className="border-l-4 border-l-blue-500 card-hover-subtle">
+            <CardContent className="card-stats">
+              <div className="flex items-center gap-responsive-sm">
+                <Building2 className="icon-responsive text-blue-500 shrink-0" />
+                <span className="text-responsive-xs text-muted-foreground truncate">Total</span>
               </div>
-              <p className="text-lg sm:text-xl font-bold mt-0.5 sm:mt-1">{portfolioStats.total}</p>
+              <p className="text-responsive-lg font-bold">{portfolioStats.total}</p>
             </CardContent>
           </Card>
-          <Card className="min-w-[100px] xs:min-w-[110px] sm:min-w-0 border-l-4 border-l-green-500 shrink-0 sm:shrink snap-start">
+          <Card className="border-l-4 border-l-green-500">
             <CardContent className="p-2 sm:p-3">
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500 shrink-0" />
@@ -505,7 +500,7 @@ export default function PropertiesList() {
               <p className="text-lg sm:text-xl font-bold mt-0.5 sm:mt-1">{portfolioStats.available}</p>
             </CardContent>
           </Card>
-          <Card className="min-w-[100px] xs:min-w-[110px] sm:min-w-0 border-l-4 border-l-purple-500 shrink-0 sm:shrink snap-start">
+          <Card className="border-l-4 border-l-purple-500">
             <CardContent className="p-2 sm:p-3">
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <Home className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-purple-500 shrink-0" />
@@ -514,25 +509,7 @@ export default function PropertiesList() {
               <p className="text-lg sm:text-xl font-bold mt-0.5 sm:mt-1">{portfolioStats.rented}</p>
             </CardContent>
           </Card>
-          <Card className="min-w-[100px] xs:min-w-[110px] sm:min-w-0 border-l-4 border-l-blue-400 shrink-0 sm:shrink snap-start">
-            <CardContent className="p-2 sm:p-3">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-400 shrink-0" />
-                <span className="text-[10px] sm:text-xs text-muted-foreground truncate">Vendidos</span>
-              </div>
-              <p className="text-lg sm:text-xl font-bold mt-0.5 sm:mt-1">{portfolioStats.sold}</p>
-            </CardContent>
-          </Card>
-          <Card className="min-w-[100px] xs:min-w-[110px] sm:min-w-0 border-l-4 border-l-yellow-500 shrink-0 sm:shrink snap-start">
-            <CardContent className="p-2 sm:p-3">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <Star className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-yellow-500 shrink-0" />
-                <span className="text-[10px] sm:text-xs text-muted-foreground truncate">Destaque</span>
-              </div>
-              <p className="text-lg sm:text-xl font-bold mt-0.5 sm:mt-1">{portfolioStats.featured}</p>
-            </CardContent>
-          </Card>
-          <Card className={`min-w-[100px] xs:min-w-[110px] sm:min-w-0 border-l-4 shrink-0 sm:shrink snap-start ${portfolioStats.incomplete > 0 ? "border-l-red-500" : "border-l-gray-300"}`}>
+          <Card className={`border-l-4 ${portfolioStats.incomplete > 0 ? "border-l-red-500" : "border-l-gray-300"}`}>
             <CardContent className="p-2 sm:p-3">
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <AlertTriangle className={`h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 ${portfolioStats.incomplete > 0 ? "text-red-500" : "text-gray-400"}`} />
@@ -557,26 +534,45 @@ export default function PropertiesList() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
             {searchQuery && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-0.5 top-1/2 -translate-y-1/2 h-8 w-8"
-                onClick={() => setSearchQuery("")}
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0.5 top-1/2 -translate-y-1/2 h-8 w-8"
+                      onClick={() => setSearchQuery("")}
+                      aria-label="Limpar busca"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Limpar busca</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
           </div>
 
           {/* Mobile: Filter Sheet */}
           <Sheet open={showFilters} onOpenChange={setShowFilters}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 lg:hidden relative">
-                <SlidersHorizontal className="h-4 w-4" />
-                {hasActiveFilters && (
-                  <span className="absolute -top-1 -right-1 h-2.5 w-2.5 sm:h-3 sm:w-3 bg-primary rounded-full border-2 border-background" />
-                )}
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-9 w-9 sm:h-10 sm:w-10 shrink-0 lg:hidden relative" aria-label="Abrir filtros">
+                      <SlidersHorizontal className="h-4 w-4" />
+                      {hasActiveFilters && (
+                        <span className="absolute -top-1 -right-1 h-2.5 w-2.5 sm:h-3 sm:w-3 bg-primary rounded-full border-2 border-background" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Abrir filtros</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </SheetTrigger>
             <SheetContent side="right" className="w-full xs:w-[320px] sm:w-[360px] p-4 sm:p-6">
               <SheetHeader className="pb-4 border-b">
@@ -658,22 +654,42 @@ export default function PropertiesList() {
 
           {/* View Toggle - visible on sm+ */}
           <div className="hidden sm:flex border rounded-lg shrink-0">
-            <Button
-              variant={viewMode === "grid" ? "secondary" : "ghost"}
-              size="icon"
-              className="h-9 w-9 sm:h-10 sm:w-10 rounded-r-none"
-              onClick={() => setViewMode("grid")}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === "list" ? "secondary" : "ghost"}
-              size="icon"
-              className="h-9 w-9 sm:h-10 sm:w-10 rounded-l-none"
-              onClick={() => setViewMode("list")}
-            >
-              <List className="h-4 w-4" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={viewMode === "grid" ? "secondary" : "ghost"}
+                    size="icon"
+                    className="h-9 w-9 sm:h-10 sm:w-10 rounded-r-none"
+                    onClick={() => setViewMode("grid")}
+                    aria-label="Visualização em grade"
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Visualização em grade</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant={viewMode === "list" ? "secondary" : "ghost"}
+                    size="icon"
+                    className="h-9 w-9 sm:h-10 sm:w-10 rounded-l-none"
+                    onClick={() => setViewMode("list")}
+                    aria-label="Visualização em lista"
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Visualização em lista</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
 
@@ -752,9 +768,9 @@ export default function PropertiesList() {
 
       {/* ==================== PROPERTY LIST ==================== */}
       {loading ? (
-        /* LOADING SKELETONS */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 3xl:grid-cols-5 gap-4 sm:gap-6 animate-in fade-in duration-200">
-          {Array.from({ length: 8 }).map((_, index) => (
+        /* LOADING SKELETONS - Grid responsivo: 1 col mobile → 2 tablet → 3 desktop, com gaps adaptativos */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 animate-in fade-in duration-200">
+          {Array.from({ length: 6 }).map((_, index) => (
             <PropertyCardSkeleton key={index} />
           ))}
         </div>
@@ -775,174 +791,98 @@ export default function PropertiesList() {
           </PermissionGate>
         </div>
       ) : viewMode === "grid" ? (
-        /* GRID VIEW - Responsive grid: 1 col (mobile) → 2 (sm) → 3 (lg) → 4 (xl) → 5 (3xl) */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 3xl:grid-cols-5 gap-4 sm:gap-6">
-          {enrichedProperties.map((property) => (
-            <Card
-              key={property.id}
-              className="group overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-1 hover:border-primary/20 cursor-pointer touch-manipulation"
-              onClick={() => setLocation(`/properties/${property.id}`)}
-            >
-              {/* Image Container - Responsive height */}
-              <div className="h-40 xs:h-44 sm:h-48 overflow-hidden relative">
-                <img
-                  src={property.images?.[0] || "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800"}
-                  alt={property.title}
-                  title={property.title}
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  onClick={(e) => { e.stopPropagation(); openLightbox(property.images || []); }}
-                  loading="lazy"
-                />
+        /* GRID VIEW WITH VIRTUALIZATION - Grid responsivo: 1 col mobile → 2 tablet → 3 desktop */
+        (() => {
+          const parentRef = useRef<HTMLDivElement>(null);
 
-                {/* Badges Repositioning */}
-                <div className="absolute top-2 left-2 right-2 flex justify-between items-start pointer-events-none">
-                  {/* Type Badge - Top Left with backdrop blur and bg-black/60 */}
-                  <Badge className="backdrop-blur-sm bg-black/60 text-white text-xs px-2 py-1">
-                    {property.category === 'sale' ? 'Venda' : 'Aluguel'}
-                  </Badge>
+          // Calculate columns based on viewport
+          const getColumnCount = () => {
+            if (typeof window === 'undefined') return 3;
+            const width = window.innerWidth;
+            if (width < 640) return 1;  // mobile (<640px)
+            if (width < 1024) return 2; // tablet (640-1024px)
+            return 3;                    // desktop (1024+)
+          };
 
-                  {/* Status Badge - Top Right */}
-                  <Badge className={`text-xs px-2 py-1 ${STATUS_CONFIG[property.status]?.bg} ${STATUS_CONFIG[property.status]?.color}`}>
-                    {STATUS_CONFIG[property.status]?.label || property.status}
-                  </Badge>
-                </div>
+          const [columnCount, setColumnCount] = useState(getColumnCount);
 
-                {/* Featured and Image Count badges */}
-                {(property.featured || (property.images && property.images.length > 1)) && (
-                  <div className="absolute top-12 right-2 flex flex-col gap-1 items-end pointer-events-none">
-                    {property.featured && (
-                      <Badge className="bg-yellow-500 text-white text-xs px-2 py-1">
-                        <Star className="h-3 w-3 fill-current" />
-                      </Badge>
-                    )}
-                    {property.images && property.images.length > 1 && (
-                      <Badge className="backdrop-blur-sm bg-black/60 text-white text-xs px-2 py-1">
-                        <Images className="h-3 w-3 mr-1" />{property.images.length}
-                      </Badge>
-                    )}
-                  </div>
-                )}
+          // Update column count on resize
+          useEffect(() => {
+            const handleResize = () => setColumnCount(getColumnCount());
+            window.addEventListener('resize', handleResize);
+            return () => window.removeEventListener('resize', handleResize);
+          }, []);
 
-                {/* Quality Warnings - Bottom left */}
-                {property.hasQualityIssues && (
-                  <div className="absolute bottom-1.5 sm:bottom-2 left-1.5 sm:left-2 flex gap-0.5 sm:gap-1 flex-wrap pointer-events-none">
-                    {(!property.images || property.images.length === 0) && (
-                      <Badge variant="destructive" className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0 h-4 sm:h-auto">
-                        <Camera className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5" /> Sem fotos
-                      </Badge>
-                    )}
-                    {(!property.description || property.description.length < 50) && (
-                      <Badge variant="destructive" className="text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0 h-4 sm:h-auto">
-                        <FileText className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5" /> Sem descrição
-                      </Badge>
-                    )}
-                  </div>
-                )}
+          const rowCount = Math.ceil(enrichedProperties.length / columnCount);
 
+          const rowVirtualizer = useVirtualizer({
+            count: rowCount,
+            getScrollElement: () => parentRef.current,
+            estimateSize: () => 280, // PropertyCard estimated height
+            overscan: 5,
+          });
+
+          return (
+            <div ref={parentRef} className="h-[calc(100vh-24rem)] overflow-auto">
+              <div
+                style={{
+                  height: `${rowVirtualizer.getTotalSize()}px`,
+                  width: '100%',
+                  position: 'relative',
+                }}
+              >
+                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                  const startIndex = virtualRow.index * columnCount;
+                  const rowProperties = enrichedProperties.slice(startIndex, startIndex + columnCount);
+
+                  return (
+                    <div
+                      key={virtualRow.key}
+                      data-index={virtualRow.index}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
+                    >
+                      {/* Grid responsivo: 1 col mobile → 2 tablet → 3 desktop, com gaps adaptativos */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 px-1">
+                        {rowProperties.map((property) => (
+                          <PropertyCard
+                            key={property.id}
+                            id={property.id}
+                            title={property.title}
+                            city={property.city}
+                            price={parseFloat(property.price)}
+                            bedrooms={property.bedrooms}
+                            bathrooms={property.bathrooms}
+                            area={property.area}
+                            status={property.status as "available" | "sold" | "rented" | "pending" | "reserved"}
+                            type={property.category as 'sale' | 'rent'}
+                            featured={property.featured}
+                            imageUrl={property.images?.[0]}
+                            imageCount={property.images?.length || 0}
+                            isTogglingFeatured={togglingFeatured === property.id}
+                            onView={(id) => setLocation(`/properties/${id}`)}
+                            onEdit={(id) => openEditModal(property)}
+                            onDelete={(id) => setDeleteConfirmId(id)}
+                            onShare={(id) => shareWhatsApp(property)}
+                            onToggleFeatured={(id) => handleToggleFeatured(property)}
+                            onCopyLink={(id) => copyLink(property)}
+                            onScheduleVisit={(id) => setLocation("/calendar")}
+                            onImageClick={(id) => openLightbox(property.images || [])}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-
-              {/* Content */}
-              <CardContent className="p-2.5 sm:p-3">
-                <div className="flex items-start justify-between gap-1.5 sm:gap-2">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-xs sm:text-sm line-clamp-2 group-hover:text-primary transition-colors" title={property.title}>
-                      {property.title}
-                    </h3>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground flex items-center mt-0.5">
-                      <MapPin className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1 shrink-0" />
-                      <span className="truncate">{property.city}</span>
-                    </p>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 shrink-0 -mr-1.5 sm:-mr-1 hover:bg-muted rounded-full touch-manipulation" aria-label="Mais opções" onClick={(e) => e.stopPropagation()}>
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuItem onClick={() => setLocation(`/properties/${property.id}`)}>
-                        <Eye className="h-4 w-4 mr-2" /> Ver detalhes
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => openEditModal(property)}>
-                        <Pencil className="h-4 w-4 mr-2" /> Editar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleToggleFeatured(property)}>
-                        {property.featured ? <StarOff className="h-4 w-4 mr-2" /> : <Star className="h-4 w-4 mr-2" />}
-                        {property.featured ? "Remover destaque" : "Destacar"}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => shareWhatsApp(property)}>
-                        <Send className="h-4 w-4 mr-2" /> WhatsApp
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => copyLink(property)}>
-                        <Copy className="h-4 w-4 mr-2" /> Copiar link
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setLocation("/calendar")}>
-                        <CalendarPlus className="h-4 w-4 mr-2" /> Agendar visita
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-red-600" onClick={() => setDeleteConfirmId(property.id)}>
-                        <Trash2 className="h-4 w-4 mr-2" /> Excluir
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-
-                <p className="text-lg xs:text-xl sm:text-2xl font-bold text-primary mt-1.5 xs:mt-2">{formatPrice(property.price)}</p>
-
-                {/* Property Info with clear icons - Responsive */}
-                <div className="flex flex-wrap items-center gap-2 xs:gap-3 mt-1.5 xs:mt-2 text-xs xs:text-sm text-muted-foreground">
-                  {property.bedrooms && (
-                    <span className="flex items-center gap-0.5 xs:gap-1">
-                      <Bed className="h-3.5 w-3.5 xs:h-4 xs:w-4" /> {property.bedrooms}
-                    </span>
-                  )}
-                  {property.bathrooms && (
-                    <span className="flex items-center gap-0.5 xs:gap-1">
-                      <Bath className="h-3.5 w-3.5 xs:h-4 xs:w-4" /> {property.bathrooms}
-                    </span>
-                  )}
-                  {property.area && (
-                    <span className="flex items-center gap-0.5 xs:gap-1">
-                      <Maximize2 className="h-3.5 w-3.5 xs:h-4 xs:w-4" /> {property.area}m²
-                    </span>
-                  )}
-                </div>
-
-                {/* Score Bar - Hidden on very small screens */}
-                <div className="mt-2 sm:mt-3 pt-2 border-t hidden xs:block">
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-muted-foreground">Completude</span>
-                    <span className={property.score >= 70 ? "text-green-600" : "text-amber-600"}>
-                      {property.score}%
-                    </span>
-                  </div>
-                  <Progress value={property.score} className="h-1.5" />
-                </div>
-
-                {/* Action Buttons - Always visible, touch-friendly (min 44px) */}
-                <div className="flex gap-2 mt-2 xs:mt-3 pt-2 xs:pt-3 border-t">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 h-10 xs:h-9 text-xs xs:text-sm active:scale-95 transition-transform"
-                    onClick={(e) => { e.stopPropagation(); setLocation(`/properties/${property.id}`); }}
-                  >
-                    <Eye className="h-4 w-4 mr-1" /> Ver
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="flex-1 h-10 xs:h-9 text-xs xs:text-sm active:scale-95 transition-transform"
-                    onClick={(e) => { e.stopPropagation(); openEditModal(property); }}
-                  >
-                    <Pencil className="h-4 w-4 mr-1" /> Editar
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+            </div>
+          );
+        })()
       ) : (
         /* LIST VIEW - Responsive: stacks on very small screens, horizontal on larger */
         <div className="space-y-2 sm:space-y-2.5">
@@ -992,9 +932,18 @@ export default function PropertiesList() {
                       {/* Actions Dropdown - Touch-friendly (min 44px) */}
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 shrink-0 -mr-1 -mt-0.5 touch-manipulation">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-8 sm:w-8 shrink-0 -mr-1 -mt-0.5 touch-manipulation" aria-label="Mais opções">
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Mais opções</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44 sm:w-48">
                           <DropdownMenuItem onClick={() => setLocation(`/properties/${property.id}`)}>
@@ -1030,7 +979,7 @@ export default function PropertiesList() {
                       {formatPrice(property.price)}
                     </p>
 
-                    {/* Badges - Compact row, scrollable if needed on very small screens */}
+                    {/* Badges - Simplificados: categoria + tipo + status */}
                     <div className="flex flex-wrap gap-1 sm:gap-1.5 mt-1 sm:mt-1.5">
                       <Badge className={`text-[9px] sm:text-[10px] px-1.5 py-0 h-4 sm:h-5 ${property.category === 'sale' ? 'bg-blue-500' : 'bg-green-500'}`}>
                         {property.category === 'sale' ? 'Venda' : 'Aluguel'}
@@ -1041,12 +990,6 @@ export default function PropertiesList() {
                       <Badge className={`text-[9px] sm:text-[10px] px-1.5 py-0 h-4 sm:h-5 ${STATUS_CONFIG[property.status]?.bg} ${STATUS_CONFIG[property.status]?.color}`}>
                         {STATUS_CONFIG[property.status]?.label}
                       </Badge>
-                      {property.hasQualityIssues && (
-                        <Badge variant="destructive" className="text-[9px] sm:text-[10px] px-1.5 py-0 h-4 sm:h-5">
-                          <AlertTriangle className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5" />
-                          <span className="hidden xs:inline">Incompleto</span>
-                        </Badge>
-                      )}
                     </div>
 
                     {/* Stats Row - Responsive, wraps nicely */}
@@ -1409,8 +1352,7 @@ export default function PropertiesList() {
                     Próximo
                   </Button>
                 ) : (
-                  <Button type="submit" form="property-form" disabled={isSubmitting} className="h-9 sm:h-10 text-sm flex-1 xs:flex-none">
-                    {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  <Button type="submit" form="property-form" isLoading={isSubmitting} className="h-9 sm:h-10 text-sm flex-1 xs:flex-none">
                     {editingProperty ? "Salvar" : "Cadastrar"}
                   </Button>
                 )}
@@ -1430,10 +1372,10 @@ export default function PropertiesList() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-col-reverse xs:flex-row gap-2 mt-2">
-            <Button variant="outline" onClick={() => setDeleteConfirmId(null)} className="w-full xs:w-auto h-9 sm:h-10 text-sm">
+            <Button variant="outline" onClick={() => setDeleteConfirmId(null)} disabled={isDeleting} className="w-full xs:w-auto h-9 sm:h-10 text-sm">
               Cancelar
             </Button>
-            <Button variant="destructive" onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)} className="w-full xs:w-auto h-9 sm:h-10 text-sm">
+            <Button variant="destructive" onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)} isLoading={isDeleting} className="w-full xs:w-auto h-9 sm:h-10 text-sm">
               Excluir
             </Button>
           </DialogFooter>

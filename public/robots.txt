@@ -1,0 +1,42 @@
+# ImobiBase - robots.txt
+# Production robots configuration
+
+# Allow all crawlers by default
+User-agent: *
+Allow: /
+
+# Disallow sensitive paths
+Disallow: /api/
+Disallow: /admin/
+Disallow: /_dev/
+Disallow: /dashboard/
+Disallow: /login
+Disallow: /register
+Disallow: /settings/
+
+# Allow public pages
+Allow: /api/leads/public
+Allow: /api/newsletter/subscribe
+
+# Sitemap
+Sitemap: https://imobibase.com/sitemap.xml
+
+# Crawl delay (1 second between requests)
+Crawl-delay: 1
+
+# Security scanning bots
+User-agent: security-scanner
+User-agent: security-bot
+Disallow: /
+
+# Archive bots - be polite
+User-agent: ia_archiver
+Crawl-delay: 5
+
+# Bad bots
+User-agent: AhrefsBot
+User-agent: SemrushBot
+User-agent: DotBot
+User-agent: MJ12bot
+User-agent: rogerbot
+Disallow: /

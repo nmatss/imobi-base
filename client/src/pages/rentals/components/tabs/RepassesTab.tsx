@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -180,19 +180,21 @@ export function RepassesTab({
       {/* Table - Desktop */}
       <div className="hidden sm:block">
         <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Locador</TableHead>
-                <TableHead>Período</TableHead>
-                <TableHead className="text-right">Bruto</TableHead>
-                <TableHead className="text-right">Taxa Admin</TableHead>
-                <TableHead className="text-right">Deduções</TableHead>
-                <TableHead className="text-right">Líquido</TableHead>
-                <TableHead className="text-center">Status</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <div className="inline-block min-w-full align-middle">
+              <Table className="min-w-[700px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Locador</TableHead>
+                    <TableHead>Período</TableHead>
+                    <TableHead className="text-right">Bruto</TableHead>
+                    <TableHead className="text-right">Taxa Admin</TableHead>
+                    <TableHead className="text-right">Deduções</TableHead>
+                    <TableHead className="text-right">Líquido</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
@@ -269,7 +271,9 @@ export function RepassesTab({
                 ))
               )}
             </TableBody>
-          </Table>
+              </Table>
+            </div>
+          </div>
         </Card>
       </div>
 

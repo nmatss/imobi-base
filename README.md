@@ -181,6 +181,59 @@ Características:
 - Captação de leads
 - Newsletter
 
+## Integrações
+
+ImobiBase suporta integração com diversos serviços externos:
+
+### WhatsApp Business API
+
+Integração completa com WhatsApp Business API para comunicação com leads:
+- Envio e recebimento de mensagens
+- Templates de mensagens
+- Gestão de conversas
+- Auto-resposta inteligente
+- **Webhook com validação de assinatura HMAC SHA-256**
+
+**Documentação:**
+- 📖 [Setup Completo](./docs/WHATSAPP_WEBHOOK_SECURITY_SETUP.md) - Guia passo-a-passo
+- 📋 [Referência Rápida](./docs/WHATSAPP_WEBHOOK_QUICK_REFERENCE.md) - Comandos e troubleshooting
+- 📊 [Resumo da Implementação](./docs/WHATSAPP_WEBHOOK_IMPLEMENTATION_SUMMARY.md)
+
+**Configuração Rápida:**
+```bash
+# Gerar tokens
+WHATSAPP_VERIFY_TOKEN=$(openssl rand -base64 32)
+
+# Adicionar ao .env
+echo "WHATSAPP_APP_SECRET=seu-app-secret" >> .env
+echo "WHATSAPP_VERIFY_TOKEN=$WHATSAPP_VERIFY_TOKEN" >> .env
+```
+
+### Outras Integrações (Planejadas)
+
+- **Email** - SendGrid / Resend
+- **SMS** - Twilio
+- **Pagamentos** - Stripe / Mercado Pago
+- **Mapas** - Google Maps API
+- **E-signature** - ClickSign
+- **Storage** - Supabase Storage
+
+## Design System
+
+ImobiBase utiliza um design system consistente baseado em:
+
+- **UI Components**: shadcn/ui + Tailwind CSS
+- **Icons**: Lucide React
+- **Spacing**: Sistema 8pt grid (16px, 24px, 32px)
+- **Colors**: Paleta semântica (Primary, Success, Warning, Error, Info)
+- **Typography**: Escala hierárquica clara
+
+Para mais detalhes, consulte:
+- [Design System Guide](./client/src/lib/DESIGN_SYSTEM_GUIDE.md)
+- [Component Examples](./client/src/lib/COMPONENT_EXAMPLES.md)
+- [Spacing Guide](./client/src/lib/SPACING_GUIDE.md)
+- [Migration Guide](./client/src/lib/MIGRATION_GUIDE.md)
+
 ## Licença
 
 MIT

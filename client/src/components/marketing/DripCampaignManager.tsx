@@ -166,7 +166,7 @@ export function DripCampaignManager({ tenantId }: DripCampaignManagerProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'bg-green-500';
-      case 'paused': return 'bg-yellow-500';
+      case 'paused': return 'bg-amber-700'; // WCAG AA: 4.6:1 contrast
       case 'completed': return 'bg-blue-500';
       default: return 'bg-gray-500';
     }

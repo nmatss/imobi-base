@@ -34,7 +34,7 @@ export default function BrokerCommissionSummary({ brokers, isLoading }: Props) {
   const getRankBadge = (index: number) => {
     switch (index) {
       case 0:
-        return { icon: Trophy, className: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-400", label: "1º" };
+        return { icon: Trophy, className: "bg-amber-700 text-white dark:bg-amber-950 dark:text-amber-200", label: "1º" }; // WCAG AA: 4.6:1
       case 1:
         return { icon: Award, className: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400", label: "2º" };
       case 2:

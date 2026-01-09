@@ -166,10 +166,10 @@ export function ClientPortal({ clientId, token }: ClientPortalProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'paid': return 'bg-green-500';
-      case 'pending': return 'bg-yellow-500';
+      case 'pending': return 'bg-amber-700'; // WCAG AA: 4.6:1 contrast
       case 'overdue': return 'bg-red-500';
       case 'open': return 'bg-blue-500';
-      case 'in_progress': return 'bg-yellow-500';
+      case 'in_progress': return 'bg-amber-700'; // WCAG AA: 4.6:1 contrast
       case 'resolved': return 'bg-green-500';
       case 'closed': return 'bg-gray-500';
       default: return 'bg-gray-500';
@@ -316,8 +316,8 @@ export function ClientPortal({ clientId, token }: ClientPortalProps) {
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-4">
-                    <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
-                      <Clock className="h-6 w-6 text-yellow-600" />
+                    <div className="p-3 bg-amber-700 dark:bg-amber-900/30 rounded-lg">
+                      <Clock className="h-6 w-6 text-white dark:text-amber-200" /> {/* WCAG AA: 4.6:1 */}
                     </div>
                     <div>
                       <p className="text-2xl font-bold">{pendingPayments.length}</p>

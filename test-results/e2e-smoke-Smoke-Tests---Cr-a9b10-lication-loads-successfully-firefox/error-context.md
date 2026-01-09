@@ -1,0 +1,278 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - generic [ref=e6]:
+          - img [ref=e8]
+          - generic [ref=e14]: ImobiBase
+        - navigation [ref=e15]:
+          - link "Recursos" [ref=e16] [cursor=pointer]:
+            - /url: "#recursos"
+            - text: Recursos
+          - link "Soluções" [ref=e17] [cursor=pointer]:
+            - /url: "#soluções"
+            - text: Soluções
+          - link "Preços" [ref=e18] [cursor=pointer]:
+            - /url: "#preços"
+            - text: Preços
+          - link "Empresa" [ref=e19] [cursor=pointer]:
+            - /url: "#empresa"
+            - text: Empresa
+        - generic [ref=e20]:
+          - link "Entrar" [ref=e21] [cursor=pointer]:
+            - /url: /login
+            - button "Entrar" [ref=e22]
+          - link "Começar Grátis" [ref=e23] [cursor=pointer]:
+            - /url: /login
+            - button "Começar Grátis" [ref=e24]
+    - main [ref=e25]:
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - generic [ref=e32]: Sistema Completo para Imobiliárias
+          - heading "A inteligência que sua imobiliária precisa." [level=1] [ref=e36]:
+            - text: A inteligência
+            - text: que sua imobiliária
+            - text: precisa.
+          - paragraph [ref=e37]: Centralize imóveis, leads e contratos em uma única plataforma. Crie sites automáticos e gerencie seu funil de vendas com a tecnologia que as grandes redes usam.
+          - generic [ref=e38]:
+            - link "Começar Agora" [ref=e39] [cursor=pointer]:
+              - /url: /login
+              - button "Começar Agora" [ref=e40]:
+                - text: Começar Agora
+                - img
+            - button "Ver Demo" [ref=e41] [cursor=pointer]:
+              - img
+              - text: Ver Demo
+          - generic [ref=e45]: Sistema disponível para testes
+        - generic [ref=e47]:
+          - generic [ref=e54]: dashboard.imobibase.com
+          - img "Dashboard ImobiBase" [ref=e55]
+          - generic [ref=e57]:
+            - img [ref=e59]
+            - generic [ref=e62]:
+              - paragraph [ref=e63]: Venda Concluída!
+              - paragraph [ref=e64]: R$ 450.000,00
+          - generic [ref=e66]:
+            - img [ref=e68]
+            - generic [ref=e73]:
+              - paragraph [ref=e74]: Novo Lead
+              - paragraph [ref=e75]: Via Instagram • Há 2min
+      - generic [ref=e78]:
+        - generic [ref=e79]:
+          - status [ref=e80]: Plataforma All-in-One
+          - heading "Um sistema, infinitas possibilidades" [level=2] [ref=e81]
+          - paragraph [ref=e82]: Simplificamos a complexidade do mercado imobiliário em uma interface fluida e poderosa.
+        - generic [ref=e83]:
+          - tablist [ref=e84]:
+            - tab "CRM & Leads" [selected] [ref=e85] [cursor=pointer]:
+              - img [ref=e86]
+              - text: CRM & Leads
+            - tab "Site & Marketing" [ref=e91] [cursor=pointer]:
+              - img [ref=e92]
+              - text: Site & Marketing
+            - tab "Gestão & Analytics" [ref=e96] [cursor=pointer]:
+              - img [ref=e97]
+              - text: Gestão & Analytics
+          - tabpanel "CRM & Leads" [ref=e103]:
+            - generic [ref=e104]:
+              - generic [ref=e105]:
+                - img [ref=e107]
+                - heading "Pipeline de Vendas Visual" [level=3] [ref=e112]
+                - paragraph [ref=e113]: Acompanhe cada lead desde o primeiro contato até a assinatura do contrato. Nosso Kanban intuitivo garante que nenhuma oportunidade seja perdida.
+                - list [ref=e114]:
+                  - listitem [ref=e115]:
+                    - img [ref=e117]
+                    - generic [ref=e120]: Automação de follow-up
+                  - listitem [ref=e121]:
+                    - img [ref=e123]
+                    - generic [ref=e126]: Histórico completo de interações
+                  - listitem [ref=e127]:
+                    - img [ref=e129]
+                    - generic [ref=e132]: Integração com Portais e WhatsApp
+              - img "CRM" [ref=e134]
+      - generic [ref=e137]:
+        - generic [ref=e138]:
+          - img [ref=e140]
+          - heading "Velocidade Incrível" [level=3] [ref=e142]
+          - paragraph [ref=e143]: Otimizado para performance máxima. Carregamento instantâneo de imóveis e fotos para não perder a atenção do cliente.
+          - generic [ref=e144]:
+            - generic [ref=e145]:
+              - generic [ref=e146]: 99%
+              - generic [ref=e147]: Uptime Garantido
+            - generic [ref=e148]:
+              - generic [ref=e149]: <1s
+              - generic [ref=e150]: Carregamento
+        - generic [ref=e151]:
+          - img [ref=e153]
+          - heading "Segurança Total" [level=3] [ref=e156]
+          - paragraph [ref=e157]: Seus dados criptografados e backups diários automáticos. Dormimos tranquilos para você também dormir.
+      - generic [ref=e159]:
+        - generic [ref=e160]:
+          - heading "Investimento Transparente" [level=2] [ref=e161]
+          - paragraph [ref=e162]: Escolha o plano ideal para o momento do seu negócio.
+          - generic [ref=e163]:
+            - generic [ref=e164]: Mensal
+            - switch [ref=e165] [cursor=pointer]
+            - generic [ref=e166]: Anual -20%
+        - generic [ref=e167]:
+          - generic [ref=e168]:
+            - generic [ref=e169]:
+              - heading "Inicial" [level=3] [ref=e170]
+              - generic [ref=e171]: Grátis
+              - paragraph [ref=e172]: Para começar sua jornada digital.
+            - button "Começar Agora" [ref=e173] [cursor=pointer]
+            - generic [ref=e174]:
+              - paragraph [ref=e175]: "Inclui:"
+              - list [ref=e176]:
+                - listitem [ref=e177]:
+                  - img [ref=e178]
+                  - text: 1 Usuário
+                - listitem [ref=e181]:
+                  - img [ref=e182]
+                  - text: Até 50 imóveis
+                - listitem [ref=e185]:
+                  - img [ref=e186]
+                  - text: Site básico
+          - generic [ref=e189]:
+            - generic [ref=e190]: RECOMENDADO
+            - generic [ref=e191]:
+              - heading "Profissional" [level=3] [ref=e192]
+              - generic [ref=e193]:
+                - generic [ref=e194]: R$ 109
+                - generic [ref=e195]: /mês
+              - paragraph [ref=e196]: Para quem quer escalar vendas.
+            - button "Assinar Pro" [ref=e197] [cursor=pointer]
+            - generic [ref=e198]:
+              - paragraph [ref=e199]: "Tudo do Inicial, mais:"
+              - list [ref=e200]:
+                - listitem [ref=e201]:
+                  - img [ref=e202]
+                  - text: Até 10 Usuários
+                - listitem [ref=e205]:
+                  - img [ref=e206]
+                  - text: 2.000 imóveis
+                - listitem [ref=e209]:
+                  - img [ref=e210]
+                  - text: Site personalizado (SEO)
+                - listitem [ref=e213]:
+                  - img [ref=e214]
+                  - text: Gestão de Contratos
+                - listitem [ref=e217]:
+                  - img [ref=e218]
+                  - text: Integração WhatsApp
+          - generic [ref=e221]:
+            - generic [ref=e222]:
+              - heading "Empresa" [level=3] [ref=e223]
+              - generic [ref=e224]:
+                - generic [ref=e225]: R$ 389
+                - generic [ref=e226]: /mês
+              - paragraph [ref=e227]: Para redes e franquias.
+            - button "Falar com Vendas" [ref=e228] [cursor=pointer]
+            - generic [ref=e229]:
+              - paragraph [ref=e230]: "Tudo do Profissional, mais:"
+              - list [ref=e231]:
+                - listitem [ref=e232]:
+                  - img [ref=e233]
+                  - text: Usuários Ilimitados
+                - listitem [ref=e236]:
+                  - img [ref=e237]
+                  - text: Multi-filiais
+                - listitem [ref=e240]:
+                  - img [ref=e241]
+                  - text: API & Webhooks
+                - listitem [ref=e244]:
+                  - img [ref=e245]
+                  - text: Gerente de Conta
+      - generic [ref=e249]:
+        - heading "Perguntas Frequentes" [level=2] [ref=e250]
+        - generic [ref=e251]:
+          - heading "Consigo migrar meus dados de outro sistema?" [level=3] [ref=e253]:
+            - button "Consigo migrar meus dados de outro sistema?" [ref=e254] [cursor=pointer]:
+              - text: Consigo migrar meus dados de outro sistema?
+              - img [ref=e255]
+          - heading "O site gerado é responsivo para celular?" [level=3] [ref=e258]:
+            - button "O site gerado é responsivo para celular?" [ref=e259] [cursor=pointer]:
+              - text: O site gerado é responsivo para celular?
+              - img [ref=e260]
+          - heading "Tem fidelidade ou multa de cancelamento?" [level=3] [ref=e263]:
+            - button "Tem fidelidade ou multa de cancelamento?" [ref=e264] [cursor=pointer]:
+              - text: Tem fidelidade ou multa de cancelamento?
+              - img [ref=e265]
+          - heading "Como funciona o suporte?" [level=3] [ref=e268]:
+            - button "Como funciona o suporte?" [ref=e269] [cursor=pointer]:
+              - text: Como funciona o suporte?
+              - img [ref=e270]
+      - generic [ref=e274]:
+        - heading "O futuro da sua imobiliária começa hoje." [level=2] [ref=e275]
+        - paragraph [ref=e276]: Não perca mais tempo com ferramentas ultrapassadas. Junte-se à revolução digital do mercado imobiliário.
+        - link "Criar Conta Grátis" [ref=e278] [cursor=pointer]:
+          - /url: /login
+          - button "Criar Conta Grátis" [ref=e279]
+      - generic [ref=e281]:
+        - generic [ref=e282]:
+          - generic [ref=e283]:
+            - generic [ref=e284]:
+              - generic [ref=e285]: I
+              - text: ImobiBase
+            - paragraph [ref=e286]: Transformando a maneira como imobiliárias e corretores fazem negócios no Brasil.
+            - generic [ref=e287]:
+              - img [ref=e289] [cursor=pointer]
+              - img [ref=e294] [cursor=pointer]
+              - img [ref=e299] [cursor=pointer]
+          - generic [ref=e303]:
+            - heading "Produto" [level=4] [ref=e304]
+            - list [ref=e305]:
+              - listitem [ref=e306]:
+                - link "CRM de Vendas" [ref=e307] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e308]:
+                - link "Criador de Sites" [ref=e309] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e310]:
+                - link "Gestão de Contratos" [ref=e311] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e312]:
+                - link "Integrações" [ref=e313] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e314]:
+                - link "Preços" [ref=e315] [cursor=pointer]:
+                  - /url: "#"
+          - generic [ref=e316]:
+            - heading "Recursos" [level=4] [ref=e317]
+            - list [ref=e318]:
+              - listitem [ref=e319]:
+                - link "Blog" [ref=e320] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e321]:
+                - link "Academia Imobi" [ref=e322] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e323]:
+                - link "Central de Ajuda" [ref=e324] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e325]:
+                - link "API Docs" [ref=e326] [cursor=pointer]:
+                  - /url: "#"
+              - listitem [ref=e327]:
+                - link "Status" [ref=e328] [cursor=pointer]:
+                  - /url: "#"
+          - generic [ref=e329]:
+            - heading "Fique por dentro" [level=4] [ref=e330]
+            - paragraph [ref=e331]: Receba dicas de vendas e novidades da plataforma.
+            - generic [ref=e332]:
+              - textbox "seu@email.com" [ref=e333]
+              - button [ref=e334] [cursor=pointer]:
+                - img
+        - generic [ref=e335]:
+          - paragraph [ref=e336]: © 2024 ImobiBase Tecnologia Ltda. CNPJ 00.000.000/0001-00.
+          - generic [ref=e337]:
+            - link "Termos" [ref=e338] [cursor=pointer]:
+              - /url: "#"
+            - link "Privacidade" [ref=e339] [cursor=pointer]:
+              - /url: "#"
+            - link "Cookies" [ref=e340] [cursor=pointer]:
+              - /url: "#"
+  - region "Notifications alt+T"
+```

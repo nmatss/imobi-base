@@ -1,4 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
+/**
+ * Página Financeiro - Gestão Financeira Completa
+ * @module FinanceiroPage
+ * @updated 2025-12-27
+ * @fixed Added React import for helper functions that return JSX
+ */
+import React from "react";
+import { useEffect, useMemo, useState, type ElementType, type FormEvent } from "react";
 import { useImobi } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -280,13 +287,7 @@ function getStatusBadgeVariant(status: TransactionStatus): "default" | "secondar
   }
 }
 
-function getStatusIcon(status: TransactionStatus) {
-  switch (status) {
-    case "pending": return <Clock className="h-3 w-3" />;
-    case "completed": return <CheckCircle className="h-3 w-3" />;
-    case "overdue": return <AlertCircle className="h-3 w-3" />;
-  }
-}
+// Status icon components - moved inline to JSX to avoid scope issues
 
 function getStatusLabel(status: TransactionStatus): string {
   switch (status) {
@@ -308,15 +309,7 @@ function getOriginBadgeColor(originType: OriginType): string {
   }
 }
 
-function getOriginIcon(originType: OriginType) {
-  switch (originType) {
-    case "sale": return <Building className="h-3 w-3" />;
-    case "rental": return <Home className="h-3 w-3" />;
-    case "transfer": return <ArrowUpCircle className="h-3 w-3" />;
-    case "commission": return <HandCoins className="h-3 w-3" />;
-    default: return <FileText className="h-3 w-3" />;
-  }
-}
+// Origin icon components - moved inline to JSX to avoid scope issues
 
 function getOriginLabel(originType: OriginType): string {
   switch (originType) {
@@ -366,7 +359,7 @@ function KPICard({
   title: string;
   value: number;
   change: number;
-  icon: React.ElementType;
+  icon: ElementType;
   iconColor: string;
   valueColor: string;
   invertTrend?: boolean;
@@ -448,7 +441,9 @@ function TransactionCard({
                 {formatDate(transaction.entryDate)}
               </span>
               <Badge variant={getStatusBadgeVariant(transaction.status)} className="gap-1 text-xs">
-                {getStatusIcon(transaction.status)}
+                {transaction.status === "pending" && <Clock className="h-3 w-3" />}
+                {transaction.status === "completed" && <CheckCircle className="h-3 w-3" />}
+                {transaction.status === "overdue" && <AlertCircle className="h-3 w-3" />}
                 {getStatusLabel(transaction.status)}
               </Badge>
             </div>
@@ -517,7 +512,11 @@ function TransactionCard({
               </Badge>
             )}
             <Badge className={cn("text-xs gap-1", getOriginBadgeColor(transaction.originType))}>
-              {getOriginIcon(transaction.originType)}
+              {transaction.originType === "sale" && <Building className="h-3 w-3" />}
+              {transaction.originType === "rental" && <Home className="h-3 w-3" />}
+              {transaction.originType === "transfer" && <ArrowUpCircle className="h-3 w-3" />}
+              {transaction.originType === "commission" && <HandCoins className="h-3 w-3" />}
+              {(transaction.originType === "manual" || !transaction.originType) && <FileText className="h-3 w-3" />}
               {getOriginLabel(transaction.originType)}
               {transaction.originId && (
                 <span className="opacity-75">#{transaction.originId.slice(0, 4)}</span>
@@ -772,7 +771,7 @@ export default function FinanceiroPage() {
 
   // ================== HANDLERS ==================
 
-  const handleCreateTransaction = async (e: React.FormEvent) => {
+  const handleCreateTransaction = async (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
@@ -823,7 +822,7 @@ export default function FinanceiroPage() {
     }
   };
 
-  const handleCreateCategory = async (e: React.FormEvent) => {
+  const handleCreateCategory = async (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
@@ -1662,13 +1661,19 @@ export default function FinanceiroPage() {
                         </td>
                         <td className="py-3">
                           <Badge variant={getStatusBadgeVariant(transaction.status)} className="gap-1">
-                            {getStatusIcon(transaction.status)}
+                            {transaction.status === "pending" && <Clock className="h-3 w-3" />}
+                            {transaction.status === "completed" && <CheckCircle className="h-3 w-3" />}
+                            {transaction.status === "overdue" && <AlertCircle className="h-3 w-3" />}
                             {getStatusLabel(transaction.status)}
                           </Badge>
                         </td>
                         <td className="py-3">
                           <Badge className={cn("gap-1", getOriginBadgeColor(transaction.originType))}>
-                            {getOriginIcon(transaction.originType)}
+                            {transaction.originType === "sale" && <Building className="h-3 w-3" />}
+                            {transaction.originType === "rental" && <Home className="h-3 w-3" />}
+                            {transaction.originType === "transfer" && <ArrowUpCircle className="h-3 w-3" />}
+                            {transaction.originType === "commission" && <HandCoins className="h-3 w-3" />}
+                            {(transaction.originType === "manual" || !transaction.originType) && <FileText className="h-3 w-3" />}
                             {getOriginLabel(transaction.originType)}
                             {transaction.originId && (
                               <span className="ml-0.5 opacity-75">#{transaction.originId.slice(0, 4)}</span>
@@ -1897,8 +1902,7 @@ export default function FinanceiroPage() {
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              <Button type="submit" isLoading={isSubmitting}>
                 {editingTransaction ? "Atualizar" : "Criar"} Lançamento
               </Button>
             </DialogFooter>
@@ -1995,8 +1999,7 @@ export default function FinanceiroPage() {
               <Button type="button" variant="outline" onClick={() => setIsCategoryModalOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              <Button type="submit" isLoading={isSubmitting}>
                 Criar Categoria
               </Button>
             </DialogFooter>

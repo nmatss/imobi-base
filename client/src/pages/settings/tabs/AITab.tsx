@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { SettingsCard } from "../components/SettingsCard";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -385,23 +385,55 @@ export function AITab({ initialData, onSave }: AITabProps) {
         </div>
       </SettingsCard>
 
-      {/* Info Card */}
-      <Card className="border-blue-200 bg-blue-50/50">
-        <CardContent className="p-4">
-          <div className="flex gap-3">
-            <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
-            <div className="text-sm text-blue-800">
-              <p className="font-medium mb-1">Sobre a IA no ImobiBase</p>
-              <p className="text-blue-700">
-                A IA auxilia sua equipe com tarefas específicas do mercado imobiliário,
-                como criar descrições de imóveis, mensagens de follow-up para leads,
-                textos de cobrança e muito mais. Os presets são otimizados para o
-                contexto brasileiro.
-              </p>
+      {/* Informações sobre AITOPIA - Rodapé discreto */}
+      <div className="mt-8 pt-6 border-t">
+        <details className="group">
+          <summary className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <Info className="w-4 h-4" />
+            <span className="font-medium">Sobre a IA no ImobiBase (AITOPIA)</span>
+            <span className="ml-auto text-xs group-open:hidden">Clique para ver mais</span>
+          </summary>
+          <div className="mt-4 p-4 rounded-lg bg-gradient-to-br from-blue-50 to-purple-50 border border-blue-200">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 text-white">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div className="flex-1">
+                <h4 className="font-semibold text-lg mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  AITOPIA - IA Especializada em Imobiliário
+                </h4>
+                <p className="text-sm text-slate-700 mb-3">
+                  A AITOPIA é nossa tecnologia de inteligência artificial desenvolvida
+                  especificamente para o mercado imobiliário brasileiro. Ela auxilia sua
+                  equipe com tarefas específicas como:
+                </p>
+                <ul className="space-y-2 text-sm text-slate-700">
+                  <li className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 shrink-0" />
+                    <span>Criar descrições atrativas de imóveis otimizadas para SEO</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-purple-600 mt-1.5 shrink-0" />
+                    <span>Gerar mensagens de follow-up personalizadas para leads</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-600 mt-1.5 shrink-0" />
+                    <span>Criar textos profissionais de cobrança e comunicações</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-purple-600 mt-1.5 shrink-0" />
+                    <span>Elaborar propostas comerciais e apresentações de vendas</span>
+                  </li>
+                </ul>
+                <p className="text-xs text-slate-600 mt-4 italic">
+                  Todos os presets são otimizados para o contexto brasileiro e podem
+                  ser personalizados conforme suas necessidades.
+                </p>
+              </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </details>
+      </div>
     </div>
   );
 }

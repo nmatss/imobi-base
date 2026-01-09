@@ -1,9 +1,9 @@
+import React, { useEffect, useState } from "react";
 import { useRoute, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { MapPin, Phone, Mail, ArrowRight, BedDouble, Bath, Ruler, Check, Building, Loader2, Search, Filter, Menu, X, MessageCircle } from "lucide-react";
-import { useState, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Helmet } from "react-helmet";
 

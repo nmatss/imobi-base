@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bem-vindo ao {{branding.companyName}}</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+        }
+        .header {
+            background: linear-gradient(135deg, {{branding.primaryColor}} 0%, {{branding.secondaryColor}} 100%);
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .logo {
+            max-width: 180px;
+            height: auto;
+            margin-bottom: 20px;
+        }
+        .header-title {
+            color: #ffffff;
+            font-size: 28px;
+            font-weight: bold;
+            margin: 0;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .greeting {
+            font-size: 24px;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 20px;
+        }
+        .text {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #4b5563;
+            margin-bottom: 20px;
+        }
+        .cta-button {
+            display: inline-block;
+            background-color: {{branding.primaryColor}};
+            color: #ffffff;
+            text-decoration: none;
+            padding: 14px 32px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            margin: 20px 0;
+        }
+        .features {
+            margin: 30px 0;
+        }
+        .feature {
+            display: flex;
+            align-items: start;
+            margin-bottom: 20px;
+        }
+        .feature-icon {
+            width: 40px;
+            height: 40px;
+            background-color: {{branding.primaryColor}}20;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+        .feature-text {
+            flex: 1;
+        }
+        .feature-title {
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 5px;
+        }
+        .feature-desc {
+            font-size: 14px;
+            color: #6b7280;
+        }
+        .footer {
+            background-color: #f9fafb;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+        .footer-text {
+            font-size: 14px;
+            color: #6b7280;
+            margin: 5px 0;
+        }
+        .social-links {
+            margin: 20px 0;
+        }
+        .social-link {
+            display: inline-block;
+            margin: 0 10px;
+            color: #6b7280;
+            text-decoration: none;
+        }
+        .unsubscribe {
+            font-size: 12px;
+            color: #9ca3af;
+            margin-top: 15px;
+        }
+        .unsubscribe a {
+            color: #6b7280;
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            {{#if branding.logo}}
+            <img src="{{branding.logo}}" alt="{{branding.companyName}}" class="logo">
+            {{/if}}
+            <h1 class="header-title">Bem-vindo ao {{branding.companyName}}!</h1>
+        </div>
+
+        <div class="content">
+            <h2 class="greeting">Olá, {{name}}!</h2>
+
+            <p class="text">
+                Estamos muito felizes em tê-lo(a) conosco! Sua conta foi criada com sucesso e você já pode começar a explorar todas as funcionalidades da nossa plataforma.
+            </p>
+
+            <p class="text">
+                O {{branding.companyName}} é a solução completa para gestão imobiliária. Aqui estão alguns recursos que você pode explorar:
+            </p>
+
+            <div class="features">
+                <div class="feature">
+                    <div class="feature-icon">📊</div>
+                    <div class="feature-text">
+                        <div class="feature-title">Dashboard Personalizado</div>
+                        <div class="feature-desc">Visualize todas as suas métricas e KPIs em um só lugar</div>
+                    </div>
+                </div>
+
+                <div class="feature">
+                    <div class="feature-icon">🏘️</div>
+                    <div class="feature-text">
+                        <div class="feature-title">Gestão de Imóveis</div>
+                        <div class="feature-desc">Cadastre e gerencie seu portfólio de propriedades</div>
+                    </div>
+                </div>
+
+                <div class="feature">
+                    <div class="feature-icon">👥</div>
+                    <div class="feature-text">
+                        <div class="feature-title">CRM de Leads</div>
+                        <div class="feature-desc">Acompanhe seus leads e oportunidades de negócio</div>
+                    </div>
+                </div>
+
+                <div class="feature">
+                    <div class="feature-icon">💰</div>
+                    <div class="feature-text">
+                        <div class="feature-title">Gestão Financeira</div>
+                        <div class="feature-desc">Controle receitas, despesas e comissões</div>
+                    </div>
+                </div>
+            </div>
+
+            <center>
+                <a href="{{loginUrl}}" class="cta-button">Acessar Minha Conta</a>
+            </center>
+
+            <p class="text">
+                Se precisar de ajuda, nossa equipe de suporte está sempre disponível para você. Basta responder a este e-mail ou visitar nossa central de ajuda.
+            </p>
+
+            <p class="text">
+                Desejamos muito sucesso!<br>
+                <strong>Equipe {{branding.companyName}}</strong>
+            </p>
+        </div>
+
+        <div class="footer">
+            {{#if branding.companyName}}
+            <p class="footer-text"><strong>{{branding.companyName}}</strong></p>
+            {{/if}}
+            {{#if branding.address}}
+            <p class="footer-text">{{branding.address}}</p>
+            {{/if}}
+            {{#if branding.phone}}
+            <p class="footer-text">Telefone: {{branding.phone}}</p>
+            {{/if}}
+            {{#if branding.email}}
+            <p class="footer-text">Email: {{branding.email}}</p>
+            {{/if}}
+
+            <p class="footer-text">&copy; {{currentYear}} {{branding.companyName}}. Todos os direitos reservados.</p>
+
+            {{#if unsubscribeUrl}}
+            <p class="unsubscribe">
+                <a href="{{unsubscribeUrl}}">Cancelar inscrição</a>
+            </p>
+            {{/if}}
+        </div>
+    </div>
+</body>
+</html>

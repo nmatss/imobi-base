@@ -1,0 +1,24 @@
+{
+  "*.{ts,tsx}": [
+    "eslint --fix",
+    "prettier --write"
+  ],
+  "*.{js,jsx}": [
+    "eslint --fix",
+    "prettier --write"
+  ],
+  "*.{json,md,yml,yaml}": [
+    "prettier --write"
+  ],
+  "*.{css,scss}": [
+    "prettier --write"
+  ],
+  "server/**/*.ts": [
+    "eslint --fix",
+    "vitest related --run --reporter=verbose"
+  ],
+  "client/**/*.{ts,tsx}": [
+    "eslint --fix",
+    "vitest related --run --reporter=verbose"
+  ]
+}

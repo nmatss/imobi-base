@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, startOfDay, endOfDay } from "date-fns";
 import FinancialDashboard from "./components/FinancialDashboard";
 import FinancialTabs from "./components/FinancialTabs";
 import FinancialCharts from "./components/FinancialCharts";
 import FinancialAI from "./components/FinancialAI";
+import { FinancialChartsSkeleton } from "@/components/ui/skeleton-loaders";
 import type {
   FinancialMetrics,
   FinanceTransaction,
@@ -77,6 +78,8 @@ export default function FinanceiroPage() {
 
   // Fetch financial metrics
   useEffect(() => {
+    const abortController = new AbortController();
+
     const fetchMetrics = async () => {
       setIsLoadingMetrics(true);
       try {
@@ -92,31 +95,42 @@ export default function FinanceiroPage() {
 
         const res = await fetch(`/api/financial/metrics?${params.toString()}`, {
           credentials: "include",
+          signal: abortController.signal,
         });
 
-        if (res.ok) {
+        if (res.ok && !abortController.signal.aborted) {
           const data = await res.json();
           setMetrics(data);
-        } else {
+        } else if (!abortController.signal.aborted) {
           throw new Error('Failed to fetch metrics');
         }
       } catch (error) {
-        console.error('Error fetching metrics:', error);
-        toast({
-          title: "Erro ao carregar métricas",
-          description: "Não foi possível carregar as métricas financeiras.",
-          variant: "destructive",
-        });
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.error('Error fetching metrics:', error);
+          toast({
+            title: "Erro ao carregar métricas",
+            description: "Não foi possível carregar as métricas financeiras.",
+            variant: "destructive",
+          });
+        }
       } finally {
-        setIsLoadingMetrics(false);
+        if (!abortController.signal.aborted) {
+          setIsLoadingMetrics(false);
+        }
       }
     };
 
     fetchMetrics();
+
+    return () => {
+      abortController.abort();
+    };
   }, [dateRange, toast]);
 
   // Fetch transactions
   useEffect(() => {
+    const abortController = new AbortController();
+
     const fetchTransactions = async () => {
       setIsLoadingTransactions(true);
       try {
@@ -127,31 +141,42 @@ export default function FinanceiroPage() {
 
         const res = await fetch(`/api/financial/transactions?${params.toString()}`, {
           credentials: "include",
+          signal: abortController.signal,
         });
 
-        if (res.ok) {
+        if (res.ok && !abortController.signal.aborted) {
           const data = await res.json();
           setTransactions(data);
-        } else {
+        } else if (!abortController.signal.aborted) {
           throw new Error('Failed to fetch transactions');
         }
       } catch (error) {
-        console.error('Error fetching transactions:', error);
-        toast({
-          title: "Erro ao carregar transações",
-          description: "Não foi possível carregar as transações financeiras.",
-          variant: "destructive",
-        });
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.error('Error fetching transactions:', error);
+          toast({
+            title: "Erro ao carregar transações",
+            description: "Não foi possível carregar as transações financeiras.",
+            variant: "destructive",
+          });
+        }
       } finally {
-        setIsLoadingTransactions(false);
+        if (!abortController.signal.aborted) {
+          setIsLoadingTransactions(false);
+        }
       }
     };
 
     fetchTransactions();
+
+    return () => {
+      abortController.abort();
+    };
   }, [dateRange, toast]);
 
   // Fetch chart data
   useEffect(() => {
+    const abortController = new AbortController();
+
     const fetchChartData = async () => {
       setIsLoadingCharts(true);
       try {
@@ -161,27 +186,36 @@ export default function FinanceiroPage() {
 
         const res = await fetch(`/api/financial/charts?period=${chartPeriod}`, {
           credentials: "include",
+          signal: abortController.signal,
         });
 
-        if (res.ok) {
+        if (res.ok && !abortController.signal.aborted) {
           const data = await res.json();
           setChartData(data);
-        } else {
+        } else if (!abortController.signal.aborted) {
           throw new Error('Failed to fetch chart data');
         }
       } catch (error) {
-        console.error('Error fetching chart data:', error);
-        toast({
-          title: "Erro ao carregar gráficos",
-          description: "Não foi possível carregar os dados dos gráficos.",
-          variant: "destructive",
-        });
+        if (error instanceof Error && error.name !== 'AbortError') {
+          console.error('Error fetching chart data:', error);
+          toast({
+            title: "Erro ao carregar gráficos",
+            description: "Não foi possível carregar os dados dos gráficos.",
+            variant: "destructive",
+          });
+        }
       } finally {
-        setIsLoadingCharts(false);
+        if (!abortController.signal.aborted) {
+          setIsLoadingCharts(false);
+        }
       }
     };
 
     fetchChartData();
+
+    return () => {
+      abortController.abort();
+    };
   }, [period, toast]);
 
   const handleMarkAsPaid = async (id: string) => {
@@ -310,7 +344,10 @@ export default function FinanceiroPage() {
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6 pb-8">
+    <section
+      className="space-y-6 sm:space-y-8 pb-8"
+      aria-label="Visão geral financeira"
+    >
       {/* Financial Dashboard with KPIs */}
       <FinancialDashboard
         metrics={metrics}
@@ -323,7 +360,11 @@ export default function FinanceiroPage() {
       />
 
       {/* Charts */}
-      <FinancialCharts chartData={chartData} isLoading={isLoadingCharts} />
+      {isLoadingCharts ? (
+        <FinancialChartsSkeleton />
+      ) : (
+        <FinancialCharts chartData={chartData} isLoading={false} />
+      )}
 
       {/* Transaction Tabs */}
       <FinancialTabs
@@ -340,6 +381,6 @@ export default function FinanceiroPage() {
 
       {/* AI Assistant */}
       <FinancialAI onPromptSelect={handleAIPrompt} />
-    </div>
+    </section>
   );
 }

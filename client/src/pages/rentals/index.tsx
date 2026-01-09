@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useImobi } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -211,48 +211,56 @@ export default function RentalsPage() {
   const [overdueReport, setOverdueReport] = useState<any>(null);
 
   // Fetch all data
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
     try {
       setLoading(true);
       const [ownersRes, rentersRes, contractsRes, paymentsRes, transfersRes, metricsRes, alertsRes] = await Promise.all([
-        fetch("/api/owners", { credentials: "include" }),
-        fetch("/api/renters", { credentials: "include" }),
-        fetch("/api/rental-contracts", { credentials: "include" }),
-        fetch("/api/rental-payments", { credentials: "include" }),
-        fetch("/api/rental-transfers", { credentials: "include" }),
-        fetch("/api/rentals/metrics", { credentials: "include" }),
-        fetch("/api/rentals/alerts", { credentials: "include" }),
+        fetch("/api/owners", { credentials: "include", signal }),
+        fetch("/api/renters", { credentials: "include", signal }),
+        fetch("/api/rental-contracts", { credentials: "include", signal }),
+        fetch("/api/rental-payments", { credentials: "include", signal }),
+        fetch("/api/rental-transfers", { credentials: "include", signal }),
+        fetch("/api/rentals/metrics", { credentials: "include", signal }),
+        fetch("/api/rentals/alerts", { credentials: "include", signal }),
       ]);
 
-      if (ownersRes.ok) setOwners(await ownersRes.json());
-      if (rentersRes.ok) setRenters(await rentersRes.json());
-      if (contractsRes.ok) setRentalContracts(await contractsRes.json());
-      if (paymentsRes.ok) setPayments(await paymentsRes.json());
-      if (transfersRes.ok) setTransfers(await transfersRes.json());
-      if (metricsRes.ok) setMetrics(await metricsRes.json());
-      if (alertsRes.ok) setAlerts(await alertsRes.json());
+      if (!signal?.aborted) {
+        if (ownersRes.ok) setOwners(await ownersRes.json());
+        if (rentersRes.ok) setRenters(await rentersRes.json());
+        if (contractsRes.ok) setRentalContracts(await contractsRes.json());
+        if (paymentsRes.ok) setPayments(await paymentsRes.json());
+        if (transfersRes.ok) setTransfers(await transfersRes.json());
+        if (metricsRes.ok) setMetrics(await metricsRes.json());
+        if (alertsRes.ok) setAlerts(await alertsRes.json());
+      }
     } catch (error) {
-      console.error("Error fetching data:", error);
-      toast({ title: "Erro", description: "Erro ao carregar dados", variant: "destructive" });
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error("Error fetching data:", error);
+        toast({ title: "Erro", description: "Erro ao carregar dados", variant: "destructive" });
+      }
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   }, [toast]);
 
   // Fetch chart data
-  const fetchChartData = useCallback(async (period: Period) => {
+  const fetchChartData = useCallback(async (period: Period, signal?: AbortSignal) => {
     try {
-      const res = await fetch(`/api/rentals/metrics/chart?period=${period}`, { credentials: "include" });
-      if (res.ok) {
+      const res = await fetch(`/api/rentals/metrics/chart?period=${period}`, { credentials: "include", signal });
+      if (res.ok && !signal?.aborted) {
         setChartData(await res.json());
       }
     } catch (error) {
-      console.error("Error fetching chart data:", error);
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error("Error fetching chart data:", error);
+      }
     }
   }, []);
 
   // Fetch reports
-  const fetchReports = useCallback(async () => {
+  const fetchReports = useCallback(async (signal?: AbortSignal) => {
     try {
       const params = new URLSearchParams();
       if (reportFilters.ownerId) params.append("ownerId", reportFilters.ownerId);
@@ -262,33 +270,49 @@ export default function RentalsPage() {
       if (reportFilters.endDate) params.append("endDate", reportFilters.endDate);
 
       const [ownerRes, renterRes, paymentsRes, overdueRes] = await Promise.all([
-        fetch(`/api/reports/owners?${params}`, { credentials: "include" }),
-        fetch(`/api/reports/renters?${params}`, { credentials: "include" }),
-        fetch(`/api/reports/payments-detailed?${params}`, { credentials: "include" }),
-        fetch(`/api/reports/overdue`, { credentials: "include" }),
+        fetch(`/api/reports/owners?${params}`, { credentials: "include", signal }),
+        fetch(`/api/reports/renters?${params}`, { credentials: "include", signal }),
+        fetch(`/api/reports/payments-detailed?${params}`, { credentials: "include", signal }),
+        fetch(`/api/reports/overdue`, { credentials: "include", signal }),
       ]);
 
-      if (ownerRes.ok) setOwnerReport(await ownerRes.json());
-      if (renterRes.ok) setRenterReport(await renterRes.json());
-      if (paymentsRes.ok) setPaymentsReport(await paymentsRes.json());
-      if (overdueRes.ok) setOverdueReport(await overdueRes.json());
+      if (!signal?.aborted) {
+        if (ownerRes.ok) setOwnerReport(await ownerRes.json());
+        if (renterRes.ok) setRenterReport(await renterRes.json());
+        if (paymentsRes.ok) setPaymentsReport(await paymentsRes.json());
+        if (overdueRes.ok) setOverdueReport(await overdueRes.json());
+      }
     } catch (error) {
-      console.error("Error fetching reports:", error);
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error("Error fetching reports:", error);
+      }
     }
   }, [reportFilters]);
 
   useEffect(() => {
-    fetchData();
+    const abortController = new AbortController();
+    fetchData(abortController.signal);
+    return () => {
+      abortController.abort();
+    };
   }, [fetchData]);
 
   useEffect(() => {
-    fetchChartData(chartPeriod);
+    const abortController = new AbortController();
+    fetchChartData(chartPeriod, abortController.signal);
+    return () => {
+      abortController.abort();
+    };
   }, [chartPeriod, fetchChartData]);
 
   useEffect(() => {
+    const abortController = new AbortController();
     if (activeTab === "relatorios") {
-      fetchReports();
+      fetchReports(abortController.signal);
     }
+    return () => {
+      abortController.abort();
+    };
   }, [activeTab, fetchReports]);
 
   // CRUD Handlers
@@ -497,7 +521,7 @@ export default function RentalsPage() {
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto">
+    <div className="p-4 sm:p-6 space-y-6 sm:space-y-8 max-w-[1600px] mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
@@ -530,7 +554,7 @@ export default function RentalsPage() {
       />
 
       {/* Tabs - Mobile-First Scrollable */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)} className="space-y-6 sm:space-y-8">
         <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
           <TabsList className="w-full sm:w-auto inline-flex min-w-max border-b border-border bg-transparent h-auto p-0 gap-0">
             <TabsTrigger
@@ -625,8 +649,8 @@ export default function RentalsPage() {
         </TabsContent>
 
         {/* Contratos Tab */}
-        <TabsContent value="contratos" className="mt-4">
-          <div className="space-y-4">
+        <TabsContent value="contratos" className="mt-6 sm:mt-8">
+          <div className="space-y-6 sm:space-y-8">
             {/* Filters */}
             <Card className="rounded-xl">
               <CardContent className="pt-4">
@@ -661,7 +685,7 @@ export default function RentalsPage() {
             </Card>
 
             {/* Contracts List - Enhanced Mobile Cards */}
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-6 sm:gap-8 sm:grid-cols-2 lg:grid-cols-3">
               {loading ? (
                 <div className="col-span-full text-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin mx-auto" />
@@ -733,8 +757,8 @@ export default function RentalsPage() {
         </TabsContent>
 
         {/* Boletos Tab */}
-        <TabsContent value="boletos" className="mt-4">
-          <div className="space-y-4">
+        <TabsContent value="boletos" className="mt-6 sm:mt-8">
+          <div className="space-y-6 sm:space-y-8">
             {/* Filters */}
             <Card className="rounded-xl">
               <CardContent className="pt-4">
@@ -856,7 +880,7 @@ export default function RentalsPage() {
             </div>
 
             {/* Payments Cards - Mobile Enhanced */}
-            <div className="sm:hidden space-y-3">
+            <div className="sm:hidden space-y-6 sm:space-y-8">
               {loading ? (
                 <div className="text-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin mx-auto" />
@@ -952,7 +976,7 @@ export default function RentalsPage() {
         </TabsContent>
 
         {/* Repasses Tab */}
-        <TabsContent value="repasses" className="mt-4">
+        <TabsContent value="repasses" className="mt-6 sm:mt-8">
           <RepassesTab
             transfers={transfers}
             owners={owners}
@@ -965,15 +989,15 @@ export default function RentalsPage() {
         </TabsContent>
 
         {/* Relatorios Tab */}
-        <TabsContent value="relatorios" className="mt-4">
-          <div className="space-y-4">
+        <TabsContent value="relatorios" className="mt-6 sm:mt-8">
+          <div className="space-y-6 sm:space-y-8">
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Relatorios de Locacao</CardTitle>
                 <CardDescription>Analise o desempenho da sua carteira de alugueis</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-6 sm:gap-8 sm:grid-cols-2 lg:grid-cols-4">
                   <Card>
                     <CardContent className="p-4">
                       <div className="flex items-center gap-3">
@@ -1088,8 +1112,7 @@ export default function RentalsPage() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOwnerModalOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Button type="submit" isLoading={isSubmitting}>
                 Salvar
               </Button>
             </DialogFooter>
@@ -1153,8 +1176,7 @@ export default function RentalsPage() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsRenterModalOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Button type="submit" isLoading={isSubmitting}>
                 Salvar
               </Button>
             </DialogFooter>
@@ -1254,8 +1276,7 @@ export default function RentalsPage() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsContractModalOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Button type="submit" isLoading={isSubmitting}>
                 Salvar
               </Button>
             </DialogFooter>
@@ -1317,8 +1338,7 @@ export default function RentalsPage() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsPaymentModalOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Button type="submit" isLoading={isSubmitting}>
                 Salvar
               </Button>
             </DialogFooter>

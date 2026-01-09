@@ -1,0 +1,158 @@
+
+> rest-express@1.0.0 build
+> tsx script/build.ts
+
+building client...
+vite v7.1.12 building for production...
+transforming...
+✓ 1793 modules transformed.
+✗ Build failed in 1.28s
+[vite:esbuild] Transform failed with 1 error:
+/home/nic20/ProjetosWeb/ImobiBase/client/src/lib/toast-helpers.ts:73:24: ERROR: Expected ">" but found "className"
+file: /home/nic20/ProjetosWeb/ImobiBase/client/src/lib/toast-helpers.ts:73:24
+
+Expected ">" but found "className"
+71 |    return sonnerToast.success(message, {
+72 |      description,
+73 |      icon: <CheckCircle2 className="w-5 h-5" />,
+   |                          ^
+74 |      duration: TOAST_DURATIONS.SUCCESS,
+75 |    });
+
+    at failureErrorWithLog (/home/nic20/ProjetosWeb/ImobiBase/node_modules/esbuild/lib/main.js:1467:15)
+    at /home/nic20/ProjetosWeb/ImobiBase/node_modules/esbuild/lib/main.js:736:50
+    at responseCallbacks.<computed> (/home/nic20/ProjetosWeb/ImobiBase/node_modules/esbuild/lib/main.js:603:9)
+    at handleIncomingPacket (/home/nic20/ProjetosWeb/ImobiBase/node_modules/esbuild/lib/main.js:658:12)
+    at Socket.readFromStdout (/home/nic20/ProjetosWeb/ImobiBase/node_modules/esbuild/lib/main.js:581:7)
+    at Socket.emit (node:events:524:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:191:23) {
+  errors: [Getter/Setter],
+  warnings: [Getter/Setter],
+  frame: '\n' +
+    'Expected ">" but found "className"\n' +
+    '71 |    return sonnerToast.success(message, {\n' +
+    '72 |      description,\n' +
+    '73 |      icon: <CheckCircle2 className="w-5 h-5" />,\n' +
+    '   |                          ^\n' +
+    '74 |      duration: TOAST_DURATIONS.SUCCESS,\n' +
+    '75 |    });\n',
+  loc: {
+    column: 24,
+    file: '/home/nic20/ProjetosWeb/ImobiBase/client/src/lib/toast-helpers.ts',
+    length: 9,
+    line: 73,
+    lineText: '    icon: <CheckCircle2 className="w-5 h-5" />,',
+    namespace: '',
+    suggestion: '>'
+  },
+  code: 'PLUGIN_ERROR',
+  plugin: 'vite:esbuild',
+  hook: 'transform',
+  id: '/home/nic20/ProjetosWeb/ImobiBase/client/src/lib/toast-helpers.ts',
+  watchFiles: [
+    '/home/nic20/ProjetosWeb/ImobiBase/client/index.html',
+    'src/pages/dashboard.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/main.tsx',
+    'src/pages/properties/list.tsx',
+    'src/pages/leads/kanban.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/package.json',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/react/jsx-runtime.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/react-dom/client.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/index.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/react/index.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/web-vitals/dist/web-vitals.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/lib/queryClient.ts',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/App.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/lib/monitoring/sentry-client.ts',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/lib/analytics/index.ts',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/index.css',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/react/cjs/react-jsx-runtime.production.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/react/cjs/react.production.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/types.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/query-core/build/modern/index.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/useQueries.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/useSuspenseQuery.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/useQuery.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/useSuspenseInfiniteQuery.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/useSuspenseQueries.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/usePrefetchQuery.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/usePrefetchInfiniteQuery.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/queryOptions.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/infiniteQueryOptions.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/QueryClientProvider.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/QueryErrorResetBoundary.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/HydrationBoundary.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/useMutationState.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/useIsFetching.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/useMutation.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/useInfiniteQuery.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/isRestoring.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/react-dom/cjs/react-dom-client.production.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/wouter/esm/index.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/lib/imobi-context.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/lucide-react/dist/esm/lucide-react.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/components/ErrorBoundary.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/lib/accessibility-context.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/components/GlobalSearch.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/components/TimeoutWarning.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/components/ui/button.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/components/layout/dashboard-layout.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/components/ui/label.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/components/ui/sonner.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/components/ui/input.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/dashboard.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/properties/list.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/properties/details.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/contracts/index.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/rentals/index.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/financeiro.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/reports/index.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/settings/index.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/leads/kanban.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/public/landing.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/public/properties.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/public/property-details.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/public/product-landing.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/not-found.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/admin/index.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/admin/tenants.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/admin/logs.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/calendar/index.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/vendas/index.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/pages/admin/plans.tsx',
+    '/home/nic20/ProjetosWeb/ImobiBase/client/src/lib/error-handling.ts',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@sentry/react/build/esm/index.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/react-router-dom/dist/index.mjs',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/react-ga4/dist/index.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/posthog-js/dist/module.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/query-core/build/modern/retryer.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/query-core/build/modern/queryCache.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/query-core/build/modern/queryClient.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/query-core/build/modern/queryObserver.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/query-core/build/modern/queriesObserver.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/query-core/build/modern/infiniteQueryObserver.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/query-core/build/modern/mutationCache.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/query-core/build/modern/mutationObserver.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/query-core/build/modern/notifyManager.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/query-core/build/modern/focusManager.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/query-core/build/modern/onlineManager.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/query-core/build/modern/utils.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/query-core/build/modern/hydration.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/query-core/build/modern/types.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/query-core/build/modern/query.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/query-core/build/modern/mutation.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/errorBoundaryUtils.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/suspense.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/utils.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/@tanstack/react-query/build/modern/useBaseQuery.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/scheduler/index.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/react-dom/index.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/wouter/esm/use-browser-location.js',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/regexparam/dist/index.mjs',
+    '/home/nic20/ProjetosWeb/ImobiBase/node_modules/wouter/esm/react-deps.js',
+    ... 1739 more items
+  ]
+}

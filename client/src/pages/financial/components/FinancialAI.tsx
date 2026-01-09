@@ -1,3 +1,4 @@
+import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Sparkles, TrendingUp, PieChart, Target, AlertCircle } from "lucide-react";
@@ -49,6 +50,8 @@ const AI_PROMPTS: AIPrompt[] = [
   },
 ];
 
+const iconA11yProps = { "aria-hidden": true, focusable: false } as const;
+
 type Props = {
   onPromptSelect?: (promptId: string) => void;
 };
@@ -65,7 +68,10 @@ export default function FinancialAI({ onPromptSelect }: Props) {
       <CardHeader className="p-4 sm:p-6 pb-3 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20">
         <div className="flex items-center gap-2">
           <div className="rounded-full p-2 bg-purple-100 dark:bg-purple-900/50">
-            <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 dark:text-purple-400" />
+            <Sparkles
+              {...iconA11yProps}
+              className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 dark:text-purple-400"
+            />
           </div>
           <CardTitle className="text-sm sm:text-base">Assistente Financeiro AI</CardTitle>
         </div>
@@ -82,7 +88,10 @@ export default function FinancialAI({ onPromptSelect }: Props) {
               >
                 <div className="flex items-start gap-3">
                   <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/50 dark:to-purple-800/50 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform shadow-sm">
-                    <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600 dark:text-purple-400" />
+                    <Icon
+                      {...iconA11yProps}
+                      className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600 dark:text-purple-400"
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1.5">

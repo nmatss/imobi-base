@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Convite para Equipe</title>
+    <style>
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f3f4f6; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+        .header { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); padding: 40px 20px; text-align: center; color: #ffffff; }
+        .header-title { font-size: 24px; font-weight: bold; margin: 0; }
+        .content { padding: 40px 30px; }
+        .invite-box { background: linear-gradient(135deg, #cffafe 0%, #a5f3fc 100%); border-radius: 12px; padding: 25px; text-align: center; margin: 25px 0; }
+        .cta-button { display: inline-block; background-color: #06b6d4; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; margin: 10px 0; }
+        .footer { background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header"><h1 class="header-title">👥 Convite para Equipe</h1></div>
+        <div class="content">
+            <p style="font-size: 16px; color: #4b5563; text-align: center;"><strong>{{inviterName}}</strong> convidou você para se juntar à equipe!</p>
+            <div class="invite-box">
+                <div style="font-size: 24px; font-weight: bold; color: #0891b2; margin-bottom: 10px;">{{tenantName}}</div>
+                <div style="font-size: 14px; color: #155e75;">{{role}}</div>
+            </div>
+            <p style="font-size: 16px; color: #4b5563; text-align: center;">Aceite o convite para começar a colaborar com a equipe no {{branding.companyName}}.</p>
+            <center><a href="{{acceptUrl}}" class="cta-button">Aceitar Convite</a></center>
+            <p style="font-size: 14px; color: #6b7280; margin-top: 25px; text-align: center;">Este convite expira em {{expirationDays}} dias.</p>
+        </div>
+        <div class="footer"><p>&copy; {{currentYear}} {{branding.companyName}}</p></div>
+    </div>
+</body>
+</html>

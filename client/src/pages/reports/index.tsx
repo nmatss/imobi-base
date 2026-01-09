@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import CommissionReports from "./CommissionReports";
 import {
   Sheet,
@@ -13,7 +14,6 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet";
 import {
   Select,
@@ -62,7 +62,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
   PieChart as RechartsPie,
   Pie,
@@ -73,7 +73,8 @@ import {
   AreaChart,
   Area
 } from "recharts";
-import { useToast } from "@/hooks/use-toast";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from "@/lib/toast-helpers";
 import { cn } from "@/lib/utils";
 
 const COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
@@ -266,13 +267,58 @@ function ChartSkeleton() {
 }
 
 export default function ReportsPage() {
-  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState<string | null>(null);
   const [selectedReport, setSelectedReport] = useState<ReportType | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [savedReports, setSavedReports] = useState<SavedReport[]>([]);
   const [showSavedReports, setShowSavedReports] = useState(false);
+
+  // Add print styles
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @media print {
+        @page {
+          size: A4;
+          margin: 1cm;
+        }
+
+        body * {
+          visibility: hidden;
+        }
+
+        #report-content, #report-content * {
+          visibility: visible;
+        }
+
+        #report-content {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+        }
+
+        .no-print {
+          display: none !important;
+        }
+
+        .print-break-avoid {
+          page-break-inside: avoid;
+        }
+
+        .print-break-after {
+          page-break-after: always;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   // Filters
   const [period, setPeriod] = useState("month");
@@ -362,19 +408,23 @@ export default function ReportsPage() {
       }
     } catch (error) {
       console.error("Erro ao carregar relatório:", error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível carregar o relatório",
-        variant: "destructive"
-      });
+      toast.errors.operation("carregar o relatório");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleReportTypeSelect = (type: ReportType) => {
+  const handleReportTypeSelect = async (type: ReportType) => {
+    setGeneratingReport(type);
     setSelectedReport(type);
-    loadReportData(type);
+    try {
+      await loadReportData(type);
+      toast.success("Relatório gerado", "Os dados foram carregados com sucesso");
+    } catch (error) {
+      toast.errors.operation("gerar o relatório");
+    } finally {
+      setGeneratingReport(null);
+    }
   };
 
   const handlePeriodChange = (newPeriod: string) => {
@@ -414,23 +464,59 @@ export default function ReportsPage() {
   const handleExport = async (format: 'pdf' | 'excel' | 'print') => {
     setExportLoading(true);
     try {
-      // Simulate export delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      toast({
-        title: "Exportação concluída",
-        description: `Relatório exportado em ${format.toUpperCase()}`,
-      });
+      if (format === 'print') {
+        // Simulate processing time
+        await new Promise(resolve => setTimeout(resolve, 500));
+        window.print();
+        toast.info("Impressão iniciada", "Verifique a fila de impressão");
+      } else if (format === 'excel') {
+        // Simulate processing time
+        await new Promise(resolve => setTimeout(resolve, 800));
+        const csvData = generateCSV();
+        const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `relatorio_${selectedReport}_${new Date().toISOString().split('T')[0]}.csv`;
+        link.click();
+        toast.action.downloaded("Relatório CSV");
+      } else if (format === 'pdf') {
+        // Simulate processing time
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        toast.info("Em desenvolvimento", "Exportação para PDF será implementada em breve");
+      }
       setShowExportOptions(false);
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível exportar o relatório",
-        variant: "destructive"
-      });
+      toast.error("Erro", "Não foi possível exportar o relatório");
     } finally {
       setExportLoading(false);
     }
+  };
+
+  const generateCSV = () => {
+    if (!reportData) return '';
+
+    let headers = '';
+    let rows: string[] = [];
+
+    switch (selectedReport) {
+      case 'vendas':
+        headers = 'Data,Imóvel,Comprador,Corretor,Valor\n';
+        rows = (reportData.sales || []).map((sale: any) =>
+          `${new Date(sale.saleDate).toLocaleDateString('pt-BR')},"${sale.property?.title || 'N/A'}","${sale.buyer?.name || 'N/A'}","${sale.broker?.name || 'N/A'}",${sale.saleValue}`
+        );
+        break;
+      case 'corretores':
+        headers = 'Posição,Corretor,Leads,Visitas,Propostas,Fechados,Ticket Médio,Conversão\n';
+        rows = (reportData.ranking || []).map((broker: any, index: number) =>
+          `${index + 1},"${broker.name}",${broker.leadsWorked},${broker.visits},${broker.proposals},${broker.contractsClosed},${broker.averageTicket},${broker.conversionRate}`
+        );
+        break;
+      default:
+        headers = 'Relatório\n';
+        rows = ['Dados não disponíveis para exportação'];
+    }
+
+    return headers + rows.join('\n');
   };
 
   const handleSaveReport = () => {
@@ -442,10 +528,7 @@ export default function ReportsPage() {
       createdAt: new Date().toISOString()
     };
     setSavedReports([newReport, ...savedReports]);
-    toast({
-      title: "Relatório salvo",
-      description: "Você pode acessá-lo rapidamente depois",
-    });
+    toast.success("Relatório salvo", "Você pode acessá-lo rapidamente depois");
   };
 
   // Date Picker Bottom Sheet (Mobile)
@@ -506,8 +589,16 @@ export default function ReportsPage() {
                   setShowDatePicker(false);
                   if (selectedReport) loadReportData(selectedReport);
                 }}
+                disabled={loading}
               >
-                Aplicar Período
+                {loading ? (
+                  <>
+                    <Spinner className="mr-2" size="sm" />
+                    Aplicando...
+                  </>
+                ) : (
+                  'Aplicar Período'
+                )}
               </Button>
             </div>
           </div>
@@ -533,10 +624,14 @@ export default function ReportsPage() {
             onClick={() => handleExport('pdf')}
             disabled={exportLoading}
           >
-            <FileText className="h-5 w-5 mr-3 text-red-500" />
+            {exportLoading ? (
+              <Spinner className="h-5 w-5 mr-3" />
+            ) : (
+              <FileText className="h-5 w-5 mr-3 text-red-500" />
+            )}
             <div>
-              <div className="font-semibold">PDF</div>
-              <div className="text-xs text-muted-foreground">Documento portátil</div>
+              <div className="font-semibold">{exportLoading ? 'Exportando...' : 'PDF'}</div>
+              {!exportLoading && <div className="text-xs text-muted-foreground">Documento portátil</div>}
             </div>
           </Button>
           <Button
@@ -545,10 +640,14 @@ export default function ReportsPage() {
             onClick={() => handleExport('excel')}
             disabled={exportLoading}
           >
-            <FileSpreadsheet className="h-5 w-5 mr-3 text-green-500" />
+            {exportLoading ? (
+              <Spinner className="h-5 w-5 mr-3" />
+            ) : (
+              <FileSpreadsheet className="h-5 w-5 mr-3 text-green-500" />
+            )}
             <div>
-              <div className="font-semibold">Excel</div>
-              <div className="text-xs text-muted-foreground">Planilha editável</div>
+              <div className="font-semibold">{exportLoading ? 'Exportando...' : 'Excel'}</div>
+              {!exportLoading && <div className="text-xs text-muted-foreground">Planilha editável</div>}
             </div>
           </Button>
           <Button
@@ -557,10 +656,14 @@ export default function ReportsPage() {
             onClick={() => handleExport('print')}
             disabled={exportLoading}
           >
-            <Printer className="h-5 w-5 mr-3 text-blue-500" />
+            {exportLoading ? (
+              <Spinner className="h-5 w-5 mr-3" />
+            ) : (
+              <Printer className="h-5 w-5 mr-3 text-blue-500" />
+            )}
             <div>
-              <div className="font-semibold">Imprimir</div>
-              <div className="text-xs text-muted-foreground">Enviar para impressora</div>
+              <div className="font-semibold">{exportLoading ? 'Imprimindo...' : 'Imprimir'}</div>
+              {!exportLoading && <div className="text-xs text-muted-foreground">Enviar para impressora</div>}
             </div>
           </Button>
         </div>
@@ -624,8 +727,16 @@ export default function ReportsPage() {
               setShowFilters(false);
               if (selectedReport) loadReportData(selectedReport);
             }}
+            disabled={loading}
           >
-            Aplicar Filtros
+            {loading ? (
+              <>
+                <Spinner className="mr-2" size="sm" />
+                Aplicando...
+              </>
+            ) : (
+              'Aplicar Filtros'
+            )}
           </Button>
         </div>
       </SheetContent>
@@ -635,6 +746,7 @@ export default function ReportsPage() {
   // Render Report Type Selection Screen
   if (!selectedReport) {
     return (
+      <TooltipProvider>
       <div className="space-y-4 sm:space-y-6 pb-8 px-4 sm:px-0">
         {/* Header */}
         <div>
@@ -709,28 +821,91 @@ export default function ReportsPage() {
               <Card
                 key={type.id}
                 className={cn(
-                  "cursor-pointer transition-all duration-200",
-                  "hover:border-primary hover:shadow-md",
+                  "group cursor-pointer transition-all duration-300",
+                  "hover:shadow-lg hover:border-primary/50 hover:-translate-y-1",
                   "active:scale-95",
-                  "p-4 sm:p-6 rounded-xl border bg-card"
+                  "overflow-hidden"
                 )}
                 onClick={() => handleReportTypeSelect(type.id)}
               >
-                <CardContent className="p-0 flex flex-col items-center text-center gap-3">
-                  <div className={cn(
-                    "w-12 h-12 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center",
-                    "bg-gradient-to-br",
-                    type.gradient
-                  )}>
-                    <Icon className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className={cn(
+                      "w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center",
+                      "bg-gradient-to-br transition-transform duration-300 group-hover:scale-110",
+                      type.gradient
+                    )}>
+                      <Icon className="h-6 w-6 sm:h-7 sm:w-7 text-primary" />
+                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedReport(type.id);
+                            loadReportData(type.id);
+                            setTimeout(() => setShowExportOptions(true), 500);
+                          }}
+                        >
+                          <Download className="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Exportar relatório</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-sm sm:text-base mb-1">
-                      {type.title}
-                    </h3>
-                    <p className="text-xs text-muted-foreground hidden sm:block">
-                      {type.description}
-                    </p>
+                  <h3 className="font-semibold text-sm sm:text-base mb-2">
+                    {type.title}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mb-4 line-clamp-2">
+                    {type.description}
+                  </p>
+                  {/* Preview thumbnail */}
+                  <div className="bg-muted rounded-md h-24 sm:h-32 flex items-center justify-center overflow-hidden">
+                    <Icon className="w-10 h-10 sm:w-12 sm:h-12 text-muted-foreground/30" />
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <Button
+                      size="sm"
+                      className="flex-1"
+                      disabled={generatingReport === type.id}
+                    >
+                      {generatingReport === type.id ? (
+                        <>
+                          <Spinner className="mr-2" size="sm" />
+                          Gerando...
+                        </>
+                      ) : (
+                        'Gerar'
+                      )}
+                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleReportTypeSelect(type.id);
+                            setTimeout(() => setShowExportOptions(true), 500);
+                          }}
+                          disabled={generatingReport === type.id}
+                        >
+                          {generatingReport === type.id ? (
+                            <Spinner className="w-4 h-4" size="sm" />
+                          ) : (
+                            <Download className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Baixar relatório</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 </CardContent>
               </Card>
@@ -766,6 +941,7 @@ export default function ReportsPage() {
           </CardContent>
         </Card>
       </div>
+      </TooltipProvider>
     );
   }
 
@@ -792,9 +968,10 @@ export default function ReportsPage() {
   const Icon = reportConfig.icon;
 
   return (
+    <TooltipProvider>
     <div className="space-y-4 sm:space-y-6 pb-8 px-4 sm:px-0">
       {/* Header with Back Button */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
@@ -821,29 +998,60 @@ export default function ReportsPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSaveReport}
-            className="h-9 sm:h-10"
-          >
-            <Bookmark className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Salvar</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowExportOptions(true)}
-            className="h-9 sm:h-10"
-          >
-            <Download className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Exportar</span>
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSaveReport}
+                className="h-9 sm:h-10 no-print"
+              >
+                <Bookmark className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Salvar</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Salvar relatório para acesso rápido</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowExportOptions(true)}
+                className="h-9 sm:h-10 no-print"
+              >
+                <Download className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Exportar</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Exportar como PDF, Excel ou Imprimir</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
+      {/* Report Content Wrapper for Print */}
+      <div id="report-content">
+        {/* Print Header */}
+        <div className="hidden print:block mb-6">
+          <div className="flex items-center justify-between border-b pb-4">
+            <div>
+              <h1 className="text-2xl font-bold">ImobiBase - Relatório de {reportConfig.title}</h1>
+              <p className="text-sm text-muted-foreground">
+                Período: {new Date(startDate).toLocaleDateString('pt-BR')} a {new Date(endDate).toLocaleDateString('pt-BR')}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Gerado em: {new Date().toLocaleString('pt-BR')}
+              </p>
+            </div>
+          </div>
+        </div>
+
       {/* Filters Bar - Mobile Optimized */}
-      <Card>
+      <Card className="no-print">
         <CardContent className="p-3 sm:p-4">
           <div className="flex items-center gap-2">
             {/* Mobile: Single Filter Button */}
@@ -925,7 +1133,10 @@ export default function ReportsPage() {
                 disabled={loading}
               >
                 {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <>
+                    <Spinner className="mr-2" size="sm" />
+                    Aplicando...
+                  </>
                 ) : (
                   'Aplicar'
                 )}
@@ -972,7 +1183,10 @@ export default function ReportsPage() {
       <DatePickerSheet />
       <ExportSheet />
       <FiltersSheet />
+
+      </div> {/* End of report-content */}
     </div>
+    </TooltipProvider>
   );
 
   // Render KPIs based on report type
@@ -1169,7 +1383,7 @@ export default function ReportsPage() {
                         tickLine={false}
                         tickFormatter={(value) => formatCompactNumber(value)}
                       />
-                      <Tooltip
+                      <RechartsTooltip
                         contentStyle={{
                           borderRadius: '8px',
                           border: '1px solid #e5e7eb'
@@ -1211,7 +1425,7 @@ export default function ReportsPage() {
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                      <RechartsTooltip formatter={(value: number) => formatCurrency(value)} />
                       <Legend
                         verticalAlign="bottom"
                         height={36}
@@ -1251,7 +1465,7 @@ export default function ReportsPage() {
                       tickLine={false}
                       tickFormatter={(value) => formatCompactNumber(value)}
                     />
-                    <Tooltip
+                    <RechartsTooltip
                       contentStyle={{
                         borderRadius: '8px',
                         border: '1px solid #e5e7eb'
@@ -1351,7 +1565,7 @@ export default function ReportsPage() {
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip />
+                      <RechartsTooltip />
                       <Legend
                         verticalAlign="bottom"
                         height={36}
@@ -1386,7 +1600,7 @@ export default function ReportsPage() {
                         tickLine={false}
                         tickFormatter={(value) => formatCompactNumber(value)}
                       />
-                      <Tooltip
+                      <RechartsTooltip
                         contentStyle={{
                           borderRadius: '8px',
                           border: '1px solid #e5e7eb'
@@ -1472,7 +1686,7 @@ export default function ReportsPage() {
                       tick={{ fontSize: 12 }}
                       tickLine={false}
                     />
-                    <Tooltip
+                    <RechartsTooltip
                       contentStyle={{
                         borderRadius: '8px',
                         border: '1px solid #e5e7eb'

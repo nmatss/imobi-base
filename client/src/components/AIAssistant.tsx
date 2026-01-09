@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Sparkles, Copy, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {

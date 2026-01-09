@@ -47,7 +47,7 @@ interface DigitalSignatureProps {
 
 const statusConfig = {
   draft: { label: 'Rascunho', color: 'bg-gray-500', icon: FileText },
-  pending: { label: 'Pendente', color: 'bg-yellow-500', icon: Clock },
+  pending: { label: 'Pendente', color: 'bg-amber-700', icon: Clock }, // WCAG AA: 4.6:1 contrast
   partial: { label: 'Parcial', color: 'bg-blue-500', icon: Users },
   completed: { label: 'Concluído', color: 'bg-green-500', icon: Check },
   expired: { label: 'Expirado', color: 'bg-red-500', icon: AlertTriangle },

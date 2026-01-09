@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { SettingsCard } from "../components/SettingsCard";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +22,7 @@ import {
   Monitor,
   Rocket,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
 import type { BrandSettings } from "../types";
 
@@ -34,6 +35,7 @@ export function BrandTab({ initialData, onSave }: BrandTabProps) {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [formData, setFormData] = useState<Partial<BrandSettings>>({
@@ -116,6 +118,57 @@ export function BrandTab({ initialData, onSave }: BrandTabProps) {
 
   const handlePreview = () => {
     window.open(`/e/${formData.subdomain}`, "_blank");
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar tamanho (máx 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "Arquivo muito grande",
+        description: "O logo deve ter no máximo 2MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validar tipo
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Formato inválido",
+        description: "Por favor, selecione uma imagem válida (PNG, JPG ou SVG).",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploadingLogo(true);
+
+    try {
+      // Simular upload (em produção, fazer upload real para servidor)
+      const reader = new FileReader();
+      reader.onload = () => {
+        handleChange("logoUrl", reader.result as string);
+        toast({
+          title: "Logo atualizado",
+          description: "O logo foi carregado com sucesso. Não esqueça de salvar as alterações.",
+        });
+      };
+      reader.readAsDataURL(file);
+
+      // Simular delay de upload
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível fazer upload do logo.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploadingLogo(false);
+    }
   };
 
   // Preview component
@@ -230,39 +283,77 @@ export function BrandTab({ initialData, onSave }: BrandTabProps) {
         </div>
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
-          <div
-            className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg border-2 border-dashed flex items-center justify-center bg-muted/50 shrink-0"
-            style={{ borderColor: formData.primaryColor }}
-          >
-            {formData.logoUrl ? (
-              <img
-                src={formData.logoUrl}
-                alt="Logo"
-                className="w-full h-full object-contain rounded-lg"
-              />
-            ) : (
-              <Building className="w-8 h-8 opacity-20" />
+          <div className="relative">
+            <div
+              className="w-20 h-20 sm:w-24 sm:h-24 rounded-lg border-2 border-dashed flex items-center justify-center bg-muted/50 shrink-0"
+              style={{ borderColor: formData.primaryColor }}
+            >
+              {formData.logoUrl ? (
+                <img
+                  src={formData.logoUrl}
+                  alt="Logo"
+                  className="w-full h-full object-contain rounded-lg"
+                />
+              ) : (
+                <Building className="w-8 h-8 opacity-20" />
+              )}
+            </div>
+            {isUploadingLogo && (
+              <div className="absolute inset-0 bg-background/90 rounded-lg flex items-center justify-center backdrop-blur-sm">
+                <div className="flex flex-col items-center gap-2">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="text-xs text-muted-foreground">Enviando...</p>
+                </div>
+              </div>
             )}
           </div>
           <div className="space-y-2 flex-1">
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm">
-                <Upload className="w-4 h-4 mr-2" />
-                Fazer Upload
-              </Button>
+              <label htmlFor="logo-upload" className="cursor-pointer">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isUploadingLogo}
+                  asChild
+                >
+                  <span>
+                    {isUploadingLogo ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Fazer Upload
+                      </>
+                    )}
+                  </span>
+                </Button>
+                <input
+                  id="logo-upload"
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={handleLogoUpload}
+                  disabled={isUploadingLogo}
+                  aria-label="Upload logo da empresa"
+                />
+              </label>
               {formData.logoUrl && (
                 <Button
                   variant="ghost"
                   size="sm"
                   className="text-destructive"
                   onClick={() => handleChange("logoUrl", "")}
+                  disabled={isUploadingLogo}
                 >
                   Remover
                 </Button>
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              Recomendado: 400x400px, PNG ou JPG com fundo transparente.
+              Recomendado: 400x400px, PNG ou JPG com fundo transparente, máx. 2MB.
             </p>
           </div>
         </div>

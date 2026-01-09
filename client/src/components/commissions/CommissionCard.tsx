@@ -34,7 +34,7 @@ export default function CommissionCard({ commission, onStatusChange }: Props) {
           label: 'Pendente',
           variant: 'secondary' as const,
           icon: Clock,
-          className: 'bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-950 dark:text-amber-400',
+          className: 'bg-amber-700 text-white hover:bg-amber-800 dark:bg-amber-950 dark:text-amber-200', // WCAG AA: 4.6:1
         };
       case 'approved':
         return {
@@ -66,7 +66,7 @@ export default function CommissionCard({ commission, onStatusChange }: Props) {
   };
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className="transition-shadow duration-200">
       <CardHeader className="pb-3">
         <div className="flex justify-between items-start gap-2">
           <div className="flex-1 min-w-0">

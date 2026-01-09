@@ -1,0 +1,23 @@
+# Security Policy for ImobiBase
+# This file follows RFC 9116 - https://www.rfc-editor.org/rfc/rfc9116.html
+
+Contact: mailto:security@imobibase.com
+Contact: mailto:dpo@imobibase.com
+Expires: 2026-12-31T23:59:59.000Z
+Preferred-Languages: pt-BR, en
+Canonical: https://imobibase.com/.well-known/security.txt
+
+# Security Policy
+Policy: https://imobibase.com/security
+
+# Acknowledgments
+Acknowledgments: https://imobibase.com/security#hall-of-fame
+
+# Encryption
+Encryption: https://imobibase.com/pgp-key.txt
+
+# Hiring
+Hiring: https://imobibase.com/careers
+
+# Please report security vulnerabilities responsibly
+# Include: type of issue, affected files, reproduction steps, and impact assessment

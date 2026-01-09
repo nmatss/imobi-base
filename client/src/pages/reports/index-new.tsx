@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Spinner } from "@/components/ui/spinner";
 import {
   DollarSign,
   TrendingUp,
@@ -85,6 +86,7 @@ interface User {
 
 export default function ComprehensiveReportsPage() {
   const [loading, setLoading] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("sales");
   const [users, setUsers] = useState<User[]>([]);
 
@@ -188,18 +190,26 @@ export default function ComprehensiveReportsPage() {
     setEndDate(end);
   };
 
-  const handleExportCSV = (data: any[], filename: string) => {
+  const handleExportCSV = async (data: any[], filename: string) => {
     if (!data.length) return;
 
-    const headers = Object.keys(data[0]).join(",");
-    const rows = data.map(row => Object.values(row).join(","));
-    const csv = [headers, ...rows].join("\n");
+    setExportLoading(true);
+    try {
+      // Simulate processing time
+      await new Promise(resolve => setTimeout(resolve, 800));
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `${filename}_${startDate}_${endDate}.csv`;
-    link.click();
+      const headers = Object.keys(data[0]).join(",");
+      const rows = data.map(row => Object.values(row).join(","));
+      const csv = [headers, ...rows].join("\n");
+
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `${filename}_${startDate}_${endDate}.csv`;
+      link.click();
+    } finally {
+      setExportLoading(false);
+    }
   };
 
   if (loading && !salesReport) {
@@ -303,8 +313,15 @@ export default function ComprehensiveReportsPage() {
             </div>
 
             <div className="flex items-end">
-              <Button onClick={loadReports} className="w-full">
-                Aplicar Filtros
+              <Button onClick={loadReports} className="w-full" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Spinner className="mr-2" size="sm" />
+                    Aplicando...
+                  </>
+                ) : (
+                  'Aplicar Filtros'
+                )}
               </Button>
             </div>
           </div>
@@ -347,9 +364,19 @@ export default function ComprehensiveReportsPage() {
             <Button
               variant="outline"
               onClick={() => salesReport && handleExportCSV(salesReport.sales, 'vendas')}
+              disabled={exportLoading}
             >
-              <Download className="h-4 w-4 mr-2" />
-              Exportar CSV
+              {exportLoading ? (
+                <>
+                  <Spinner className="mr-2" size="sm" />
+                  Exportando...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar CSV
+                </>
+              )}
             </Button>
           </div>
 
@@ -723,9 +750,19 @@ export default function ComprehensiveReportsPage() {
             <Button
               variant="outline"
               onClick={() => brokerReport && handleExportCSV(brokerReport.ranking, 'corretores')}
+              disabled={exportLoading}
             >
-              <Download className="h-4 w-4 mr-2" />
-              Exportar CSV
+              {exportLoading ? (
+                <>
+                  <Spinner className="mr-2" size="sm" />
+                  Exportando...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar CSV
+                </>
+              )}
             </Button>
           </div>
 
@@ -901,9 +938,18 @@ export default function ComprehensiveReportsPage() {
         <TabsContent value="financial" className="space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Relatório Financeiro (DRE Simplificado)</h2>
-            <Button variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Exportar Excel
+            <Button variant="outline" disabled={exportLoading}>
+              {exportLoading ? (
+                <>
+                  <Spinner className="mr-2" size="sm" />
+                  Exportando...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar Excel
+                </>
+              )}
             </Button>
           </div>
 

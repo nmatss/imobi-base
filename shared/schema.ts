@@ -642,6 +642,7 @@ export const tenantSubscriptions = pgTable("tenant_subscriptions", {
   currentPeriodStart: timestamp("current_period_start"),
   currentPeriodEnd: timestamp("current_period_end"),
   cancelledAt: timestamp("cancelled_at"),
+  metadata: json("metadata").default('{}'), // Store payment gateway IDs (stripeCustomerId, etc.)
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -667,4 +668,315 @@ export const usageLogs = pgTable("usage_logs", {
 
 export const insertUsageLogSchema = createInsertSchema(usageLogs).omit({ id: true, createdAt: true });
 export type InsertUsageLog = z.infer<typeof insertUsageLogSchema>;
+
+// ============== WHATSAPP INTEGRATION ==============
+
+/**
+ * WHATSAPP TEMPLATES
+ * Store WhatsApp message templates for Business API
+ */
+export const whatsappTemplates = pgTable("whatsapp_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  name: text("name").notNull(), // Template name/identifier
+  category: text("category").notNull(), // leads, properties, visits, contracts, payments
+  language: text("language").notNull().default("pt_BR"),
+  status: text("status").notNull().default("pending"), // pending, approved, rejected
+  headerType: text("header_type"), // text, image, document, video
+  headerContent: text("header_content"),
+  bodyText: text("body_text").notNull(),
+  footerText: text("footer_text"),
+  buttons: json("buttons"), // Array of button objects
+  variables: text("variables").array(), // Variable names like ["nome", "data", "hora"]
+  wabaTemplateId: text("waba_template_id"), // WhatsApp Business API template ID
+  usageCount: integer("usage_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertWhatsappTemplateSchema = createInsertSchema(whatsappTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertWhatsappTemplate = z.infer<typeof insertWhatsappTemplateSchema>;
+export type WhatsappTemplate = typeof whatsappTemplates.$inferSelect;
+
+/**
+ * WHATSAPP CONVERSATIONS
+ * Track WhatsApp conversations with leads/clients
+ */
+export const whatsappConversations = pgTable("whatsapp_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  leadId: varchar("lead_id").references(() => leads.id),
+  phoneNumber: text("phone_number").notNull(),
+  contactName: text("contact_name"),
+  status: text("status").notNull().default("active"), // active, waiting, closed
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  lastMessageAt: timestamp("last_message_at"),
+  lastMessageFrom: text("last_message_from"), // user, contact
+  unreadCount: integer("unread_count").notNull().default(0),
+  metadata: json("metadata").default('{}'),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertWhatsappConversationSchema = createInsertSchema(whatsappConversations).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertWhatsappConversation = z.infer<typeof insertWhatsappConversationSchema>;
+export type WhatsappConversation = typeof whatsappConversations.$inferSelect;
+
+/**
+ * WHATSAPP MESSAGES
+ * Store all WhatsApp messages (incoming and outgoing)
+ */
+export const whatsappMessages = pgTable("whatsapp_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  conversationId: varchar("conversation_id").notNull().references(() => whatsappConversations.id),
+  wabaMessageId: text("waba_message_id"), // WhatsApp Business API message ID
+  direction: text("direction").notNull(), // inbound, outbound
+  messageType: text("message_type").notNull().default("text"), // text, image, document, location, contact, template
+  content: text("content"),
+  mediaUrl: text("media_url"),
+  caption: text("caption"),
+  templateId: varchar("template_id").references(() => whatsappTemplates.id),
+  status: text("status").notNull().default("pending"), // pending, sent, delivered, read, failed
+  errorCode: text("error_code"),
+  errorMessage: text("error_message"),
+  sentBy: varchar("sent_by").references(() => users.id), // For outbound messages
+  metadata: json("metadata").default('{}'),
+  sentAt: timestamp("sent_at"),
+  deliveredAt: timestamp("delivered_at"),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertWhatsappMessageSchema = createInsertSchema(whatsappMessages).omit({ id: true, createdAt: true });
+export type InsertWhatsappMessage = z.infer<typeof insertWhatsappMessageSchema>;
+export type WhatsappMessage = typeof whatsappMessages.$inferSelect;
+
+/**
+ * WHATSAPP MESSAGE QUEUE
+ * Queue for managing WhatsApp message sending with rate limiting
+ */
+export const whatsappMessageQueue = pgTable("whatsapp_message_queue", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  phoneNumber: text("phone_number").notNull(),
+  messageType: text("message_type").notNull(), // text, template, media
+  templateId: varchar("template_id").references(() => whatsappTemplates.id),
+  content: text("content"),
+  mediaUrl: text("media_url"),
+  variables: json("variables"),
+  priority: integer("priority").notNull().default(5), // 1-10, higher = more priority
+  status: text("status").notNull().default("pending"), // pending, processing, sent, failed
+  retryCount: integer("retry_count").notNull().default(0),
+  maxRetries: integer("max_retries").notNull().default(3),
+  scheduledFor: timestamp("scheduled_for"),
+  processedAt: timestamp("processed_at"),
+  errorMessage: text("error_message"),
+  metadata: json("metadata").default('{}'),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertWhatsappMessageQueueSchema = createInsertSchema(whatsappMessageQueue).omit({ id: true, createdAt: true });
+export type InsertWhatsappMessageQueue = z.infer<typeof insertWhatsappMessageQueueSchema>;
+export type WhatsappMessageQueue = typeof whatsappMessageQueue.$inferSelect;
+
+/**
+ * WHATSAPP AUTO RESPONSES
+ * Configure automatic responses based on keywords or business hours
+ */
+export const whatsappAutoResponses = pgTable("whatsapp_auto_responses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  name: text("name").notNull(),
+  triggerType: text("trigger_type").notNull(), // keyword, business_hours, first_contact, all_messages
+  keywords: text("keywords").array(),
+  responseText: text("response_text").notNull(),
+  templateId: varchar("template_id").references(() => whatsappTemplates.id),
+  isActive: boolean("is_active").notNull().default(true),
+  priority: integer("priority").notNull().default(5),
+  businessHoursOnly: boolean("business_hours_only").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertWhatsappAutoResponseSchema = createInsertSchema(whatsappAutoResponses).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertWhatsappAutoResponse = z.infer<typeof insertWhatsappAutoResponseSchema>;
+export type WhatsappAutoResponse = typeof whatsappAutoResponses.$inferSelect;
+
+/**
+ * COMPLIANCE: USER SESSIONS
+ * Track user login sessions for security and compliance
+ */
+export const userSessions = pgTable("user_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  sessionToken: text("session_token").notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+/**
+ * COMPLIANCE: USER CONSENTS
+ * Track user consent for data processing (GDPR/LGPD)
+ */
+export const userConsents = pgTable("user_consents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  email: text("email"),
+  consentType: text("consent_type").notNull(), // marketing, analytics, necessary
+  status: text("status").notNull(), // given, withdrawn, expired
+  purpose: text("purpose"),
+  consentMethod: text("consent_method"), // form, email, checkbox
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+/**
+ * COMPLIANCE: AUDIT LOG
+ * Track all data access and modifications for compliance
+ */
+export const complianceAuditLog = pgTable("compliance_audit_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  userId: varchar("user_id").references(() => users.id),
+  action: text("action").notNull(), // view, create, update, delete, export, anonymize
+  resourceType: text("resource_type").notNull(), // user, lead, property, etc.
+  resourceId: varchar("resource_id"),
+  details: json("details"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  timestamp: timestamp("timestamp").notNull().defaultNow(),
+});
+
+/**
+ * COMPLIANCE: ACCOUNT DELETION REQUESTS
+ * Track and manage account deletion requests (GDPR Right to be Forgotten)
+ */
+export const accountDeletionRequests = pgTable("account_deletion_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  email: text("email").notNull(),
+  reason: text("reason"),
+  status: text("status").notNull().default("pending"), // pending, approved, processing, completed, rejected
+  requestedAt: timestamp("requested_at").notNull().defaultNow(),
+  processedAt: timestamp("processed_at"),
+  processedBy: varchar("processed_by").references(() => users.id),
+  deletionDate: timestamp("deletion_date"),
+  notes: text("notes"),
+});
+
+/**
+ * COMPLIANCE: DATA EXPORT REQUESTS
+ * Track and manage data export requests (GDPR Right to Data Portability)
+ */
+export const dataExportRequests = pgTable("data_export_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  email: text("email").notNull(),
+  status: text("status").notNull().default("pending"), // pending, processing, completed, failed
+  format: text("format").notNull().default("json"), // json, csv, pdf
+  exportUrl: text("export_url"),
+  expiresAt: timestamp("expires_at"),
+  requestedAt: timestamp("requested_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+  fileSize: integer("file_size"),
+  error: text("error"),
+});
+
+/**
+ * COMPLIANCE: DATA BREACH INCIDENTS
+ * Track and manage data breach incidents for regulatory reporting
+ */
+export const dataBreachIncidents = pgTable("data_breach_incidents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  severity: text("severity").notNull(), // low, medium, high, critical
+  status: text("status").notNull().default("detected"), // detected, investigating, contained, resolved
+  affectedRecords: integer("affected_records"),
+  dataTypes: text("data_types").array(), // personal_info, financial, medical, etc.
+  detectedAt: timestamp("detected_at").notNull().defaultNow(),
+  reportedAt: timestamp("reported_at"),
+  resolvedAt: timestamp("resolved_at"),
+  reportedBy: varchar("reported_by").references(() => users.id),
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  regulatoryNotification: boolean("regulatory_notification").default(false),
+  affectedUsersNotified: boolean("affected_users_notified").default(false),
+  notes: text("notes"),
+});
+
+/**
+ * COMPLIANCE: COOKIE PREFERENCES
+ * Track user cookie preferences (GDPR/LGPD)
+ */
+export const cookiePreferences = pgTable("cookie_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  tenantId: varchar("tenant_id").references(() => tenants.id),
+  sessionId: text("session_id"),
+  necessary: boolean("necessary").notNull().default(true),
+  analytics: boolean("analytics").notNull().default(false),
+  marketing: boolean("marketing").notNull().default(false),
+  preferences: boolean("preferences").notNull().default(false),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+/**
+ * COMPLIANCE: DATA PROCESSING ACTIVITIES
+ * Record of processing activities (GDPR Article 30)
+ */
+export const dataProcessingActivities = pgTable("data_processing_activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  name: text("name").notNull(),
+  purpose: text("purpose").notNull(),
+  legalBasis: text("legal_basis").notNull(), // consent, contract, legal_obligation, etc.
+  dataCategories: text("data_categories").array(),
+  dataSubjects: text("data_subjects").array(),
+  recipients: text("recipients").array(),
+  retentionPeriod: text("retention_period"),
+  securityMeasures: text("security_measures"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+/**
+ * FILES
+ * File storage metadata for uploaded files
+ */
+export const files = pgTable("files", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  userId: varchar("user_id").references(() => users.id),
+  filename: text("filename").notNull(),
+  originalName: text("original_name").notNull(),
+  mimeType: text("mime_type").notNull(),
+  size: integer("size").notNull(),
+  path: text("path").notNull(),
+  url: text("url"),
+  category: text("category"), // document, image, video, etc.
+  relatedTo: text("related_to"), // property, lead, contract, etc.
+  relatedId: varchar("related_id"),
+  metadata: json("metadata"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertFileSchema = createInsertSchema(files).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertFile = z.infer<typeof insertFileSchema>;
+export type File = typeof files.$inferSelect;
+
 export type UsageLog = typeof usageLogs.$inferSelect;

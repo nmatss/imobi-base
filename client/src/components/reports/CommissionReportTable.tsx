@@ -291,8 +291,9 @@ export default function CommissionReportTable({
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden lg:block overflow-x-auto rounded-lg border">
-        <table className="w-full">
+      <div className="hidden lg:block overflow-x-auto -mx-4 lg:mx-0 rounded-lg border">
+        <div className="inline-block min-w-full align-middle">
+          <table className="w-full min-w-[900px]">
           <thead className="bg-muted/50 sticky top-0">
             <tr className="text-left text-xs font-medium text-muted-foreground">
               {selectable && (
@@ -503,7 +504,8 @@ export default function CommissionReportTable({
               <td colSpan={2}></td>
             </tr>
           </tfoot>
-        </table>
+          </table>
+        </div>
       </div>
     </div>
   );

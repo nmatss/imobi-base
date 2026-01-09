@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório Mensal</title>
+    <style>
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f3f4f6; }
+        .container { max-width: 650px; margin: 0 auto; background-color: #ffffff; }
+        .header { background: linear-gradient(135deg, {{branding.primaryColor}} 0%, {{branding.secondaryColor}} 100%); padding: 30px; text-align: center; }
+        .header-title { color: #ffffff; font-size: 24px; font-weight: bold; margin: 0; }
+        .period { color: #ffffff; opacity: 0.9; font-size: 14px; margin-top: 5px; }
+        .content { padding: 30px; }
+        .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 25px 0; }
+        .metric-card { background-color: #f9fafb; border-radius: 8px; padding: 20px; text-align: center; }
+        .metric-value { font-size: 32px; font-weight: bold; color: {{branding.primaryColor}}; margin: 10px 0; }
+        .metric-label { font-size: 14px; color: #6b7280; }
+        .section-title { font-size: 18px; font-weight: 600; color: #111827; margin: 25px 0 15px 0; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; }
+        .stat-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f3f4f6; }
+        .stat-label { color: #374151; }
+        .stat-value { font-weight: 600; color: #111827; }
+        .cta-button { display: inline-block; background-color: {{branding.primaryColor}}; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; margin: 15px 0; }
+        .footer { background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="header-title">📊 Relatório de Performance</h1>
+            <p class="period">{{period}}</p>
+        </div>
+        <div class="content">
+            <p style="font-size: 16px; color: #4b5563;">Olá, <strong>{{userName}}</strong>!</p>
+            <p style="font-size: 16px; color: #4b5563;">Aqui está o resumo do seu desempenho no último mês:</p>
+
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Novos Leads</div>
+                    <div class="metric-value">{{leadsCount}}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Visitas Realizadas</div>
+                    <div class="metric-value">{{visitsCount}}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Contratos Fechados</div>
+                    <div class="metric-value">{{contractsCount}}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Receita Total</div>
+                    <div class="metric-value" style="font-size: 20px;">{{revenue}}</div>
+                </div>
+            </div>
+
+            <h2 class="section-title">Detalhamento</h2>
+            <div class="stat-row">
+                <span class="stat-label">Taxa de Conversão</span>
+                <span class="stat-value">{{conversionRate}}%</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Tempo Médio de Resposta</span>
+                <span class="stat-value">{{avgResponseTime}}</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Imóveis Ativos</span>
+                <span class="stat-value">{{activeProperties}}</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Novos Clientes</span>
+                <span class="stat-value">{{newClients}}</span>
+            </div>
+
+            <center>
+                <a href="{{dashboardUrl}}" class="cta-button">Ver Relatório Completo</a>
+            </center>
+
+            <p style="font-size: 14px; color: #6b7280; margin-top: 25px;">Continue com o excelente trabalho!</p>
+            <p style="margin-top: 15px;"><strong>Equipe {{branding.companyName}}</strong></p>
+        </div>
+        <div class="footer">
+            <p>&copy; {{currentYear}} {{branding.companyName}}</p>
+            {{#if unsubscribeUrl}}<p><a href="{{unsubscribeUrl}}" style="color: #6b7280;">Cancelar inscrição</a></p>{{/if}}
+        </div>
+    </div>
+</body>
+</html>

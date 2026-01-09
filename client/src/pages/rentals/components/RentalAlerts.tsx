@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,10 @@ import {
   CalendarClock,
   Home,
   AlertCircle,
+  Send,
+  MessageCircle,
+  RotateCcw,
+  Eye,
 } from "lucide-react";
 import type { RentalAlerts as RentalAlertsType, RentalPayment, RentalContract, Property } from "../types";
 import { formatPrice, formatDate } from "../types";
@@ -22,6 +26,9 @@ interface RentalAlertsProps {
   onPaymentClick?: (payment: RentalPayment) => void;
   onContractClick?: (contract: RentalContract) => void;
   onPropertyClick?: (property: Property) => void;
+  onSendReminder?: (payment: RentalPayment) => void;
+  onSendBulkReminder?: (payments: RentalPayment[]) => void;
+  onRenewContract?: (contract: RentalContract) => void;
 }
 
 type AlertCategory = {
@@ -40,8 +47,22 @@ export function RentalAlerts({
   onPaymentClick,
   onContractClick,
   onPropertyClick,
+  onSendReminder,
+  onSendBulkReminder,
+  onRenewContract,
 }: RentalAlertsProps) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+
+  const toggleSection = (sectionId: string) => {
+    const newExpanded = new Set(expandedSections);
+    if (newExpanded.has(sectionId)) {
+      newExpanded.delete(sectionId);
+    } else {
+      newExpanded.add(sectionId);
+    }
+    setExpandedSections(newExpanded);
+  };
 
   if (loading) {
     return (
@@ -77,16 +98,57 @@ export function RentalAlerts({
       bgColor: "bg-yellow-100",
       count: alerts?.paymentsDueToday?.length || 0,
       items: (
-        <div className="space-y-1">
-          {alerts?.paymentsDueToday?.slice(0, 3).map((payment) => (
-            <button
-              key={payment.id}
-              onClick={() => onPaymentClick?.(payment)}
-              className="w-full text-left text-xs p-2 rounded hover:bg-muted transition-colors"
+        <div className="space-y-2">
+          {/* Bulk Actions */}
+          {(alerts?.paymentsDueToday?.length || 0) > 1 && onSendBulkReminder && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full text-xs"
+              onClick={() => onSendBulkReminder(alerts?.paymentsDueToday || [])}
             >
-              <span className="font-medium">{payment.referenceMonth}</span>
-              <span className="text-muted-foreground ml-2">{formatPrice(payment.totalValue)}</span>
-            </button>
+              <Send className="h-3 w-3 mr-1" />
+              Enviar lembrete em massa ({alerts?.paymentsDueToday?.length})
+            </Button>
+          )}
+
+          {alerts?.paymentsDueToday?.slice(0, 3).map((payment) => (
+            <div
+              key={payment.id}
+              className="p-2 rounded-lg border bg-background hover:bg-muted/50 transition-colors"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <button
+                  onClick={() => onPaymentClick?.(payment)}
+                  className="text-left flex-1"
+                >
+                  <span className="font-medium text-xs">{payment.referenceMonth}</span>
+                  <span className="text-muted-foreground ml-2 text-xs">{formatPrice(payment.totalValue)}</span>
+                </button>
+              </div>
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2 text-[10px]"
+                  onClick={() => onPaymentClick?.(payment)}
+                >
+                  <Eye className="h-3 w-3 mr-1" />
+                  Ver
+                </Button>
+                {onSendReminder && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-[10px]"
+                    onClick={() => onSendReminder(payment)}
+                  >
+                    <MessageCircle className="h-3 w-3 mr-1" />
+                    Lembrar
+                  </Button>
+                )}
+              </div>
+            </div>
           ))}
           {(alerts?.paymentsDueToday?.length || 0) > 3 && (
             <p className="text-xs text-muted-foreground px-2">
@@ -161,16 +223,44 @@ export function RentalAlerts({
       bgColor: "bg-orange-100",
       count: alerts?.contractsExpiring?.length || 0,
       items: (
-        <div className="space-y-1">
+        <div className="space-y-2">
           {alerts?.contractsExpiring?.slice(0, 3).map((contract) => (
-            <button
+            <div
               key={contract.id}
-              onClick={() => onContractClick?.(contract)}
-              className="w-full text-left text-xs p-2 rounded hover:bg-muted transition-colors"
+              className="p-2 rounded-lg border bg-background hover:bg-muted/50 transition-colors"
             >
-              <span className="font-medium">{formatPrice(contract.rentValue)}/mês</span>
-              <span className="text-muted-foreground ml-2">até {formatDate(contract.endDate)}</span>
-            </button>
+              <div className="flex items-center justify-between mb-1">
+                <button
+                  onClick={() => onContractClick?.(contract)}
+                  className="text-left flex-1"
+                >
+                  <span className="font-medium text-xs">{formatPrice(contract.rentValue)}/mês</span>
+                  <span className="text-muted-foreground ml-2 text-xs">até {formatDate(contract.endDate)}</span>
+                </button>
+              </div>
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2 text-[10px]"
+                  onClick={() => onContractClick?.(contract)}
+                >
+                  <Eye className="h-3 w-3 mr-1" />
+                  Ver
+                </Button>
+                {onRenewContract && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 px-2 text-[10px]"
+                    onClick={() => onRenewContract(contract)}
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    Renovar
+                  </Button>
+                )}
+              </div>
+            </div>
           ))}
           {(alerts?.contractsExpiring?.length || 0) > 3 && (
             <p className="text-xs text-muted-foreground px-2">

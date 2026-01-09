@@ -1,5 +1,6 @@
 // Types for the Rentals module
 
+import React from "react";
 export type Owner = {
   id: string;
   tenantId: string;

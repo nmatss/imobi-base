@@ -1,0 +1,2619 @@
+
+> rest-express@1.0.0 test
+> vitest run
+
+[1m[43m DEPRECATED [49m[22m [33m`test.poolOptions` was removed in Vitest 4. All previous `poolOptions` are now top-level options. Please, refer to the migration guide: https://vitest.dev/guide/migration#pool-rework[39m
+
+[1m[46m RUN [49m[22m [36mv4.0.16 [39m[90m/home/nic20/ProjetosWeb/ImobiBase[39m
+
+ [31m❯[39m server/security/file-validator.test.ts [2m([22m[2m103 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 57[2mms[22m[39m
+       [32m✓[39m should validate a valid JPEG file[32m 3[2mms[22m[39m
+       [32m✓[39m should validate a valid PNG file[32m 1[2mms[22m[39m
+       [32m✓[39m should validate a valid GIF file (GIF87a)[32m 1[2mms[22m[39m
+       [32m✓[39m should validate a valid GIF file (GIF89a)[32m 0[2mms[22m[39m
+       [32m✓[39m should validate a valid PDF file[32m 0[2mms[22m[39m
+       [32m✓[39m should detect file type spoofing - PNG claiming to be JPEG[32m 1[2mms[22m[39m
+       [32m✓[39m should detect file type spoofing - JPEG claiming to be PNG[32m 0[2mms[22m[39m
+       [32m✓[39m should reject empty files[32m 0[2mms[22m[39m
+       [32m✓[39m should reject files that are too small (< 8 bytes)[32m 0[2mms[22m[39m
+       [32m✓[39m should reject corrupted files with unrecognized magic bytes[32m 1[2mms[22m[39m
+       [32m✓[39m should accept JPEG with alternative MIME type (image/jpg)[32m 0[2mms[22m[39m
+       [32m✓[39m should accept JPEG with pjpeg MIME type[32m 0[2mms[22m[39m
+       [32m✓[39m should validate ZIP files[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .php as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .phtml as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .php5 as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .asp as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .aspx as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .jsp as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .exe as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .bat as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .cmd as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .dll as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .msi as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .sh as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .bash as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .ps1 as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .py as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .rb as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .pl as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .htaccess as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .env as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .ini as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .yml as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should allow .jpg[32m 0[2mms[22m[39m
+         [32m✓[39m should allow .png[32m 0[2mms[22m[39m
+         [32m✓[39m should allow .pdf[32m 0[2mms[22m[39m
+         [32m✓[39m should allow .txt[32m 0[2mms[22m[39m
+         [32m✓[39m should allow .docx[32m 0[2mms[22m[39m
+         [32m✓[39m should allow .xlsx[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .PHP (uppercase) as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .ExE (mixed case) as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .AsP (mixed case) as dangerous[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .jpg.php[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .png.php[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .pdf.exe[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .txt.sh[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .doc.asp[32m 0[2mms[22m[39m
+         [32m✓[39m should detect triple extensions with dangerous ending[32m 0[2mms[22m[39m
+         [32m✓[39m should allow .tar.gz[32m 0[2mms[22m[39m
+         [32m✓[39m should allow single extension files[32m 0[2mms[22m[39m
+         [32m✓[39m should allow files without extension[32m 0[2mms[22m[39m
+         [32m✓[39m should allow .doc.pdf[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .jpg.PHP (uppercase)[32m 0[2mms[22m[39m
+         [32m✓[39m should detect .PDF.ExE (mixed case)[32m 0[2mms[22m[39m
+       [32m✓[39m should detect null byte character (\0)[32m 0[2mms[22m[39m
+       [32m✓[39m should detect URL-encoded null byte (%00)[32m 0[2mms[22m[39m
+       [32m✓[39m should detect null byte in middle of filename[32m 0[2mms[22m[39m
+       [32m✓[39m should detect multiple null bytes[32m 0[2mms[22m[39m
+       [32m✓[39m should detect mixed null byte encodings[32m 0[2mms[22m[39m
+       [32m✓[39m should allow clean filenames[32m 0[2mms[22m[39m
+       [32m✓[39m should allow filenames with special characters[32m 0[2mms[22m[39m
+       [32m✓[39m should allow Unicode filenames[32m 0[2mms[22m[39m
+         [32m✓[39m should remove .. (parent directory)[32m 0[2mms[22m[39m
+         [32m✓[39m should remove forward slashes[32m 0[2mms[22m[39m
+         [32m✓[39m should remove backslashes[32m 0[2mms[22m[39m
+         [32m✓[39m should remove null byte characters[32m 0[2mms[22m[39m
+         [32m✓[39m should remove URL-encoded null bytes[32m 0[2mms[22m[39m
+         [32m✓[39m should remove < and >[32m 1[2mms[22m[39m
+         [32m✓[39m should remove : (colon)[32m 0[2mms[22m[39m
+         [32m✓[39m should remove " (quotes)[32m 0[2mms[22m[39m
+         [32m✓[39m should remove | (pipe)[32m 0[2mms[22m[39m
+         [32m✓[39m should remove ? (question mark)[32m 0[2mms[22m[39m
+         [32m✓[39m should remove * (asterisk)[32m 0[2mms[22m[39m
+         [32m✓[39m should truncate very long filenames to 255 characters[32m 0[2mms[22m[39m
+         [32m✓[39m should preserve extension when truncating[32m 0[2mms[22m[39m
+         [32m✓[39m should preserve normal filenames[32m 0[2mms[22m[39m
+         [32m✓[39m should preserve filenames with spaces[32m 0[2mms[22m[39m
+         [32m✓[39m should preserve filenames with hyphens[32m 0[2mms[22m[39m
+         [32m✓[39m should preserve filenames with underscores[32m 0[2mms[22m[39m
+         [32m✓[39m should pass validation for valid JPEG[32m 1[2mms[22m[39m
+         [32m✓[39m should pass validation for valid PNG[32m 0[2mms[22m[39m
+         [32m✓[39m should pass validation for valid PDF[32m 0[2mms[22m[39m
+         [32m✓[39m should fail validation for null byte injection[32m 1[2mms[22m[39m
+         [32m✓[39m should fail validation for dangerous extension[32m 0[2mms[22m[39m
+         [32m✓[39m should fail validation for double extension attack[32m 0[2mms[22m[39m
+         [32m✓[39m should fail validation for empty file[32m 0[2mms[22m[39m
+[31m         [31m×[31m should fail validation for file type mismatch[39m[32m 12[2mms[22m[39m
+         [32m✓[39m should warn about PHP embedded in JPEG[32m 1[2mms[22m[39m
+         [32m✓[39m should warn about ASP embedded in PNG[32m 9[2mms[22m[39m
+         [32m✓[39m should warn about JavaScript in image[32m 1[2mms[22m[39m
+         [32m✓[39m should warn about eval() in image[32m 1[2mms[22m[39m
+         [32m✓[39m should warn about base64_decode in image[32m 2[2mms[22m[39m
+         [32m✓[39m should warn about system() call in image[32m 0[2mms[22m[39m
+         [32m✓[39m should reject files larger than 100MB[32m 2[2mms[22m[39m
+         [32m✓[39m should accept files under 100MB[32m 1[2mms[22m[39m
+         [32m✓[39m should detect multiple issues at once[32m 1[2mms[22m[39m
+       [32m✓[39m should handle filenames with only dots[32m 0[2mms[22m[39m
+       [32m✓[39m should handle Unicode filenames[32m 0[2mms[22m[39m
+       [32m✓[39m should handle extremely long filenames[32m 0[2mms[22m[39m
+       [32m✓[39m should detect case variations of dangerous extensions[32m 0[2mms[22m[39m
+       [32m✓[39m should handle files without extensions[32m 0[2mms[22m[39m
+       [32m✓[39m should sanitize path traversal in various forms[32m 0[2mms[22m[39m
+ [31m❯[39m tests/integration/security/csrf-protection.test.ts [2m([22m[2m20 tests[22m[2m | [22m[33m20 skipped[39m[2m)[22m[32m 16[2mms[22m[39m
+       [2m[90m↓[39m[22m should generate CSRF token on first request
+       [2m[90m↓[39m[22m should maintain same CSRF token across requests in same session
+       [2m[90m↓[39m[22m should generate different tokens for different sessions
+       [2m[90m↓[39m[22m should accept request with valid CSRF token
+       [2m[90m↓[39m[22m should reject POST request without CSRF token
+       [2m[90m↓[39m[22m should reject request with invalid CSRF token
+       [2m[90m↓[39m[22m should reject request with CSRF token from different session
+       [2m[90m↓[39m[22m should protect POST requests
+       [2m[90m↓[39m[22m should protect PUT requests
+       [2m[90m↓[39m[22m should protect DELETE requests
+       [2m[90m↓[39m[22m should NOT protect GET requests
+       [2m[90m↓[39m[22m should rotate CSRF token after successful login
+       [2m[90m↓[39m[22m should allow webhook endpoints without CSRF token
+       [2m[90m↓[39m[22m should allow login endpoint without CSRF token
+       [2m[90m↓[39m[22m should allow health check without CSRF token
+       [2m[90m↓[39m[22m should reject modified CSRF token
+       [2m[90m↓[39m[22m should reject empty CSRF token
+       [2m[90m↓[39m[22m should reject CSRF token with SQL injection attempt
+       [2m[90m↓[39m[22m should reject CSRF token with XSS attempt
+       [2m[90m↓[39m[22m should validate CSRF token matches session value
+ [32m✓[39m tests/integration/auth.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 234[2mms[22m[39m
+ [31m❯[39m tests/integration/security/auth-flow.test.ts [2m([22m[2m10 tests[22m[2m | [22m[33m10 skipped[39m[2m)[22m[32m 12[2mms[22m[39m
+       [2m[90m↓[39m[22m should complete full authentication flow successfully
+       [2m[90m↓[39m[22m should regenerate session ID after successful login
+       [2m[90m↓[39m[22m should lock account after 5 failed login attempts
+       [2m[90m↓[39m[22m should reset failed attempts after successful login
+       [2m[90m↓[39m[22m should reject registration with missing fields
+       [2m[90m↓[39m[22m should reject registration with weak password
+       [2m[90m↓[39m[22m should reject duplicate email registration
+       [2m[90m↓[39m[22m should maintain session across multiple requests
+       [2m[90m↓[39m[22m should not allow access with expired session
+       [2m[90m↓[39m[22m should handle multiple sessions for same user
+ [32m✓[39m client/src/components/ui/__tests__/StatusBadge.test.tsx [2m([22m[2m11 tests[22m[2m)[22m[32m 210[2mms[22m[39m
+ [32m✓[39m tests/integration/properties.test.ts [2m([22m[2m13 tests[22m[2m)[22m[33m 356[2mms[22m[39m
+ [32m✓[39m client/src/components/ui/__tests__/LoadingState.test.tsx [2m([22m[2m24 tests[22m[2m)[22m[33m 721[2mms[22m[39m
+     [33m[2m✓[22m[39m count prop renderiza múltiplos skeletons [33m 322[2mms[22m[39m
+ [32m✓[39m server/security/__tests__/intrusion-detection.test.ts [2m([22m[2m38 tests[22m[2m)[22m[33m 484[2mms[22m[39m
+ [32m✓[39m client/src/pages/leads/__tests__/kanban.test.tsx [2m([22m[2m28 tests[22m[2m)[22m[33m 690[2mms[22m[39m
+       [33m[2m✓[22m[39m should filter leads by search term [33m 404[2mms[22m[39m
+ [32m✓[39m client/src/components/ui/__tests__/EmptyState.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[33m 562[2mms[22m[39m
+     [33m[2m✓[22m[39m onClick do botão funciona [33m 354[2mms[22m[39m
+ [32m✓[39m client/src/components/ui/__tests__/MetricCard.test.tsx [2m([22m[2m12 tests[22m[2m)[22m[33m 601[2mms[22m[39m
+     [33m[2m✓[22m[39m onClick é chamado quando clicável [33m 329[2mms[22m[39m
+ [32m✓[39m client/src/components/dashboard/__tests__/DashboardMetrics.test.tsx [2m([22m[2m24 tests[22m[2m)[22m[33m 974[2mms[22m[39m
+[90mstdout[2m | server/security/__tests__/svg-sanitizer.test.ts[2m > [22m[2mSVG Sanitizer[2m > [22m[2msanitizeSVG[2m > [22m[2mshould remove script tags
+[22m[39m[SVG_SANITIZER] Content sanitized: { sizeBefore: [33m72[39m, sizeAfter: [33m51[39m, reductionPercent: [32m'29.17'[39m }
+
+[90mstderr[2m | server/security/__tests__/svg-sanitizer.test.ts[2m > [22m[2mSVG Sanitizer[2m > [22m[2msanitizeSVG[2m > [22m[2mshould remove script tags
+[22m[39m[SVG_SANITIZER] Pre-sanitization check failed: SVG contains dangerous pattern: <script[\s\S]*?>
+
+[90mstdout[2m | server/security/__tests__/svg-sanitizer.test.ts[2m > [22m[2mSVG Sanitizer[2m > [22m[2msanitizeSVG[2m > [22m[2mshould remove event handlers
+[22m[39m[SVG_SANITIZER] Content sanitized: { sizeBefore: [33m65[39m, sizeAfter: [33m51[39m, reductionPercent: [32m'21.54'[39m }
+
+[90mstderr[2m | server/security/__tests__/svg-sanitizer.test.ts[2m > [22m[2mSVG Sanitizer[2m > [22m[2msanitizeSVG[2m > [22m[2mshould remove event handlers
+[22m[39m[SVG_SANITIZER] Pre-sanitization check failed: SVG contains dangerous pattern: on\w+\s*=
+
+[90mstdout[2m | server/security/__tests__/svg-sanitizer.test.ts[2m > [22m[2mSVG Sanitizer[2m > [22m[2msanitizeSVG[2m > [22m[2mshould preserve safe SVG elements
+[22m[39m[SVG_SANITIZER] Content sanitized: { sizeBefore: [33m123[39m, sizeAfter: [33m137[39m, reductionPercent: [32m'-11.38'[39m }
+
+[90mstdout[2m | server/security/__tests__/svg-sanitizer.test.ts[2m > [22m[2mSVG Sanitizer[2m > [22m[2msanitizeSVG[2m > [22m[2mshould remove foreignObject tags
+[22m[39m[SVG_SANITIZER] Content sanitized: { sizeBefore: [33m116[39m, sizeAfter: [33m51[39m, reductionPercent: [32m'56.03'[39m }
+
+[90mstderr[2m | server/security/__tests__/svg-sanitizer.test.ts[2m > [22m[2mSVG Sanitizer[2m > [22m[2msanitizeSVG[2m > [22m[2mshould remove foreignObject tags
+[22m[39m[SVG_SANITIZER] Pre-sanitization check failed: SVG contains dangerous pattern: <script[\s\S]*?>
+
+[90mstdout[2m | server/security/__tests__/svg-sanitizer.test.ts[2m > [22m[2mSVG Sanitizer[2m > [22m[2mvalidateAndSanitizeSVG[2m > [22m[2mshould return safe:true for clean SVG
+[22m[39m[SVG_SANITIZER] Content sanitized: { sizeBefore: [33m80[39m, sizeAfter: [33m88[39m, reductionPercent: [32m'-10.00'[39m }
+
+[90mstdout[2m | server/security/__tests__/svg-sanitizer.test.ts[2m > [22m[2mSVG Sanitizer[2m > [22m[2mvalidateAndSanitizeSVG[2m > [22m[2mshould return safe:true after sanitizing malicious SVG
+[22m[39m[SVG_SANITIZER] Content sanitized: { sizeBefore: [33m72[39m, sizeAfter: [33m51[39m, reductionPercent: [32m'29.17'[39m }
+
+[90mstderr[2m | server/security/__tests__/svg-sanitizer.test.ts[2m > [22m[2mSVG Sanitizer[2m > [22m[2mvalidateAndSanitizeSVG[2m > [22m[2mshould return safe:true after sanitizing malicious SVG
+[22m[39m[SVG_SANITIZER] Pre-sanitization check failed: SVG contains dangerous pattern: <script[\s\S]*?>
+
+ [32m✓[39m tests/unit/frontend/utils/helpers.test.ts [2m([22m[2m19 tests[22m[2m)[22m[33m 342[2mms[22m[39m
+[90mstderr[2m | server/security/__tests__/svg-sanitizer.test.ts[2m > [22m[2mSVG Sanitizer[2m > [22m[2mvalidateAndSanitizeSVG[2m > [22m[2mshould return safe:false for extremely malicious content
+[22m[39m[SVG_SANITIZER] Pre-sanitization check failed: SVG contains null bytes
+
+[90mstdout[2m | server/security/__tests__/svg-sanitizer.test.ts[2m > [22m[2mSVG Sanitizer[2m > [22m[2mvalidateAndSanitizeSVG[2m > [22m[2mshould include warnings for suspicious content
+[22m[39m[SVG_SANITIZER] Content sanitized: { sizeBefore: [33m40[39m, sizeAfter: [33m11[39m, reductionPercent: [32m'72.50'[39m }
+
+[90mstderr[2m | server/security/__tests__/svg-sanitizer.test.ts[2m > [22m[2mSVG Sanitizer[2m > [22m[2mvalidateAndSanitizeSVG[2m > [22m[2mshould include warnings for suspicious content
+[22m[39m[SVG_SANITIZER] Pre-sanitization check failed: SVG contains dangerous pattern: <script[\s\S]*?>
+
+ [32m✓[39m client/src/components/ui/__tests__/ImageLightbox.test.tsx [2m([22m[2m34 tests[22m[2m)[22m[33m 1687[2mms[22m[39m
+       [33m[2m✓[22m[39m should zoom in when zoom in button is clicked [33m 344[2mms[22m[39m
+ [32m✓[39m client/src/components/ui/__tests__/ErrorState.test.tsx [2m([22m[2m29 tests[22m[2m)[22m[33m 1295[2mms[22m[39m
+     [33m[2m✓[22m[39m onClick de retry funciona [33m 345[2mms[22m[39m
+[90mstdout[2m | server/security/__tests__/svg-sanitizer.test.ts[2m > [22m[2mSVG Sanitizer[2m > [22m[2mSecurity Edge Cases[2m > [22m[2mshould handle nested malicious content
+[22m[39m[SVG_SANITIZER] Content sanitized: { sizeBefore: [33m54[39m, sizeAfter: [33m25[39m, reductionPercent: [32m'53.70'[39m }
+
+[90mstderr[2m | server/security/__tests__/svg-sanitizer.test.ts[2m > [22m[2mSVG Sanitizer[2m > [22m[2mSecurity Edge Cases[2m > [22m[2mshould handle nested malicious content
+[22m[39m[SVG_SANITIZER] Pre-sanitization check failed: SVG contains dangerous pattern: <script[\s\S]*?>
+
+[90mstdout[2m | server/security/__tests__/svg-sanitizer.test.ts[2m > [22m[2mSVG Sanitizer[2m > [22m[2mSecurity Edge Cases[2m > [22m[2mshould handle multiple attack vectors
+[22m[39m[SVG_SANITIZER] Content sanitized: { sizeBefore: [33m229[39m, sizeAfter: [33m74[39m, reductionPercent: [32m'67.69'[39m }
+
+[90mstderr[2m | server/security/__tests__/svg-sanitizer.test.ts[2m > [22m[2mSVG Sanitizer[2m > [22m[2mSecurity Edge Cases[2m > [22m[2mshould handle multiple attack vectors
+[22m[39m[SVG_SANITIZER] Pre-sanitization check failed: SVG contains dangerous pattern: <script[\s\S]*?>
+
+[90mstdout[2m | server/security/__tests__/svg-sanitizer.test.ts[2m > [22m[2mSVG Sanitizer[2m > [22m[2mSecurity Edge Cases[2m > [22m[2mshould preserve gradients and filters
+[22m[39m[SVG_SANITIZER] Content sanitized: { sizeBefore: [33m308[39m, sizeAfter: [33m326[39m, reductionPercent: [32m'-5.84'[39m }
+
+ [32m✓[39m server/security/__tests__/svg-sanitizer.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 192[2mms[22m[39m
+ [32m✓[39m tests/unit/frontend/components/Button.test.tsx [2m([22m[2m11 tests[22m[2m)[22m[33m 1367[2mms[22m[39m
+     [33m[2m✓[22m[39m should render with default variant and size [33m 397[2mms[22m[39m
+     [33m[2m✓[22m[39m should render with different variants [33m 314[2mms[22m[39m
+[90mstderr[2m | client/src/components/dashboard/__tests__/DashboardBuilder.test.tsx[2m > [22m[2mDashboardBuilder[2m > [22m[2mCreate New Layout[2m > [22m[2mshould open dialog when clicking "Novo Layout"
+[22m[39mWarning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+
+ [32m✓[39m client/src/lib/__tests__/sanitizer.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 166[2mms[22m[39m
+[90mstderr[2m | client/src/components/dashboard/__tests__/DashboardBuilder.test.tsx[2m > [22m[2mDashboardBuilder[2m > [22m[2mCreate New Layout[2m > [22m[2mshould allow entering layout name
+[22m[39mWarning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+
+ [32m✓[39m tests/unit/frontend/hooks/useToast.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 169[2mms[22m[39m
+ [32m✓[39m client/src/components/ui/__tests__/PageHeader.test.tsx [2m([22m[2m10 tests[22m[2m)[22m[32m 208[2mms[22m[39m
+ [32m✓[39m client/src/lib/__tests__/form-schemas.test.ts [2m([22m[2m42 tests[22m[2m)[22m[32m 67[2mms[22m[39m
+ [32m✓[39m server/security/__tests__/csrf-protection.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 56[2mms[22m[39m
+ [32m✓[39m tests/unit/backend/whatsapp-webhook.test.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m tests/unit/backend/formatting.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 24[2mms[22m[39m
+ [32m✓[39m tests/unit/backend/validation.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m tests/integration/critical-flows.test.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 21[2mms[22m[39m
+[90mstderr[2m | server/payments/__tests__/mercadopago.test.ts[2m > [22m[2mMercadoPagoService[2m > [22m[2mverifyWebhookSignature[2m > [22m[2mshould allow webhooks when secret not configured
+[22m[39mMercado Pago webhook secret not configured
+
+ [32m✓[39m server/payments/__tests__/mercadopago.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 56[2mms[22m[39m
+ [32m✓[39m server/jobs/__tests__/notification-processor.test.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 54[2mms[22m[39m
+ [32m✓[39m server/payments/__tests__/stripe.test.ts [2m([22m[2m22 tests[22m[2m)[22m[32m 68[2mms[22m[39m
+ [32m✓[39m server/security/__tests__/url-validator.test.ts [2m([22m[2m24 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+[90mstderr[2m | client/src/components/dashboard/__tests__/DashboardBuilder.test.tsx[2m > [22m[2mDashboardBuilder[2m > [22m[2mCreate New Layout[2m > [22m[2mshould create layout when form is submitted
+[22m[39mWarning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+
+ [32m✓[39m client/src/components/__tests__/ErrorBoundary.test.tsx [2m([22m[2m28 tests[22m[2m)[22m[33m 3322[2mms[22m[39m
+       [33m[2m✓[22m[39m should display "Tentar Novamente" button [33m 501[2mms[22m[39m
+ [32m✓[39m client/src/lib/monitoring/__tests__/sentry-client.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m client/src/components/ui/__tests__/ConfirmDialog.test.tsx [2m([22m[2m17 tests[22m[2m)[22m[33m 3165[2mms[22m[39m
+     [33m[2m✓[22m[39m renderiza quando open=true [33m 606[2mms[22m[39m
+[90mstderr[2m | client/src/pages/__tests__/dashboard.test.tsx[2m > [22m[2mDashboard Component[2m > [22m[2mUser Interactions[2m > [22m[2mshould open new lead dialog when clicking add button
+[22m[39mWarning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+
+ [32m✓[39m client/src/components/ui/__tests__/ActionMenu.test.tsx [2m([22m[2m15 tests[22m[2m)[22m[33m 4094[2mms[22m[39m
+     [33m[2m✓[22m[39m renderiza trigger MoreVertical por padrão [33m 393[2mms[22m[39m
+     [33m[2m✓[22m[39m items são exibidos ao abrir [33m 753[2mms[22m[39m
+     [33m[2m✓[22m[39m onClick de cada item funciona [33m 834[2mms[22m[39m
+     [33m[2m✓[22m[39m variante default funciona [33m 568[2mms[22m[39m
+     [33m[2m✓[22m[39m variante destructive aplica cor vermelha [33m 436[2mms[22m[39m
+ [31m❯[39m client/src/components/dashboard/__tests__/DashboardBuilder.test.tsx [2m([22m[2m22 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 3961[2mms[22m[39m
+       [32m✓[39m should show loading spinner while fetching layouts[32m 98[2mms[22m[39m
+       [32m✓[39m should render dashboard builder header[32m 95[2mms[22m[39m
+       [32m✓[39m should display description text[32m 63[2mms[22m[39m
+       [33m[2m✓[22m[39m should show "Novo Layout" button [33m 467[2mms[22m[39m
+       [32m✓[39m should display all available layouts[32m 51[2mms[22m[39m
+       [32m✓[39m should show widget count for each layout[32m 46[2mms[22m[39m
+       [32m✓[39m should mark default layout with badge[32m 40[2mms[22m[39m
+       [32m✓[39m should allow selecting a layout[32m 57[2mms[22m[39m
+       [33m[2m✓[22m[39m should open dialog when clicking "Novo Layout" [33m 483[2mms[22m[39m
+[31m       [31m×[31m should allow entering layout name[39m[33m 1317[2mms[22m[39m
+       [33m[2m✓[22m[39m should create layout when form is submitted [33m 362[2mms[22m[39m
+       [32m✓[39m should enter edit mode when clicking "Editar Layout"[32m 208[2mms[22m[39m
+       [32m✓[39m should show "Adicionar Widget" button in edit mode[32m 116[2mms[22m[39m
+       [32m✓[39m should cancel edit mode when clicking "Cancelar"[32m 148[2mms[22m[39m
+       [32m✓[39m should display existing widgets in edit mode[32m 67[2mms[22m[39m
+       [32m✓[39m should show empty state when no widgets[32m 62[2mms[22m[39m
+       [32m✓[39m should allow removing widgets[32m 61[2mms[22m[39m
+       [32m✓[39m should allow setting layout as default[32m 70[2mms[22m[39m
+       [32m✓[39m should not show "Definir como Padrão" for default layout[32m 43[2mms[22m[39m
+       [32m✓[39m should allow deleting layout[32m 65[2mms[22m[39m
+       [32m✓[39m should have responsive grid for layouts[32m 20[2mms[22m[39m
+       [32m✓[39m should show empty state when no layouts exist[32m 14[2mms[22m[39m
+[90mstderr[2m | client/src/pages/__tests__/dashboard.test.tsx[2m > [22m[2mDashboard Component[2m > [22m[2mUser Interactions[2m > [22m[2mshould handle lead form submission
+[22m[39mWarning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+
+[90mstderr[2m | client/src/pages/__tests__/dashboard.test.tsx[2m > [22m[2mDashboard Component[2m > [22m[2mUser Interactions[2m > [22m[2mshould handle lead form submission
+[22m[39mWarning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+
+ [32m✓[39m client/src/components/properties/__tests__/PropertyCard.test.tsx [2m([22m[2m44 tests[22m[2m)[22m[33m 4541[2mms[22m[39m
+       [33m[2m✓[22m[39m should call onView when clicking the card [33m 393[2mms[22m[39m
+       [33m[2m✓[22m[39m should open dropdown menu on more options click [33m 823[2mms[22m[39m
+       [33m[2m✓[22m[39m should call onEdit from dropdown menu [33m 732[2mms[22m[39m
+       [33m[2m✓[22m[39m should call onDelete from dropdown menu [33m 390[2mms[22m[39m
+[90mstderr[2m | client/src/pages/__tests__/dashboard.test.tsx[2m > [22m[2mDashboard Component[2m > [22m[2mUser Interactions[2m > [22m[2mshould handle lead form submission
+[22m[39mWarning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+
+[90mstderr[2m | client/src/pages/__tests__/dashboard.test.tsx[2m > [22m[2mDashboard Component[2m > [22m[2mUser Interactions[2m > [22m[2mshould handle lead form submission
+[22m[39mWarning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+
+[90mstderr[2m | client/src/pages/__tests__/dashboard.test.tsx[2m > [22m[2mDashboard Component[2m > [22m[2mUser Interactions[2m > [22m[2mshould handle lead form submission
+[22m[39mWarning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+
+[90mstderr[2m | client/src/pages/__tests__/dashboard.test.tsx[2m > [22m[2mDashboard Component[2m > [22m[2mUser Interactions[2m > [22m[2mshould handle lead form submission
+[22m[39mWarning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+
+[90mstderr[2m | client/src/pages/__tests__/dashboard.test.tsx[2m > [22m[2mDashboard Component[2m > [22m[2mUser Interactions[2m > [22m[2mshould handle lead form submission
+[22m[39mWarning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+
+[90mstderr[2m | client/src/pages/__tests__/dashboard.test.tsx[2m > [22m[2mDashboard Component[2m > [22m[2mUser Interactions[2m > [22m[2mshould handle lead form submission
+[22m[39mWarning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+
+[90mstderr[2m | client/src/pages/__tests__/dashboard.test.tsx[2m > [22m[2mDashboard Component[2m > [22m[2mUser Interactions[2m > [22m[2mshould handle lead form submission
+[22m[39mWarning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+
+[90mstderr[2m | client/src/pages/__tests__/dashboard.test.tsx[2m > [22m[2mDashboard Component[2m > [22m[2mUser Interactions[2m > [22m[2mshould handle lead form submission
+[22m[39mWarning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+
+ [31m❯[39m client/src/pages/__tests__/dashboard.test.tsx [2m([22m[2m25 tests[22m[2m | [22m[31m9 failed[39m[2m)[22m[33m 9797[2mms[22m[39m
+       [33m[2m✓[22m[39m should render dashboard without crashing [33m 977[2mms[22m[39m
+       [33m[2m✓[22m[39m should display metrics cards [33m 425[2mms[22m[39m
+[31m       [31m×[31m should display leads when available[39m[33m 332[2mms[22m[39m
+       [32m✓[39m should display visit information[32m 217[2mms[22m[39m
+       [33m[2m✓[22m[39m should open new lead dialog when clicking add button [33m 647[2mms[22m[39m
+[31m       [31m×[31m should handle lead form submission[39m[33m 1437[2mms[22m[39m
+[31m       [31m×[31m should navigate to lead details when clicking on lead[39m[32m 93[2mms[22m[39m
+       [32m✓[39m should format currency values correctly[32m 74[2mms[22m[39m
+[31m       [31m×[31m should display lead status badges[39m[32m 92[2mms[22m[39m
+       [32m✓[39m should display lead sources correctly[32m 71[2mms[22m[39m
+[31m       [31m×[31m should show empty state when no leads[39m[32m 71[2mms[22m[39m
+[31m       [31m×[31m should show empty state when no contracts[39m[32m 72[2mms[22m[39m
+       [32m✓[39m should display total leads count[32m 69[2mms[22m[39m
+       [32m✓[39m should display active contracts count[32m 72[2mms[22m[39m
+       [32m✓[39m should display pending visits count[32m 73[2mms[22m[39m
+[31m       [31m×[31m should display monthly revenue[39m[32m 73[2mms[22m[39m
+       [32m✓[39m should render mobile-friendly layout[32m 75[2mms[22m[39m
+       [32m✓[39m should render tablet layout[32m 65[2mms[22m[39m
+[31m       [31m×[31m should render charts without errors[39m[32m 82[2mms[22m[39m
+       [32m✓[39m should render quick action buttons[32m 180[2mms[22m[39m
+[31m       [31m×[31m should render navigation links[39m[33m 4321[2mms[22m[39m
+       [32m✓[39m should memoize expensive computations[32m 96[2mms[22m[39m
+       [32m✓[39m should handle large datasets efficiently[32m 69[2mms[22m[39m
+       [32m✓[39m should handle missing tenant gracefully[32m 55[2mms[22m[39m
+       [32m✓[39m should handle undefined data gracefully[32m 55[2mms[22m[39m
+ [32m✓[39m server/jobs/__tests__/email-processor.test.ts [2m([22m[2m15 tests[22m[2m)[22m[33m 14086[2mms[22m[39m
+       [33m[2m✓[22m[39m should process single recipient email successfully [33m 1035[2mms[22m[39m
+       [33m[2m✓[22m[39m should process multiple recipients email [33m 1009[2mms[22m[39m
+       [33m[2m✓[22m[39m should handle email with attachments [33m 1007[2mms[22m[39m
+       [33m[2m✓[22m[39m should update job progress during processing [33m 1002[2mms[22m[39m
+       [33m[2m✓[22m[39m should log template data for debugging [33m 1004[2mms[22m[39m
+       [33m[2m✓[22m[39m should handle different email templates [33m 5009[2mms[22m[39m
+       [33m[2m✓[22m[39m should handle empty data object [33m 1003[2mms[22m[39m
+       [33m[2m✓[22m[39m should handle undefined optional fields [33m 1003[2mms[22m[39m
+       [33m[2m✓[22m[39m should log correct recipient format for single email [33m 1002[2mms[22m[39m
+       [33m[2m✓[22m[39m should log correct recipient format for multiple emails [33m 1003[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Suites 3 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/integration/security/auth-flow.test.ts[2m > [22mAuthentication Flow Integration Tests
+[31m[1mTypeError[22m: store.on is not a function[39m
+[90m [2m❯[22m session node_modules/express-session/index.js:[2m172:9[22m[39m
+[36m [2m❯[22m createTestApp tests/integration/security/auth-flow.test.ts:[2m40:11[22m[39m
+    [90m 38| [39m
+    [90m 39| [39m  [90m// Session configuration[39m
+    [90m 40| [39m  app[33m.[39m[34muse[39m([34msession[39m({
+    [90m   | [39m          [31m^[39m
+    [90m 41| [39m    secret[33m:[39m [32m'test-secret-key-for-testing-only'[39m[33m,[39m
+    [90m 42| [39m    resave[33m:[39m [35mfalse[39m[33m,[39m
+[90m [2m❯[22m tests/integration/security/auth-flow.test.ts:[2m260:11[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/14]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/integration/security/csrf-protection.test.ts[2m > [22mCSRF Protection Integration Tests
+[31m[1mTypeError[22m: store.on is not a function[39m
+[90m [2m❯[22m session node_modules/express-session/index.js:[2m172:9[22m[39m
+[36m [2m❯[22m createTestApp tests/integration/security/csrf-protection.test.ts:[2m34:11[22m[39m
+    [90m 32| [39m
+    [90m 33| [39m  [90m// Session middleware[39m
+    [90m 34| [39m  app[33m.[39m[34muse[39m([34msession[39m({
+    [90m   | [39m          [31m^[39m
+    [90m 35| [39m    secret[33m:[39m [32m'test-secret-csrf'[39m[33m,[39m
+    [90m 36| [39m    resave[33m:[39m [35mfalse[39m[33m,[39m
+[90m [2m❯[22m tests/integration/security/csrf-protection.test.ts:[2m167:11[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/14]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/backend/security.test.ts[2m [ tests/unit/backend/security.test.ts ][22m
+[31m[1mError[22m: Failed to resolve import "@shared/schema-sqlite" from "server/auth/security.ts". Does the file exist?[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36m/home/nic20/ProjetosWeb/ImobiBase/server/auth/security.ts[39m:10:36
+[33m  2  |  import bcrypt from "bcryptjs";
+  3  |  import { db } from "../db";
+  4  |  import { users, loginHistory } from "@shared/schema-sqlite";
+     |                                       ^
+  5  |  import { eq, and, desc, gte } from "drizzle-orm";
+  6  |  import { createAuditLog } from "../routes-security";[39m
+[90m [2m❯[22m TransformPluginContext._formatLog node_modules/vite/dist/node/chunks/config.js:[2m31106:43[22m[39m
+[90m [2m❯[22m TransformPluginContext.error node_modules/vite/dist/node/chunks/config.js:[2m31103:14[22m[39m
+[90m [2m❯[22m normalizeUrl node_modules/vite/dist/node/chunks/config.js:[2m29590:18[22m[39m
+[90m [2m❯[22m node_modules/vite/dist/node/chunks/config.js:[2m29648:32[22m[39m
+[90m [2m❯[22m TransformPluginContext.transform node_modules/vite/dist/node/chunks/config.js:[2m29616:4[22m[39m
+[90m [2m❯[22m EnvironmentPluginContainer.transform node_modules/vite/dist/node/chunks/config.js:[2m30905:14[22m[39m
+[90m [2m❯[22m loadAndTransform node_modules/vite/dist/node/chunks/config.js:[2m26043:26[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/14]⎯[22m[39m
+
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 11 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m server/security/file-validator.test.ts[2m > [22mFile Validator Security Tests[2m > [22mcomprehensiveFileValidation - Integration Tests[2m > [22mAttack detection[2m > [22mshould fail validation for file type mismatch
+[31m[1mAssertionError[22m: expected undefined to be 'image/png' // Object.is equality[39m
+
+[32m- Expected:[39m 
+"image/png"
+
+[31m+ Received:[39m 
+undefined
+
+[36m [2m❯[22m server/security/file-validator.test.ts:[2m678:37[22m[39m
+    [90m676| [39m        [34mexpect[39m(result[33m.[39mvalid)[33m.[39m[34mtoBe[39m([35mfalse[39m)[33m;[39m
+    [90m677| [39m        [34mexpect[39m(result[33m.[39merrors[33m.[39mlength)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)[33m;[39m
+    [90m678| [39m        [34mexpect[39m(result[33m.[39mdetectedType)[33m.[39m[34mtoBe[39m([32m'image/png'[39m)[33m;[39m
+    [90m   | [39m                                    [31m^[39m
+    [90m679| [39m      })[33m;[39m
+    [90m680| [39m    })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/14]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m client/src/pages/__tests__/dashboard.test.tsx[2m > [22mDashboard Component[2m > [22mRendering[2m > [22mshould display leads when available
+[31m[1mTestingLibraryElementError[22m[39m: Found multiple elements with the text: John Doe
+
+Here are the matching elements:
+
+Ignored nodes: comments, script, style
+[36m<h4[39m
+  [33mclass[39m=[32m"font-medium text-sm truncate"[39m
+  [33mtitle[39m=[32m"John Doe"[39m
+[36m>[39m
+  [0mJohn Doe[0m
+[36m</h4>[39m
+
+Ignored nodes: comments, script, style
+[36m<h4[39m
+  [33mclass[39m=[32m"font-medium text-sm truncate"[39m
+  [33mtitle[39m=[32m"John Doe"[39m
+[36m>[39m
+  [0mJohn Doe[0m
+[36m</h4>[39m
+
+Ignored nodes: comments, script, style
+[36m<h4[39m
+  [33mclass[39m=[32m"font-medium text-sm truncate"[39m
+  [33mtitle[39m=[32m"John Doe"[39m
+[36m>[39m
+  [0mJohn Doe[0m
+[36m</h4>[39m
+
+Ignored nodes: comments, script, style
+[36m<p[39m
+  [33mclass[39m=[32m"font-semibold text-sm xs:text-base truncate"[39m
+[36m>[39m
+  [0mJohn Doe[0m
+[36m</p>[39m
+
+(If this is intentional, then use the `*AllBy*` variant of the query (like `queryAllByText`, `getAllByText`, or `findAllByText`)).
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<main[39m
+      [33mclass[39m=[32m"space-y-6 sm:space-y-8 lg:space-y-10"[39m
+    [36m>[39m
+      [36m<header[39m
+        [33mclass[39m=[32m"flex items-center justify-between gap-3"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"min-w-0 flex-1"[39m
+        [36m>[39m
+          [36m<h1[39m
+            [33mclass[39m=[32m"text-xl xs:text-2xl sm:text-3xl lg:text-4xl font-heading font-bold text-foreground truncate"[39m
+          [36m>[39m
+            [0mPainel Operacional[0m
+          [36m</h1>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"text-sm xs:text-base sm:text-lg text-muted-foreground truncate mt-0.5 sm:mt-1"[39m
+          [36m>[39m
+            [0mTest Realty[0m
+            [0m • [0m
+            [0msexta, 26 dez[0m
+          [36m</p>[39m
+        [36m</div>[39m
+        [36m<button[39m
+          [33maria-controls[39m=[32m"radix-_r_o_"[39m
+          [33maria-expanded[39m=[32m"false"[39m
+          [33maria-haspopup[39m=[32m"dialog"[39m
+          [33maria-label[39m=[32m"Abrir ações rápidas"[39m
+          [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none h-9 w-9 sm:hidden min-h-[44px] min-w-[44px] shrink-0 touch-manipulation active:scale-95 transition-transform"[39m
+          [33mdata-state[39m=[32m"closed"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"lucide lucide-plus h-5 w-5"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M5 12h14"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M12 5v14"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+        [36m</button>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"hidden sm:flex gap-2"[39m
+        [36m>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"lucide lucide-house mr-2 h-4 w-4"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [0mNovo Imóvel[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [33maria-controls[39m=[32m"radix-_r_r_"[39m
+            [33maria-expanded[39m=[32m"false"[39m
+            [33maria-haspopup[39m=[32m"dialog"[39m
+            [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+            [33mdata-state[39m=[32m"closed"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"lucide lucide-user-plus mr-2 h-4 w-4"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"[39m
+              [36m/>[39m
+              [36m<circle[39m
+                [33mcx[39m=[32m"9"[39m
+                [33mcy[39m=[32m"7"[39m
+                [33mr[39m=[32m"4"[39m
+              [36m/>[39m
+              [36m<line[39m
+                [33mx1[39m=[32m"19"[39m
+                [33mx2[39m=[32m"19"[39m
+                [33my1[39m=[32m"8"[39m
+                [33my2[39m=[32m"14"[39m
+              [36m/>[39m
+              [36m<line[39m
+                [33mx1[39m=[32m"22"[39m
+                [33mx2[39m=[32m"16"[39m
+                [33my1[39m=[32m"11"[39m
+                [33my2[39m=[32m"11"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [0mNovo Lead[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"inline-flex items-center ...
+[90m [2m❯[22m Object.getElementError node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m getElementError node_modules/@testing-library/dom/dist/query-helpers.js:[2m20:35[22m[39m
+[90m [2m❯[22m getMultipleElementsFoundError node_modules/@testing-library/dom/dist/query-helpers.js:[2m23:10[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m55:13[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
+[36m [2m❯[22m client/src/pages/__tests__/dashboard.test.tsx:[2m190:21[22m[39m
+    [90m188| [39m      [34mrender[39m([33m<[39m[33mDashboard[39m [33m/[39m[33m>[39m)[33m;[39m
+    [90m189| [39m
+    [90m190| [39m      [34mexpect[39m(screen[33m.[39m[34mgetByText[39m([32m'John Doe'[39m))[33m.[39m[34mtoBeInTheDocument[39m()[33m;[39m
+    [90m   | [39m                    [31m^[39m
+    [90m191| [39m      [34mexpect[39m(screen[33m.[39m[34mgetByText[39m([32m'Jane Smith'[39m))[33m.[39m[34mtoBeInTheDocument[39m()[33m;[39m
+    [90m192| [39m    })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/14]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m client/src/pages/__tests__/dashboard.test.tsx[2m > [22mDashboard Component[2m > [22mUser Interactions[2m > [22mshould handle lead form submission
+[31m[1mTestingLibraryElementError[22m[39m: Unable to find a label with the text of: /Email/i
+
+Ignored nodes: comments, script, style
+[36m<body[39m
+  [33mdata-scroll-locked[39m=[32m"1"[39m
+  [33mstyle[39m=[32m"pointer-events: none;"[39m
+[36m>[39m
+  [36m<span[39m
+    [33maria-hidden[39m=[32m"true"[39m
+    [33mdata-aria-hidden[39m=[32m"true"[39m
+    [33mdata-radix-focus-guard[39m=[32m""[39m
+    [33mstyle[39m=[32m"outline: none; opacity: 0; position: fixed; pointer-events: none;"[39m
+    [33mtabindex[39m=[32m"0"[39m
+  [36m/>[39m
+  [36m<div[39m
+    [33maria-hidden[39m=[32m"true"[39m
+    [33mdata-aria-hidden[39m=[32m"true"[39m
+  [36m>[39m
+    [36m<main[39m
+      [33mclass[39m=[32m"space-y-6 sm:space-y-8 lg:space-y-10"[39m
+    [36m>[39m
+      [36m<header[39m
+        [33mclass[39m=[32m"flex items-center justify-between gap-3"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"min-w-0 flex-1"[39m
+        [36m>[39m
+          [36m<h1[39m
+            [33mclass[39m=[32m"text-xl xs:text-2xl sm:text-3xl lg:text-4xl font-heading font-bold text-foreground truncate"[39m
+          [36m>[39m
+            [0mPainel Operacional[0m
+          [36m</h1>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"text-sm xs:text-base sm:text-lg text-muted-foreground truncate mt-0.5 sm:mt-1"[39m
+          [36m>[39m
+            [0mTest Realty[0m
+            [0m • [0m
+            [0msexta, 26 dez[0m
+          [36m</p>[39m
+        [36m</div>[39m
+        [36m<button[39m
+          [33maria-controls[39m=[32m"radix-_r_26_"[39m
+          [33maria-expanded[39m=[32m"false"[39m
+          [33maria-haspopup[39m=[32m"dialog"[39m
+          [33maria-label[39m=[32m"Abrir ações rápidas"[39m
+          [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none h-9 w-9 sm:hidden min-h-[44px] min-w-[44px] shrink-0 touch-manipulation active:scale-95 transition-transform"[39m
+          [33mdata-state[39m=[32m"closed"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"lucide lucide-plus h-5 w-5"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M5 12h14"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M12 5v14"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+        [36m</button>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"hidden sm:flex gap-2"[39m
+        [36m>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"lucide lucide-house mr-2 h-4 w-4"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [0mNovo Imóvel[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [33maria-controls[39m=[32m"radix-_r_5c_"[39m
+            [33maria-expanded[39m=[32m"true"[39m
+            [33maria-haspopup[39m=[32m"dialog"[39m
+            [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+            [33mdata-state[39m=[32m"open"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"lucide lucide-user-plus mr-2 h-4 w-4"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"[39m
+              [36m/>[39m
+              [36m<circle[39m
+                [33mcx[39m=[32m"9"[39m
+                [33mcy[39m=[32m"7"[39m
+                [33mr[39m=[32m"4"[39m
+              [36m/>[39m
+              [36m<line[39m
+                [33mx1[39m=[32m"19"[39m
+                [33mx2[39m=[32m"19"[39m
+   ...
+[90m [2m❯[22m Object.getElementError node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m getAllByLabelText node_modules/@testing-library/dom/dist/queries/label-text.js:[2m111:38[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m52:17[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
+[36m [2m❯[22m client/src/pages/__tests__/dashboard.test.tsx:[2m232:30[22m[39m
+    [90m230| [39m      [90m// Fill form[39m
+    [90m231| [39m      [35mawait[39m user[33m.[39m[34mtype[39m(screen[33m.[39m[34mgetByLabelText[39m([36m/Nome/i[39m)[33m,[39m [32m'Test Lead'[39m)[33m;[39m
+    [90m232| [39m      await user.type(screen.getByLabelText(/Email/i), 'test@example.c…
+    [90m   | [39m                             [31m^[39m
+    [90m233| [39m      await user.type(screen.getByLabelText(/Telefone/i), '(11) 98765-…
+    [90m234| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/14]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m client/src/pages/__tests__/dashboard.test.tsx[2m > [22mDashboard Component[2m > [22mUser Interactions[2m > [22mshould navigate to lead details when clicking on lead
+[31m[1mTestingLibraryElementError[22m[39m: Found multiple elements with the text: John Doe
+
+Here are the matching elements:
+
+Ignored nodes: comments, script, style
+[36m<h4[39m
+  [33mclass[39m=[32m"font-medium text-sm truncate"[39m
+  [33mtitle[39m=[32m"John Doe"[39m
+[36m>[39m
+  [0mJohn Doe[0m
+[36m</h4>[39m
+
+Ignored nodes: comments, script, style
+[36m<h4[39m
+  [33mclass[39m=[32m"font-medium text-sm truncate"[39m
+  [33mtitle[39m=[32m"John Doe"[39m
+[36m>[39m
+  [0mJohn Doe[0m
+[36m</h4>[39m
+
+Ignored nodes: comments, script, style
+[36m<h4[39m
+  [33mclass[39m=[32m"font-medium text-sm truncate"[39m
+  [33mtitle[39m=[32m"John Doe"[39m
+[36m>[39m
+  [0mJohn Doe[0m
+[36m</h4>[39m
+
+Ignored nodes: comments, script, style
+[36m<p[39m
+  [33mclass[39m=[32m"font-semibold text-sm xs:text-base truncate"[39m
+[36m>[39m
+  [0mJohn Doe[0m
+[36m</p>[39m
+
+(If this is intentional, then use the `*AllBy*` variant of the query (like `queryAllByText`, `getAllByText`, or `findAllByText`)).
+
+Ignored nodes: comments, script, style
+[36m<body[39m
+  [33mstyle[39m=[32m""[39m
+[36m>[39m
+  [36m<div>[39m
+    [36m<main[39m
+      [33mclass[39m=[32m"space-y-6 sm:space-y-8 lg:space-y-10"[39m
+    [36m>[39m
+      [36m<header[39m
+        [33mclass[39m=[32m"flex items-center justify-between gap-3"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"min-w-0 flex-1"[39m
+        [36m>[39m
+          [36m<h1[39m
+            [33mclass[39m=[32m"text-xl xs:text-2xl sm:text-3xl lg:text-4xl font-heading font-bold text-foreground truncate"[39m
+          [36m>[39m
+            [0mPainel Operacional[0m
+          [36m</h1>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"text-sm xs:text-base sm:text-lg text-muted-foreground truncate mt-0.5 sm:mt-1"[39m
+          [36m>[39m
+            [0mTest Realty[0m
+            [0m • [0m
+            [0msexta, 26 dez[0m
+          [36m</p>[39m
+        [36m</div>[39m
+        [36m<button[39m
+          [33maria-controls[39m=[32m"radix-_r_5m_"[39m
+          [33maria-expanded[39m=[32m"false"[39m
+          [33maria-haspopup[39m=[32m"dialog"[39m
+          [33maria-label[39m=[32m"Abrir ações rápidas"[39m
+          [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none h-9 w-9 sm:hidden min-h-[44px] min-w-[44px] shrink-0 touch-manipulation active:scale-95 transition-transform"[39m
+          [33mdata-state[39m=[32m"closed"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"lucide lucide-plus h-5 w-5"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M5 12h14"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M12 5v14"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+        [36m</button>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"hidden sm:flex gap-2"[39m
+        [36m>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"lucide lucide-house mr-2 h-4 w-4"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [0mNovo Imóvel[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [33maria-controls[39m=[32m"radix-_r_5p_"[39m
+            [33maria-expanded[39m=[32m"false"[39m
+            [33maria-haspopup[39m=[32m"dialog"[39m
+            [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+            [33mdata-state[39m=[32m"closed"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"lucide lucide-user-plus mr-2 h-4 w-4"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"[39m
+              [36m/>[39m
+              [36m<circle[39m
+                [33mcx[39m=[32m"9"[39m
+                [33mcy[39m=[32m"7"[39m
+                [33mr[39m=[32m"4"[39m
+              [36m/>[39m
+              [36m<line[39m
+                [33mx1[39m=[32m"19"[39m
+                [33mx2[39m=[32m"19"[39m
+                [33my1[39m=[32m"8"[39m
+                [33my2[39m=[32m"14"[39m
+              [36m/>[39m
+              [36m<line[39m
+                [33mx1[39m=[32m"22"[39m
+                [33mx2[39m=[32m"16"[39m
+                [33my1[39m=[32m"11"[39m
+                [33my2[39m=[32m"11"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [0mNovo Lead[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [3...
+[90m [2m❯[22m Object.getElementError node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m getElementError node_modules/@testing-library/dom/dist/query-helpers.js:[2m20:35[22m[39m
+[90m [2m❯[22m getMultipleElementsFoundError node_modules/@testing-library/dom/dist/query-helpers.js:[2m23:10[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m55:13[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
+[36m [2m❯[22m client/src/pages/__tests__/dashboard.test.tsx:[2m248:31[22m[39m
+    [90m246| [39m      [34mrender[39m([33m<[39m[33mDashboard[39m [33m/[39m[33m>[39m)[33m;[39m
+    [90m247| [39m
+    [90m248| [39m      const leadCard = screen.getByText('John Doe').closest('button') …
+    [90m   | [39m                              [31m^[39m
+    [90m249| [39m                       screen.getByText('John Doe').closest('div[role=…
+    [90m250| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/14]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m client/src/pages/__tests__/dashboard.test.tsx[2m > [22mDashboard Component[2m > [22mData Display[2m > [22mshould display lead status badges
+[31m[1mTestingLibraryElementError[22m[39m: Found multiple elements with the text: /Novo/i
+
+Here are the matching elements:
+
+Ignored nodes: comments, script, style
+[36m<button[39m
+  [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+[36m>[39m
+  [36m<svg[39m
+    [33maria-hidden[39m=[32m"true"[39m
+    [33mclass[39m=[32m"lucide lucide-house mr-2 h-4 w-4"[39m
+    [33mfill[39m=[32m"none"[39m
+    [33mheight[39m=[32m"24"[39m
+    [33mstroke[39m=[32m"currentColor"[39m
+    [33mstroke-linecap[39m=[32m"round"[39m
+    [33mstroke-linejoin[39m=[32m"round"[39m
+    [33mstroke-width[39m=[32m"2"[39m
+    [33mviewBox[39m=[32m"0 0 24 24"[39m
+    [33mwidth[39m=[32m"24"[39m
+    [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+  [36m>[39m
+    [36m<path[39m
+      [33md[39m=[32m"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"[39m
+    [36m/>[39m
+    [36m<path[39m
+      [33md[39m=[32m"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"[39m
+    [36m/>[39m
+  [36m</svg>[39m
+  [0mNovo Imóvel[0m
+[36m</button>[39m
+
+Ignored nodes: comments, script, style
+[36m<button[39m
+  [33maria-controls[39m=[32m"radix-_r_6h_"[39m
+  [33maria-expanded[39m=[32m"false"[39m
+  [33maria-haspopup[39m=[32m"dialog"[39m
+  [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+  [33mdata-state[39m=[32m"closed"[39m
+  [33mtype[39m=[32m"button"[39m
+[36m>[39m
+  [36m<svg[39m
+    [33maria-hidden[39m=[32m"true"[39m
+    [33mclass[39m=[32m"lucide lucide-user-plus mr-2 h-4 w-4"[39m
+    [33mfill[39m=[32m"none"[39m
+    [33mheight[39m=[32m"24"[39m
+    [33mstroke[39m=[32m"currentColor"[39m
+    [33mstroke-linecap[39m=[32m"round"[39m
+    [33mstroke-linejoin[39m=[32m"round"[39m
+    [33mstroke-width[39m=[32m"2"[39m
+    [33mviewBox[39m=[32m"0 0 24 24"[39m
+    [33mwidth[39m=[32m"24"[39m
+    [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+  [36m>[39m
+    [36m<path[39m
+      [33md[39m=[32m"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"[39m
+    [36m/>[39m
+    [36m<circle[39m
+      [33mcx[39m=[32m"9"[39m
+      [33mcy[39m=[32m"7"[39m
+      [33mr[39m=[32m"4"[39m
+    [36m/>[39m
+    [36m<line[39m
+      [33mx1[39m=[32m"19"[39m
+      [33mx2[39m=[32m"19"[39m
+      [33my1[39m=[32m"8"[39m
+      [33my2[39m=[32m"14"[39m
+    [36m/>[39m
+    [36m<line[39m
+      [33mx1[39m=[32m"22"[39m
+      [33mx2[39m=[32m"16"[39m
+      [33my1[39m=[32m"11"[39m
+      [33my2[39m=[32m"11"[39m
+    [36m/>[39m
+  [36m</svg>[39m
+  [0mNovo Lead[0m
+[36m</button>[39m
+
+Ignored nodes: comments, script, style
+[36m<h3[39m
+  [33mclass[39m=[32m"font-semibold text-sm"[39m
+[36m>[39m
+  [0mNovo[0m
+[36m</h3>[39m
+
+Ignored nodes: comments, script, style
+[36m<h3[39m
+  [33mclass[39m=[32m"font-semibold text-sm"[39m
+[36m>[39m
+  [0mNovo[0m
+[36m</h3>[39m
+
+Ignored nodes: comments, script, style
+[36m<span>[39m
+  [0mNovo[0m
+[36m</span>[39m
+
+Ignored nodes: comments, script, style
+[36m<h3[39m
+  [33mclass[39m=[32m"font-semibold text-sm"[39m
+[36m>[39m
+  [0mNovo[0m
+[36m</h3>[39m
+
+Ignored nodes: comments, script, style
+[36m<div[39m
+  [33mclass[39m=[32m"whitespace-nowrap inline-flex items-center rounded-md border font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover-elevate border-transparent bg-secondary text-secondary-foreground text-xs px-2 py-0.5"[39m
+  [33mrole[39m=[32m"status"[39m
+  [33mstyle[39m=[32m"background-color: rgba(59, 130, 246, 0.125); color: rgb(59, 130, 246);"[39m
+[36m>[39m
+  [0mNovo[0m
+[36m</div>[39m
+
+(If this is intentional, then use the `*AllBy*` variant of the query (like `queryAllByText`, `getAllByText`, or `findAllByText`)).
+
+Ignored nodes: comments, script, style
+[36m<body[39m
+  [33mstyle[39m=[32m""[39m
+[36m>[39m
+  [36m<div>[39m
+    [36m<main[39m
+      [33mclass[39m=[32m"space-y-6 sm:space-y-8 lg:space-y-10"[39m
+    [36m>[39m
+      [36m<header[39m
+        [33mclass[39m=[32m"flex items-center justify-between gap-3"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"min-w-0 flex-1"[39m
+        [36m>[39m
+          [36m<h1[39m
+            [33mclass[39m=[32m"text-xl xs:text-2xl sm:text-3xl lg:text-4xl font-heading font-bold text-foreground truncate"[39m
+          [36m>[39m
+            [0mPainel Operacional[0m
+          [36m</h1>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"text-sm xs:text-base sm:text-lg text-muted-foreground truncate mt-0.5 sm:mt-1"[39m
+          [36m>[39m
+            [0mTest Realty[0m
+            [0m • [0m
+            [0msexta, 26 dez[0m
+          [36m</p>[39m
+        [36m</div>[39m
+        [36m<button[39m
+          [33maria-controls[39m=[32m"radix-_r_6e_"[39m
+          [33maria-expanded[39m=[32m"false"[39m
+          [33maria-haspopup[39m=[32m"dialog"[39m
+          [33maria-label[39m=[32m"Abrir ações rápidas"[39m
+          [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none h-9 w-9 sm:hidden min-h-[44px] min-w-[44px] shrink-0 touch-manipulation active:scale-95 transition-transform"[39m
+          [33mdata-state[39m=[32m"closed"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"lucide lucide-plus h-5 w-5"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M5 12h14"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M12 5v14"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+        [36m</button>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"hidden sm:flex gap-2"[39m
+        [36m>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"lucide lucide-house mr-2 h-4 w-4"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [0mNovo Imóvel[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [33maria-controls[39m=[32m"radix-_r_6h_"[39m
+            [33maria-expanded[39m=[32m"false"[39m
+            [33maria-haspopup[39m=[32m"dialog"[39m
+            [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+            [33mdata-state[39m=[32m"closed"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"lucide lucide-user-plus mr-2 h-4 w-4"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"[39m
+              [36m/>[39m
+              [36m<circle[39m
+                [33mcx[39m=[32m"9"[39m
+                [33mcy[39m=[32m"7"[39m
+                [33mr[39m=[32m"4"[39m
+              [36m/>[39m
+              [36m<line[39m
+                [33mx1[39m=[32m"19"[39m
+                [33mx2[39m=[32m"19"[39m
+                [33my1[39m=[32m"8"[39m
+                [33my2[39m=[32m"14"[39m
+              [36m/>[39m
+              [36m<line[39m
+                [33mx1[39m=[32m"22"[39m
+                [33mx2[39m=[32m"16"[39m
+                [33my1[39m=[32m"11"[39m
+                [33my2[39m=[32m"11"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [0mNovo Lead[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [3...
+[90m [2m❯[22m Object.getElementError node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m getElementError node_modules/@testing-library/dom/dist/query-helpers.js:[2m20:35[22m[39m
+[90m [2m❯[22m getMultipleElementsFoundError node_modules/@testing-library/dom/dist/query-helpers.js:[2m23:10[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m55:13[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
+[36m [2m❯[22m client/src/pages/__tests__/dashboard.test.tsx:[2m273:21[22m[39m
+    [90m271| [39m      [34mrender[39m([33m<[39m[33mDashboard[39m [33m/[39m[33m>[39m)[33m;[39m
+    [90m272| [39m
+    [90m273| [39m      [90m// Check for status badges in the recent leads section[39m
+    [90m   | [39m                    [31m^[39m
+    [90m274| [39m      [34mexpect[39m(screen[33m.[39m[34mgetByText[39m([32m'Novo'[39m))[33m.[39m[34mtoBeInTheDocument[39m()[33m;[39m
+    [90m275| [39m      [34mexpect[39m(screen[33m.[39m[34mgetByText[39m([32m'Em Contato'[39m))[33m.[39m[34mtoBeInTheDocument[39m()[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/14]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m client/src/pages/__tests__/dashboard.test.tsx[2m > [22mDashboard Component[2m > [22mEmpty States[2m > [22mshould show empty state when no leads
+[31m[1mTestingLibraryElementError[22m[39m: Unable to find an element with the text: /Nenhum lead cadastrado/i. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body[39m
+  [33mstyle[39m=[32m""[39m
+[36m>[39m
+  [36m<div>[39m
+    [36m<main[39m
+      [33mclass[39m=[32m"space-y-6 sm:space-y-8 lg:space-y-10"[39m
+    [36m>[39m
+      [36m<header[39m
+        [33mclass[39m=[32m"flex items-center justify-between gap-3"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"min-w-0 flex-1"[39m
+        [36m>[39m
+          [36m<h1[39m
+            [33mclass[39m=[32m"text-xl xs:text-2xl sm:text-3xl lg:text-4xl font-heading font-bold text-foreground truncate"[39m
+          [36m>[39m
+            [0mPainel Operacional[0m
+          [36m</h1>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"text-sm xs:text-base sm:text-lg text-muted-foreground truncate mt-0.5 sm:mt-1"[39m
+          [36m>[39m
+            [0mTest Realty[0m
+            [0m • [0m
+            [0msexta, 26 dez[0m
+          [36m</p>[39m
+        [36m</div>[39m
+        [36m<button[39m
+          [33maria-controls[39m=[32m"radix-_r_76_"[39m
+          [33maria-expanded[39m=[32m"false"[39m
+          [33maria-haspopup[39m=[32m"dialog"[39m
+          [33maria-label[39m=[32m"Abrir ações rápidas"[39m
+          [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none h-9 w-9 sm:hidden min-h-[44px] min-w-[44px] shrink-0 touch-manipulation active:scale-95 transition-transform"[39m
+          [33mdata-state[39m=[32m"closed"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"lucide lucide-plus h-5 w-5"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M5 12h14"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M12 5v14"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+        [36m</button>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"hidden sm:flex gap-2"[39m
+        [36m>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"lucide lucide-house mr-2 h-4 w-4"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [0mNovo Imóvel[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [33maria-controls[39m=[32m"radix-_r_79_"[39m
+            [33maria-expanded[39m=[32m"false"[39m
+            [33maria-haspopup[39m=[32m"dialog"[39m
+            [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+            [33mdata-state[39m=[32m"closed"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"lucide lucide-user-plus mr-2 h-4 w-4"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"[39m
+              [36m/>[39m
+              [36m<circle[39m
+                [33mcx[39m=[32m"9"[39m
+                [33mcy[39m=[32m"7"[39m
+                [33mr[39m=[32m"4"[39m
+              [36m/>[39m
+              [36m<line[39m
+                [33mx1[39m=[32m"19"[39m
+                [33mx2[39m=[32m"19"[39m
+                [33my1[39m=[32m"8"[39m
+                [33my2[39m=[32m"14"[39m
+              [36m/>[39m
+              [36m<line[39m
+                [33mx1[39m=[32m"22"[39m
+                [33mx2[39m=[32m"16"[39m
+                [33my1[39m=[32m"11"[39m
+                [33my2[39m=[32m"11"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [0mNovo Lead[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [3...
+[90m [2m❯[22m Object.getElementError node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m76:38[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m52:17[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
+[36m [2m❯[22m client/src/pages/__tests__/dashboard.test.tsx:[2m300:21[22m[39m
+    [90m298| [39m        refetchLeads[33m:[39m vi[33m.[39m[34mfn[39m()[33m,[39m
+    [90m299| [39m        refetchContracts[33m:[39m vi[33m.[39m[34mfn[39m()[33m,[39m
+    [90m300| [39m        refetchProperties[33m:[39m vi[33m.[39m[34mfn[39m()[33m,[39m
+    [90m   | [39m                    [31m^[39m
+    [90m301| [39m      })[33m;[39m
+    [90m302| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/14]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m client/src/pages/__tests__/dashboard.test.tsx[2m > [22mDashboard Component[2m > [22mEmpty States[2m > [22mshould show empty state when no contracts
+[31m[1mTestingLibraryElementError[22m[39m: Unable to find an element with the text: /Nenhuma visita hoje/i. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body[39m
+  [33mstyle[39m=[32m""[39m
+[36m>[39m
+  [36m<div>[39m
+    [36m<main[39m
+      [33mclass[39m=[32m"space-y-6 sm:space-y-8 lg:space-y-10"[39m
+    [36m>[39m
+      [36m<header[39m
+        [33mclass[39m=[32m"flex items-center justify-between gap-3"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"min-w-0 flex-1"[39m
+        [36m>[39m
+          [36m<h1[39m
+            [33mclass[39m=[32m"text-xl xs:text-2xl sm:text-3xl lg:text-4xl font-heading font-bold text-foreground truncate"[39m
+          [36m>[39m
+            [0mPainel Operacional[0m
+          [36m</h1>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"text-sm xs:text-base sm:text-lg text-muted-foreground truncate mt-0.5 sm:mt-1"[39m
+          [36m>[39m
+            [0mTest Realty[0m
+            [0m • [0m
+            [0msexta, 26 dez[0m
+          [36m</p>[39m
+        [36m</div>[39m
+        [36m<button[39m
+          [33maria-controls[39m=[32m"radix-_r_7i_"[39m
+          [33maria-expanded[39m=[32m"false"[39m
+          [33maria-haspopup[39m=[32m"dialog"[39m
+          [33maria-label[39m=[32m"Abrir ações rápidas"[39m
+          [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none h-9 w-9 sm:hidden min-h-[44px] min-w-[44px] shrink-0 touch-manipulation active:scale-95 transition-transform"[39m
+          [33mdata-state[39m=[32m"closed"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"lucide lucide-plus h-5 w-5"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M5 12h14"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M12 5v14"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+        [36m</button>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"hidden sm:flex gap-2"[39m
+        [36m>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"lucide lucide-house mr-2 h-4 w-4"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [0mNovo Imóvel[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [33maria-controls[39m=[32m"radix-_r_7l_"[39m
+            [33maria-expanded[39m=[32m"false"[39m
+            [33maria-haspopup[39m=[32m"dialog"[39m
+            [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+            [33mdata-state[39m=[32m"closed"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"lucide lucide-user-plus mr-2 h-4 w-4"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"[39m
+              [36m/>[39m
+              [36m<circle[39m
+                [33mcx[39m=[32m"9"[39m
+                [33mcy[39m=[32m"7"[39m
+                [33mr[39m=[32m"4"[39m
+              [36m/>[39m
+              [36m<line[39m
+                [33mx1[39m=[32m"19"[39m
+                [33mx2[39m=[32m"19"[39m
+                [33my1[39m=[32m"8"[39m
+                [33my2[39m=[32m"14"[39m
+              [36m/>[39m
+              [36m<line[39m
+                [33mx1[39m=[32m"22"[39m
+                [33mx2[39m=[32m"16"[39m
+                [33my1[39m=[32m"11"[39m
+                [33my2[39m=[32m"11"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [0mNovo Lead[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [3...
+[90m [2m❯[22m Object.getElementError node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m76:38[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m52:17[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
+[36m [2m❯[22m client/src/pages/__tests__/dashboard.test.tsx:[2m317:21[22m[39m
+    [90m315| [39m        refetchLeads[33m:[39m vi[33m.[39m[34mfn[39m()[33m,[39m
+    [90m316| [39m        refetchContracts[33m:[39m vi[33m.[39m[34mfn[39m()[33m,[39m
+    [90m317| [39m        refetchProperties[33m:[39m vi[33m.[39m[34mfn[39m()[33m,[39m
+    [90m   | [39m                    [31m^[39m
+    [90m318| [39m      })[33m;[39m
+    [90m319| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/14]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m client/src/pages/__tests__/dashboard.test.tsx[2m > [22mDashboard Component[2m > [22mMetrics Display[2m > [22mshould display monthly revenue
+[31m[1mTestingLibraryElementError[22m[39m: Unable to find an element with the text: /125\.000|125,000/. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body[39m
+  [33mstyle[39m=[32m""[39m
+[36m>[39m
+  [36m<div>[39m
+    [36m<main[39m
+      [33mclass[39m=[32m"space-y-6 sm:space-y-8 lg:space-y-10"[39m
+    [36m>[39m
+      [36m<header[39m
+        [33mclass[39m=[32m"flex items-center justify-between gap-3"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"min-w-0 flex-1"[39m
+        [36m>[39m
+          [36m<h1[39m
+            [33mclass[39m=[32m"text-xl xs:text-2xl sm:text-3xl lg:text-4xl font-heading font-bold text-foreground truncate"[39m
+          [36m>[39m
+            [0mPainel Operacional[0m
+          [36m</h1>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"text-sm xs:text-base sm:text-lg text-muted-foreground truncate mt-0.5 sm:mt-1"[39m
+          [36m>[39m
+            [0mTest Realty[0m
+            [0m • [0m
+            [0msexta, 26 dez[0m
+          [36m</p>[39m
+        [36m</div>[39m
+        [36m<button[39m
+          [33maria-controls[39m=[32m"radix-_r_92_"[39m
+          [33maria-expanded[39m=[32m"false"[39m
+          [33maria-haspopup[39m=[32m"dialog"[39m
+          [33maria-label[39m=[32m"Abrir ações rápidas"[39m
+          [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none h-9 w-9 sm:hidden min-h-[44px] min-w-[44px] shrink-0 touch-manipulation active:scale-95 transition-transform"[39m
+          [33mdata-state[39m=[32m"closed"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"lucide lucide-plus h-5 w-5"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M5 12h14"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M12 5v14"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+        [36m</button>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"hidden sm:flex gap-2"[39m
+        [36m>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"lucide lucide-house mr-2 h-4 w-4"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [0mNovo Imóvel[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [33maria-controls[39m=[32m"radix-_r_95_"[39m
+            [33maria-expanded[39m=[32m"false"[39m
+            [33maria-haspopup[39m=[32m"dialog"[39m
+            [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+            [33mdata-state[39m=[32m"closed"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"lucide lucide-user-plus mr-2 h-4 w-4"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"[39m
+              [36m/>[39m
+              [36m<circle[39m
+                [33mcx[39m=[32m"9"[39m
+                [33mcy[39m=[32m"7"[39m
+                [33mr[39m=[32m"4"[39m
+              [36m/>[39m
+              [36m<line[39m
+                [33mx1[39m=[32m"19"[39m
+                [33mx2[39m=[32m"19"[39m
+                [33my1[39m=[32m"8"[39m
+                [33my2[39m=[32m"14"[39m
+              [36m/>[39m
+              [36m<line[39m
+                [33mx1[39m=[32m"22"[39m
+                [33mx2[39m=[32m"16"[39m
+                [33my1[39m=[32m"11"[39m
+                [33my2[39m=[32m"11"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [0mNovo Lead[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [3...
+[90m [2m❯[22m Object.getElementError node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m76:38[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m52:17[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
+[36m [2m❯[22m client/src/pages/__tests__/dashboard.test.tsx:[2m343:21[22m[39m
+    [90m343| [39m    })[33m;[39m
+    [90m344| [39m
+    [90m345| [39m    [34mit[39m([32m'should display monthly revenue'[39m[33m,[39m () [33m=>[39m {
+    [90m   | [39m [31m^[39m
+    [90m346| [39m      [34mrender[39m([33m<[39m[33mDashboard[39m [33m/[39m[33m>[39m)[33m;[39m
+    [90m347| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/14]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m client/src/pages/__tests__/dashboard.test.tsx[2m > [22mDashboard Component[2m > [22mChart Rendering[2m > [22mshould render charts without errors
+[31m[1mAssertionError[22m: expected 0 to be greater than 0[39m
+[36m [2m❯[22m client/src/pages/__tests__/dashboard.test.tsx:[2m376:38[22m[39m
+    [90m374| [39m
+    [90m375| [39m  [34mdescribe[39m([32m'Chart Rendering'[39m[33m,[39m () [33m=>[39m {
+    [90m376| [39m    [34mit[39m([32m'should render charts without errors'[39m[33m,[39m () [33m=>[39m {
+    [90m   | [39m                                     [31m^[39m
+    [90m377| [39m      [34mrender[39m([33m<[39m[33mDashboard[39m [33m/[39m[33m>[39m)[33m;[39m
+    [90m378| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/14]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m client/src/pages/__tests__/dashboard.test.tsx[2m > [22mDashboard Component[2m > [22mAction Buttons[2m > [22mshould render navigation links
+[31m[1mTestingLibraryElementError[22m[39m: Unable to find an accessible element with the role "link"
+
+Here are the accessible roles:
+
+  main:
+
+  Name "":
+  [36m<main[39m
+    [33mclass[39m=[32m"space-y-6 sm:space-y-8 lg:space-y-10"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  banner:
+
+  Name "":
+  [36m<header[39m
+    [33mclass[39m=[32m"flex items-center justify-between gap-3"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  heading:
+
+  Name "Painel Operacional":
+  [36m<h1[39m
+    [33mclass[39m=[32m"text-xl xs:text-2xl sm:text-3xl lg:text-4xl font-heading font-bold text-foreground truncate"[39m
+  [36m/>[39m
+
+  Name "Indicadores principais":
+  [36m<h2[39m
+    [33mid[39m=[32m"kpis-title"[39m
+  [36m/>[39m
+
+  Name "Novo":
+  [36m<h3[39m
+    [33mclass[39m=[32m"font-semibold text-sm"[39m
+  [36m/>[39m
+
+  Name "John Doe":
+  [36m<h4[39m
+    [33mclass[39m=[32m"font-medium text-sm truncate"[39m
+    [33mtitle[39m=[32m"John Doe"[39m
+  [36m/>[39m
+
+  Name "Em Contato":
+  [36m<h3[39m
+    [33mclass[39m=[32m"font-semibold text-sm"[39m
+  [36m/>[39m
+
+  Name "Jane Smith":
+  [36m<h4[39m
+    [33mclass[39m=[32m"font-medium text-sm truncate"[39m
+    [33mtitle[39m=[32m"Jane Smith"[39m
+  [36m/>[39m
+
+  Name "Em Visita":
+  [36m<h3[39m
+    [33mclass[39m=[32m"font-semibold text-sm"[39m
+  [36m/>[39m
+
+  Name "Proposta":
+  [36m<h3[39m
+    [33mclass[39m=[32m"font-semibold text-sm"[39m
+  [36m/>[39m
+
+  Name "Fechado":
+  [36m<h3[39m
+    [33mclass[39m=[32m"font-semibold text-sm"[39m
+  [36m/>[39m
+
+  Name "Novo":
+  [36m<h3[39m
+    [33mclass[39m=[32m"font-semibold text-sm"[39m
+  [36m/>[39m
+
+  Name "John Doe":
+  [36m<h4[39m
+    [33mclass[39m=[32m"font-medium text-sm truncate"[39m
+    [33mtitle[39m=[32m"John Doe"[39m
+  [36m/>[39m
+
+  Name "Em Contato":
+  [36m<h3[39m
+    [33mclass[39m=[32m"font-semibold text-sm"[39m
+  [36m/>[39m
+
+  Name "Jane Smith":
+  [36m<h4[39m
+    [33mclass[39m=[32m"font-medium text-sm truncate"[39m
+    [33mtitle[39m=[32m"Jane Smith"[39m
+  [36m/>[39m
+
+  Name "Em Visita":
+  [36m<h3[39m
+    [33mclass[39m=[32m"font-semibold text-sm"[39m
+  [36m/>[39m
+
+  Name "Proposta":
+  [36m<h3[39m
+    [33mclass[39m=[32m"font-semibold text-sm"[39m
+  [36m/>[39m
+
+  Name "Fechado":
+  [36m<h3[39m
+    [33mclass[39m=[32m"font-semibold text-sm"[39m
+  [36m/>[39m
+
+  Name "Novo":
+  [36m<h3[39m
+    [33mclass[39m=[32m"font-semibold text-sm"[39m
+  [36m/>[39m
+
+  Name "John Doe":
+  [36m<h4[39m
+    [33mclass[39m=[32m"font-medium text-sm truncate"[39m
+    [33mtitle[39m=[32m"John Doe"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-sm xs:text-base sm:text-lg text-muted-foreground truncate mt-0.5 sm:mt-1"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-2xl xs:text-3xl sm:text-4xl font-bold text-foreground"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-xs xs:text-sm text-muted-foreground mt-1"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-2xl xs:text-3xl sm:text-4xl font-bold text-foreground"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-xs xs:text-sm text-muted-foreground mt-1"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-2xl xs:text-3xl sm:text-4xl font-bold text-foreground"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-xs xs:text-sm text-muted-foreground mt-1"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-2xl xs:text-3xl sm:text-4xl font-bold text-foreground"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-xs xs:text-sm text-muted-foreground mt-1"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-xs text-muted-foreground text-center"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-xs text-muted-foreground text-center"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-xs text-muted-foreground text-center"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-xs text-muted-foreground text-center"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-xs text-muted-foreground text-center"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-xs text-muted-foreground text-center"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-sm xs:text-base font-semibold truncate"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-xs xs:text-sm text-muted-foreground truncate mt-0.5"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"font-semibold text-sm xs:text-base truncate"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"font-semibold text-sm xs:text-base truncate"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-emerald-100 text-sm xs:text-base sm:text-lg font-medium"[39m
+    [33mid[39m=[32m"total-value-title"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-3xl xs:text-4xl sm:text-5xl lg:text-6xl font-bold mt-1 sm:mt-2 truncate"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-emerald-200 text-sm xs:text-base sm:text-lg mt-2 sm:mt-3"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  button:
+
+  Name "Abrir ações rápidas":
+  [36m<button[39m
+    [33maria-controls[39m=[32m"radix-_r_au_"[39m
+    [33maria-expanded[39m=[32m"false"[39m
+    [33maria-haspopup[39m=[32m"dialog"[39m
+    [33maria-label[39m=[32m"Abrir ações rápidas"[39m
+    [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none h-9 w-9 sm:hidden min-h-[44px] min-w-[44px] shrink-0 touch-manipulation active:scale-95 transition-transform"[39m
+    [33mdata-state[39m=[32m"closed"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  Name "Novo Imóvel":
+  [36m<button[39m
+    [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+  [36m/>[39m
+
+  Name "Novo Lead":
+  [36m<button[39m
+    [33maria-controls[39m=[32m"radix-_r_b1_"[39m
+    [33maria-expanded[39m=[32m"false"[39m
+    [33maria-haspopup[39m=[32m"dialog"[39m
+    [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+    [33mdata-state[39m=[32m"closed"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  Name "Agendar Visita":
+  [36m<button[39m
+    [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] bg-primary text-primary-foreground border border-primary/20 shadow-sm hover:bg-primary/90 hover:shadow-md hover:-translate-y-0.5 rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+  [36m/>[39m
+
+  Name "Ver imóveis ativos":
+  [36m<div[39m
+    [33maria-label[39m=[32m"Ver imóveis ativos"[39m
+    [33mclass[39m=[32m"rounded-xl border bg-card text-card-foreground shadow transition-all duration-200 hover:shadow-lg hover:-translate-y-1 cursor-pointer active:scale-95 touch-manipulation"[39m
+    [33mrole[39m=[32m"button"[39m
+    [33mtabindex[39m=[32m"0"[39m
+  [36m/>[39m
+
+  Name "Ver leads do mês":
+  [36m<div[39m
+    [33maria-label[39m=[32m"Ver leads do mês"[39m
+    [33mclass[39m=[32m"rounded-xl border bg-card text-card-foreground shadow transition-all duration-200 hover:shadow-lg hover:-translate-y-1 cursor-pointer active:scale-95 touch-manipulation"[39m
+    [33mrole[39m=[32m"button"[39m
+    [33mtabindex[39m=[32m"0"[39m
+  [36m/>[39m
+
+  Name "Ver visitas agendadas":
+  [36m<div[39m
+    [33maria-label[39m=[32m"Ver visitas agendadas"[39m
+    [33mclass[39m=[32m"rounded-xl border bg-card text-card-foreground shadow transition-all duration-200 hover:shadow-lg hover:-translate-y-1 cursor-pointer active:scale-95 touch-manipulation"[39m
+    [33mrole[39m=[32m"button"[39m
+    [33mtabindex[39m=[32m"0"[39m
+  [36m/>[39m
+
+  Name "Ver contratos ativos":
+  [36m<div[39m
+    [33maria-label[39m=[32m"Ver contratos ativos"[39m
+    [33mclass[39m=[32m"rounded-xl border bg-card text-card-foreground shadow transition-all duration-200 hover:shadow-lg hover:-translate-y-1 cursor-pointer active:scale-95 touch-manipulation"[39m
+    [33mrole[39m=[32m"button"[39m
+    [33mtabindex[39m=[32m"0"[39m
+  [36m/>[39m
+
+  Name "Ver CRM":
+  [36m<button[39m
+    [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-transparent hover:bg-accent hover:text-accent-foreground rounded-md px-3 min-h-[36px] text-sm shrink-0 focus-visible:ring-2"[39m
+  [36m/>[39m
+
+  Name "Ver calendário completo":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Ver calendário completo"[39m
+    [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-transparent hover:bg-accent hover:text-accent-foreground h-9 w-9 min-h-[44px] min-w-[44px] shrink-0 focus-visible:ring-2"[39m
+  [36m/>[39m
+
+  Name "Confirmar":
+  [36m<button[39m
+    [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md min-h-[32px] text-xs px-3 mt-2 focus-visible:ring-2"[39m
+  [36m/>[39m
+
+  Name "Ver todos":
+  [36m<button[39m
+    [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-transparent hover:bg-accent hover:text-accent-foreground rounded-md px-3 min-h-[36px] text-sm shrink-0 focus-visible:ring-2"[39m
+  [36m/>[39m
+
+  Name "Ligar para John Doe":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Ligar para John Doe"[39m
+    [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-transparent hover:text-accent-foreground h-9 w-9 min-h-[36px] min-w-[36px] hover:bg-blue-100 focus-visible:ring-2"[39m
+  [36m/>[39m
+
+  Name "WhatsApp para John Doe":
+  [36m<button[39m
+    [33maria-label[39m=[32m"WhatsApp para John Doe"[39m
+    [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-transparent hover:text-accent-foreground h-9 w-9 min-h-[36px] min-w-[36px] hover:bg-green-100 focus-visible:ring-2"[39m
+  [36m/>[39m
+
+  Name "Ligar para Jane Smith":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Ligar para Jane Smith"[39m
+    [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-transparent hover:text-accent-foreground h-9 w-9 min-h-[36px] min-w-[36px] hover:bg-blue-100 focus-visible:ring-2"[39m
+  [36m/>[39m
+
+  Name "WhatsApp para Jane Smith":
+  [36m<button[39m
+    [33maria-label[39m=[32m"WhatsApp para Jane Smith"[39m
+    [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-transparent hover:text-accent-foreground h-9 w-9 min-h-[36px] min-w-[36px] hover:bg-green-100 focus-visible:ring-2"[39m
+  [36m/>[39m
+
+  Name "Ver todos":
+  [36m<button[39m
+    [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-transparent hover:bg-accent hover:text-accent-foreground rounded-md px-3 min-h-[36px] text-sm shrink-0 focus-visible:ring-2"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  region:
+
+  Name "Indicadores principais":
+  [36m<section[39m
+    [33maria-labelledby[39m=[32m"kpis-title"[39m
+    [33mclass[39m=[32m"sr-only"[39m
+  [36m/>[39m
+
+  Name "Pipeline de Vendas":
+  [36m<section[39m
+    [33maria-labelledby[39m=[32m"pipeline-title"[39m
+    [33mclass[39m=[32m"lg:col-span-2"[39m
+  [36m/>[39m
+
+  Name "Agenda de Hoje":
+  [36m<section[39m
+    [33maria-labelledby[39m=[32m"agenda-title"[39m
+  [36m/>[39m
+
+  Name "Últimos Leads":
+  [36m<section[39m
+    [33maria-labelledby[39m=[32m"recent-leads-title"[39m
+  [36m/>[39m
+
+  Name "Portfólio de Imóveis":
+  [36m<section[39m
+    [33maria-labelledby[39m=[32m"property-portfolio-title"[39m
+  [36m/>[39m
+
+  Name "Valor Total em Contratos Fechados":
+  [36m<section[39m
+    [33maria-labelledby[39m=[32m"total-value-title"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  status:
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"whitespace-nowrap inline-flex items-center rounded-md border px-2.5 py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover-elevate border-transparent bg-secondary text-secondary-foreground text-xs"[39m
+    [33mrole[39m=[32m"status"[39m
+    [33mstyle[39m=[32m"background-color: rgba(59, 130, 246, 0.082); color: rgb(59, 130, 246); border-color: rgba(59, 130, 246, 0.19);"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"whitespace-nowrap inline-flex items-center rounded-md border px-2.5 py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover-elevate border-transparent bg-secondary text-secondary-foreground text-xs"[39m
+    [33mrole[39m=[32m"status"[39m
+    [33mstyle[39m=[32m"background-color: rgba(139, 92, 246, 0.082); color: rgb(139, 92, 246); border-color: rgba(139, 92, 246, 0.19);"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"whitespace-nowrap inline-flex items-center rounded-md border px-2.5 py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover-elevate border-transparent bg-secondary text-secondary-foreground text-xs"[39m
+    [33mrole[39m=[32m"status"[39m
+    [33mstyle[39m=[32m"background-color: rgba(249, 115, 22, 0.082); color: rgb(249, 115, 22); border-color: rgba(249, 115, 22, 0.19);"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"whitespace-nowrap inline-flex items-center rounded-md border px-2.5 py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover-elevate border-transparent bg-secondary text-secondary-foreground text-xs"[39m
+    [33mrole[39m=[32m"status"[39m
+    [33mstyle[39m=[32m"background-color: rgba(234, 179, 8, 0.082); color: rgb(234, 179, 8); border-color: rgba(234, 179, 8, 0.19);"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"whitespace-nowrap inline-flex items-center rounded-md border px-2.5 py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover-elevate border-transparent bg-secondary text-secondary-foreground text-xs"[39m
+    [33mrole[39m=[32m"status"[39m
+    [33mstyle[39m=[32m"background-color: rgba(34, 197, 94, 0.082); color: rgb(34, 197, 94); border-color: rgba(34, 197, 94, 0.19);"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"whitespace-nowrap inline-flex items-center rounded-md border px-2.5 py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover-elevate border-transparent bg-secondary text-secondary-foreground text-xs"[39m
+    [33mrole[39m=[32m"status"[39m
+    [33mstyle[39m=[32m"background-color: rgba(59, 130, 246, 0.082); color: rgb(59, 130, 246); border-color: rgba(59, 130, 246, 0.19);"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"whitespace-nowrap inline-flex items-center rounded-md border px-2.5 py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover-elevate border-transparent bg-secondary text-secondary-foreground text-xs"[39m
+    [33mrole[39m=[32m"status"[39m
+    [33mstyle[39m=[32m"background-color: rgba(139, 92, 246, 0.082); color: rgb(139, 92, 246); border-color: rgba(139, 92, 246, 0.19);"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"whitespace-nowrap inline-flex items-center rounded-md border px-2.5 py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover-elevate border-transparent bg-secondary text-secondary-foreground text-xs"[39m
+    [33mrole[39m=[32m"status"[39m
+    [33mstyle[39m=[32m"background-color: rgba(249, 115, 22, 0.082); color: rgb(249, 115, 22); border-color: rgba(249, 115, 22, 0.19);"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"whitespace-nowrap inline-flex items-center rounded-md border px-2.5 py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover-elevate border-transparent bg-secondary text-secondary-foreground text-xs"[39m
+    [33mrole[39m=[32m"status"[39m
+    [33mstyle[39m=[32m"background-color: rgba(234, 179, 8, 0.082); color: rgb(234, 179, 8); border-color: rgba(234, 179, 8, 0.19);"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"whitespace-nowrap inline-flex items-center rounded-md border px-2.5 py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover-elevate border-transparent bg-secondary text-secondary-foreground text-xs"[39m
+    [33mrole[39m=[32m"status"[39m
+    [33mstyle[39m=[32m"background-color: rgba(34, 197, 94, 0.082); color: rgb(34, 197, 94); border-color: rgba(34, 197, 94, 0.19);"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"whitespace-nowrap inline-flex items-center rounded-md border py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover-elevate border-transparent bg-secondary text-secondary-foreground text-[10px] h-4 px-1.5 ml-1"[39m
+    [33mrole[39m=[32m"status"[39m
+    [33mstyle[39m=[32m"background-color: rgba(59, 130, 246, 0.082); color: rgb(59, 130, 246);"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"whitespace-nowrap inline-flex items-center rounded-md border py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover-elevate border-transparent bg-secondary text-secondary-foreground text-[10px] h-4 px-1.5 ml-1"[39m
+    [33mrole[39m=[32m"status"[39m
+    [33mstyle[39m=[32m"background-color: rgba(139, 92, 246, 0.082); color: rgb(139, 92, 246);"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"whitespace-nowrap inline-flex items-center rounded-md border py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover-elevate border-transparent bg-secondary text-secondary-foreground text-[10px] h-4 px-1.5 ml-1"[39m
+    [33mrole[39m=[32m"status"[39m
+    [33mstyle[39m=[32m"background-color: rgba(249, 115, 22, 0.082); color: rgb(249, 115, 22);"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"whitespace-nowrap inline-flex items-center rounded-md border py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover-elevate border-transparent bg-secondary text-secondary-foreground text-[10px] h-4 px-1.5 ml-1"[39m
+    [33mrole[39m=[32m"status"[39m
+    [33mstyle[39m=[32m"background-color: rgba(234, 179, 8, 0.082); color: rgb(234, 179, 8);"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"whitespace-nowrap inline-flex items-center rounded-md border py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover-elevate border-transparent bg-secondary text-secondary-foreground text-[10px] h-4 px-1.5 ml-1"[39m
+    [33mrole[39m=[32m"status"[39m
+    [33mstyle[39m=[32m"background-color: rgba(34, 197, 94, 0.082); color: rgb(34, 197, 94);"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"whitespace-nowrap inline-flex items-center rounded-md border px-2.5 py-0.5 font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover-elevate border-transparent bg-secondary text-secondary-foreground text-xs"[39m
+    [33mrole[39m=[32m"status"[39m
+    [33mstyle[39m=[32m"background-color: rgba(59, 130, 246, 0.082); color: rgb(59, 130, 246); border-color: rgba(59, 130, 246, 0.19);"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"whitespace-nowrap inline-flex items-center rounded-md border font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover-elevate border-transparent bg-secondary text-secondary-foreground text-xs px-2 py-0.5"[39m
+    [33mrole[39m=[32m"status"[39m
+    [33mstyle[39m=[32m"background-color: rgba(59, 130, 246, 0.125); color: rgb(59, 130, 246);"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"whitespace-nowrap inline-flex items-center rounded-md border font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 hover-elevate border-transparent bg-secondary text-secondary-foreground text-xs px-2 py-0.5"[39m
+    [33mrole[39m=[32m"status"[39m
+    [33mstyle[39m=[32m"background-color: rgba(139, 92, 246, 0.125); color: rgb(139, 92, 246);"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  tablist:
+
+  Name "":
+  [36m<div[39m
+    [33maria-orientation[39m=[32m"horizontal"[39m
+    [33mclass[39m=[32m"inline-flex items-center rounded-lg text-muted-foreground w-full h-auto flex-wrap justify-start gap-1 p-1 bg-muted/50"[39m
+    [33mdata-orientation[39m=[32m"horizontal"[39m
+    [33mrole[39m=[32m"tablist"[39m
+    [33mstyle[39m=[32m"outline: none;"[39m
+    [33mtabindex[39m=[32m"0"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  tab:
+
+  Name "Novo 1":
+  [36m<button[39m
+    [33maria-controls[39m=[32m"radix-_r_b4_-content-new"[39m
+    [33maria-selected[39m=[32m"true"[39m
+    [33mclass[39m=[32m"justify-center whitespace-nowrap rounded-md font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground flex items-center gap-1.5 text-xs px-3 py-1.5 data-[state=active]:shadow-sm"[39m
+    [33mdata-orientation[39m=[32m"horizontal"[39m
+    [33mdata-radix-collection-item[39m=[32m""[39m
+    [33mdata-state[39m=[32m"active"[39m
+    [33mid[39m=[32m"radix-_r_b4_-trigger-new"[39m
+    [33mrole[39m=[32m"tab"[39m
+    [33mtabindex[39m=[32m"-1"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  Name "Em Contato 1":
+  [36m<button[39m
+    [33maria-controls[39m=[32m"radix-_r_b4_-content-qualification"[39m
+    [33maria-selected[39m=[32m"false"[39m
+    [33mclass[39m=[32m"justify-center whitespace-nowrap rounded-md font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground flex items-center gap-1.5 text-xs px-3 py-1.5 data-[state=active]:shadow-sm"[39m
+    [33mdata-orientation[39m=[32m"horizontal"[39m
+    [33mdata-radix-collection-item[39m=[32m""[39m
+    [33mdata-state[39m=[32m"inactive"[39m
+    [33mid[39m=[32m"radix-_r_b4_-trigger-qualification"[39m
+    [33mrole[39m=[32m"tab"[39m
+    [33mtabindex[39m=[32m"-1"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  Name "Em Visita 0":
+  [36m<button[39m
+    [33maria-controls[39m=[32m"radix-_r_b4_-content-visit"[39m
+    [33maria-selected[39m=[32m"false"[39m
+    [33mclass[39m=[32m"justify-center whitespace-nowrap rounded-md font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground flex items-center gap-1.5 text-xs px-3 py-1.5 data-[state=active]:shadow-sm"[39m
+    [33mdata-orientation[39m=[32m"horizontal"[39m
+    [33mdata-radix-collection-item[39m=[32m""[39m
+    [33mdata-state[39m=[32m"inactive"[39m
+    [33mid[39m=[32m"radix-_r_b4_-trigger-visit"[39m
+    [33mrole[39m=[32m"tab"[39m
+    [33mtabindex[39m=[32m"-1"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  Name "Proposta 0":
+  [36m<button[39m
+    [33maria-controls[39m=[32m"radix-_r_b4_-content-proposal"[39m
+    [33maria-selected[39m=[32m"false"[39m
+    [33mclass[39m=[32m"justify-center whitespace-nowrap rounded-md font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground flex items-center gap-1.5 text-xs px-3 py-1.5 data-[state=active]:shadow-sm"[39m
+    [33mdata-orientation[39m=[32m"horizontal"[39m
+    [33mdata-radix-collection-item[39m=[32m""[39m
+    [33mdata-state[39m=[32m"inactive"[39m
+    [33mid[39m=[32m"radix-_r_b4_-trigger-proposal"[39m
+    [33mrole[39m=[32m"tab"[39m
+    [33mtabindex[39m=[32m"-1"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  Name "Fechado 0":
+  [36m<button[39m
+    [33maria-controls[39m=[32m"radix-_r_b4_-content-contract"[39m
+    [33maria-selected[39m=[32m"false"[39m
+    [33mclass[39m=[32m"justify-center whitespace-nowrap rounded-md font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground flex items-center gap-1.5 text-xs px-3 py-1.5 data-[state=active]:shadow-sm"[39m
+    [33mdata-orientation[39m=[32m"horizontal"[39m
+    [33mdata-radix-collection-item[39m=[32m""[39m
+    [33mdata-state[39m=[32m"inactive"[39m
+    [33mid[39m=[32m"radix-_r_b4_-trigger-contract"[39m
+    [33mrole[39m=[32m"tab"[39m
+    [33mtabindex[39m=[32m"-1"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  tabpanel:
+
+  Name "Novo 1":
+  [36m<div[39m
+    [33maria-labelledby[39m=[32m"radix-_r_b4_-trigger-new"[39m
+    [33mclass[39m=[32m"ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 mt-4"[39m
+    [33mdata-orientation[39m=[32m"horizontal"[39m
+    [33mdata-state[39m=[32m"active"[39m
+    [33mid[39m=[32m"radix-_r_b4_-content-new"[39m
+    [33mrole[39m=[32m"tabpanel"[39m
+    [33mstyle[39m=[32m"animation-duration: 0s;"[39m
+    [33mtabindex[39m=[32m"0"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  article:
+
+  Name "":
+  [36m<article[39m
+    [33mclass[39m=[32m"p-3 xs:p-4 rounded-lg border transition-all duration-200 hover:bg-muted/50 hover:shadow-sm"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<article[39m
+    [33mclass[39m=[32m"p-3 xs:p-4 rounded-lg border transition-all duration-200 hover:bg-muted/50 hover:shadow-sm"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  list:
+
+  Name "Legenda do gráfico":
+  [36m<div[39m
+    [33maria-label[39m=[32m"Legenda do gráfico"[39m
+    [33mclass[39m=[32m"flex justify-center gap-4 xs:gap-6 mt-4"[39m
+    [33mrole[39m=[32m"list"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  listitem:
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"flex items-center gap-2"[39m
+    [33mrole[39m=[32m"listitem"[39m
+  [36m/>[39m
+
+  Name "":
+  [36m<div[39m
+    [33mclass[39m=[32m"flex items-center gap-2"[39m
+    [33mrole[39m=[32m"listitem"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body[39m
+  [33mstyle[39m=[32m""[39m
+[36m>[39m
+  [36m<div>[39m
+    [36m<main[39m
+      [33mclass[39m=[32m"space-y-6 sm:space-y-8 lg:space-y-10"[39m
+    [36m>[39m
+      [36m<header[39m
+        [33mclass[39m=[32m"flex items-center justify-between gap-3"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"min-w-0 flex-1"[39m
+        [36m>[39m
+          [36m<h1[39m
+            [33mclass[39m=[32m"text-xl xs:text-2xl sm:text-3xl lg:text-4xl font-heading font-bold text-foreground truncate"[39m
+          [36m>[39m
+            [0mPainel Operacional[0m
+          [36m</h1>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"text-sm xs:text-base sm:text-lg text-muted-foreground truncate mt-0.5 sm:mt-1"[39m
+          [36m>[39m
+            [0mTest Realty[0m
+            [0m • [0m
+            [0msexta, 26 dez[0m
+          [36m</p>[39m
+        [36m</div>[39m
+        [36m<button[39m
+          [33maria-controls[39m=[32m"radix-_r_au_"[39m
+          [33maria-expanded[39m=[32m"false"[39m
+          [33maria-haspopup[39m=[32m"dialog"[39m
+          [33maria-label[39m=[32m"Abrir ações rápidas"[39m
+          [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none h-9 w-9 sm:hidden min-h-[44px] min-w-[44px] shrink-0 touch-manipulation active:scale-95 transition-transform"[39m
+          [33mdata-state[39m=[32m"closed"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"lucide lucide-plus h-5 w-5"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M5 12h14"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M12 5v14"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+        [36m</button>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"hidden sm:flex gap-2"[39m
+        [36m>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"lucide lucide-house mr-2 h-4 w-4"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [0mNovo Imóvel[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [33maria-controls[39m=[32m"radix-_r_b1_"[39m
+            [33maria-expanded[39m=[32m"false"[39m
+            [33maria-haspopup[39m=[32m"dialog"[39m
+            [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] border border-input bg-background shadow-xs hover:bg-accent hover:text-accent-foreground hover:shadow-sm active:shadow-none rounded-md px-3 text-xs min-h-[36px] focus-visible:ring-2"[39m
+            [33mdata-state[39m=[32m"closed"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"lucide lucide-user-plus mr-2 h-4 w-4"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"[39m
+              [36m/>[39m
+              [36m<circle[39m
+                [33mcx[39m=[32m"9"[39m
+                [33mcy[39m=[32m"7"[39m
+                [33mr[39m=[32m"4"[39m
+              [36m/>[39m
+              [36m<line[39m
+                [33mx1[39m=[32m"19"[39m
+                [33mx2[39m=[32m"19"[39m
+                [33my1[39m=[32m"8"[39m
+                [33my2[39m=[32m"14"[39m
+              [36m/>[39m
+              [36m<line[39m
+                [33mx1[39m=[32m"22"[39m
+                [33mx2[39m=[32m"16"[39m
+                [33my1[39m=[32m"11"[39m
+                [33my2[39m=[32m"11"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [0mNovo Lead[0m
+          [36m</button>[39m
+          [36m<button[39m
+            [3...
+[90m [2m❯[22m Object.getElementError node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m76:38[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m109:15[22m[39m
+[36m [2m❯[22m client/src/pages/__tests__/dashboard.test.tsx:[2m390:28[22m[39m
+    [90m390| [39m    })[33m;[39m
+    [90m391| [39m
+    [90m392| [39m    [34mit[39m([32m'should render navigation links'[39m[33m,[39m () [33m=>[39m {
+    [90m   | [39m        [31m^[39m
+    [90m393| [39m      [34mrender[39m([33m<[39m[33mDashboard[39m [33m/[39m[33m>[39m)[33m;[39m
+    [90m394| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/14]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m client/src/components/dashboard/__tests__/DashboardBuilder.test.tsx[2m > [22mDashboardBuilder[2m > [22mCreate New Layout[2m > [22mshould allow entering layout name
+[31m[1mError[22m[39m: Timed out in waitFor.
+
+Ignored nodes: comments, script, style
+[36m<html>[39m
+  [36m<head />[39m
+  [36m<body[39m
+    [33mdata-scroll-locked[39m=[32m"1"[39m
+    [33mstyle[39m=[32m"pointer-events: none;"[39m
+  [36m>[39m
+    [36m<span[39m
+      [33maria-hidden[39m=[32m"true"[39m
+      [33mdata-aria-hidden[39m=[32m"true"[39m
+      [33mdata-radix-focus-guard[39m=[32m""[39m
+      [33mstyle[39m=[32m"outline: none; opacity: 0; position: fixed; pointer-events: none;"[39m
+      [33mtabindex[39m=[32m"0"[39m
+    [36m/>[39m
+    [36m<div[39m
+      [33maria-hidden[39m=[32m"true"[39m
+      [33mdata-aria-hidden[39m=[32m"true"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"space-y-4 sm:space-y-6"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"min-w-0"[39m
+          [36m>[39m
+            [36m<h2[39m
+              [33mclass[39m=[32m"text-xl sm:text-2xl font-bold flex items-center gap-2"[39m
+            [36m>[39m
+              [36m<svg[39m
+                [33maria-hidden[39m=[32m"true"[39m
+                [33mclass[39m=[32m"lucide lucide-layout-dashboard h-5 w-5 sm:h-6 sm:w-6"[39m
+                [33mfill[39m=[32m"none"[39m
+                [33mheight[39m=[32m"24"[39m
+                [33mstroke[39m=[32m"currentColor"[39m
+                [33mstroke-linecap[39m=[32m"round"[39m
+                [33mstroke-linejoin[39m=[32m"round"[39m
+                [33mstroke-width[39m=[32m"2"[39m
+                [33mviewBox[39m=[32m"0 0 24 24"[39m
+                [33mwidth[39m=[32m"24"[39m
+                [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+              [36m>[39m
+                [36m<rect[39m
+                  [33mheight[39m=[32m"9"[39m
+                  [33mrx[39m=[32m"1"[39m
+                  [33mwidth[39m=[32m"7"[39m
+                  [33mx[39m=[32m"3"[39m
+                  [33my[39m=[32m"3"[39m
+                [36m/>[39m
+                [36m<rect[39m
+                  [33mheight[39m=[32m"5"[39m
+                  [33mrx[39m=[32m"1"[39m
+                  [33mwidth[39m=[32m"7"[39m
+                  [33mx[39m=[32m"14"[39m
+                  [33my[39m=[32m"3"[39m
+                [36m/>[39m
+                [36m<rect[39m
+                  [33mheight[39m=[32m"9"[39m
+                  [33mrx[39m=[32m"1"[39m
+                  [33mwidth[39m=[32m"7"[39m
+                  [33mx[39m=[32m"14"[39m
+                  [33my[39m=[32m"12"[39m
+                [36m/>[39m
+                [36m<rect[39m
+                  [33mheight[39m=[32m"5"[39m
+                  [33mrx[39m=[32m"1"[39m
+                  [33mwidth[39m=[32m"7"[39m
+                  [33mx[39m=[32m"3"[39m
+                  [33my[39m=[32m"16"[39m
+                [36m/>[39m
+              [36m</svg>[39m
+              [0mDashboard Customizável[0m
+            [36m</h2>[39m
+            [36m<p[39m
+              [33mclass[39m=[32m"text-xs sm:text-sm text-muted-foreground"[39m
+            [36m>[39m
+              [0mPersonalize seu dashboard com os widgets que você precisa[0m
+            [36m</p>[39m
+          [36m</div>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex items-center gap-2 shrink-0"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33maria-controls[39m=[32m"radix-_r_o_"[39m
+              [33maria-expanded[39m=[32m"true"[39m
+              [33maria-haspopup[39m=[32m"dialog"[39m
+              [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 active:scale-[0.98] bg-primary text-primary-foreground border border-primary/20 shadow-sm hover:bg-primary/90 hover:shadow-md hover:-translate-y-0.5 min-h-9 px-4 py-2"[39m
+              [33mdata-state[39m=[32m"open"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [36m<svg[39m
+                [33maria-hidden[39m=[32m"true"[39m
+                [33mclass[39m=[32m"lucide lucide-plus h-4 w-4 mr-2"[39m
+                [33mfill[39m=[32m"none"[39m
+                [33mheight[39m=[32m"24"[39m
+                [33mstroke[39m=[32m"currentColor"[39m
+                [33mstroke-linecap[39m=[32m"round"[39m
+                [33mstroke-linejoin[39m=[32m"round"[39m
+                [33mstroke-width[39m=[32m"2"[39m
+                [33mviewBox[39m=[32m"0 0 24 24"[39m
+                [33mwidth[39m=[32m"24"[39m
+                [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+              [36m>[39m
+                [36m<path[39m
+                  [33md[39m=[32m"M5 12h14"[39m
+                [36m/>[39m
+                [36m<path[39m
+                  [33md[39m=[32m"M12 5v14"[39m
+                [36m/>[39m
+              [36m</svg>[39m
+              [0mNovo Layout[0m
+            [36m</button>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"rounded-xl border bg-card text-card-foreground shadow cursor-pointer transition-all hover:border-primary touch-manipulation"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"p-3 sm:p-4"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"flex items-center gap-3"[39m
+              [36m>[39m
+                [36m<svg[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"lucide lucide-layout-dashboard h-5 w-5 text-muted-foreground"[39m
+                  [33mfill[39m=[32m"none"[39m
+                  [33mheight[39m=[32m"24"[39m
+                  [33mstroke[39m=[32m"currentColor"[39m
+                  [33mstroke-linecap[39m=[32m"round"[39m
+                  [33mstroke-linejoin[39m=[32m"round"[39m
+                  [33mstroke-width[39m=[32m"2"[39m
+                  [33mviewBox[39m=[32m"0 0 24 24"[39m
+                  [33mwidth[39m=[32m"24"[39m
+                  [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+                [36m>[39m
+                  [36m<rect[39m
+                    [33mheight[39m=[32m"9"[39m
+                    [33mrx[39m=[32m"1"[39m
+                    [33mwidth[39m=[32m"7"[39m
+                    [33mx[39m=[32m"3"[39m
+                    [33my[39m=[...
+[90m [2m❯[22m waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:[2m163:27[22m[39m
+[36m [2m❯[22m client/src/components/dashboard/__tests__/DashboardBuilder.test.tsx:[2m233:13[22m[39m
+    [90m231| [39m      })[33m;[39m
+    [90m232| [39m
+    [90m233| [39m      [35mawait[39m [34mwaitFor[39m([35masync[39m () [33m=>[39m {
+    [90m   | [39m            [31m^[39m
+    [90m234| [39m        const nameInput = screen.getByPlaceholderText(/ex: meu dashboa…
+    [90m235| [39m        [35mawait[39m user[33m.[39m[34mtype[39m(nameInput[33m,[39m [32m'Meu Novo Dashboard'[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/14]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m6 failed[39m[22m[2m | [22m[1m[32m33 passed[39m[22m[90m (39)[39m
+[2m      Tests [22m [1m[31m11 failed[39m[22m[2m | [22m[1m[32m859 passed[39m[22m[2m | [22m[33m30 skipped[39m[90m (900)[39m
+[2m   Start at [22m 18:47:42
+[2m   Duration [22m 17.49s[2m (transform 9.47s, setup 14.91s, import 29.03s, tests 53.74s, environment 54.24s)[22m
+

@@ -8,6 +8,14 @@ export type FinancialMetrics = {
   operationalExpenses: number;
   cashBalance: number;
   periodVariation: number;
+  // Extended metrics for new KPIs (calculated on frontend or backend)
+  totalRevenue?: number;
+  accountsReceivable?: number;
+  accountsPayable?: number;
+  overdueAmount?: number;
+  overduePercentage?: number;
+  pendingInvoicesCount?: number;
+  overdueContractsCount?: number;
 };
 
 export type FinanceTransaction = {

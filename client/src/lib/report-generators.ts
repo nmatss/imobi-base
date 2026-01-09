@@ -3,6 +3,8 @@
  * Handles PDF/Excel export, formatting, and data transformation
  */
 
+import { sanitizeHtml } from './sanitizer';
+
 // Format currency
 export function formatCurrency(value: string | number): string {
   const num = typeof value === "string" ? parseFloat(value) : value;
@@ -78,6 +80,12 @@ export function printDocument(elementId: string) {
   const printWindow = window.open("", "_blank");
   if (!printWindow) return;
 
+  // Sanitizar HTML antes de escrever no documento de impressão
+  const sanitizedHtml = sanitizeHtml(element.innerHTML, {
+    allowedTags: ['p', 'div', 'span', 'strong', 'em', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'br', 'h1', 'h2', 'h3', 'h4', 'ul', 'ol', 'li'],
+    allowedAttributes: ['class', 'style', 'id'],
+  });
+
   printWindow.document.write(`
     <!DOCTYPE html>
     <html>
@@ -96,7 +104,7 @@ export function printDocument(elementId: string) {
         </style>
       </head>
       <body>
-        ${element.innerHTML}
+        ${sanitizedHtml}
       </body>
     </html>
   `);

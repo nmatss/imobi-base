@@ -1,3 +1,4 @@
+import React, { Suspense, lazy, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useImobi } from "@/lib/imobi-context";
 import {
@@ -8,7 +9,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useState, useMemo, lazy, Suspense } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,9 +19,13 @@ import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { DashboardMetrics } from "@/components/dashboard/DashboardMetrics";
 import { DashboardPipeline } from "@/components/dashboard/DashboardPipeline";
+import { DashboardCardSkeleton } from "@/components/ui/skeleton-loaders";
+import { PageErrorBoundary } from "@/components/PageErrorBoundary";
+import { Spinner } from "@/components/ui/spinner";
 
 // Lazy load Recharts components to reduce initial bundle size
 const Bar = lazy(() => import("recharts").then(m => ({ default: m.Bar })));
@@ -29,7 +33,7 @@ const BarChart = lazy(() => import("recharts").then(m => ({ default: m.BarChart 
 const ResponsiveContainer = lazy(() => import("recharts").then(m => ({ default: m.ResponsiveContainer })));
 const XAxis = lazy(() => import("recharts").then(m => ({ default: m.XAxis })));
 const YAxis = lazy(() => import("recharts").then(m => ({ default: m.YAxis })));
-const Tooltip = lazy(() => import("recharts").then(m => ({ default: m.Tooltip })));
+const RechartsTooltip = lazy(() => import("recharts").then(m => ({ default: m.Tooltip })));
 
 // Constantes
 const FOLLOW_UP_TYPE_LABELS: Record<string, string> = {
@@ -108,9 +112,13 @@ export default function Dashboard() {
     recentLeads,
     todayTimeline,
     refetchFollowUps,
+    loading: dashboardDataLoading,
   } = useDashboardData();
 
+  const [completingFollowUp, setCompletingFollowUp] = useState<string | null>(null);
+
   const handleCompleteFollowUp = async (id: string) => {
+    setCompletingFollowUp(id);
     try {
       const res = await fetch(`/api/follow-ups/${id}`, {
         method: "PATCH",
@@ -124,6 +132,8 @@ export default function Dashboard() {
       }
     } catch (error) {
       toast({ title: "Erro", description: "Não foi possível concluir o lembrete.", variant: "destructive" });
+    } finally {
+      setCompletingFollowUp(null);
     }
   };
 
@@ -288,7 +298,7 @@ export default function Dashboard() {
                 disabled={isSubmitting}
                 className="min-h-[44px] focus-visible:ring-2"
               >
-                {isSubmitting ? "Salvando..." : "Salvar Lead"}
+                {isSubmitting ? <><Spinner size="sm" className="mr-2" /> Salvando...</> : "Salvar Lead"}
               </Button>
             </div>
           </form>
@@ -310,10 +320,10 @@ export default function Dashboard() {
       {/* ==================== ACTION BAR ==================== */}
       <header className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-xl xs:text-2xl sm:text-3xl lg:text-4xl font-heading font-bold text-foreground truncate">
+          <h1 className="text-3xl font-semibold text-foreground truncate leading-tight">
             Painel Operacional
           </h1>
-          <p className="text-sm xs:text-base sm:text-lg text-muted-foreground truncate mt-0.5 sm:mt-1">
+          <p className="text-sm sm:text-base text-muted-foreground truncate mt-1 leading-relaxed">
             {tenant?.name} • {format(new Date(), "EEE, dd MMM", { locale: ptBR })}
           </p>
         </div>
@@ -321,14 +331,23 @@ export default function Dashboard() {
         {/* Mobile: Sheet with actions */}
         <Sheet open={actionsSheetOpen} onOpenChange={setActionsSheetOpen}>
           <SheetTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              className="sm:hidden min-h-[44px] min-w-[44px] shrink-0 touch-manipulation active:scale-95 transition-transform"
-              aria-label="Abrir ações rápidas"
-            >
-              <Plus className="h-5 w-5" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="sm:hidden min-h-[44px] min-w-[44px] shrink-0 touch-manipulation active:scale-95 transition-transform"
+                    aria-label="Abrir ações rápidas"
+                  >
+                    <Plus className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Abrir ações rápidas</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </SheetTrigger>
           <SheetContent side="bottom" className="h-auto">
             <SheetHeader className="pb-4">
@@ -346,23 +365,23 @@ export default function Dashboard() {
       {(pendencies.totalUrgent > 0 || pendencies.todayVisitsList.length > 0 || pendencies.todayFollowUps.length > 0) && (
         <section aria-labelledby="pendencies-title">
           <Card className="border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 transition-all duration-200 hover:shadow-lg">
-            <CardHeader className="p-4 xs:p-5 sm:p-6 pb-3">
+            <CardHeader className="p-4 sm:p-6 pb-3">
               <div className="flex items-center gap-3">
                 <div className="min-h-[44px] min-w-[44px] xs:h-10 xs:w-10 sm:h-12 sm:w-12 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
                   <AlertTriangle className="h-5 w-5 xs:h-5 xs:w-5 sm:h-6 sm:w-6 text-amber-600" />
                 </div>
                 <div className="min-w-0">
-                  <CardTitle id="pendencies-title" className="text-base xs:text-lg sm:text-xl font-bold">
+                  <CardTitle id="pendencies-title" className="text-lg sm:text-xl font-semibold leading-tight">
                     Pendências de Hoje
                   </CardTitle>
-                  <CardDescription className="text-amber-700 text-sm xs:text-base mt-0.5">
+                  <CardDescription className="text-amber-700 text-sm sm:text-base mt-1 leading-relaxed">
                     {pendencies.overdueFollowUps.length > 0 && `${pendencies.overdueFollowUps.length} atrasado • `}
                     {pendencies.todayVisitsList.length} visita(s) • {pendencies.todayFollowUps.length} tarefa(s)
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-4 xs:p-5 sm:p-6 pt-0">
+            <CardContent className="p-4 sm:p-6 pt-0">
               {/* Mobile: Horizontal scroll | Desktop: Grid */}
               <ScrollArea className="sm:overflow-visible">
                 <div className="flex gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
@@ -382,9 +401,10 @@ export default function Dashboard() {
                               size="sm"
                               className="min-h-[32px] min-w-[32px] p-0 shrink-0 hover:bg-red-200 focus-visible:ring-2 focus-visible:ring-red-600"
                               onClick={() => handleCompleteFollowUp(f.id)}
+                              disabled={completingFollowUp === f.id}
                               aria-label={`Marcar ${f.lead?.name} como concluído`}
                             >
-                              <CheckCircle2 className="h-4 w-4" />
+                              {completingFollowUp === f.id ? <Spinner size="sm" /> : <CheckCircle2 className="h-4 w-4" />}
                             </Button>
                           </div>
                         ))}
@@ -440,80 +460,94 @@ export default function Dashboard() {
       )}
 
       {/* ==================== KPIs PRINCIPAIS - COMPONENTE NOVO ==================== */}
-      <section aria-labelledby="kpis-title" className="sr-only">
-        <h2 id="kpis-title">Indicadores principais</h2>
-      </section>
-      <DashboardMetrics
-        metrics={{
-          properties: { value: metrics.availableProperties },
-          leads: { value: metrics.totalLeads },
-          visits: { value: metrics.scheduledVisits },
-          contracts: { value: metrics.signedContracts },
-        }}
-      />
+      <PageErrorBoundary componentName="DashboardMetrics" pageName="Dashboard">
+        <section aria-labelledby="kpis-title">
+          <h2 id="kpis-title" className="sr-only">Indicadores principais</h2>
+          <DashboardMetrics
+            metrics={{
+              properties: { value: metrics.availableProperties },
+              leads: { value: metrics.totalLeads },
+              visits: { value: metrics.scheduledVisits },
+              contracts: { value: metrics.signedContracts },
+            }}
+            isLoading={dashboardDataLoading}
+          />
+        </section>
+      </PageErrorBoundary>
 
       {/* Seção de Indicadores removida - informação redundante com KPIs principais */}
 
       {/* ==================== CONTEÚDO PRINCIPAL - COM DASHBOARD PIPELINE ==================== */}
       <div className="grid gap-6 sm:gap-8 lg:grid-cols-3 lg:gap-10">
         {/* PIPELINE VISUAL - NOVO COMPONENTE */}
-        <section aria-labelledby="pipeline-title" className="lg:col-span-2">
-          <Card className="transition-all duration-200 hover:shadow-md">
-            <CardHeader className="p-4 xs:p-5 sm:p-6 pb-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <CardTitle className="text-base xs:text-lg sm:text-xl font-bold" id="pipeline-title">
-                    Pipeline de Vendas
-                  </CardTitle>
-                  <CardDescription className="text-sm xs:text-base mt-0.5">
-                    Funil de conversão de leads
-                  </CardDescription>
+        <PageErrorBoundary componentName="DashboardPipeline" pageName="Dashboard">
+          <section aria-labelledby="pipeline-title" className="lg:col-span-2">
+            <Card className="transition-all duration-200 hover:shadow-md">
+              <CardHeader className="p-4 sm:p-6 pb-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <CardTitle className="text-lg sm:text-xl font-semibold leading-tight" id="pipeline-title">
+                      Pipeline de Vendas
+                    </CardTitle>
+                    <CardDescription className="text-sm sm:text-base mt-1 leading-relaxed">
+                      Funil de conversão de leads
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="min-h-[36px] text-sm shrink-0 focus-visible:ring-2"
+                    onClick={() => setLocation("/leads")}
+                  >
+                    Ver CRM <ChevronRight className="ml-1 h-4 w-4" />
+                  </Button>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="min-h-[36px] text-sm shrink-0 focus-visible:ring-2"
-                  onClick={() => setLocation("/leads")}
-                >
-                  Ver CRM <ChevronRight className="ml-1 h-4 w-4" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4 xs:p-5 sm:p-6 pt-0">
-              <DashboardPipeline
-                stages={pipelineStages}
-                onLeadClick={(leadId) => setLocation(`/leads/${leadId}`)}
-                maxCardsVisible={3}
-              />
-            </CardContent>
-          </Card>
-        </section>
+              </CardHeader>
+              <CardContent className="p-4 sm:p-6 pt-0">
+                <DashboardPipeline
+                  stages={pipelineStages}
+                  onLeadClick={(leadId) => setLocation(`/leads/${leadId}`)}
+                  maxCardsVisible={3}
+                />
+              </CardContent>
+            </Card>
+          </section>
+        </PageErrorBoundary>
 
         {/* AGENDA DO DIA */}
         <section aria-labelledby="agenda-title">
           <Card className="transition-all duration-200 hover:shadow-md">
-            <CardHeader className="p-4 xs:p-5 sm:p-6 pb-3">
+            <CardHeader className="p-4 sm:p-6 pb-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <CardTitle className="text-base xs:text-lg sm:text-xl font-bold" id="agenda-title">
+                  <CardTitle className="text-lg sm:text-xl font-semibold leading-tight" id="agenda-title">
                     Agenda de Hoje
                   </CardTitle>
-                  <CardDescription className="text-sm xs:text-base mt-0.5">
+                  <CardDescription className="text-sm sm:text-base mt-1 leading-relaxed">
                     {format(new Date(), "dd 'de' MMMM", { locale: ptBR })}
                   </CardDescription>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="min-h-[44px] min-w-[44px] shrink-0 focus-visible:ring-2"
-                  onClick={() => setLocation("/calendar")}
-                  aria-label="Ver calendário completo"
-                >
-                  <Calendar className="h-5 w-5" />
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="min-h-[44px] min-w-[44px] shrink-0 focus-visible:ring-2"
+                        onClick={() => setLocation("/calendar")}
+                        aria-label="Ver calendário completo"
+                      >
+                        <Calendar className="h-5 w-5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Ver calendário completo</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </CardHeader>
-            <CardContent className="p-4 xs:p-5 sm:p-6 pt-0">
+            <CardContent className="p-4 sm:p-6 pt-0">
               {todayTimeline.length > 0 ? (
                 <ScrollArea className="h-48 xs:h-56 sm:h-64 lg:h-80">
                   <div className="space-y-3 sm:space-y-4">
@@ -579,13 +613,13 @@ export default function Dashboard() {
         {/* ÚLTIMOS LEADS COM TIMELINE */}
         <section aria-labelledby="recent-leads-title">
           <Card className="transition-all duration-200 hover:shadow-md">
-            <CardHeader className="p-4 xs:p-5 sm:p-6 pb-3">
+            <CardHeader className="p-4 sm:p-6 pb-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <CardTitle className="text-base xs:text-lg sm:text-xl font-bold" id="recent-leads-title">
+                  <CardTitle className="text-lg sm:text-xl font-semibold leading-tight" id="recent-leads-title">
                     Últimos Leads
                   </CardTitle>
-                  <CardDescription className="text-sm xs:text-base mt-0.5 hidden sm:block">
+                  <CardDescription className="text-sm sm:text-base mt-1 leading-relaxed hidden sm:block">
                     Com sugestão de próximo passo
                   </CardDescription>
                 </div>
@@ -599,7 +633,7 @@ export default function Dashboard() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="p-4 xs:p-5 sm:p-6 pt-0">
+            <CardContent className="p-4 sm:p-6 pt-0">
               {recentLeads.length > 0 ? (
                 <div className="space-y-3 sm:space-y-4">
                   {recentLeads.slice(0, 4).map((lead) => (
@@ -640,22 +674,24 @@ export default function Dashboard() {
                           </div>
                         </div>
                         <div className="flex gap-1 shrink-0">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="min-h-[36px] min-w-[36px] hover:bg-blue-100 focus-visible:ring-2"
-                            aria-label={`Ligar para ${lead.name}`}
-                          >
-                            <PhoneCall className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="min-h-[36px] min-w-[36px] hover:bg-green-100 focus-visible:ring-2"
-                            aria-label={`WhatsApp para ${lead.name}`}
-                          >
-                            <MessageSquare className="h-4 w-4" />
-                          </Button>
+                          {/* Priorizar WhatsApp - evitar duplicação de ícones */}
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="min-h-[36px] min-w-[36px] hover:bg-green-100 focus-visible:ring-2"
+                                  aria-label={`WhatsApp para ${lead.name}`}
+                                >
+                                  <MessageSquare className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Enviar WhatsApp</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         </div>
                       </div>
                       <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t flex items-center justify-between gap-2">
@@ -693,13 +729,13 @@ export default function Dashboard() {
         {/* IMÓVEIS POR TIPO */}
         <section aria-labelledby="property-portfolio-title">
           <Card className="transition-all duration-200 hover:shadow-md">
-            <CardHeader className="p-4 xs:p-5 sm:p-6 pb-3">
+            <CardHeader className="p-4 sm:p-6 pb-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <CardTitle className="text-base xs:text-lg sm:text-xl font-bold" id="property-portfolio-title">
+                  <CardTitle className="text-lg sm:text-xl font-semibold leading-tight" id="property-portfolio-title">
                     Portfólio de Imóveis
                   </CardTitle>
-                  <CardDescription className="text-sm xs:text-base mt-0.5">
+                  <CardDescription className="text-sm sm:text-base mt-1 leading-relaxed">
                     {propertyInsights.available} disponíveis de {propertyInsights.total}
                   </CardDescription>
                 </div>
@@ -713,7 +749,7 @@ export default function Dashboard() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="p-4 xs:p-5 sm:p-6 pt-0">
+            <CardContent className="p-4 sm:p-6 pt-0">
               {propertyInsights.byType.length > 0 ? (
                 <>
                   <Suspense fallback={
@@ -731,7 +767,7 @@ export default function Dashboard() {
                           tick={{ fontSize: 12 }}
                           className="text-xs xs:text-sm"
                         />
-                        <Tooltip
+                        <RechartsTooltip
                           contentStyle={{
                             borderRadius: '8px',
                             border: 'none',

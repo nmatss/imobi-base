@@ -1,3 +1,4 @@
+import React from "react";
 import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -211,25 +212,25 @@ export function DashboardBuilder({ userId, tenantId }: DashboardBuilderProps) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" role="status" aria-label="Carregando layouts" />
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <LayoutDashboard className="h-6 w-6" />
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="min-w-0">
+          <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+            <LayoutDashboard className="h-5 w-5 sm:h-6 sm:w-6" />
             Dashboard Customizável
           </h2>
-          <p className="text-muted-foreground">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Personalize seu dashboard com os widgets que você precisa
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {isEditing ? (
             <>
               <Button variant="outline" onClick={cancelEditing}>
@@ -287,16 +288,16 @@ export function DashboardBuilder({ userId, tenantId }: DashboardBuilderProps) {
 
       {/* Layout Selector */}
       {!isEditing && layouts && layouts.length > 0 && (
-        <div className="flex flex-wrap gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {layouts.map((layout) => (
             <Card
               key={layout.id}
-              className={`cursor-pointer transition-all hover:border-primary ${
+              className={`cursor-pointer transition-all hover:border-primary touch-manipulation ${
                 selectedLayout?.id === layout.id ? 'border-primary ring-2 ring-primary/20' : ''
               }`}
               onClick={() => setSelectedLayout(layout)}
             >
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center gap-3">
                   <LayoutDashboard className="h-5 w-5 text-muted-foreground" />
                   <div>

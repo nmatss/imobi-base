@@ -1,3 +1,4 @@
+import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,8 @@ type Props = {
   period?: string;
 };
 
+const iconA11yProps = { "aria-hidden": true, focusable: false } as const;
+
 export default function FinancialTabs({
   transactions,
   activeTab,
@@ -51,35 +54,35 @@ export default function FinancialTabs({
         <ScrollArea className="w-full">
           <TabsList className="inline-flex w-auto h-auto p-1 gap-1">
             <TabsTrigger value="general" className="flex flex-col items-center gap-1 px-3 py-2 h-auto min-h-[44px]">
-              <LayoutGrid className="h-4 w-4" />
+              <LayoutGrid {...iconA11yProps} className="h-4 w-4" />
               <span className="text-xs">Geral</span>
               <Badge variant="secondary" className="text-[10px] px-1 py-0">
                 {generalTransactions.length}
               </Badge>
             </TabsTrigger>
             <TabsTrigger value="sales" className="flex flex-col items-center gap-1 px-3 py-2 h-auto min-h-[44px]">
-              <Building2 className="h-4 w-4" />
+              <Building2 {...iconA11yProps} className="h-4 w-4" />
               <span className="text-xs">Vendas</span>
               <Badge variant="secondary" className="text-[10px] px-1 py-0">
                 {salesTransactions.length}
               </Badge>
             </TabsTrigger>
             <TabsTrigger value="rentals" className="flex flex-col items-center gap-1 px-3 py-2 h-auto min-h-[44px]">
-              <Home className="h-4 w-4" />
+              <Home {...iconA11yProps} className="h-4 w-4" />
               <span className="text-xs">Aluguéis</span>
               <Badge variant="secondary" className="text-[10px] px-1 py-0">
                 {rentalsTransactions.length}
               </Badge>
             </TabsTrigger>
             <TabsTrigger value="transfers" className="flex flex-col items-center gap-1 px-3 py-2 h-auto min-h-[44px]">
-              <Receipt className="h-4 w-4" />
+              <Receipt {...iconA11yProps} className="h-4 w-4" />
               <span className="text-xs">Repasses</span>
               <Badge variant="secondary" className="text-[10px] px-1 py-0">
                 {transfersTransactions.length}
               </Badge>
             </TabsTrigger>
             <TabsTrigger value="broker-commissions" className="flex flex-col items-center gap-1 px-3 py-2 h-auto min-h-[44px]">
-              <Percent className="h-4 w-4" />
+              <Percent {...iconA11yProps} className="h-4 w-4" />
               <span className="text-xs">Comissões</span>
             </TabsTrigger>
           </TabsList>
@@ -91,35 +94,35 @@ export default function FinancialTabs({
       <div className="hidden md:block">
         <TabsList className="grid w-full grid-cols-5 h-auto">
           <TabsTrigger value="general" className="flex items-center gap-2 py-3">
-            <LayoutGrid className="h-4 w-4" />
+            <LayoutGrid {...iconA11yProps} className="h-4 w-4" />
             <span>Geral</span>
             <Badge variant="secondary" className="ml-auto text-xs">
               {generalTransactions.length}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="sales" className="flex items-center gap-2 py-3">
-            <Building2 className="h-4 w-4" />
+            <Building2 {...iconA11yProps} className="h-4 w-4" />
             <span>Vendas</span>
             <Badge variant="secondary" className="ml-auto text-xs">
               {salesTransactions.length}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="rentals" className="flex items-center gap-2 py-3">
-            <Home className="h-4 w-4" />
+            <Home {...iconA11yProps} className="h-4 w-4" />
             <span>Aluguéis</span>
             <Badge variant="secondary" className="ml-auto text-xs">
               {rentalsTransactions.length}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="transfers" className="flex items-center gap-2 py-3">
-            <Receipt className="h-4 w-4" />
+            <Receipt {...iconA11yProps} className="h-4 w-4" />
             <span>Repasses</span>
             <Badge variant="secondary" className="ml-auto text-xs">
               {transfersTransactions.length}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="broker-commissions" className="flex items-center gap-2 py-3">
-            <Percent className="h-4 w-4" />
+            <Percent {...iconA11yProps} className="h-4 w-4" />
             <span>Comissões</span>
           </TabsTrigger>
         </TabsList>

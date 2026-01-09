@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useImobi, Visit, Lead, Property } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { CreateEventModal, EventFormData } from "@/components/calendar/CreateEventModal";
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -219,8 +221,12 @@ export default function CalendarPage() {
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingVisit, setEditingVisit] = useState<Visit | null>(null);
+
+  // Popover state for month view
+  const [selectedDayForPopover, setSelectedDayForPopover] = useState<Date | null>(null);
 
   // Detail panel state
   const [selectedVisit, setSelectedVisit] = useState<VisitDetails | null>(null);
@@ -482,8 +488,15 @@ export default function CalendarPage() {
     }
   };
 
-  // Open create modal
+  // Open create modal (novo modal simplificado)
   const openCreateModal = (date?: Date) => {
+    setEditingVisit(null);
+    setSelectedDate(date || new Date());
+    setIsCreateModalOpen(true);
+  };
+
+  // Open legacy create modal (mantido para edição)
+  const openLegacyCreateModal = (date?: Date) => {
     setEditingVisit(null);
     setFormData({
       propertyId: "",
@@ -535,7 +548,55 @@ export default function CalendarPage() {
     setIsModalOpen(true);
   };
 
-  // Handle form submit
+  // Handle new event creation
+  const handleCreateEvent = async (data: EventFormData) => {
+    try {
+      const scheduledFor = new Date(`${data.date}T${data.time}:00`);
+
+      // Build notes with metadata
+      let notesWithMeta = "";
+      notesWithMeta += `[TYPE:${data.type}] `;
+      if (data.description) notesWithMeta += data.description;
+      if (data.reminderMinutes) notesWithMeta += ` [REMINDER:${data.reminderMinutes}]`;
+
+      const payload = {
+        propertyId: data.propertyId || properties[0]?.id || "",
+        leadId: data.clientId || null,
+        scheduledFor: scheduledFor.toISOString(),
+        notes: notesWithMeta.trim() || null,
+        status: "scheduled",
+        assignedTo: user?.id || null,
+      };
+
+      const res = await fetch("/api/visits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Erro ao criar evento");
+      }
+
+      toast({
+        title: "Evento criado",
+        description: "O evento foi criado com sucesso.",
+      });
+
+      await refetchVisits();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
+  // Handle form submit (legacy)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -917,7 +978,7 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="space-y-3 sm:space-y-4 lg:space-y-6 pb-20 sm:pb-6">
+    <div className="space-y-6 sm:space-y-8 pb-20 sm:pb-6">
       {/* Header */}
       <div className="flex flex-col gap-3 sm:gap-4">
         <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-3">
@@ -1015,9 +1076,9 @@ export default function CalendarPage() {
 
         {/* Stats counters - Horizontal scroll on mobile */}
         <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
-          <div className="flex gap-2 sm:gap-3 min-w-max sm:grid sm:grid-cols-3 lg:grid-cols-6">
+          <div className="flex gap-6 sm:gap-8 min-w-max sm:grid sm:grid-cols-3 lg:grid-cols-6">
             <Card className="min-w-[120px] sm:min-w-0 bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-200">
-              <CardContent className="p-3">
+              <CardContent className="p-4">
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-blue-500 rounded-lg">
                     <CalendarIcon className="h-4 w-4 text-white" />
@@ -1031,7 +1092,7 @@ export default function CalendarPage() {
             </Card>
 
             <Card className="min-w-[120px] sm:min-w-0 bg-gradient-to-br from-green-50 to-green-100/50 border-green-200">
-              <CardContent className="p-3">
+              <CardContent className="p-4">
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-green-500 rounded-lg">
                     <CheckCircle className="h-4 w-4 text-white" />
@@ -1045,7 +1106,7 @@ export default function CalendarPage() {
             </Card>
 
             <Card className="min-w-[120px] sm:min-w-0 bg-gradient-to-br from-red-50 to-red-100/50 border-red-200">
-              <CardContent className="p-3">
+              <CardContent className="p-4">
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-red-500 rounded-lg">
                     <XCircle className="h-4 w-4 text-white" />
@@ -1059,7 +1120,7 @@ export default function CalendarPage() {
             </Card>
 
             <Card className="min-w-[120px] sm:min-w-0 bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-200">
-              <CardContent className="p-3">
+              <CardContent className="p-4">
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-amber-500 rounded-lg">
                     <AlertTriangle className="h-4 w-4 text-white" />
@@ -1073,7 +1134,7 @@ export default function CalendarPage() {
             </Card>
 
             <Card className="min-w-[120px] sm:min-w-0 bg-gradient-to-br from-purple-50 to-purple-100/50 border-purple-200">
-              <CardContent className="p-3">
+              <CardContent className="p-4">
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-purple-500 rounded-lg">
                     <Clock className="h-4 w-4 text-white" />
@@ -1087,7 +1148,7 @@ export default function CalendarPage() {
             </Card>
 
             <Card className="min-w-[120px] sm:min-w-0 bg-gradient-to-br from-indigo-50 to-indigo-100/50 border-indigo-200">
-              <CardContent className="p-3">
+              <CardContent className="p-4">
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-indigo-500 rounded-lg">
                     <CalendarPlus className="h-4 w-4 text-white" />
@@ -1126,29 +1187,39 @@ export default function CalendarPage() {
           </div>
         )}
 
-        {/* View Switcher - Mobile segmented control */}
-        <div className="flex border-b">
-          {[
-            { value: "list", label: "Lista", icon: List },
-            { value: "day", label: "Dia", icon: CalendarIcon },
-            { value: "week", label: "Semana", icon: CalendarPlus },
-            { value: "month", label: "Mês", icon: CalendarIcon },
-          ].map((view) => (
-            <button
-              key={view.value}
-              onClick={() => setViewMode(view.value as any)}
-              className={cn(
-                "flex-1 py-3 px-2 text-sm font-medium border-b-2 transition-colors flex items-center justify-center gap-1.5",
-                viewMode === view.value
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              )}
+        {/* View Switcher - Custom Tabs */}
+        <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as any)} className="w-full">
+          <TabsList className="grid w-full grid-cols-4 bg-muted p-1 rounded-lg h-auto">
+            <TabsTrigger
+              value="list"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5 py-2.5"
             >
-              <view.icon className="h-4 w-4" />
-              <span className="hidden xs:inline">{view.label}</span>
-            </button>
-          ))}
-        </div>
+              <List className="w-4 h-4" />
+              <span className="hidden xs:inline">Lista</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="day"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5 py-2.5"
+            >
+              <CalendarIcon className="w-4 h-4" />
+              <span className="hidden xs:inline">Dia</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="week"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5 py-2.5"
+            >
+              <CalendarPlus className="w-4 h-4" />
+              <span className="hidden xs:inline">Semana</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="month"
+              className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground gap-1.5 py-2.5"
+            >
+              <CalendarIcon className="w-4 h-4" />
+              <span className="hidden xs:inline">Mês</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* Main content */}
@@ -1192,11 +1263,23 @@ export default function CalendarPage() {
               </CardHeader>
               <CardContent className="p-3 sm:p-4">
                 {getVisitsForDate(selectedDate).length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <Clock className="w-12 h-12 mb-3 opacity-20" />
-                    <p className="text-sm text-muted-foreground mb-4">Nenhuma visita agendada para este dia.</p>
-                    <Button variant="outline" size="sm" onClick={() => openCreateModal(selectedDate)}>
-                      <Plus className="h-4 w-4 mr-2" />
+                  <div className="flex flex-col items-center justify-center py-12 px-4 text-center animate-fadeIn">
+                    <CalendarIcon className="w-16 h-16 text-muted-foreground/50 mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">
+                      {isToday(selectedDate) ? "Nenhuma visita agendada hoje" : "Nenhuma visita neste dia"}
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-6 max-w-md">
+                      {isToday(selectedDate)
+                        ? "Comece agendando uma visita para seus imóveis. Gerencie horários, leads e acompanhe o status de cada visita."
+                        : "Organize sua agenda e melhore o acompanhamento de leads agendando visitas."
+                      }
+                    </p>
+                    <Button
+                      onClick={() => openCreateModal(selectedDate)}
+                      size="lg"
+                      className="shadow-lg hover:shadow-xl transition-all hover:scale-105"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
                       Agendar Visita
                     </Button>
                   </div>
@@ -1358,7 +1441,7 @@ export default function CalendarPage() {
                           </div>
                           <div className={cn(
                             "text-lg font-bold w-10 h-10 flex items-center justify-center rounded-full mx-auto",
-                            isCurrentDay && "bg-primary text-primary-foreground"
+                            isCurrentDay && "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2"
                           )}>
                             {format(day, "d")}
                           </div>
@@ -1392,7 +1475,7 @@ export default function CalendarPage() {
               </div>
 
               {/* Desktop: Grid */}
-              <div className="hidden sm:grid grid-cols-7 gap-2">
+              <div className="hidden sm:grid grid-cols-7 gap-6 sm:gap-8">
                 {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map(day => (
                   <div key={day} className="text-xs font-medium text-muted-foreground py-2 text-center">
                     {day}
@@ -1417,7 +1500,7 @@ export default function CalendarPage() {
                     >
                       <div className={cn(
                         "text-sm font-bold mb-2 w-8 h-8 flex items-center justify-center rounded-full mx-auto",
-                        isCurrentDay && "bg-primary text-primary-foreground"
+                        isCurrentDay && "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2"
                       )}>
                         {format(day, "d")}
                       </div>
@@ -1451,7 +1534,7 @@ export default function CalendarPage() {
           </Card>
         )}
 
-        {/* Month View - Compact with event dots */}
+        {/* Month View - Melhorado com popover de eventos */}
         {viewMode === "month" && (
           <Card>
             <CardHeader className="p-3 sm:p-4 border-b">
@@ -1480,7 +1563,7 @@ export default function CalendarPage() {
               </div>
             </CardHeader>
             <CardContent className="p-2 sm:p-4">
-              <div className="grid grid-cols-7 gap-1">
+              <div className="grid grid-cols-7 gap-6 sm:gap-8">
                 {["D", "S", "T", "Q", "Q", "S", "S"].map((day, i) => (
                   <div key={i} className="text-xs font-medium text-muted-foreground py-2 text-center">
                     {day}
@@ -1488,63 +1571,121 @@ export default function CalendarPage() {
                 ))}
                 {daysInMonth.map((day, i) => {
                   if (!day) {
-                    return <div key={`empty-${i}`} className="min-h-[60px] sm:min-h-[80px]" />;
+                    return <div key={`empty-${i}`} className="min-h-[80px] sm:min-h-[100px]" />;
                   }
 
                   const dayVisits = getVisitsForDate(day);
                   const isCurrentDay = isSameDay(day, new Date());
                   const isSelected = isSameDay(day, selectedDate);
                   const isCurrentMonth = isSameMonth(day, currentMonth);
+                  const maxVisibleEvents = 2;
+                  const hasMoreEvents = dayVisits.length > maxVisibleEvents;
 
                   return (
-                    <div
-                      key={i}
-                      onClick={() => {
-                        setSelectedDate(day);
-                        setViewMode("list");
-                      }}
-                      onDragOver={handleDragOver}
-                      onDrop={(e) => handleDrop(e, day)}
-                      className={cn(
-                        "min-h-[60px] sm:min-h-[80px] border rounded-lg p-1.5 cursor-pointer transition-all",
-                        isSelected ? "bg-primary/5 border-primary ring-1 ring-primary" : "bg-card hover:border-primary/30",
-                        !isCurrentMonth && "opacity-40",
-                        draggedVisit && "border-dashed border-2"
-                      )}
-                    >
-                      <div className={cn(
-                        "text-xs sm:text-sm font-medium mb-1 w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded-full mx-auto",
-                        isCurrentDay && "bg-primary text-primary-foreground"
-                      )}>
-                        {format(day, "d")}
-                      </div>
+                    <Popover key={i}>
+                      <PopoverTrigger asChild>
+                        <div
+                          onClick={() => {
+                            if (dayVisits.length === 0) {
+                              openCreateModal(day);
+                            }
+                          }}
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, day)}
+                          className={cn(
+                            "min-h-[80px] sm:min-h-[100px] border rounded-lg p-1.5 cursor-pointer transition-all",
+                            isSelected ? "bg-primary/5 border-primary ring-1 ring-primary" : "bg-card hover:border-primary/30",
+                            !isCurrentMonth && "opacity-40",
+                            draggedVisit && "border-dashed border-2"
+                          )}
+                        >
+                          <div className={cn(
+                            "text-xs sm:text-sm font-medium mb-1 w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center rounded-full mx-auto",
+                            isCurrentDay && "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2"
+                          )}>
+                            {format(day, "d")}
+                          </div>
 
-                      {/* Event dots - mobile friendly */}
-                      {dayVisits.length > 0 && (
-                        <div className="flex flex-wrap gap-0.5 justify-center">
-                          {dayVisits.slice(0, 3).map((v, idx) => {
-                            const config = getStatusConfig(v.status);
-                            return (
-                              <div
-                                key={idx}
-                                className="w-1.5 h-1.5 rounded-full"
-                                style={{ backgroundColor: config.borderColor }}
-                              />
-                            );
-                          })}
-                          {dayVisits.length > 3 && (
-                            <div className="text-[8px] text-muted-foreground">
-                              +{dayVisits.length - 3}
+                          {/* Mostrar APENAS 2 eventos importantes */}
+                          {dayVisits.length > 0 && (
+                            <div className="space-y-0.5">
+                              {dayVisits.slice(0, maxVisibleEvents).map((v, idx) => {
+                                const config = getStatusConfig(v.status);
+                                return (
+                                  <div
+                                    key={idx}
+                                    className="text-[9px] sm:text-[10px] px-1 py-0.5 rounded truncate border-l-2"
+                                    style={{ borderLeftColor: config.borderColor }}
+                                  >
+                                    {format(new Date(v.scheduledFor), "HH:mm")}
+                                  </div>
+                                );
+                              })}
+                              {hasMoreEvents && (
+                                <div className="text-[9px] sm:text-[10px] text-muted-foreground text-center py-0.5">
+                                  +{dayVisits.length - maxVisibleEvents} mais
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
+                      </PopoverTrigger>
+                      {dayVisits.length > 0 && (
+                        <PopoverContent className="w-80 p-3" side="top">
+                          <div className="space-y-2">
+                            <div className="font-semibold text-sm border-b pb-2">
+                              {format(day, "EEEE, d 'de' MMMM", { locale: ptBR })}
+                            </div>
+                            <ScrollArea className="max-h-[300px]">
+                              <div className="space-y-2">
+                                {dayVisits.map(visit => (
+                                  <div
+                                    key={visit.id}
+                                    onClick={() => openDetailPanel(visit)}
+                                    className="p-2 hover:bg-accent rounded-lg cursor-pointer transition-colors border-l-2"
+                                    style={{ borderLeftColor: getStatusConfig(visit.status).borderColor }}
+                                  >
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="font-medium text-xs">
+                                        {format(new Date(visit.scheduledFor), "HH:mm")}
+                                      </span>
+                                      <Badge
+                                        variant="outline"
+                                        className={cn("text-[9px] px-1.5 py-0", getStatusConfig(visit.status).bg)}
+                                      >
+                                        {getStatusConfig(visit.status).label}
+                                      </Badge>
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {getVisitDetails(visit).lead?.name || "Cliente"}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground truncate">
+                                      {getVisitDetails(visit).property?.title}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </ScrollArea>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="w-full h-9"
+                              onClick={() => {
+                                setSelectedDate(day);
+                                setViewMode("list");
+                              }}
+                            >
+                              Ver todos os eventos
+                            </Button>
+                          </div>
+                        </PopoverContent>
                       )}
-                    </div>
+                    </Popover>
                   );
                 })}
               </div>
               <p className="text-center text-xs text-muted-foreground py-2 mt-2">
-                Toque em um dia para ver as visitas
+                Clique em um dia para ver detalhes ou criar evento
               </p>
             </CardContent>
           </Card>
@@ -1560,7 +1701,17 @@ export default function CalendarPage() {
         <Plus className="h-6 w-6" />
       </Button>
 
-      {/* Create/Edit Visit Modal */}
+      {/* New Create Event Modal - Simplified */}
+      <CreateEventModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmit={handleCreateEvent}
+        initialDate={selectedDate}
+        clients={leads.map(l => ({ id: l.id, name: l.name }))}
+        properties={properties.map(p => ({ id: p.id, title: p.title, address: p.address }))}
+      />
+
+      {/* Legacy Create/Edit Visit Modal - Mantido para edição */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -1703,8 +1854,7 @@ export default function CalendarPage() {
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)} className="h-11">
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting || !formData.propertyId || !formData.leadId} className="h-11">
-                {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Button type="submit" isLoading={isSubmitting} disabled={!formData.propertyId || !formData.leadId} className="h-11">
                 {editingVisit ? "Salvar" : "Agendar"}
               </Button>
             </DialogFooter>

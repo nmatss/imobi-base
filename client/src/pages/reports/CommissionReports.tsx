@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useImobi } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Spinner } from "@/components/ui/spinner";
 import {
   HandCoins,
   Calendar,
@@ -65,7 +66,7 @@ import {
   LineChart,
   Line,
 } from "recharts";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast-helpers";
 import { cn } from "@/lib/utils";
 import CommissionReportTable, { Commission } from "@/components/reports/CommissionReportTable";
 import CommissionReceipt from "@/components/reports/CommissionReceipt";
@@ -86,7 +87,6 @@ const COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"];
 
 export default function CommissionReports() {
   const { tenant } = useImobi();
-  const { toast } = useToast();
 
   // State
   const [isLoading, setIsLoading] = useState(true);
@@ -162,11 +162,7 @@ export default function CommissionReports() {
       setCommissions(transformedCommissions);
     } catch (error) {
       console.error("Error fetching commissions:", error);
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar comissões",
-        variant: "destructive",
-      });
+      toast.error("Erro", "Erro ao carregar comissões");
     } finally {
       setIsLoading(false);
     }
@@ -312,24 +308,20 @@ export default function CommissionReports() {
         )
       );
 
-      toast({
-        title: "Comissões atualizadas",
-        description: `${ids.length} comissão(ões) marcada(s) como paga(s)`,
-      });
+      toast.success("Comissões atualizadas", `${ids.length} comissão(ões) marcada(s) como paga(s)`);
 
       fetchData();
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao atualizar comissões",
-        variant: "destructive",
-      });
+      toast.error("Erro", "Erro ao atualizar comissões");
     }
   };
 
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     setIsExporting(true);
     try {
+      // Simulate processing time
+      await new Promise(resolve => setTimeout(resolve, 800));
+
       const data = filteredCommissions.map((c) => ({
         Data: formatDate(c.date),
         Tipo: c.type === "sale" ? "Venda" : "Locação",
@@ -344,16 +336,9 @@ export default function CommissionReports() {
 
       exportToCSV(data, `comissoes_${new Date().toISOString().split("T")[0]}.csv`);
 
-      toast({
-        title: "Exportado com sucesso",
-        description: "Relatório exportado em formato CSV",
-      });
+      toast.success("Exportado com sucesso", "Relatório exportado em formato CSV");
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao exportar relatório",
-        variant: "destructive",
-      });
+      toast.error("Erro", "Erro ao exportar relatório");
     } finally {
       setIsExporting(false);
     }
@@ -371,16 +356,9 @@ export default function CommissionReports() {
         "commission-receipt",
         `recibo_${selectedCommission.id.slice(0, 8)}.pdf`
       );
-      toast({
-        title: "PDF gerado",
-        description: "Recibo baixado com sucesso",
-      });
+      toast.success("PDF gerado", "Recibo baixado com sucesso");
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Erro ao gerar PDF",
-        variant: "destructive",
-      });
+      toast.error("Erro", "Erro ao gerar PDF");
     }
   };
 
@@ -438,7 +416,7 @@ export default function CommissionReports() {
             <DropdownMenuTrigger asChild>
               <Button size="sm" disabled={isExporting}>
                 {isExporting ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Spinner className="h-4 w-4 mr-2" size="sm" />
                 ) : (
                   <Download className="h-4 w-4 mr-2" />
                 )}

@@ -1,0 +1,109 @@
+
+> rest-express@1.0.0 build
+> tsx script/build.ts
+
+building client...
+vite v7.1.12 building for production...
+transforming...
+✓ 4121 modules transformed.
+rendering chunks...
+[meta-images] no Replit deployment domain found, skipping meta tag updates
+computing gzip size...
+../dist/public/registerSW.js                                            0.13 kB
+../dist/public/manifest.webmanifest                                     0.29 kB
+../dist/public/index.html                                               6.30 kB │ gzip:   2.65 kB
+../dist/public/assets/tsx/dashboard-DaGcxOGT.tsx                       37.06 kB
+../dist/public/assets/tsx/list-Db7juncQ.tsx                            63.77 kB
+../dist/public/assets/tsx/kanban-C7ZlSu98.tsx                          95.44 kB
+../dist/public/assets/jpg/abstract_blue_tech_g_c1dd56ff-CP1jgwWl.jpg  499.30 kB
+../dist/public/assets/css/details-CIGW-MKW.css                         15.61 kB │ gzip:   6.46 kB
+../dist/public/assets/css/index-BjDLD5sC.css                          248.23 kB │ gzip:  34.34 kB
+../dist/public/assets/js/vendor-forms-BeGoTtPD.js                       0.04 kB │ gzip:   0.06 kB
+../dist/public/assets/js/skeleton-7RlAum6u.js                           0.22 kB │ gzip:   0.19 kB
+../dist/public/assets/js/textarea-CbF99X4N.js                           0.54 kB │ gzip:   0.36 kB
+../dist/public/assets/js/checkbox-BAXrzXaC.js                           0.77 kB │ gzip:   0.43 kB
+../dist/public/assets/js/slider-DDyfHZ-n.js                             0.79 kB │ gzip:   0.45 kB
+../dist/public/assets/js/not-found-10nIvyR4.js                          0.89 kB │ gzip:   0.47 kB
+../dist/public/assets/js/switch-2IqSCkzE.js                             0.91 kB │ gzip:   0.48 kB
+../dist/public/assets/js/alert-9AgHyiZW.js                              1.05 kB │ gzip:   0.53 kB
+../dist/public/assets/js/separator-DkxihJNY.js                          1.11 kB │ gzip:   0.62 kB
+../dist/public/assets/js/accordion-ot0sXHGE.js                          1.12 kB │ gzip:   0.56 kB
+../dist/public/assets/js/tabs-DuO9zHIV.js                               1.18 kB │ gzip:   0.49 kB
+../dist/public/assets/js/use-toast-CtrhG70P.js                          1.21 kB │ gzip:   0.65 kB
+../dist/public/assets/js/table-BGkXGw_-.js                              1.65 kB │ gzip:   0.58 kB
+../dist/public/assets/js/alert-dialog-CZh_jhwg.js                       2.05 kB │ gzip:   0.74 kB
+../dist/public/assets/js/select-4bZD58jS.js                             3.21 kB │ gzip:   1.18 kB
+../dist/public/assets/js/image-lightbox-B0NHkoF5.js                     3.62 kB │ gzip:   1.29 kB
+../dist/public/assets/js/logs-BiGaqPux.js                               5.58 kB │ gzip:   2.11 kB
+../dist/public/assets/js/index-D1K2Nceo.js                              6.01 kB │ gzip:   1.94 kB
+../dist/public/assets/js/web-vitals-B3y21I-e.js                         6.14 kB │ gzip:   2.50 kB
+../dist/public/assets/js/plans-BLgq9pzk.js                              7.05 kB │ gzip:   2.24 kB
+../dist/public/assets/js/QuickSendModal-BYcx1kuv.js                     7.45 kB │ gzip:   3.11 kB
+../dist/public/assets/js/tenants-DBnHN_8N.js                           11.77 kB │ gzip:   3.04 kB
+../dist/public/assets/js/scroll-area-Iucetwn2.js                       12.64 kB │ gzip:   4.01 kB
+../dist/public/assets/js/Helmet-CMFFNClC.js                            16.60 kB │ gzip:   6.10 kB
+../dist/public/assets/js/vendor-react-s-c3WbsR.js                      17.35 kB │ gzip:   6.59 kB
+../dist/public/assets/js/landing-Cti9XFG3.js                           17.76 kB │ gzip:   5.04 kB
+../dist/public/assets/js/vendor-ui-misc-BeQDGpBR.js                    17.97 kB │ gzip:   5.10 kB
+../dist/public/assets/js/vendor-ui-forms-BmHtUM9w.js                   19.91 kB │ gzip:   5.89 kB
+../dist/public/assets/js/properties-DQ25TMl4.js                        22.37 kB │ gzip:   5.89 kB
+../dist/public/assets/js/purify.es-B9ZVCkUG.js                         22.64 kB │ gzip:   8.75 kB
+../dist/public/assets/js/property-details-DFx09PcP.js                  22.72 kB │ gzip:   6.22 kB
+../dist/public/assets/js/vendor-date-Futv0n7b.js                       24.48 kB │ gzip:   6.94 kB
+../dist/public/assets/js/vendor-utils-CjxovF-h.js                      25.48 kB │ gzip:   8.21 kB
+../dist/public/assets/js/details-BpFBeaP2.js                           28.93 kB │ gzip:   7.69 kB
+../dist/public/assets/js/dashboard-CmDcwsWk.js                         32.82 kB │ gzip:   8.71 kB
+../dist/public/assets/js/vendor-query-CaqrzeyF.js                      36.76 kB │ gzip:  11.01 kB
+../dist/public/assets/js/vendor-ui-dialog-BRQn1Aam.js                  37.28 kB │ gzip:  12.30 kB
+../dist/public/assets/js/index-D4Y0sdcO.js                             46.65 kB │ gzip:  10.01 kB
+../dist/public/assets/js/list-Dr9cqKi_.js                              54.39 kB │ gzip:  14.73 kB
+../dist/public/assets/js/index-IOqMGqMI.js                             54.55 kB │ gzip:  12.92 kB
+../dist/public/assets/js/kanban-fEwBliEy.js                            55.34 kB │ gzip:  13.31 kB
+../dist/public/assets/js/index-CMqL2pJY.js                             57.95 kB │ gzip:  12.64 kB
+../dist/public/assets/js/financeiro-vmJGWGWf.js                        60.44 kB │ gzip:  13.46 kB
+../dist/public/assets/js/index-CR3jG4MJ.js                             68.97 kB │ gzip:  15.38 kB
+../dist/public/assets/js/vendor-icons-RhYEl-wc.js                      70.24 kB │ gzip:  13.54 kB
+../dist/public/assets/js/vendor-ui-dropdown-BwV_SGIr.js                75.05 kB │ gzip:  23.95 kB
+../dist/public/assets/js/index-CB3D9eos.js                             79.85 kB │ gzip:  14.68 kB
+../dist/public/assets/js/product-landing-DfpT6zJn.js                  144.96 kB │ gzip:  44.93 kB
+../dist/public/assets/js/vendor-maps-CAv6VkIw.js                      154.13 kB │ gzip:  45.03 kB
+../dist/public/assets/js/index.es-tY9xoGts.js                         159.68 kB │ gzip:  53.56 kB
+../dist/public/assets/js/index-A_SFIuLG.js                            162.17 kB │ gzip:  36.47 kB
+../dist/public/assets/js/html2canvas.esm-B0tyYwQk.js                  202.36 kB │ gzip:  48.04 kB
+../dist/public/assets/js/index-D3wNDBUX.js                            308.98 kB │ gzip:  93.61 kB
+../dist/public/assets/js/jspdf.es.min-DHC4YpKN.js                     388.56 kB │ gzip: 127.56 kB
+../dist/public/assets/js/vendor-charts-pPYycFCD.js                    430.88 kB │ gzip: 114.71 kB
+✓ built in 20.16s
+
+PWA v1.2.0
+mode      generateSW
+precache  61 entries (3190.04 KiB)
+files generated
+  ../dist/public/sw.js
+  ../dist/public/workbox-b51dd497.js
+building server...
+▲ [WARNING] Duplicate member "getTenantSettings" in class body [duplicate-class-member]
+
+    server/storage.ts:3287:8:
+      3287 │   async getTenantSettings(tenantId: string) {
+           ╵         ~~~~~~~~~~~~~~~~~
+
+  The original member "getTenantSettings" is here:
+
+    server/storage.ts:1829:8:
+      1829 │   async getTenantSettings(tenantId: string): Promise<TenantSetti...
+           ╵         ~~~~~~~~~~~~~~~~~
+
+▲ [WARNING] "import.meta" is not available with the "cjs" output format and will be empty [empty-import-meta]
+
+    server/email/template-renderer.ts:5:33:
+      5 │ const __filename = fileURLToPath(import.meta.url);
+        ╵                                  ~~~~~~~~~~~
+
+  You need to set the output format to "esm" for "import.meta" to work correctly.
+
+2 warnings
+
+  dist/index.cjs  3.5mb ⚠️
+
+⚡ Done in 172ms

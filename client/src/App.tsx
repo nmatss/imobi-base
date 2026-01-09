@@ -279,33 +279,33 @@ function Router() {
     <Suspense fallback={<PageLoader />}>
       <Switch>
         {/* Public Tenant Routes */}
-        <Route path="/e/:slug/imoveis" component={() => <ErrorBoundary><PublicProperties /></ErrorBoundary>} />
-        <Route path="/e/:slug/imovel/:propertyId" component={() => <ErrorBoundary><PropertyDetails /></ErrorBoundary>} />
-        <Route path="/e/:rest*" component={() => <ErrorBoundary><TenantLanding /></ErrorBoundary>} />
+        <Route key="public-properties" path="/e/:slug/imoveis" component={() => <ErrorBoundary><PublicProperties /></ErrorBoundary>} />
+        <Route key="public-property-details" path="/e/:slug/imovel/:propertyId" component={() => <ErrorBoundary><PropertyDetails /></ErrorBoundary>} />
+        <Route key="tenant-landing" path="/e/:rest*" component={() => <ErrorBoundary><TenantLanding /></ErrorBoundary>} />
 
         {/* App Routes */}
-        <Route path="/" component={() => <ErrorBoundary><ProductLanding /></ErrorBoundary>} />
-        <Route path="/login" component={() => <ErrorBoundary><LoginPage /></ErrorBoundary>} />
-        <Route path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
-        <Route path="/properties" component={() => <ProtectedRoute component={PropertiesList} />} />
-        <Route path="/properties/:id" component={() => <ProtectedRoute component={PropertyDetailsPage} />} />
-        <Route path="/leads" component={() => <ProtectedRoute component={LeadsKanban} />} />
-        <Route path="/calendar" component={() => <ProtectedRoute component={CalendarPage} />} />
-        <Route path="/contracts" component={() => <ProtectedRoute component={ContractsPage} />} />
-        <Route path="/rentals" component={() => <ProtectedRoute component={RentalsPage} />} />
-        <Route path="/vendas" component={() => <ProtectedRoute component={VendasPage} />} />
-        <Route path="/financeiro" component={() => <ProtectedRoute component={FinanceiroPage} />} />
-        <Route path="/reports" component={() => <ProtectedRoute component={ReportsPage} />} />
-        <Route path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
+        <Route key="landing" path="/" component={() => <ErrorBoundary><ProductLanding /></ErrorBoundary>} />
+        <Route key="login" path="/login" component={() => <ErrorBoundary><LoginPage /></ErrorBoundary>} />
+        <Route key="dashboard" path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
+        <Route key="properties" path="/properties" component={() => <ProtectedRoute component={PropertiesList} />} />
+        <Route key="property-details" path="/properties/:id" component={() => <ProtectedRoute component={PropertyDetailsPage} />} />
+        <Route key="leads" path="/leads" component={() => <ProtectedRoute component={LeadsKanban} />} />
+        <Route key="calendar" path="/calendar" component={() => <ProtectedRoute component={CalendarPage} />} />
+        <Route key="contracts" path="/contracts" component={() => <ProtectedRoute component={ContractsPage} />} />
+        <Route key="rentals" path="/rentals" component={() => <ProtectedRoute component={RentalsPage} />} />
+        <Route key="vendas" path="/vendas" component={() => <ProtectedRoute component={VendasPage} />} />
+        <Route key="financeiro" path="/financeiro" component={() => <ProtectedRoute component={FinanceiroPage} />} />
+        <Route key="reports" path="/reports" component={() => <ProtectedRoute component={ReportsPage} />} />
+        <Route key="settings" path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
 
         {/* Admin Routes (SuperAdmin only) */}
-        <Route path="/admin" component={() => <SuperAdminRoute component={AdminDashboard} />} />
-        <Route path="/admin/tenants" component={() => <SuperAdminRoute component={TenantsPage} />} />
-        <Route path="/admin/plans" component={() => <SuperAdminRoute component={PlansPage} />} />
-        <Route path="/admin/logs" component={() => <SuperAdminRoute component={LogsPage} />} />
+        <Route key="admin" path="/admin" component={() => <SuperAdminRoute component={AdminDashboard} />} />
+        <Route key="admin-tenants" path="/admin/tenants" component={() => <SuperAdminRoute component={TenantsPage} />} />
+        <Route key="admin-plans" path="/admin/plans" component={() => <SuperAdminRoute component={PlansPage} />} />
+        <Route key="admin-logs" path="/admin/logs" component={() => <SuperAdminRoute component={LogsPage} />} />
 
         {/* Fallback */}
-        <Route component={NotFound} />
+        <Route key="not-found" component={NotFound} />
       </Switch>
     </Suspense>
   );

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -143,17 +143,19 @@ export function InquilinosTab({
       {/* Table - Desktop */}
       <div className="hidden sm:block">
         <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead className="text-center">Contratos</TableHead>
-                <TableHead className="text-center">Status</TableHead>
-                <TableHead className="text-right">Valor Mensal</TableHead>
-                <TableHead className="text-center">Dias Atraso Médio</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <div className="inline-block min-w-full align-middle">
+              <Table className="min-w-[650px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead className="text-center">Contratos</TableHead>
+                    <TableHead className="text-center">Status</TableHead>
+                    <TableHead className="text-right">Valor Mensal</TableHead>
+                    <TableHead className="text-center">Dias Atraso Médio</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
@@ -240,7 +242,9 @@ export function InquilinosTab({
                 ))
               )}
             </TableBody>
-          </Table>
+              </Table>
+            </div>
+          </div>
         </Card>
       </div>
 

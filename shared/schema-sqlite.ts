@@ -30,6 +30,20 @@ export const users = sqliteTable("users", {
   password: text("password").notNull(),
   role: text("role").notNull().default("user"),
   avatar: text("avatar"),
+  emailVerified: integer("email_verified", { mode: "boolean" }).default(false),
+  verificationToken: text("verification_token"),
+  verificationTokenExpires: text("verification_token_expires"),
+  passwordResetToken: text("password_reset_token"),
+  passwordResetExpires: text("password_reset_expires"),
+  oauthProvider: text("oauth_provider"), // google, microsoft, null
+  oauthId: text("oauth_id"),
+  oauthAccessToken: text("oauth_access_token"),
+  oauthRefreshToken: text("oauth_refresh_token"),
+  lastLogin: text("last_login"),
+  lastLoginIp: text("last_login_ip"),
+  failedLoginAttempts: integer("failed_login_attempts").default(0),
+  lockedUntil: text("locked_until"),
+  passwordHistory: text("password_history"), // JSON array of hashed passwords
   createdAt: text("created_at").notNull().default(now()),
 });
 
@@ -636,6 +650,50 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: tru
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 
+/**
+ * USER SESSIONS
+ * Track active user sessions for security
+ */
+export const userSessions = sqliteTable("user_sessions", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  sessionToken: text("session_token").notNull().unique(),
+  deviceName: text("device_name"),
+  deviceType: text("device_type"), // desktop, mobile, tablet
+  browser: text("browser"),
+  os: text("os"),
+  ipAddress: text("ip_address"),
+  location: text("location"), // City, Country from IP
+  lastActivity: text("last_activity").notNull().default(now()),
+  expiresAt: text("expires_at").notNull(),
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+export const insertUserSessionSchema = createInsertSchema(userSessions).omit({ id: true, createdAt: true });
+export type InsertUserSession = z.infer<typeof insertUserSessionSchema>;
+export type UserSession = typeof userSessions.$inferSelect;
+
+/**
+ * LOGIN HISTORY
+ * Track all login attempts for security monitoring
+ */
+export const loginHistory = sqliteTable("login_history", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").references(() => users.id),
+  email: text("email").notNull(),
+  success: integer("success", { mode: "boolean" }).notNull(),
+  failureReason: text("failure_reason"), // invalid_password, account_locked, 2fa_failed, etc.
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  location: text("location"),
+  suspicious: integer("suspicious", { mode: "boolean" }).default(false), // flagged for unusual activity
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+export const insertLoginHistorySchema = createInsertSchema(loginHistory).omit({ id: true, createdAt: true });
+export type InsertLoginHistory = z.infer<typeof insertLoginHistorySchema>;
+export type LoginHistory = typeof loginHistory.$inferSelect;
+
 // ==================== LEAD INTELLIGENCE ====================
 
 /**
@@ -914,3 +972,260 @@ export const widgetTypes = sqliteTable("widget_types", {
 export const insertWidgetTypeSchema = createInsertSchema(widgetTypes).omit({ id: true });
 export type InsertWidgetType = z.infer<typeof insertWidgetTypeSchema>;
 export type WidgetType = typeof widgetTypes.$inferSelect;
+
+// ==================== LGPD/GDPR COMPLIANCE ====================
+
+/**
+ * USER CONSENTS
+ * Track user consent for data processing according to LGPD/GDPR
+ */
+export const userConsents = sqliteTable("user_consents", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").references(() => users.id),
+  tenantId: text("tenant_id").references(() => tenants.id),
+  email: text("email"), // For non-registered users (newsletter, etc)
+  consentType: text("consent_type").notNull(), // privacy, marketing, analytics, cookies, newsletter
+  consentVersion: text("consent_version").notNull(), // Track document version
+  status: text("status").notNull().default("active"), // active, withdrawn, expired
+  purpose: text("purpose"), // What the data will be used for
+  ipAddress: text("ip_address"), // Record IP for audit
+  userAgent: text("user_agent"), // Browser info for audit
+  acceptedAt: text("accepted_at").notNull().default(now()),
+  withdrawnAt: text("withdrawn_at"),
+  expiresAt: text("expires_at"), // Optional expiration date
+  metadata: text("metadata"), // JSON: additional consent metadata
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+export const insertUserConsentSchema = createInsertSchema(userConsents).omit({ id: true, createdAt: true });
+export type InsertUserConsent = z.infer<typeof insertUserConsentSchema>;
+export type UserConsent = typeof userConsents.$inferSelect;
+
+/**
+ * DATA EXPORT REQUESTS
+ * Track user requests to export their personal data (LGPD Art. 18, GDPR Art. 20)
+ */
+export const dataExportRequests = sqliteTable("data_export_requests", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  requestToken: text("request_token").notNull().unique(),
+  status: text("status").notNull().default("pending"), // pending, processing, completed, failed
+  format: text("format").notNull().default("json"), // json, csv, pdf
+  dataScope: text("data_scope"), // JSON: which data to export
+  fileUrl: text("file_url"), // S3/storage URL of generated export
+  fileName: text("file_name"),
+  fileSize: text("file_size"), // In bytes
+  expiresAt: text("expires_at"), // Export link expiration (7 days recommended)
+  downloadedAt: text("downloaded_at"),
+  downloadCount: integer("download_count").default(0),
+  ipAddress: text("ip_address"),
+  errorMessage: text("error_message"),
+  completedAt: text("completed_at"),
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+export const insertDataExportRequestSchema = createInsertSchema(dataExportRequests).omit({ id: true, createdAt: true });
+export type InsertDataExportRequest = z.infer<typeof insertDataExportRequestSchema>;
+export type DataExportRequest = typeof dataExportRequests.$inferSelect;
+
+/**
+ * ACCOUNT DELETION REQUESTS
+ * Track requests to delete user accounts (Right to Erasure - LGPD Art. 18, GDPR Art. 17)
+ */
+export const accountDeletionRequests = sqliteTable("account_deletion_requests", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  confirmationToken: text("confirmation_token").notNull().unique(),
+  status: text("status").notNull().default("pending"), // pending, confirmed, processing, completed, cancelled
+  reason: text("reason"), // Optional: why user wants deletion
+  deletionType: text("deletion_type").notNull().default("anonymize"), // anonymize, hard_delete
+  dataRetention: text("data_retention"), // JSON: what data to keep for legal/audit
+  ipAddress: text("ip_address"),
+  confirmedAt: text("confirmed_at"),
+  processedAt: text("processed_at"),
+  completedAt: text("completed_at"),
+  cancelledAt: text("cancelled_at"),
+  certificateUrl: text("certificate_url"), // URL to deletion certificate
+  certificateNumber: text("certificate_number").unique(), // Unique certificate ID
+  notes: text("notes"),
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+export const insertAccountDeletionRequestSchema = createInsertSchema(accountDeletionRequests).omit({ id: true, createdAt: true });
+export type InsertAccountDeletionRequest = z.infer<typeof insertAccountDeletionRequestSchema>;
+export type AccountDeletionRequest = typeof accountDeletionRequests.$inferSelect;
+
+/**
+ * COMPLIANCE AUDIT LOG
+ * Comprehensive audit trail for LGPD/GDPR compliance
+ */
+export const complianceAuditLog = sqliteTable("compliance_audit_log", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").references(() => tenants.id),
+  userId: text("user_id").references(() => users.id),
+  actorId: text("actor_id"), // Who performed the action (user, system, admin)
+  actorType: text("actor_type").notNull(), // user, admin, system, api
+  action: text("action").notNull(), // data_access, data_export, data_deletion, consent_given, consent_withdrawn, etc
+  entityType: text("entity_type"), // user, lead, property, contract, etc
+  entityId: text("entity_id"), // ID of affected entity
+  details: text("details"), // JSON: detailed information about the action
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  requestPath: text("request_path"), // API endpoint called
+  requestMethod: text("request_method"), // GET, POST, DELETE, etc
+  changedData: text("changed_data"), // JSON: before/after values (anonymized)
+  legalBasis: text("legal_basis"), // Legal basis for processing (consent, contract, legal_obligation, etc)
+  severity: text("severity").default("info"), // info, warning, critical
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+export const insertComplianceAuditLogSchema = createInsertSchema(complianceAuditLog).omit({ id: true, createdAt: true });
+export type InsertComplianceAuditLog = z.infer<typeof insertComplianceAuditLogSchema>;
+export type ComplianceAuditLog = typeof complianceAuditLog.$inferSelect;
+
+/**
+ * DATA BREACH INCIDENTS
+ * Track data security incidents (LGPD Art. 48, GDPR Art. 33)
+ */
+export const dataBreachIncidents = sqliteTable("data_breach_incidents", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenantId").references(() => tenants.id),
+  incidentNumber: text("incident_number").notNull().unique(), // BR-2024-001
+  severity: text("severity").notNull(), // low, medium, high, critical
+  status: text("status").notNull().default("reported"), // reported, investigating, contained, resolved
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  affectedDataTypes: text("affected_data_types"), // JSON: types of data affected
+  affectedRecordsCount: integer("affected_records_count"),
+  affectedUserIds: text("affected_user_ids"), // JSON: array of affected user IDs
+  discoveredAt: text("discovered_at").notNull(),
+  reportedToAuthorityAt: text("reported_to_authority_at"), // ANPD notification
+  reportedToUsersAt: text("reported_to_users_at"),
+  containedAt: text("contained_at"),
+  resolvedAt: text("resolved_at"),
+  rootCause: text("root_cause"),
+  mitigationActions: text("mitigation_actions"), // JSON: actions taken
+  preventiveActions: text("preventive_actions"), // JSON: future prevention
+  reportedBy: text("reported_by").references(() => users.id),
+  assignedTo: text("assigned_to").references(() => users.id), // DPO or security officer
+  authorityReference: text("authority_reference"), // ANPD case number
+  notes: text("notes"),
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertDataBreachIncidentSchema = createInsertSchema(dataBreachIncidents).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDataBreachIncident = z.infer<typeof insertDataBreachIncidentSchema>;
+export type DataBreachIncident = typeof dataBreachIncidents.$inferSelect;
+
+/**
+ * DATA PROCESSING ACTIVITIES
+ * Record of processing activities (ROPA - GDPR Art. 30)
+ */
+export const dataProcessingActivities = sqliteTable("data_processing_activities", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  activityName: text("activity_name").notNull(),
+  purpose: text("purpose").notNull(), // Purpose of data processing
+  legalBasis: text("legal_basis").notNull(), // consent, contract, legal_obligation, legitimate_interest, etc
+  dataCategories: text("data_categories"), // JSON: types of personal data
+  dataSubjects: text("data_subjects"), // JSON: categories of data subjects (clients, employees, etc)
+  recipients: text("recipients"), // JSON: who receives the data
+  dataTransfers: text("data_transfers"), // JSON: international transfers
+  retentionPeriod: text("retention_period"), // How long data is kept
+  securityMeasures: text("security_measures"), // JSON: technical and organizational measures
+  dpoReviewed: integer("dpo_reviewed", { mode: "boolean" }).default(false),
+  dpoReviewedAt: text("dpo_reviewed_at"),
+  dpoReviewedBy: text("dpo_reviewed_by").references(() => users.id),
+  isActive: integer("is_active", { mode: "boolean" }).default(true),
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertDataProcessingActivitySchema = createInsertSchema(dataProcessingActivities).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDataProcessingActivity = z.infer<typeof insertDataProcessingActivitySchema>;
+export type DataProcessingActivity = typeof dataProcessingActivities.$inferSelect;
+
+/**
+ * LEGAL DOCUMENTS
+ * Version-controlled legal documents (Privacy Policy, Terms, etc)
+ */
+export const legalDocuments = sqliteTable("legal_documents", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").references(() => tenants.id),
+  documentType: text("document_type").notNull(), // privacy_policy, terms_of_service, cookie_policy, dpa
+  version: text("version").notNull(), // Semantic versioning: 1.0.0, 1.1.0, 2.0.0
+  language: text("language").notNull().default("pt-BR"), // pt-BR, en-US, es-ES
+  title: text("title").notNull(),
+  content: text("content").notNull(), // Full document in markdown
+  contentHtml: text("content_html"), // Rendered HTML version
+  effectiveDate: text("effective_date").notNull(),
+  expiryDate: text("expiry_date"),
+  isActive: integer("is_active", { mode: "boolean" }).default(true),
+  requiresConsent: integer("requires_consent", { mode: "boolean" }).default(false),
+  publishedBy: text("published_by").references(() => users.id),
+  publishedAt: text("published_at"),
+  reviewedBy: text("reviewed_by").references(() => users.id), // Legal counsel
+  reviewedAt: text("reviewed_at"),
+  checksum: text("checksum"), // SHA-256 hash for integrity
+  metadata: text("metadata"), // JSON: additional document metadata
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertLegalDocumentSchema = createInsertSchema(legalDocuments).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertLegalDocument = z.infer<typeof insertLegalDocumentSchema>;
+export type LegalDocument = typeof legalDocuments.$inferSelect;
+
+/**
+ * COOKIE PREFERENCES
+ * Track individual cookie preferences (LGPD/GDPR cookie consent)
+ */
+export const cookiePreferences = sqliteTable("cookie_preferences", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").references(() => users.id),
+  sessionId: text("session_id"), // For non-authenticated users
+  essential: integer("essential", { mode: "boolean" }).default(true), // Always true
+  analytics: integer("analytics", { mode: "boolean" }).default(false),
+  marketing: integer("marketing", { mode: "boolean" }).default(false),
+  personalization: integer("personalization", { mode: "boolean" }).default(false),
+  consentVersion: text("consent_version").notNull(), // Version of cookie policy
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  acceptedAt: text("accepted_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertCookiePreferenceSchema = createInsertSchema(cookiePreferences).omit({ id: true, acceptedAt: true, updatedAt: true });
+export type InsertCookiePreference = z.infer<typeof insertCookiePreferenceSchema>;
+export type CookiePreference = typeof cookiePreferences.$inferSelect;
+
+// ==================== FILE STORAGE ====================
+
+/**
+ * FILES
+ * Metadata tracking for all files uploaded to Supabase Storage
+ */
+export const files = sqliteTable("files", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id").references(() => users.id),
+  bucket: text("bucket").notNull(), // Storage bucket name
+  filePath: text("file_path").notNull(), // Full path in storage
+  fileName: text("file_name").notNull(), // Original filename
+  fileSize: integer("file_size").notNull(), // Size in bytes
+  mimeType: text("mime_type").notNull(),
+  category: text("category").notNull(), // property-image, document, avatar, logo, invoice, export
+  entityType: text("entity_type"), // property, lead, contract, user, tenant
+  entityId: text("entity_id"), // ID of related entity
+  isPublic: integer("is_public", { mode: "boolean" }).default(false),
+  metadata: text("metadata"), // JSON: additional metadata (dimensions, blurhash, etc)
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertFileSchema = createInsertSchema(files).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertFile = z.infer<typeof insertFileSchema>;
+export type File = typeof files.$inferSelect;

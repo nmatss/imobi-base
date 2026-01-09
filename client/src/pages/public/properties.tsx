@@ -27,7 +27,7 @@ import {
   ChevronDown,
   Home,
 } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Helmet } from "react-helmet";
 
 type Tenant = {

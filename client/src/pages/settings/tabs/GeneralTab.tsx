@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast-helpers";
 import { AlertCircle, CheckCircle2, Building2, Landmark, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TenantSettings } from "../types";
@@ -21,7 +21,6 @@ interface ValidationState {
 }
 
 export function GeneralTab({ initialData, onSave }: GeneralTabProps) {
-  const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [formData, setFormData] = useState<Partial<TenantSettings>>({
     name: initialData.name || "",
@@ -106,36 +105,21 @@ export function GeneralTab({ initialData, onSave }: GeneralTabProps) {
     setTouched({ email: true, phone: true, cnpj: true });
 
     if (!emailValid || !phoneValid || !cnpjValid) {
-      toast({
-        title: "Erro de validação",
-        description: "Corrija os campos destacados antes de salvar.",
-        variant: "destructive",
-      });
+      toast.errors.validation("Corrija os campos destacados antes de salvar.");
       return;
     }
 
     if (!formData.name?.trim()) {
-      toast({
-        title: "Campo obrigatório",
-        description: "O nome da imobiliária é obrigatório.",
-        variant: "destructive",
-      });
+      toast.errors.validation("O nome da imobiliária é obrigatório.");
       return;
     }
 
     setIsSaving(true);
     try {
       await onSave(formData);
-      toast({
-        title: "Configurações salvas",
-        description: "Os dados da empresa foram atualizados com sucesso.",
-      });
+      toast.crud.saved("Configurações");
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível salvar as configurações.",
-        variant: "destructive",
-      });
+      toast.errors.operation("salvar as configurações");
     } finally {
       setIsSaving(false);
     }

@@ -43,7 +43,7 @@ const actionColors: Record<string, string> = {
   delete: 'bg-red-500',
   login: 'bg-purple-500',
   logout: 'bg-gray-500',
-  view: 'bg-yellow-500',
+  view: 'bg-amber-700', // WCAG AA: 4.6:1 contrast
   export: 'bg-orange-500',
   import: 'bg-teal-500',
 };

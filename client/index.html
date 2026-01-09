@@ -2,7 +2,7 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <title>ImobiBase | Gestão Imobiliária Inteligente</title>
     <meta name="description" content="Sistema completo para gestão de imobiliárias: CRM, Imóveis, Financeiro e Site." />
@@ -36,10 +36,8 @@
     <!-- Preload critical CSS - main stylesheet will be injected by Vite -->
     <link rel="modulepreload" href="/src/main.tsx" />
 
-    <!-- Prefetch important routes for faster navigation -->
-    <link rel="prefetch" href="/src/pages/dashboard.tsx" />
-    <link rel="prefetch" href="/src/pages/properties/list.tsx" />
-    <link rel="prefetch" href="/src/pages/leads/kanban.tsx" />
+    <!-- Module prefetch is handled automatically by Vite's dynamic import optimization -->
+    <!-- Lazy-loaded routes are automatically code-split and cached -->
   </head>
   <body>
     <div id="root"></div>

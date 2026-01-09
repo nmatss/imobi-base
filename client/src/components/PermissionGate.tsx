@@ -3,7 +3,7 @@
  * Componente para controle de acesso baseado em permissões
  */
 
-import { ReactNode } from 'react';
+import React, { ReactNode } from 'react';
 import { usePermissions } from '@/lib/permissions';
 
 interface PermissionGateProps {

@@ -1,3 +1,4 @@
+import React from "react";
 export interface TenantSettings {
   name: string;
   cnpj: string;

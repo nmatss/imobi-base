@@ -210,9 +210,9 @@ export function PermissionsTab() {
         ) : (
           <>
             {/* Desktop Table View */}
-            <div className="hidden md:block overflow-x-auto -mx-4 sm:-mx-6">
-              <div className="inline-block min-w-full align-middle px-4 sm:px-6">
-                <Table>
+            <div className="hidden md:block overflow-x-auto -mx-4 md:mx-0">
+              <div className="inline-block min-w-full align-middle">
+                <Table className="min-w-[700px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[200px] sticky left-0 bg-background z-10">Permissão</TableHead>

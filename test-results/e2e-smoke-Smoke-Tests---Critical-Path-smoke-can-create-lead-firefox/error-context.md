@@ -1,0 +1,44 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e9]:
+        - img [ref=e11]
+        - generic [ref=e17]: ImobiBase
+      - generic [ref=e18]:
+        - heading "Gerencie sua imobiliária com inteligência" [level=1] [ref=e19]
+        - paragraph [ref=e20]: Centralize imóveis, leads e contratos em uma única plataforma. Cresça com a tecnologia que grandes redes usam.
+        - generic [ref=e21]:
+          - generic [ref=e22]:
+            - img "Usuário 1" [ref=e23]
+            - img "Usuário 2" [ref=e24]
+            - img "Usuário 3" [ref=e25]
+            - img "Usuário 4" [ref=e26]
+          - paragraph [ref=e27]: Junte-se a centenas de corretores
+      - generic [ref=e28]: © 2024 ImobiBase. Todos os direitos reservados.
+    - generic [ref=e30]:
+      - generic [ref=e31]:
+        - heading "Bem-vindo de volta" [level=2] [ref=e32]
+        - paragraph [ref=e33]: Entre com suas credenciais para acessar o painel
+      - generic [ref=e34]:
+        - generic [ref=e35]:
+          - text: Email
+          - textbox "Email" [ref=e36]:
+            - /placeholder: seu@email.com
+            - text: admin@demo.com
+        - generic [ref=e37]:
+          - generic [ref=e38]:
+            - generic [ref=e39]: Senha
+            - link "Esqueceu?" [ref=e40] [cursor=pointer]:
+              - /url: "#"
+          - textbox "Senha" [ref=e41]: demo123
+        - button "Entrar" [ref=e42] [cursor=pointer]
+      - generic [ref=e47]: ou
+      - paragraph [ref=e48]:
+        - text: Não tem uma conta?
+        - link "Criar conta grátis" [ref=e49] [cursor=pointer]:
+          - /url: "#"
+  - region "Notifications alt+T"
+```

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -225,9 +225,9 @@ export default function ProductLanding() {
                     </div>
                     <div className="flex-1 text-center text-xs font-mono text-muted-foreground opacity-50">dashboard.imobibase.com</div>
                   </div>
-                  <img 
-                    src="https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=1974&auto=format&fit=crop" 
-                    alt="Dashboard" 
+                  <img
+                    src="/dashboard-mockup.png"
+                    alt="Dashboard ImobiBase"
                     className="w-full h-auto shadow-inner"
                   />
                   

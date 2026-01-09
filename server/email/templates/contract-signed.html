@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contrato Assinado</title>
+    <style>
+        body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f3f4f6; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+        .header { background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); padding: 40px 20px; text-align: center; }
+        .icon { width: 80px; height: 80px; background-color: #ffffff; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 48px; margin-bottom: 15px; }
+        .header-title { color: #ffffff; font-size: 26px; font-weight: bold; margin: 0; }
+        .content { padding: 40px 30px; }
+        .contract-box { background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%); border-radius: 12px; padding: 25px; margin: 25px 0; }
+        .contract-number { font-size: 28px; font-weight: bold; color: #8b5cf6; text-align: center; margin-bottom: 10px; }
+        .detail-grid { display: table; width: 100%; margin: 20px 0; }
+        .detail-row { display: table-row; }
+        .detail-label { display: table-cell; padding: 10px 15px 10px 0; font-weight: 600; color: #374151; }
+        .detail-value { display: table-cell; padding: 10px 0; color: #6b7280; }
+        .cta-button { display: inline-block; background-color: #8b5cf6; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; margin: 10px 0; }
+        .footer { background-color: #f9fafb; padding: 30px; text-align: center; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="icon">📝</div>
+            <h1 class="header-title">Contrato Assinado com Sucesso!</h1>
+        </div>
+        <div class="content">
+            <p style="font-size: 16px; color: #4b5563; text-align: center;">Olá, <strong>{{clientName}}</strong>!</p>
+            <p style="font-size: 16px; color: #4b5563; text-align: center;">Parabéns! O contrato foi assinado com sucesso.</p>
+            <div class="contract-box">
+                <div class="contract-number">Contrato #{{contractNumber}}</div>
+                <div style="text-align: center; color: #6b7280; font-size: 14px;">{{contractType}}</div>
+            </div>
+            <div class="detail-grid">
+                <div class="detail-row">
+                    <div class="detail-label">🏘️ Imóvel:</div>
+                    <div class="detail-value">{{propertyAddress}}</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">📅 Data de Assinatura:</div>
+                    <div class="detail-value">{{signedDate}}</div>
+                </div>
+                {{#if startDate}}
+                <div class="detail-row">
+                    <div class="detail-label">🗓️ Início da Vigência:</div>
+                    <div class="detail-value">{{startDate}}</div>
+                </div>
+                {{/if}}
+                {{#if amount}}
+                <div class="detail-row">
+                    <div class="detail-label">💰 Valor:</div>
+                    <div class="detail-value">{{amount}}</div>
+                </div>
+                {{/if}}
+            </div>
+            <center>
+                <a href="{{contractUrl}}" class="cta-button">Ver Contrato Completo</a>
+            </center>
+            <p style="font-size: 14px; color: #6b7280; margin-top: 25px; text-align: center;">Uma cópia do contrato foi anexada a este e-mail e está disponível em sua conta.</p>
+            <p style="text-align: center; margin-top: 20px;"><strong>Equipe {{branding.companyName}}</strong></p>
+        </div>
+        <div class="footer">
+            <p>&copy; {{currentYear}} {{branding.companyName}}. Todos os direitos reservados.</p>
+        </div>
+    </div>
+</body>
+</html>

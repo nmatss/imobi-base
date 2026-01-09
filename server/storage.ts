@@ -3281,18 +3281,6 @@ export class DbStorage implements IStorage {
     return tenant || null;
   }
 
-  /**
-   * Get tenant settings
-   */
-  async getTenantSettings(tenantId: string) {
-    const [settings] = await db
-      .select()
-      .from(schema.tenantSettings)
-      .where(eq(schema.tenantSettings.tenantId, tenantId))
-      .limit(1);
-    return settings || null;
-  }
-
   // File management methods
   async createFile(file: any): Promise<any> {
     const id = generateId();
