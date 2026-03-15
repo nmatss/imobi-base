@@ -255,6 +255,9 @@
     "vitest": "^4.0.16",
     "web-vitals": "^5.1.0"
   },
+  "engines": {
+    "node": ">=20.x"
+  },
   "optionalDependencies": {
     "better-sqlite3": "^12.5.0",
     "bufferutil": "^4.0.8"
