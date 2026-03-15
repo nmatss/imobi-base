@@ -62,7 +62,7 @@
     "generate:secret": "tsx scripts/generate-session-secret.ts",
     "rotate:secrets": "tsx scripts/rotate-secrets.ts",
     "validate:secrets": "tsx scripts/validate-secrets.ts",
-    "prepare": "husky install"
+    "prepare": "husky install || true"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
