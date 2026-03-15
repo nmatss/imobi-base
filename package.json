@@ -256,7 +256,7 @@
     "web-vitals": "^5.1.0"
   },
   "engines": {
-    "node": ">=20.x"
+    "node": "20.x"
   },
   "optionalDependencies": {
     "better-sqlite3": "^12.5.0",
