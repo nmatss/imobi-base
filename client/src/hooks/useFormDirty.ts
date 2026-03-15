@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useLocation } from "wouter";
 
 /**
@@ -27,14 +27,17 @@ import { useLocation } from "wouter";
  * const { dirtyBadge, confirmDialog } = useFormDirty(isDirty);
  * ```
  */
-export function useFormDirty(isDirty: boolean, options?: {
-  /** Mensagem customizada para o dialog de confirmação */
-  message?: string;
-  /** Título do dialog de confirmação */
-  title?: string;
-  /** Habilitar/desabilitar a proteção */
-  enabled?: boolean;
-}) {
+export function useFormDirty(
+  isDirty: boolean,
+  options?: {
+    /** Mensagem customizada para o dialog de confirmação */
+    message?: string;
+    /** Título do dialog de confirmação */
+    title?: string;
+    /** Habilitar/desabilitar a proteção */
+    enabled?: boolean;
+  },
+) {
   const {
     message = "Você tem alterações não salvas. Deseja realmente sair sem salvar?",
     title = "Alterações não salvas",
@@ -55,11 +58,14 @@ export function useFormDirty(isDirty: boolean, options?: {
   useEffect(() => {
     if (!enabled || !isDirty) return;
 
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+    const handleBeforeUnload = (e: {
+      preventDefault: () => void;
+      returnValue: string;
+    }) => {
       e.preventDefault();
       // Chrome requer returnValue vazio
       e.returnValue = "";
-      return "";
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -70,21 +76,24 @@ export function useFormDirty(isDirty: boolean, options?: {
   }, [enabled, isDirty]);
 
   // Interceptar navegação programática
-  const navigate = useCallback((to: string) => {
-    if (!enabled || !isDirty) {
-      setLocation(to);
-      return;
-    }
+  const navigate = useCallback(
+    (to: string) => {
+      if (!enabled || !isDirty) {
+        setLocation(to);
+        return;
+      }
 
-    // Se já estamos na mesma página, não fazer nada
-    if (to === currentLocationRef.current) {
-      return;
-    }
+      // Se já estamos na mesma página, não fazer nada
+      if (to === currentLocationRef.current) {
+        return;
+      }
 
-    // Mostrar dialog de confirmação
-    setPendingLocation(to);
-    setShowConfirmDialog(true);
-  }, [enabled, isDirty, setLocation]);
+      // Mostrar dialog de confirmação
+      setPendingLocation(to);
+      setShowConfirmDialog(true);
+    },
+    [enabled, isDirty, setLocation],
+  );
 
   // Confirmar navegação
   const handleConfirm = useCallback(() => {
@@ -102,13 +111,14 @@ export function useFormDirty(isDirty: boolean, options?: {
   }, []);
 
   // Badge visual de estado "dirty"
-  const dirtyBadge = isDirty ? (
-    <span
-      className="inline-flex items-center justify-center w-2 h-2 bg-red-500 rounded-full ml-2 animate-pulse"
-      title="Há alterações não salvas"
-      aria-label="Há alterações não salvas"
-    />
-  ) : null;
+  const dirtyBadge = isDirty
+    ? React.createElement("span", {
+        className:
+          "inline-flex items-center justify-center w-2 h-2 bg-red-500 rounded-full ml-2 animate-pulse",
+        title: "Há alterações não salvas",
+        "aria-label": "Há alterações não salvas",
+      })
+    : null;
 
   return {
     isDirty,
@@ -143,15 +153,16 @@ export function useFormDirty(isDirty: boolean, options?: {
  * };
  * ```
  */
-export function useFormDirtyState<T extends Record<string, any>>(
+export function useFormDirtyState<T extends Record<string, unknown>>(
   currentData: T,
-  initialData: T
+  initialData: T,
 ) {
   const initialDataRef = useRef(initialData);
   const [isDirty, setIsDirty] = useState(false);
 
   useEffect(() => {
-    const hasChanges = JSON.stringify(currentData) !== JSON.stringify(initialDataRef.current);
+    const hasChanges =
+      JSON.stringify(currentData) !== JSON.stringify(initialDataRef.current);
     setIsDirty(hasChanges);
   }, [currentData]);
 
@@ -205,6 +216,7 @@ export function useNavigationGuard(isDirty: boolean, message?: string) {
 
   return {
     isBlocking,
-    message: message || "Você tem alterações não salvas. Deseja realmente sair?",
+    message:
+      message || "Você tem alterações não salvas. Deseja realmente sair?",
   };
 }

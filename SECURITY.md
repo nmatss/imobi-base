@@ -1,5 +1,7 @@
 # Security Policy
 
+**Ultima atualizacao:** 14 de Marco de 2026
+
 ## Reporting a Vulnerability
 
 The ImobiBase team takes security bugs seriously. We appreciate your efforts to responsibly disclose your findings.
@@ -9,6 +11,7 @@ The ImobiBase team takes security bugs seriously. We appreciate your efforts to 
 **Please DO NOT report security vulnerabilities through public GitHub issues.**
 
 Instead, please report them via email to:
+
 - **security@imobibase.com**
 
 You should receive a response within 48 hours. If for some reason you do not, please follow up via email to ensure we received your original message.
@@ -57,16 +60,19 @@ We recommend all users stay up to date with the latest stable release.
 ## Security Update Policy
 
 ### Critical Security Updates
+
 - Released immediately upon discovery
 - All users notified via email
 - Automatic deployment to cloud-hosted instances
 
 ### High Priority Updates
+
 - Released within 7 days
 - Announced in release notes
 - Deployment recommended within 24 hours
 
 ### Standard Security Updates
+
 - Included in regular release cycle
 - Announced in release notes
 - Deployment recommended within 30 days
@@ -76,6 +82,7 @@ We recommend all users stay up to date with the latest stable release.
 ImobiBase implements multiple layers of security:
 
 ### Authentication & Authorization
+
 - Strong password requirements (min 8 chars, uppercase, lowercase, number, special char)
 - Password hashing using scrypt with random salt
 - Two-factor authentication (2FA/TOTP) support
@@ -85,6 +92,7 @@ ImobiBase implements multiple layers of security:
 - Role-based access control (RBAC)
 
 ### Data Protection
+
 - HTTPS/TLS encryption for all data in transit
 - Secure session cookies (HttpOnly, Secure, SameSite)
 - Multi-tenant data isolation
@@ -92,6 +100,7 @@ ImobiBase implements multiple layers of security:
 - LGPD/GDPR compliance features
 
 ### Attack Prevention
+
 - SQL injection protection via parameterized queries (Drizzle ORM)
 - XSS protection with input sanitization
 - CSRF protection with token validation
@@ -101,6 +110,7 @@ ImobiBase implements multiple layers of security:
 - Automated blocking of malicious IPs
 
 ### Infrastructure Security
+
 - Security headers (Helmet.js)
   - **Content Security Policy (CSP)** with nonce-based inline script protection
     - Removed 'unsafe-inline' and 'unsafe-eval' from scriptSrc
@@ -122,6 +132,7 @@ ImobiBase implements multiple layers of security:
 ## Security Best Practices for Users
 
 ### For Administrators
+
 1. **Enable Two-Factor Authentication** on all admin accounts
 2. **Use Strong Passwords** (at least 12 characters)
 3. **Regularly Review** audit logs and user permissions
@@ -131,6 +142,7 @@ ImobiBase implements multiple layers of security:
 7. **Limit** administrative access to necessary personnel only
 
 ### For Developers
+
 1. **Review** the [Security Documentation](./docs/SECURITY_AUDIT.md)
 2. **Complete** the [Pre-Deployment Security Checklist](./SECURITY_CHECKLIST.md) before every production deployment
 3. **Follow** secure coding practices
@@ -169,7 +181,7 @@ We conduct regular security audits and penetration testing. If you're interested
 
 We recognize security researchers who have helped improve ImobiBase security:
 
-*No submissions yet - be the first!*
+_No submissions yet - be the first!_
 
 ## Learn More
 
