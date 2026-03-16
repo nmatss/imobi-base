@@ -80,7 +80,8 @@ export default function PropertyDetails() {
   const [showContactForm, setShowContactForm] = useState(false);
 
   const slug = (params as Record<string, string> | null)?.slug || "";
-  const propertyId = (params as Record<string, string> | null)?.propertyId || "";
+  const propertyId =
+    (params as Record<string, string> | null)?.propertyId || "";
 
   useEffect(() => {
     if (!slug || !propertyId) return;
@@ -101,7 +102,9 @@ export default function PropertyDetails() {
         setTenant(tenantData);
 
         // Fetch property details
-        const propertyRes = await fetch(`/api/properties/public/${tenantData.id}/${propertyId}`);
+        const propertyRes = await fetch(
+          `/api/properties/public/${tenantData.id}/${propertyId}`,
+        );
         if (!propertyRes.ok) {
           setError("Imóvel não encontrado");
           setLoading(false);
@@ -114,29 +117,44 @@ export default function PropertyDetails() {
         document.title = `${propertyData.title} - ${tenantData.name}`;
 
         // Set meta description
-        const metaDescription = document.querySelector('meta[name="description"]');
+        const metaDescription = document.querySelector(
+          'meta[name="description"]',
+        );
         if (metaDescription) {
-          metaDescription.setAttribute('content',
-            `${propertyData.title} - ${categoryLabels[propertyData.category]} por ${formatPrice(propertyData.price)}. ${propertyData.city}, ${propertyData.state}. ${tenantData.name}`
+          metaDescription.setAttribute(
+            "content",
+            `${propertyData.title} - ${categoryLabels[propertyData.category]} por ${formatPrice(propertyData.price)}. ${propertyData.city}, ${propertyData.state}. ${tenantData.name}`,
           );
         }
 
         // Set Open Graph tags
         const ogTitle = document.querySelector('meta[property="og:title"]');
-        if (ogTitle) ogTitle.setAttribute('content', `${propertyData.title} - ${tenantData.name}`);
+        if (ogTitle)
+          ogTitle.setAttribute(
+            "content",
+            `${propertyData.title} - ${tenantData.name}`,
+          );
 
-        const ogDescription = document.querySelector('meta[property="og:description"]');
-        if (ogDescription) ogDescription.setAttribute('content', propertyData.description || `${propertyData.title} em ${propertyData.city}`);
+        const ogDescription = document.querySelector(
+          'meta[property="og:description"]',
+        );
+        if (ogDescription)
+          ogDescription.setAttribute(
+            "content",
+            propertyData.description ||
+              `${propertyData.title} em ${propertyData.city}`,
+          );
 
         const ogImage = document.querySelector('meta[property="og:image"]');
-        if (ogImage && propertyData.images?.[0]) ogImage.setAttribute('content', propertyData.images[0]);
+        if (ogImage && propertyData.images?.[0])
+          ogImage.setAttribute("content", propertyData.images[0]);
 
         const ogUrl = document.querySelector('meta[property="og:url"]');
-        if (ogUrl) ogUrl.setAttribute('content', window.location.href);
+        if (ogUrl) ogUrl.setAttribute("content", window.location.href);
 
         // Fetch similar properties
         const similarRes = await fetch(
-          `/api/properties/public/${tenantData.id}?limit=3&type=${propertyData.type}&category=${propertyData.category}&exclude=${propertyId}`
+          `/api/properties/public/${tenantData.id}?limit=3&type=${propertyData.type}&category=${propertyData.category}&exclude=${propertyId}`,
         );
         if (similarRes.ok) {
           const similarData = await similarRes.json();
@@ -181,7 +199,10 @@ export default function PropertyDetails() {
   const formatPrice = (price: string) => {
     const num = parseFloat(price);
     if (isNaN(num)) return price;
-    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(num);
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(num);
   };
 
   const typeLabels: Record<string, string> = {
@@ -205,17 +226,49 @@ export default function PropertyDetails() {
       outros: [] as string[],
     };
 
-    const estruturaKeywords = ['cozinha', 'banheiro', 'quarto', 'sala', 'closet', 'varanda', 'sacada', 'churrasqueira', 'despensa', 'lavabo'];
-    const lazerKeywords = ['piscina', 'academia', 'quadra', 'playground', 'salão', 'festa', 'jardim', 'sauna', 'cinema', 'jogos', 'espaço gourmet'];
-    const segurancaKeywords = ['portaria', 'segurança', 'portão', 'eletrônico', 'câmera', 'alarme', 'cerca', 'vigilância'];
+    const estruturaKeywords = [
+      "cozinha",
+      "banheiro",
+      "quarto",
+      "sala",
+      "closet",
+      "varanda",
+      "sacada",
+      "churrasqueira",
+      "despensa",
+      "lavabo",
+    ];
+    const lazerKeywords = [
+      "piscina",
+      "academia",
+      "quadra",
+      "playground",
+      "salão",
+      "festa",
+      "jardim",
+      "sauna",
+      "cinema",
+      "jogos",
+      "espaço gourmet",
+    ];
+    const segurancaKeywords = [
+      "portaria",
+      "segurança",
+      "portão",
+      "eletrônico",
+      "câmera",
+      "alarme",
+      "cerca",
+      "vigilância",
+    ];
 
-    features.forEach(feature => {
+    features.forEach((feature) => {
       const lowerFeature = feature.toLowerCase();
-      if (estruturaKeywords.some(kw => lowerFeature.includes(kw))) {
+      if (estruturaKeywords.some((kw) => lowerFeature.includes(kw))) {
         categories.estrutura.push(feature);
-      } else if (lazerKeywords.some(kw => lowerFeature.includes(kw))) {
+      } else if (lazerKeywords.some((kw) => lowerFeature.includes(kw))) {
         categories.lazer.push(feature);
-      } else if (segurancaKeywords.some(kw => lowerFeature.includes(kw))) {
+      } else if (segurancaKeywords.some((kw) => lowerFeature.includes(kw))) {
         categories.seguranca.push(feature);
       } else {
         categories.outros.push(feature);
@@ -238,7 +291,9 @@ export default function PropertyDetails() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-4xl font-bold mb-4">404</h1>
-          <p className="text-muted-foreground mb-4">{error || "Imóvel não encontrado."}</p>
+          <p className="text-muted-foreground mb-4">
+            {error || "Imóvel não encontrado."}
+          </p>
           <Link href={`/e/${slug}`}>
             <Button variant="link">
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -250,9 +305,10 @@ export default function PropertyDetails() {
     );
   }
 
-  const images = property.images && property.images.length > 0
-    ? property.images
-    : ["https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200"];
+  const images =
+    property.images && property.images.length > 0
+      ? property.images
+      : ["https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200"];
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
@@ -268,9 +324,16 @@ export default function PropertyDetails() {
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Link href={`/e/${slug}`}>
-            <div className="flex items-center gap-2 font-heading font-bold text-lg cursor-pointer hover:opacity-80 transition-opacity" style={{ color: tenant.primaryColor }}>
+            <div
+              className="flex items-center gap-2 font-heading font-bold text-lg cursor-pointer hover:opacity-80 transition-opacity"
+              style={{ color: tenant.primaryColor }}
+            >
               {tenant.logo ? (
-                <img src={tenant.logo} alt={tenant.name} className="h-8 w-8 object-contain" />
+                <img
+                  src={tenant.logo}
+                  alt={tenant.name}
+                  className="h-8 w-8 object-contain"
+                />
               ) : (
                 <Building className="h-5 w-5" />
               )}
@@ -292,16 +355,22 @@ export default function PropertyDetails() {
         <div className="bg-muted/30 border-b">
           <div className="container mx-auto px-4 py-3">
             <nav className="flex items-center gap-2 text-sm text-muted-foreground overflow-x-auto">
-              <Link href={`/e/${slug}`} className="hover:text-foreground transition-colors flex items-center gap-1">
+              <Link href={`/e/${slug}`}>
+                <button className="hover:text-foreground transition-colors flex items-center gap-1 bg-transparent border-none cursor-pointer p-0 text-sm text-muted-foreground">
                   <Home className="h-4 w-4" />
                   Início
+                </button>
               </Link>
               <span>/</span>
               <span>Imóveis</span>
               <span>/</span>
-              <span className="text-foreground font-medium truncate">{typeLabels[property?.type || ''] || 'Imóvel'}</span>
+              <span className="text-foreground font-medium truncate">
+                {typeLabels[property?.type || ""] || "Imóvel"}
+              </span>
               <span className="hidden sm:inline">/</span>
-              <span className="text-foreground font-medium truncate hidden sm:inline">{property?.title}</span>
+              <span className="text-foreground font-medium truncate hidden sm:inline">
+                {property?.title}
+              </span>
             </nav>
           </div>
         </div>
@@ -314,7 +383,11 @@ export default function PropertyDetails() {
               alt={property.title}
               className="w-full h-full object-cover cursor-pointer"
               onClick={() => setLightboxOpen(true)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setLightboxOpen(true); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  setLightboxOpen(true);
+                }
+              }}
               role="button"
               tabIndex={0}
               loading="eager"
@@ -355,7 +428,9 @@ export default function PropertyDetails() {
                     key={idx}
                     onClick={() => setCurrentImageIndex(idx)}
                     className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all snap-start ${
-                      idx === currentImageIndex ? "border-primary scale-105" : "border-transparent opacity-60 hover:opacity-100"
+                      idx === currentImageIndex
+                        ? "border-primary scale-105"
+                        : "border-transparent opacity-60 hover:opacity-100"
                     }`}
                   >
                     <img
@@ -386,7 +461,9 @@ export default function PropertyDetails() {
                     {typeLabels[property.type] || property.type}
                   </Badge>
                   {property.featured && (
-                    <Badge style={{ backgroundColor: tenant.primaryColor }}>Destaque</Badge>
+                    <Badge style={{ backgroundColor: tenant.primaryColor }}>
+                      Destaque
+                    </Badge>
                   )}
                 </div>
 
@@ -402,11 +479,16 @@ export default function PropertyDetails() {
 
                 <div className="space-y-2">
                   <div className="flex items-baseline gap-2 flex-wrap">
-                    <span className="text-4xl font-bold" style={{ color: tenant.primaryColor }}>
+                    <span
+                      className="text-4xl font-bold"
+                      style={{ color: tenant.primaryColor }}
+                    >
                       {formatPrice(property.price)}
                     </span>
                     {property.category === "rent" && (
-                      <span className="text-lg text-muted-foreground">/mês</span>
+                      <span className="text-lg text-muted-foreground">
+                        /mês
+                      </span>
                     )}
                   </div>
 
@@ -414,7 +496,9 @@ export default function PropertyDetails() {
                   {(property.condoFee || property.iptu) && (
                     <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                       {property.condoFee && (
-                        <span>Condomínio: {formatPrice(property.condoFee)}</span>
+                        <span>
+                          Condomínio: {formatPrice(property.condoFee)}
+                        </span>
                       )}
                       {property.iptu && (
                         <span>IPTU: {formatPrice(property.iptu)}</span>
@@ -424,9 +508,19 @@ export default function PropertyDetails() {
 
                   {/* Financing Calculator Link */}
                   {property.category === "sale" && (
-                    <Button variant="link" className="h-auto p-0 text-primary" onClick={() => { alert('Calculadora de financiamento em breve!'); }}>
+                    <Button
+                      variant="link"
+                      className="h-auto p-0 text-primary"
+                      asChild
+                    >
+                      <button
+                        onClick={() => {
+                          alert("Calculadora de financiamento em breve!");
+                        }}
+                      >
                         <Calculator className="h-4 w-4 mr-1" />
                         Simular financiamento
+                      </button>
                     </Button>
                   )}
                 </div>
@@ -436,7 +530,9 @@ export default function PropertyDetails() {
 
               {/* Characteristics - Key Specs Bar */}
               <div>
-                <h2 className="text-xl font-heading font-bold mb-4">Características</h2>
+                <h2 className="text-xl font-heading font-bold mb-4">
+                  Características
+                </h2>
                 <div className="flex overflow-x-auto gap-3 pb-2 sm:grid sm:grid-cols-2 md:grid-cols-4 sm:overflow-visible">
                   {property.bedrooms !== null && (
                     <div className="flex flex-col items-center p-3 min-w-[80px] sm:min-w-0 sm:flex-row sm:items-start gap-3 sm:p-4 rounded-lg bg-muted/50 flex-shrink-0">
@@ -451,7 +547,9 @@ export default function PropertyDetails() {
                     <div className="flex flex-col items-center p-3 min-w-[80px] sm:min-w-0 sm:flex-row sm:items-start gap-3 sm:p-4 rounded-lg bg-muted/50 flex-shrink-0">
                       <Bath className="w-6 h-6 text-muted-foreground flex-shrink-0" />
                       <div className="text-center sm:text-left">
-                        <p className="text-sm text-muted-foreground">Banheiros</p>
+                        <p className="text-sm text-muted-foreground">
+                          Banheiros
+                        </p>
                         <p className="font-semibold">{property.bathrooms}</p>
                       </div>
                     </div>
@@ -465,15 +563,18 @@ export default function PropertyDetails() {
                       </div>
                     </div>
                   )}
-                  {property.parkingSpots !== null && property.parkingSpots !== undefined && (
-                    <div className="flex flex-col items-center p-3 min-w-[80px] sm:min-w-0 sm:flex-row sm:items-start gap-3 sm:p-4 rounded-lg bg-muted/50 flex-shrink-0">
-                      <Car className="w-6 h-6 text-muted-foreground flex-shrink-0" />
-                      <div className="text-center sm:text-left">
-                        <p className="text-sm text-muted-foreground">Vagas</p>
-                        <p className="font-semibold">{property.parkingSpots}</p>
+                  {property.parkingSpots !== null &&
+                    property.parkingSpots !== undefined && (
+                      <div className="flex flex-col items-center p-3 min-w-[80px] sm:min-w-0 sm:flex-row sm:items-start gap-3 sm:p-4 rounded-lg bg-muted/50 flex-shrink-0">
+                        <Car className="w-6 h-6 text-muted-foreground flex-shrink-0" />
+                        <div className="text-center sm:text-left">
+                          <p className="text-sm text-muted-foreground">Vagas</p>
+                          <p className="font-semibold">
+                            {property.parkingSpots}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
                 </div>
               </div>
 
@@ -483,16 +584,22 @@ export default function PropertyDetails() {
               {property.description && (
                 <>
                   <div>
-                    <h2 className="text-xl font-heading font-bold mb-4">Descrição</h2>
+                    <h2 className="text-xl font-heading font-bold mb-4">
+                      Descrição
+                    </h2>
                     <div className="relative">
-                      <p className={`text-muted-foreground whitespace-pre-wrap leading-relaxed ${!descriptionExpanded && property.description.length > 300 ? 'line-clamp-4' : ''}`}>
+                      <p
+                        className={`text-muted-foreground whitespace-pre-wrap leading-relaxed ${!descriptionExpanded && property.description.length > 300 ? "line-clamp-4" : ""}`}
+                      >
                         {property.description}
                       </p>
                       {property.description.length > 300 && (
                         <Button
                           variant="link"
                           className="h-auto p-0 mt-2"
-                          onClick={() => setDescriptionExpanded(!descriptionExpanded)}
+                          onClick={() =>
+                            setDescriptionExpanded(!descriptionExpanded)
+                          }
                         >
                           {descriptionExpanded ? (
                             <>
@@ -512,97 +619,157 @@ export default function PropertyDetails() {
               )}
 
               {/* Features - Categorized */}
-              {property.features && property.features.length > 0 && (() => {
-                const categorizedFeatures = categorizeFeatures(property.features);
-                return (
-                  <>
-                    <div>
-                      <h2 className="text-xl font-heading font-bold mb-4">Comodidades</h2>
-                      <div className="space-y-6">
-                        {categorizedFeatures.estrutura.length > 0 && (
-                          <div>
-                            <div className="flex items-center gap-2 mb-3">
-                              <Building className="h-5 w-5 text-primary" />
-                              <h3 className="font-semibold text-lg">Estrutura</h3>
+              {property.features &&
+                property.features.length > 0 &&
+                (() => {
+                  const categorizedFeatures = categorizeFeatures(
+                    property.features,
+                  );
+                  return (
+                    <>
+                      <div>
+                        <h2 className="text-xl font-heading font-bold mb-4">
+                          Comodidades
+                        </h2>
+                        <div className="space-y-6">
+                          {categorizedFeatures.estrutura.length > 0 && (
+                            <div>
+                              <div className="flex items-center gap-2 mb-3">
+                                <Building className="h-5 w-5 text-primary" />
+                                <h3 className="font-semibold text-lg">
+                                  Estrutura
+                                </h3>
+                              </div>
+                              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                                {categorizedFeatures.estrutura.map(
+                                  (feature, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="flex items-center gap-2 text-sm"
+                                    >
+                                      <div
+                                        className="w-2 h-2 rounded-full"
+                                        style={{
+                                          backgroundColor: tenant.primaryColor,
+                                        }}
+                                      />
+                                      <span>{feature}</span>
+                                    </div>
+                                  ),
+                                )}
+                              </div>
                             </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                              {categorizedFeatures.estrutura.map((feature, idx) => (
-                                <div key={idx} className="flex items-center gap-2 text-sm">
-                                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tenant.primaryColor }} />
-                                  <span>{feature}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                          )}
 
-                        {categorizedFeatures.lazer.length > 0 && (
-                          <div>
-                            <div className="flex items-center gap-2 mb-3">
-                              <Dumbbell className="h-5 w-5 text-primary" />
-                              <h3 className="font-semibold text-lg">Lazer</h3>
+                          {categorizedFeatures.lazer.length > 0 && (
+                            <div>
+                              <div className="flex items-center gap-2 mb-3">
+                                <Dumbbell className="h-5 w-5 text-primary" />
+                                <h3 className="font-semibold text-lg">Lazer</h3>
+                              </div>
+                              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                                {categorizedFeatures.lazer.map(
+                                  (feature, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="flex items-center gap-2 text-sm"
+                                    >
+                                      <div
+                                        className="w-2 h-2 rounded-full"
+                                        style={{
+                                          backgroundColor: tenant.primaryColor,
+                                        }}
+                                      />
+                                      <span>{feature}</span>
+                                    </div>
+                                  ),
+                                )}
+                              </div>
                             </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                              {categorizedFeatures.lazer.map((feature, idx) => (
-                                <div key={idx} className="flex items-center gap-2 text-sm">
-                                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tenant.primaryColor }} />
-                                  <span>{feature}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                          )}
 
-                        {categorizedFeatures.seguranca.length > 0 && (
-                          <div>
-                            <div className="flex items-center gap-2 mb-3">
-                              <Shield className="h-5 w-5 text-primary" />
-                              <h3 className="font-semibold text-lg">Segurança</h3>
+                          {categorizedFeatures.seguranca.length > 0 && (
+                            <div>
+                              <div className="flex items-center gap-2 mb-3">
+                                <Shield className="h-5 w-5 text-primary" />
+                                <h3 className="font-semibold text-lg">
+                                  Segurança
+                                </h3>
+                              </div>
+                              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                                {categorizedFeatures.seguranca.map(
+                                  (feature, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="flex items-center gap-2 text-sm"
+                                    >
+                                      <div
+                                        className="w-2 h-2 rounded-full"
+                                        style={{
+                                          backgroundColor: tenant.primaryColor,
+                                        }}
+                                      />
+                                      <span>{feature}</span>
+                                    </div>
+                                  ),
+                                )}
+                              </div>
                             </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                              {categorizedFeatures.seguranca.map((feature, idx) => (
-                                <div key={idx} className="flex items-center gap-2 text-sm">
-                                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tenant.primaryColor }} />
-                                  <span>{feature}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                          )}
 
-                        {categorizedFeatures.outros.length > 0 && (
-                          <div>
-                            <div className="flex items-center gap-2 mb-3">
-                              <TreePine className="h-5 w-5 text-primary" />
-                              <h3 className="font-semibold text-lg">Outros</h3>
+                          {categorizedFeatures.outros.length > 0 && (
+                            <div>
+                              <div className="flex items-center gap-2 mb-3">
+                                <TreePine className="h-5 w-5 text-primary" />
+                                <h3 className="font-semibold text-lg">
+                                  Outros
+                                </h3>
+                              </div>
+                              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                                {categorizedFeatures.outros.map(
+                                  (feature, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="flex items-center gap-2 text-sm"
+                                    >
+                                      <div
+                                        className="w-2 h-2 rounded-full"
+                                        style={{
+                                          backgroundColor: tenant.primaryColor,
+                                        }}
+                                      />
+                                      <span>{feature}</span>
+                                    </div>
+                                  ),
+                                )}
+                              </div>
                             </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                              {categorizedFeatures.outros.map((feature, idx) => (
-                                <div key={idx} className="flex items-center gap-2 text-sm">
-                                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tenant.primaryColor }} />
-                                  <span>{feature}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <Separator />
-                  </>
-                );
-              })()}
+                      <Separator />
+                    </>
+                  );
+                })()}
 
               {/* Location Section */}
               <div>
-                <h2 className="text-xl font-heading font-bold mb-4">Localização</h2>
+                <h2 className="text-xl font-heading font-bold mb-4">
+                  Localização
+                </h2>
                 <div className="space-y-4">
                   <div className="flex items-start gap-2 text-muted-foreground">
                     <MapPin className="w-5 h-5 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-medium text-foreground">{property.address}</p>
-                      <p className="text-sm">{property.city} - {property.state}</p>
-                      {property.zipCode && <p className="text-sm">CEP: {property.zipCode}</p>}
+                      <p className="font-medium text-foreground">
+                        {property.address}
+                      </p>
+                      <p className="text-sm">
+                        {property.city} - {property.state}
+                      </p>
+                      {property.zipCode && (
+                        <p className="text-sm">CEP: {property.zipCode}</p>
+                      )}
                     </div>
                   </div>
 
@@ -621,7 +788,8 @@ export default function PropertyDetails() {
                   </div>
 
                   <p className="text-xs text-muted-foreground text-center">
-                    * A localização exata será informada após o agendamento da visita
+                    * A localização exata será informada após o agendamento da
+                    visita
                   </p>
                 </div>
               </div>
@@ -630,7 +798,11 @@ export default function PropertyDetails() {
 
               {/* Share Buttons */}
               <div className="flex gap-3">
-                <Button variant="outline" onClick={handleShare} className="flex-1">
+                <Button
+                  variant="outline"
+                  onClick={handleShare}
+                  className="flex-1"
+                >
                   <Share2 className="mr-2 h-4 w-4" />
                   Compartilhar
                 </Button>
@@ -662,7 +834,9 @@ export default function PropertyDetails() {
                 {/* Contact Info */}
                 <Card>
                   <CardContent className="pt-6 space-y-4">
-                    <h3 className="font-heading font-bold text-lg mb-4">Informações de Contato</h3>
+                    <h3 className="font-heading font-bold text-lg mb-4">
+                      Informações de Contato
+                    </h3>
                     {tenant.phone && (
                       <Button
                         variant="outline"
@@ -678,7 +852,10 @@ export default function PropertyDetails() {
                     {tenant.email && (
                       <div className="flex items-center gap-3 text-sm">
                         <Mail className="w-4 h-4 text-muted-foreground" />
-                        <a href={`mailto:${tenant.email}`} className="hover:underline">
+                        <a
+                          href={`mailto:${tenant.email}`}
+                          className="hover:underline"
+                        >
                           {tenant.email}
                         </a>
                       </div>
@@ -700,14 +877,19 @@ export default function PropertyDetails() {
         {similarProperties.length > 0 && (
           <section className="py-12 bg-muted/30">
             <div className="container mx-auto px-4">
-              <h2 className="text-2xl md:text-3xl font-heading font-bold mb-8">Imóveis Similares</h2>
+              <h2 className="text-2xl md:text-3xl font-heading font-bold mb-8">
+                Imóveis Similares
+              </h2>
               <div className="flex overflow-x-auto gap-6 pb-4 snap-x snap-mandatory md:grid md:grid-cols-2 lg:grid-cols-3 md:overflow-visible">
                 {similarProperties.map((prop) => (
                   <Link key={prop.id} href={`/e/${slug}/imovel/${prop.id}`}>
                     <Card className="group cursor-pointer hover:shadow-xl transition-all duration-300 w-[280px] md:w-auto flex-shrink-0 snap-start">
                       <div className="relative aspect-[4/3] overflow-hidden rounded-t-xl">
                         <img
-                          src={prop.images?.[0] || "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800"}
+                          src={
+                            prop.images?.[0] ||
+                            "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800"
+                          }
                           alt={prop.title}
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                           loading="lazy"
@@ -724,9 +906,16 @@ export default function PropertyDetails() {
                           <MapPin className="w-3 h-3 inline mr-1" />
                           {prop.city} - {prop.state}
                         </p>
-                        <p className="text-xl font-bold" style={{ color: tenant.primaryColor }}>
+                        <p
+                          className="text-xl font-bold"
+                          style={{ color: tenant.primaryColor }}
+                        >
                           {formatPrice(prop.price)}
-                          {prop.category === "rent" && <span className="text-sm font-normal text-muted-foreground">/mês</span>}
+                          {prop.category === "rent" && (
+                            <span className="text-sm font-normal text-muted-foreground">
+                              /mês
+                            </span>
+                          )}
                         </p>
                       </CardContent>
                     </Card>
@@ -802,11 +991,7 @@ export default function PropertyDetails() {
             </Button>
           )}
           {tenant.phone && (
-            <Button
-              variant="outline"
-              size="icon"
-              asChild
-            >
+            <Button variant="outline" size="icon" asChild>
               <a href={`tel:${tenant.phone}`}>
                 <Phone className="h-4 w-4" />
               </a>
@@ -817,11 +1002,32 @@ export default function PropertyDetails() {
 
       {/* Mobile Contact Form Modal */}
       {showContactForm && (
-        <div className="fixed inset-0 z-50 bg-black/50 sm:hidden" onClick={() => setShowContactForm(false)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setShowContactForm(false); }} role="button" tabIndex={0}>
-          <div className="fixed bottom-0 left-0 right-0 bg-background rounded-t-2xl p-6 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} role="presentation">
+        <div
+          className="fixed inset-0 z-50 bg-black/50 sm:hidden"
+          onClick={() => setShowContactForm(false)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              setShowContactForm(false);
+            }
+          }}
+          role="button"
+          tabIndex={0}
+        >
+          <div
+            className="fixed bottom-0 left-0 right-0 bg-background rounded-t-2xl p-6 max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            role="dialog"
+          >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-heading font-bold">Entre em contato</h3>
-              <Button variant="ghost" size="icon" onClick={() => setShowContactForm(false)}>
+              <h3 className="text-lg font-heading font-bold">
+                Entre em contato
+              </h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowContactForm(false)}
+              >
                 <X className="h-5 w-5" />
               </Button>
             </div>
