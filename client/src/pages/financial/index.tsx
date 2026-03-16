@@ -257,7 +257,7 @@ export default function FinanceiroPage() {
 
   const handleEdit = (transaction: FinanceTransaction) => {
     // TODO: Open edit modal
-    console.log('Edit transaction:', transaction);
+    if (import.meta.env.DEV) console.log('Edit transaction:', transaction);
     toast({
       title: "Em desenvolvimento",
       description: "A edição de transações será implementada em breve.",
@@ -266,7 +266,7 @@ export default function FinanceiroPage() {
 
   const handleDuplicate = (transaction: FinanceTransaction) => {
     // TODO: Duplicate transaction
-    console.log('Duplicate transaction:', transaction);
+    if (import.meta.env.DEV) console.log('Duplicate transaction:', transaction);
     toast({
       title: "Em desenvolvimento",
       description: "A duplicação de transações será implementada em breve.",
@@ -275,7 +275,7 @@ export default function FinanceiroPage() {
 
   const handleViewOrigin = (transaction: FinanceTransaction) => {
     // TODO: Navigate to origin
-    console.log('View origin:', transaction);
+    if (import.meta.env.DEV) console.log('View origin:', transaction);
     toast({
       title: "Em desenvolvimento",
       description: "A visualização da origem será implementada em breve.",
@@ -284,7 +284,7 @@ export default function FinanceiroPage() {
 
   const handleAIPrompt = (promptId: string) => {
     // TODO: Handle AI prompt
-    console.log('AI Prompt:', promptId);
+    if (import.meta.env.DEV) console.log('AI Prompt:', promptId);
     toast({
       title: "Assistente AI",
       description: "A funcionalidade de AI será implementada em breve.",

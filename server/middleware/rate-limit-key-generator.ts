@@ -17,15 +17,14 @@ import type { Request } from 'express';
  * @param req - Express request object
  * @returns Rate limit key string or undefined
  */
-export function generateRateLimitKey(req: Request): string | undefined {
+export function generateRateLimitKey(req: Request): string {
   // If user is authenticated, use tenant-based limiting
   if (req.user?.tenantId) {
     return `tenant:${req.user.tenantId}`;
   }
 
-  // Return undefined to let express-rate-limit handle IP (IPv6-compliant)
-  // DO NOT return req.ip directly as it bypasses IPv6 normalization
-  return undefined;
+  // Fallback to IP address for unauthenticated requests
+  return req.ip || req.socket.remoteAddress || 'unknown';
 }
 
 /**
@@ -36,12 +35,12 @@ export function generateRateLimitKey(req: Request): string | undefined {
  * @param req - Express request object
  * @returns User-specific rate limit key or undefined
  */
-export function generateUserRateLimitKey(req: Request): string | undefined {
+export function generateUserRateLimitKey(req: Request): string {
   if (req.user?.id) {
     return `user:${req.user.id}`;
   }
 
-  // Fall back to tenant-based or let express-rate-limit handle IP
+  // Fall back to tenant-based or IP-based key
   return generateRateLimitKey(req);
 }
 
@@ -56,12 +55,12 @@ export function generateUserRateLimitKey(req: Request): string | undefined {
  * @param req - Express request object
  * @returns Combined rate limit key or undefined
  */
-export function generateCombinedRateLimitKey(req: Request): string | undefined {
+export function generateCombinedRateLimitKey(req: Request): string {
   if (req.user?.tenantId) {
-    // We can safely combine tenant with a marker, but not with req.ip directly
+    // Combine tenant with a marker for combined limiting
     return `tenant:${req.user.tenantId}:combined`;
   }
 
-  // Let express-rate-limit handle IP-only limiting
-  return undefined;
+  // Fallback to IP address for unauthenticated requests
+  return req.ip || req.socket.remoteAddress || 'unknown';
 }

@@ -4,6 +4,7 @@ import tsParser from "@typescript-eslint/parser";
 import reactPlugin from "eslint-plugin-react";
 import reactHooksPlugin from "eslint-plugin-react-hooks";
 import jsxA11yPlugin from "eslint-plugin-jsx-a11y";
+import globals from "globals";
 
 export default [
   js.configs.recommended,
@@ -29,14 +30,9 @@ export default [
         },
       },
       globals: {
-        window: "readonly",
-        document: "readonly",
-        navigator: "readonly",
-        console: "readonly",
-        process: "readonly",
-        __dirname: "readonly",
-        module: "readonly",
-        require: "readonly",
+        ...globals.browser,
+        ...globals.node,
+        ...globals.es2020,
       },
     },
     plugins: {

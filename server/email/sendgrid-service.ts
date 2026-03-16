@@ -1,4 +1,3 @@
-// @ts-nocheck
 import sgMail from '@sendgrid/mail';
 
 export interface SendGridConfig {
@@ -127,7 +126,7 @@ export class SendGridService {
         url: '/v3/user/profile',
       };
 
-      await sgMail.client.request(request);
+      await (sgMail as any).client.request(request);
 
       return { success: true };
     } catch (error: any) {

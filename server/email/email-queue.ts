@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Queue, Worker, Job } from 'bullmq';
 import { Redis } from 'ioredis';
 
@@ -130,7 +129,7 @@ export class EmailQueue {
       delay: options?.delay,
     });
 
-    return job.id || undefined;
+    return job.id ?? null;
   }
 
   async addBulkEmails(emails: EmailJobData[]): Promise<void> {

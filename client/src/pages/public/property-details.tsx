@@ -162,7 +162,7 @@ export default function PropertyDetails() {
           url: window.location.href,
         });
       } catch (err) {
-        console.log("Erro ao compartilhar:", err);
+        if (import.meta.env.DEV) console.log("Erro ao compartilhar:", err);
       }
     } else {
       // Fallback: copy to clipboard

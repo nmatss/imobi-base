@@ -45,7 +45,7 @@ export function PreferencesSettings() {
     onSave: async (data) => {
       // Simular API call
       await new Promise((resolve) => setTimeout(resolve, 500));
-      console.log("Saving preferences:", data);
+      if (import.meta.env.DEV) console.log("Saving preferences:", data);
     },
     delay: 1500,
     enabled: true,

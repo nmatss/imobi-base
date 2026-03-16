@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Invoice Generator
  * Generates PDF invoices and sends them via email
@@ -159,11 +158,11 @@ export class InvoiceGenerator {
 
       // Payment status
       doc.setFontSize(10);
-      const statusColor = data.paymentStatus === 'paid' ? [46, 204, 113] :
+      const statusColor: [number, number, number] = data.paymentStatus === 'paid' ? [46, 204, 113] :
                          data.paymentStatus === 'overdue' ? [231, 76, 60] :
                          [241, 196, 15];
 
-      doc.setFillColor(...statusColor);
+      doc.setFillColor(statusColor[0], statusColor[1], statusColor[2]);
       doc.rect(20, yPosition, 40, 7, 'F');
       doc.setTextColor(255, 255, 255);
       doc.text(data.paymentStatus.toUpperCase(), 40, yPosition + 5, { align: 'center' });

@@ -126,6 +126,7 @@ export const contracts = pgTable("contracts", {
   status: text("status").notNull().default("draft"),
   value: decimal("value", { precision: 12, scale: 2 }).notNull(),
   terms: text("terms"),
+  clicksignDocumentKey: text("clicksign_document_key"),
   signedAt: timestamp("signed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -854,6 +855,26 @@ export const complianceAuditLog = pgTable("compliance_audit_log", {
   userAgent: text("user_agent"),
   timestamp: timestamp("timestamp").notNull().defaultNow(),
 });
+
+/**
+ * AUDIT LOGS
+ * General audit logging for webhooks and system events (e.g. ClickSign)
+ */
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  entityType: text("entity_type").notNull(),
+  entityId: varchar("entity_id"),
+  action: text("action").notNull(),
+  metadata: json("metadata"),
+  ipAddress: text("ip_address"),
+  occurredAt: timestamp("occurred_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;
 
 /**
  * COMPLIANCE: ACCOUNT DELETION REQUESTS

@@ -1,5 +1,4 @@
-// @ts-nocheck
-// TypeScript checking disabled due to Drizzle ORM union type issues with dual database support
+// Drizzle ORM with dual database support (SQLite + PostgreSQL)
 import { eq, and, desc, sql, like, or, inArray } from "drizzle-orm";
 import { db, schema, isSqlite } from "./db";
 import { nanoid } from "nanoid";
@@ -30,19 +29,32 @@ import type {
   IntegrationConfig, InsertIntegrationConfig,
   NotificationPreference, InsertNotificationPreference,
   SavedReport, InsertSavedReport,
-  AutoMarketingContent, InsertAutoMarketingContent,
-  PropertyValuation, InsertPropertyValuation,
-  MarketIndex, InsertMarketIndex,
-  IsaConversation, InsertIsaConversation,
-  IsaMessage, InsertIsaMessage,
-  IsaSettings, InsertIsaSettings,
-  PropertyInspection, InsertPropertyInspection,
-  InspectionRoom, InsertInspectionRoom,
-  InspectionItem, InsertInspectionItem,
   ClientPortalAccess, InsertClientPortalAccess,
-  MaintenanceTicket, InsertMaintenanceTicket,
   AnalyticsEvent, InsertAnalyticsEvent
 } from "@shared/schema-sqlite";
+
+// These types exist in the PG schema but not in schema-sqlite.
+// Since db is dynamically typed (any), we alias them to any for dual-DB compat.
+type AutoMarketingContent = any;
+type InsertAutoMarketingContent = any;
+type PropertyValuation = any;
+type InsertPropertyValuation = any;
+type MarketIndex = any;
+type InsertMarketIndex = any;
+type IsaConversation = any;
+type InsertIsaConversation = any;
+type IsaMessage = any;
+type InsertIsaMessage = any;
+type IsaSettings = any;
+type InsertIsaSettings = any;
+type PropertyInspection = any;
+type InsertPropertyInspection = any;
+type InspectionRoom = any;
+type InsertInspectionRoom = any;
+type InspectionItem = any;
+type InsertInspectionItem = any;
+type MaintenanceTicket = any;
+type InsertMaintenanceTicket = any;
 
 // Helper to generate IDs
 const generateId = () => nanoid();
@@ -257,25 +269,42 @@ export interface IStorage {
     salesList: Array<{ sale: PropertySale; property: Property; buyer: Lead }>;
   }>;
   getLeadsFunnelReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date }): Promise<{
-    totalLeads: number;
-    conversionRate: number;
-    byStage: Record<string, number>;
-    bySource: Record<string, number>;
+    stages: { name: string; count: number; value: number }[];
+    conversionRates: { from: string; to: string; rate: number }[];
+    avgTimePerStage: { stage: string; avgDays: number }[];
+    lossReasons: { reason: string; count: number }[];
+    leadsByOrigin: { origin: string; count: number }[];
   }>;
   getBrokerPerformanceReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date }): Promise<{
-    brokers: Array<{ user: User; totalLeads: number; convertedLeads: number; conversionRate: number }>;
+    ranking: {
+      broker: { id: string; name: string };
+      leads: number;
+      visits: number;
+      proposals: number;
+      contracts: number;
+      avgTicket: number;
+      conversionRate: number;
+    }[];
   }>;
   getPropertiesReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date }): Promise<{
-    totalProperties: number;
-    availableProperties: number;
-    byType: Record<string, number>;
-    byStatus: Record<string, number>;
+    totalAvailable: number;
+    withVisitsRecent: number;
+    noVisitsRecent: number;
+    avgTimeToSell: number;
+    avgTimeToRent: number;
+    byType: { type: string; count: number; avgPrice: number }[];
+    byCity: { city: string; count: number }[];
+    ownerIndicators: { owner: any; activeProperties: number; avgVacancy: number; totalReturn: number }[];
   }>;
   getFinancialSummaryReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date }): Promise<{
-    totalRevenue: number;
-    totalExpenses: number;
-    netIncome: number;
-    byMonth: Array<{ month: string; revenue: number; expenses: number }>;
+    salesRevenue: number;
+    rentalRevenue: number;
+    commissions: number;
+    transfers: number;
+    expenses: number;
+    profit: number;
+    marginByChannel: { channel: string; revenue: number; margin: number }[];
+    marginByBroker: { broker: string; revenue: number; margin: number }[];
   }>;
   // Settings Module Methods
   getTenantSettings(tenantId: string): Promise<TenantSettings | undefined>;
@@ -2413,7 +2442,7 @@ export class DbStorage implements IStorage {
 
     // Count leads by stage
     const stagesMap = new Map<string, number>();
-    leads.forEach(lead => {
+    leads.forEach((lead: any) => {
       const status = lead.status || 'new';
       stagesMap.set(status, (stagesMap.get(status) || 0) + 1);
     });
@@ -2426,10 +2455,10 @@ export class DbStorage implements IStorage {
 
     // Calculate conversion rates (simplified)
     const totalLeads = leads.length;
-    const convertedLeads = leads.filter(l => l.status === 'converted').length;
+    const convertedLeads = leads.filter((l: any) => l.status === 'converted').length;
     const conversionRates = [
-      { from: 'new', to: 'contacted', rate: leads.filter(l => l.status !== 'new').length / totalLeads * 100 },
-      { from: 'contacted', to: 'qualified', rate: leads.filter(l => ['qualified', 'proposal', 'negotiating', 'converted'].includes(l.status || '')).length / totalLeads * 100 },
+      { from: 'new', to: 'contacted', rate: leads.filter((l: any) => l.status !== 'new').length / totalLeads * 100 },
+      { from: 'contacted', to: 'qualified', rate: leads.filter((l: any) => ['qualified', 'proposal', 'negotiating', 'converted'].includes(l.status || '')).length / totalLeads * 100 },
       { from: 'qualified', to: 'converted', rate: convertedLeads / totalLeads * 100 }
     ];
 
@@ -2443,7 +2472,7 @@ export class DbStorage implements IStorage {
     ];
 
     // Loss reasons (from lost leads)
-    const lostLeads = leads.filter(l => l.status === 'lost');
+    const lostLeads = leads.filter((l: any) => l.status === 'lost');
     const lossReasons = [
       { reason: 'Preço alto', count: Math.floor(lostLeads.length * 0.4) },
       { reason: 'Comprou concorrente', count: Math.floor(lostLeads.length * 0.3) },
@@ -2453,7 +2482,7 @@ export class DbStorage implements IStorage {
 
     // Leads by origin
     const originMap = new Map<string, number>();
-    leads.forEach(lead => {
+    leads.forEach((lead: any) => {
       const origin = lead.source || 'Desconhecido';
       originMap.set(origin, (originMap.get(origin) || 0) + 1);
     });
@@ -2489,7 +2518,7 @@ export class DbStorage implements IStorage {
     // Get all brokers/users
     const brokers = await db.select().from(schema.users).where(eq(schema.users.tenantId, tenantId));
 
-    const ranking = await Promise.all(brokers.map(async (broker) => {
+    const ranking = await Promise.all(brokers.map(async (broker: any) => {
       // Leads assigned to broker
       const leadsConditions = [
         eq(schema.leads.tenantId, tenantId),
@@ -2525,8 +2554,8 @@ export class DbStorage implements IStorage {
         proposalsConditions.push(sql`${schema.saleProposals.createdAt} <= ${filters.endDate.toISOString()}`);
       }
       const allProposals = await db.select().from(schema.saleProposals).where(and(...proposalsConditions));
-      const brokerProposals = allProposals.filter(p =>
-        brokerLeads.some(l => l.id === p.leadId)
+      const brokerProposals = allProposals.filter((p: any) =>
+        brokerLeads.some((l: any) => l.id === p.leadId)
       );
 
       // Sales by broker
@@ -2542,7 +2571,7 @@ export class DbStorage implements IStorage {
       }
       const brokerSales = await db.select().from(schema.propertySales).where(and(...salesConditions));
 
-      const totalSalesValue = brokerSales.reduce((sum, s) => sum + parseFloat(s.saleValue || '0'), 0);
+      const totalSalesValue = brokerSales.reduce((sum: any, s: any) => sum + parseFloat(s.saleValue || '0'), 0);
       const avgTicket = brokerSales.length > 0 ? totalSalesValue / brokerSales.length : 0;
       const conversionRate = brokerLeads.length > 0 ? (brokerSales.length / brokerLeads.length) * 100 : 0;
 
@@ -2599,8 +2628,8 @@ export class DbStorage implements IStorage {
         sql`${schema.visits.scheduledFor} >= ${thirtyDaysAgo.toISOString()}`
       ));
 
-    const propertyIdsWithVisits = new Set(recentVisits.map(v => v.propertyId));
-    const withVisitsRecent = properties.filter(p => propertyIdsWithVisits.has(p.id)).length;
+    const propertyIdsWithVisits = new Set(recentVisits.map((v: any) => v.propertyId));
+    const withVisitsRecent = properties.filter((p: any) => propertyIdsWithVisits.has(p.id)).length;
     const noVisitsRecent = totalAvailable - withVisitsRecent;
 
     // Average time to sell/rent (placeholder - would need historical data)
@@ -2609,7 +2638,7 @@ export class DbStorage implements IStorage {
 
     // Properties by type
     const byTypeMap = new Map<string, { count: number; totalPrice: number }>();
-    properties.forEach(prop => {
+    properties.forEach((prop: any) => {
       const type = prop.type || 'Outro';
       const existing = byTypeMap.get(type) || { count: 0, totalPrice: 0 };
       byTypeMap.set(type, {
@@ -2625,7 +2654,7 @@ export class DbStorage implements IStorage {
 
     // Properties by city
     const byCityMap = new Map<string, number>();
-    properties.forEach(prop => {
+    properties.forEach((prop: any) => {
       const city = prop.city || 'Desconhecido';
       byCityMap.set(city, (byCityMap.get(city) || 0) + 1);
     });
@@ -2636,15 +2665,15 @@ export class DbStorage implements IStorage {
 
     // Owner indicators (for rental properties)
     const owners = await db.select().from(schema.owners).where(eq(schema.owners.tenantId, tenantId));
-    const ownerIndicators = await Promise.all(owners.map(async (owner) => {
+    const ownerIndicators = await Promise.all(owners.map(async (owner: any) => {
       const ownerContracts = await db.select().from(schema.rentalContracts)
         .where(and(
           eq(schema.rentalContracts.tenantId, tenantId),
           eq(schema.rentalContracts.ownerId, owner.id)
         ));
 
-      const activeContracts = ownerContracts.filter(c => c.status === 'active');
-      const totalReturn = activeContracts.reduce((sum, c) => sum + parseFloat(c.rentValue || '0'), 0);
+      const activeContracts = ownerContracts.filter((c: any) => c.status === 'active');
+      const totalReturn = activeContracts.reduce((sum: any, c: any) => sum + parseFloat(c.rentValue || '0'), 0);
 
       return {
         owner: {
@@ -2696,11 +2725,11 @@ export class DbStorage implements IStorage {
     const entries = await db.select().from(schema.financeEntries).where(and(...conditions));
 
     // Calculate revenues and expenses
-    const revenues = entries.filter(e => e.flow === 'income');
-    const expenses = entries.filter(e => e.flow === 'expense');
+    const revenues = entries.filter((e: any) => e.flow === 'income');
+    const expenseEntries = entries.filter((e: any) => e.flow === 'expense');
 
-    const totalRevenue = revenues.reduce((sum, e) => sum + parseFloat(e.amount || '0'), 0);
-    const totalExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount || '0'), 0);
+    const totalRevenue = revenues.reduce((sum: any, e: any) => sum + parseFloat(e.amount || '0'), 0);
+    const totalExpenses = expenseEntries.reduce((sum: any, e: any) => sum + parseFloat(e.amount || '0'), 0);
 
     // Sales revenue (from property sales)
     const salesConditions = [eq(schema.propertySales.tenantId, tenantId)];
@@ -2711,7 +2740,7 @@ export class DbStorage implements IStorage {
       salesConditions.push(sql`${schema.propertySales.saleDate} <= ${filters.endDate.toISOString()}`);
     }
     const sales = await db.select().from(schema.propertySales).where(and(...salesConditions));
-    const salesRevenue = sales.reduce((sum, s) => sum + parseFloat(s.commissionValue || '0'), 0);
+    const salesRevenue = sales.reduce((sum: any, s: any) => sum + parseFloat(s.commissionValue || '0'), 0);
 
     // Rental revenue (from rental payments)
     const paymentsConditions = [eq(schema.rentalPayments.tenantId, tenantId)];
@@ -2725,7 +2754,7 @@ export class DbStorage implements IStorage {
       .where(and(...paymentsConditions, eq(schema.rentalPayments.status, 'paid')));
 
     // Calculate administration fee from payments
-    const rentalRevenue = payments.reduce((sum, p) => {
+    const rentalRevenue = payments.reduce((sum: any, p: any) => {
       const total = parseFloat(p.totalValue || '0');
       // Assuming 10% administration fee
       return sum + (total * 0.10);
@@ -2743,7 +2772,7 @@ export class DbStorage implements IStorage {
     }
     const transfers = await db.select().from(schema.rentalTransfers)
       .where(and(...transfersConditions, eq(schema.rentalTransfers.status, 'paid')));
-    const totalTransfers = transfers.reduce((sum, t) => sum + parseFloat(t.netAmount || '0'), 0);
+    const totalTransfers = transfers.reduce((sum: any, t: any) => sum + parseFloat(t.netAmount || '0'), 0);
 
     const profit = salesRevenue + rentalRevenue - totalExpenses;
 
@@ -2763,9 +2792,9 @@ export class DbStorage implements IStorage {
 
     // Margin by broker
     const brokers = await db.select().from(schema.users).where(eq(schema.users.tenantId, tenantId));
-    const marginByBroker = await Promise.all(brokers.map(async (broker) => {
-      const brokerSales = sales.filter(s => s.brokerId === broker.id);
-      const brokerRevenue = brokerSales.reduce((sum, s) => sum + parseFloat(s.commissionValue || '0'), 0);
+    const marginByBroker = await Promise.all(brokers.map(async (broker: any) => {
+      const brokerSales = sales.filter((s: any) => s.brokerId === broker.id);
+      const brokerRevenue = brokerSales.reduce((sum: any, s: any) => sum + parseFloat(s.commissionValue || '0'), 0);
 
       return {
         broker: broker.name,
@@ -2878,7 +2907,7 @@ export class DbStorage implements IStorage {
       .where(and(...conditions))
       .orderBy(desc(schema.commissions.createdAt));
 
-    return commissions.map(c => ({
+    return commissions.map((c: any) => ({
       ...c.commission,
       broker: c.broker ? { id: c.broker.id, name: c.broker.name, email: c.broker.email } : null,
       sale: c.sale ? { id: c.sale.id, saleValue: c.sale.saleValue, saleDate: c.sale.saleDate } : null,
@@ -2950,17 +2979,17 @@ export class DbStorage implements IStorage {
     const allCommissions = await db.select().from(schema.commissions).where(and(...conditions));
 
     // Calculate performance for each broker
-    const performance = brokers.map(broker => {
-      const brokerCommissions = allCommissions.filter(c => c.brokerId === broker.id);
+    const performance = brokers.map((broker: any) => {
+      const brokerCommissions = allCommissions.filter((c: any) => c.brokerId === broker.id);
 
       const totalTransactions = brokerCommissions.length;
-      const totalGrossCommission = brokerCommissions.reduce((sum, c) => sum + parseFloat(c.grossCommission || '0'), 0);
-      const totalBrokerCommission = brokerCommissions.reduce((sum, c) => sum + parseFloat(c.brokerCommission || '0'), 0);
-      const pendingCommissions = brokerCommissions.filter(c => c.status === 'pending').length;
-      const paidCommissions = brokerCommissions.filter(c => c.status === 'paid').length;
+      const totalGrossCommission = brokerCommissions.reduce((sum: any, c: any) => sum + parseFloat(c.grossCommission || '0'), 0);
+      const totalBrokerCommission = brokerCommissions.reduce((sum: any, c: any) => sum + parseFloat(c.brokerCommission || '0'), 0);
+      const pendingCommissions = brokerCommissions.filter((c: any) => c.status === 'pending').length;
+      const paidCommissions = brokerCommissions.filter((c: any) => c.status === 'paid').length;
 
-      const salesCount = brokerCommissions.filter(c => c.transactionType === 'sale').length;
-      const rentalsCount = brokerCommissions.filter(c => c.transactionType === 'rental').length;
+      const salesCount = brokerCommissions.filter((c: any) => c.transactionType === 'sale').length;
+      const rentalsCount = brokerCommissions.filter((c: any) => c.transactionType === 'rental').length;
 
       return {
         brokerId: broker.id,
@@ -2979,8 +3008,8 @@ export class DbStorage implements IStorage {
 
     // Filter out brokers with no transactions and sort by total commission
     return performance
-      .filter(p => p.totalTransactions > 0 || filters?.brokerId === p.brokerId)
-      .sort((a, b) => b.totalBrokerCommission - a.totalBrokerCommission);
+      .filter((p: any) => p.totalTransactions > 0 || filters?.brokerId === p.brokerId)
+      .sort((a: any, b: any) => b.totalBrokerCommission - a.totalBrokerCommission);
   }
 
   // ===== ADMIN GLOBAL METHODS =====
@@ -3009,7 +3038,7 @@ export class DbStorage implements IStorage {
         sql`${schema.rentalPayments.paidDate} >= ${startOfMonth.toISOString()}`
       ));
 
-    const monthlyRevenue = payments.reduce((sum, p) => sum + parseFloat(p.totalValue || '0'), 0);
+    const monthlyRevenue = payments.reduce((sum: any, p: any) => sum + parseFloat(p.totalValue || '0'), 0);
 
     return {
       totalTenants: tenants.length,
@@ -3025,7 +3054,7 @@ export class DbStorage implements IStorage {
   async getAllTenantsWithStats(): Promise<any[]> {
     const tenants = await db.select().from(schema.tenants);
 
-    const tenantsWithStats = await Promise.all(tenants.map(async (tenant) => {
+    const tenantsWithStats = await Promise.all(tenants.map(async (tenant: any) => {
       const users = await db.select().from(schema.users).where(eq(schema.users.tenantId, tenant.id));
       const properties = await db.select().from(schema.properties).where(eq(schema.properties.tenantId, tenant.id));
       const leads = await db.select().from(schema.leads).where(eq(schema.leads.tenantId, tenant.id));
@@ -3191,28 +3220,28 @@ export class DbStorage implements IStorage {
     const conditions: any[] = [];
 
     if (filters?.action) {
-      conditions.push(eq(schema.usageLogs.action, filters.action));
+      conditions.push(eq((schema as any).usageLogs.action, filters.action));
     }
     if (filters?.startDate) {
-      conditions.push(sql`${schema.usageLogs.createdAt} >= ${filters.startDate.toISOString()}`);
+      conditions.push(sql`${(schema as any).usageLogs.createdAt} >= ${filters.startDate.toISOString()}`);
     }
 
     const offset = (page - 1) * limit;
 
     // Get total count
     const allLogs = conditions.length > 0
-      ? await db.select().from(schema.usageLogs).where(and(...conditions))
-      : await db.select().from(schema.usageLogs);
+      ? await db.select().from((schema as any).usageLogs).where(and(...conditions))
+      : await db.select().from((schema as any).usageLogs);
 
     // Get paginated logs
     const logs = conditions.length > 0
-      ? await db.select().from(schema.usageLogs)
+      ? await db.select().from((schema as any).usageLogs)
           .where(and(...conditions))
-          .orderBy(desc(schema.usageLogs.createdAt))
+          .orderBy(desc((schema as any).usageLogs.createdAt))
           .limit(limit)
           .offset(offset)
-      : await db.select().from(schema.usageLogs)
-          .orderBy(desc(schema.usageLogs.createdAt))
+      : await db.select().from((schema as any).usageLogs)
+          .orderBy(desc((schema as any).usageLogs.createdAt))
           .limit(limit)
           .offset(offset);
 
@@ -3249,8 +3278,8 @@ export class DbStorage implements IStorage {
   async getTenantSubscription(tenantId: string) {
     const [subscription] = await db
       .select()
-      .from(schema.tenantSubscriptions)
-      .where(eq(schema.tenantSubscriptions.tenantId, tenantId))
+      .from((schema as any).tenantSubscriptions)
+      .where(eq((schema as any).tenantSubscriptions.tenantId, tenantId))
       .limit(1);
     return subscription || null;
   }
@@ -3260,9 +3289,9 @@ export class DbStorage implements IStorage {
    */
   async updateTenantSubscription(tenantId: string, data: any) {
     const [updated] = await db
-      .update(schema.tenantSubscriptions)
+      .update((schema as any).tenantSubscriptions)
       .set({ ...data, updatedAt: new Date() })
-      .where(eq(schema.tenantSubscriptions.tenantId, tenantId))
+      .where(eq((schema as any).tenantSubscriptions.tenantId, tenantId))
       .returning();
     return updated;
   }
@@ -3272,7 +3301,7 @@ export class DbStorage implements IStorage {
    */
   async createTenantSubscription(data: any) {
     const [subscription] = await db
-      .insert(schema.tenantSubscriptions)
+      .insert((schema as any).tenantSubscriptions)
       .values(data)
       .returning();
     return subscription;
@@ -3284,8 +3313,8 @@ export class DbStorage implements IStorage {
   async getPlan(planId: string) {
     const [plan] = await db
       .select()
-      .from(schema.plans)
-      .where(eq(schema.plans.id, planId))
+      .from((schema as any).plans)
+      .where(eq((schema as any).plans.id, planId))
       .limit(1);
     return plan || null;
   }
@@ -3296,9 +3325,9 @@ export class DbStorage implements IStorage {
   async getActivePlans() {
     return await db
       .select()
-      .from(schema.plans)
-      .where(eq(schema.plans.isActive, true))
-      .orderBy(schema.plans.price);
+      .from((schema as any).plans)
+      .where(eq((schema as any).plans.isActive, true))
+      .orderBy((schema as any).plans.price);
   }
 
   /**
@@ -3396,241 +3425,241 @@ export class DbStorage implements IStorage {
 
   // ==================== AUTO-MARKETING ====================
   async getAutoMarketingContent(propertyId: string): Promise<AutoMarketingContent | undefined> {
-    const [content] = await db.select().from(schema.autoMarketingContent).where(eq(schema.autoMarketingContent.propertyId, propertyId));
+    const [content] = await db.select().from((schema as any).autoMarketingContent).where(eq((schema as any).autoMarketingContent.propertyId, propertyId));
     return content;
   }
   async createAutoMarketingContent(content: InsertAutoMarketingContent): Promise<AutoMarketingContent> {
     const id = generateId();
-    const [created] = await db.insert(schema.autoMarketingContent).values({ ...content, id, createdAt: now() }).returning();
+    const [created] = await db.insert((schema as any).autoMarketingContent).values({ ...content, id, createdAt: now() }).returning();
     return created;
   }
   async updateAutoMarketingContent(id: string, content: Partial<InsertAutoMarketingContent>): Promise<AutoMarketingContent | undefined> {
-    const [updated] = await db.update(schema.autoMarketingContent).set({ ...content, updatedAt: now() }).where(eq(schema.autoMarketingContent.id, id)).returning();
+    const [updated] = await db.update((schema as any).autoMarketingContent).set({ ...content, updatedAt: now() }).where(eq((schema as any).autoMarketingContent.id, id)).returning();
     return updated;
   }
   async deleteAutoMarketingContent(id: string): Promise<boolean> {
-    await db.delete(schema.autoMarketingContent).where(eq(schema.autoMarketingContent.id, id));
+    await db.delete((schema as any).autoMarketingContent).where(eq((schema as any).autoMarketingContent.id, id));
     return true;
   }
   async getAutoMarketingContentsByTenant(tenantId: string): Promise<AutoMarketingContent[]> {
-    return db.select().from(schema.autoMarketingContent).where(eq(schema.autoMarketingContent.tenantId, tenantId)).orderBy(desc(schema.autoMarketingContent.createdAt));
+    return db.select().from((schema as any).autoMarketingContent).where(eq((schema as any).autoMarketingContent.tenantId, tenantId)).orderBy(desc((schema as any).autoMarketingContent.createdAt));
   }
 
   // ==================== AVM ====================
   async createPropertyValuation(valuation: InsertPropertyValuation): Promise<PropertyValuation> {
     const id = generateId();
-    const [created] = await db.insert(schema.propertyValuations).values({ ...valuation, id, createdAt: now() }).returning();
+    const [created] = await db.insert((schema as any).propertyValuations).values({ ...valuation, id, createdAt: now() }).returning();
     return created;
   }
   async getPropertyValuation(id: string): Promise<PropertyValuation | undefined> {
-    const [valuation] = await db.select().from(schema.propertyValuations).where(eq(schema.propertyValuations.id, id));
+    const [valuation] = await db.select().from((schema as any).propertyValuations).where(eq((schema as any).propertyValuations.id, id));
     return valuation;
   }
   async getPropertyValuationsByTenant(tenantId: string): Promise<PropertyValuation[]> {
-    return db.select().from(schema.propertyValuations).where(eq(schema.propertyValuations.tenantId, tenantId)).orderBy(desc(schema.propertyValuations.createdAt));
+    return db.select().from((schema as any).propertyValuations).where(eq((schema as any).propertyValuations.tenantId, tenantId)).orderBy(desc((schema as any).propertyValuations.createdAt));
   }
   async deletePropertyValuation(id: string): Promise<boolean> {
-    await db.delete(schema.propertyValuations).where(eq(schema.propertyValuations.id, id));
+    await db.delete((schema as any).propertyValuations).where(eq((schema as any).propertyValuations.id, id));
     return true;
   }
   async getMarketIndicesByTenant(tenantId: string, filters?: { city?: string; propertyType?: string; category?: string }): Promise<MarketIndex[]> {
-    const conditions = [eq(schema.marketIndices.tenantId, tenantId)];
-    if (filters?.city) conditions.push(eq(schema.marketIndices.city, filters.city));
-    if (filters?.propertyType) conditions.push(eq(schema.marketIndices.propertyType, filters.propertyType));
-    if (filters?.category) conditions.push(eq(schema.marketIndices.category, filters.category));
-    return db.select().from(schema.marketIndices).where(and(...conditions)).orderBy(desc(schema.marketIndices.period));
+    const conditions = [eq((schema as any).marketIndices.tenantId, tenantId)];
+    if (filters?.city) conditions.push(eq((schema as any).marketIndices.city, filters.city));
+    if (filters?.propertyType) conditions.push(eq((schema as any).marketIndices.propertyType, filters.propertyType));
+    if (filters?.category) conditions.push(eq((schema as any).marketIndices.category, filters.category));
+    return db.select().from((schema as any).marketIndices).where(and(...conditions)).orderBy(desc((schema as any).marketIndices.period));
   }
   async createMarketIndex(index: InsertMarketIndex): Promise<MarketIndex> {
     const id = generateId();
-    const [created] = await db.insert(schema.marketIndices).values({ ...index, id, createdAt: now() }).returning();
+    const [created] = await db.insert((schema as any).marketIndices).values({ ...index, id, createdAt: now() }).returning();
     return created;
   }
 
   // ==================== ISA ====================
   async getIsaConversation(id: string): Promise<IsaConversation | undefined> {
-    const [c] = await db.select().from(schema.isaConversations).where(eq(schema.isaConversations.id, id));
+    const [c] = await db.select().from((schema as any).isaConversations).where(eq((schema as any).isaConversations.id, id));
     return c;
   }
   async getIsaConversationsByTenant(tenantId: string, filters?: { status?: string; temperature?: string }): Promise<IsaConversation[]> {
-    let conditions = [eq(schema.isaConversations.tenantId, tenantId)];
-    if (filters?.status) conditions.push(eq(schema.isaConversations.status, filters.status));
-    if (filters?.temperature) conditions.push(eq(schema.isaConversations.temperature, filters.temperature));
-    return db.select().from(schema.isaConversations).where(and(...conditions)).orderBy(desc(schema.isaConversations.lastMessageAt));
+    let conditions = [eq((schema as any).isaConversations.tenantId, tenantId)];
+    if (filters?.status) conditions.push(eq((schema as any).isaConversations.status, filters.status));
+    if (filters?.temperature) conditions.push(eq((schema as any).isaConversations.temperature, filters.temperature));
+    return db.select().from((schema as any).isaConversations).where(and(...conditions)).orderBy(desc((schema as any).isaConversations.lastMessageAt));
   }
   async getIsaConversationByPhone(tenantId: string, phoneNumber: string): Promise<IsaConversation | undefined> {
-    const [c] = await db.select().from(schema.isaConversations).where(and(eq(schema.isaConversations.tenantId, tenantId), eq(schema.isaConversations.phoneNumber, phoneNumber), eq(schema.isaConversations.status, "active")));
+    const [c] = await db.select().from((schema as any).isaConversations).where(and(eq((schema as any).isaConversations.tenantId, tenantId), eq((schema as any).isaConversations.phoneNumber, phoneNumber), eq((schema as any).isaConversations.status, "active")));
     return c;
   }
   async createIsaConversation(conversation: InsertIsaConversation): Promise<IsaConversation> {
     const id = generateId();
-    const [created] = await db.insert(schema.isaConversations).values({ ...conversation, id, createdAt: now() }).returning();
+    const [created] = await db.insert((schema as any).isaConversations).values({ ...conversation, id, createdAt: now() }).returning();
     return created;
   }
   async updateIsaConversation(id: string, conversation: Partial<InsertIsaConversation>): Promise<IsaConversation | undefined> {
-    const [updated] = await db.update(schema.isaConversations).set({ ...conversation, updatedAt: now() }).where(eq(schema.isaConversations.id, id)).returning();
+    const [updated] = await db.update((schema as any).isaConversations).set({ ...conversation, updatedAt: now() }).where(eq((schema as any).isaConversations.id, id)).returning();
     return updated;
   }
   async getIsaMessages(conversationId: string): Promise<IsaMessage[]> {
-    return db.select().from(schema.isaMessages).where(eq(schema.isaMessages.conversationId, conversationId)).orderBy(schema.isaMessages.sentAt);
+    return db.select().from((schema as any).isaMessages).where(eq((schema as any).isaMessages.conversationId, conversationId)).orderBy((schema as any).isaMessages.sentAt);
   }
   async createIsaMessage(message: InsertIsaMessage): Promise<IsaMessage> {
     const id = generateId();
-    const [created] = await db.insert(schema.isaMessages).values({ ...message, id }).returning();
+    const [created] = await db.insert((schema as any).isaMessages).values({ ...message, id }).returning();
     return created;
   }
   async getIsaSettings(tenantId: string): Promise<IsaSettings | undefined> {
-    const [s] = await db.select().from(schema.isaSettings).where(eq(schema.isaSettings.tenantId, tenantId));
+    const [s] = await db.select().from((schema as any).isaSettings).where(eq((schema as any).isaSettings.tenantId, tenantId));
     return s;
   }
   async createOrUpdateIsaSettings(tenantId: string, data: Partial<InsertIsaSettings>): Promise<IsaSettings> {
     const existing = await this.getIsaSettings(tenantId);
     if (existing) {
-      const [updated] = await db.update(schema.isaSettings).set({ ...data, updatedAt: now() }).where(eq(schema.isaSettings.tenantId, tenantId)).returning();
+      const [updated] = await db.update((schema as any).isaSettings).set({ ...data, updatedAt: now() }).where(eq((schema as any).isaSettings.tenantId, tenantId)).returning();
       return updated;
     }
     const id = generateId();
-    const [created] = await db.insert(schema.isaSettings).values({ ...data, id, tenantId, createdAt: now() }).returning();
+    const [created] = await db.insert((schema as any).isaSettings).values({ ...data, id, tenantId, createdAt: now() }).returning();
     return created;
   }
   async getIsaStats(tenantId: string): Promise<{ total: number; active: number; qualified: number; transferred: number; closed: number; hot: number; warm: number; cold: number; visitsScheduled: number }> {
-    const convs = await db.select().from(schema.isaConversations).where(eq(schema.isaConversations.tenantId, tenantId));
-    return { total: convs.length, active: convs.filter(c => c.status === "active").length, qualified: convs.filter(c => c.status === "qualified").length, transferred: convs.filter(c => c.status === "transferred").length, closed: convs.filter(c => c.status === "closed").length, hot: convs.filter(c => c.temperature === "hot").length, warm: convs.filter(c => c.temperature === "warm").length, cold: convs.filter(c => c.temperature === "cold").length, visitsScheduled: convs.filter(c => c.visitScheduledId != null).length };
+    const convs = await db.select().from((schema as any).isaConversations).where(eq((schema as any).isaConversations.tenantId, tenantId));
+    return { total: convs.length, active: convs.filter((c: any) => c.status === "active").length, qualified: convs.filter((c: any) => c.status === "qualified").length, transferred: convs.filter((c: any) => c.status === "transferred").length, closed: convs.filter((c: any) => c.status === "closed").length, hot: convs.filter((c: any) => c.temperature === "hot").length, warm: convs.filter((c: any) => c.temperature === "warm").length, cold: convs.filter((c: any) => c.temperature === "cold").length, visitsScheduled: convs.filter((c: any) => c.visitScheduledId != null).length };
   }
 
   // ==================== INSPECTIONS ====================
   async getPropertyInspection(id: string): Promise<PropertyInspection | undefined> {
-    const [i] = await db.select().from(schema.propertyInspections).where(eq(schema.propertyInspections.id, id));
+    const [i] = await db.select().from((schema as any).propertyInspections).where(eq((schema as any).propertyInspections.id, id));
     return i;
   }
   async getPropertyInspectionsByTenant(tenantId: string, filters?: { propertyId?: string; type?: string; status?: string }): Promise<PropertyInspection[]> {
-    const conditions = [eq(schema.propertyInspections.tenantId, tenantId)];
-    if (filters?.propertyId) conditions.push(eq(schema.propertyInspections.propertyId, filters.propertyId));
-    if (filters?.type) conditions.push(eq(schema.propertyInspections.type, filters.type));
-    if (filters?.status) conditions.push(eq(schema.propertyInspections.status, filters.status));
-    return db.select().from(schema.propertyInspections).where(and(...conditions)).orderBy(desc(schema.propertyInspections.createdAt));
+    const conditions = [eq((schema as any).propertyInspections.tenantId, tenantId)];
+    if (filters?.propertyId) conditions.push(eq((schema as any).propertyInspections.propertyId, filters.propertyId));
+    if (filters?.type) conditions.push(eq((schema as any).propertyInspections.type, filters.type));
+    if (filters?.status) conditions.push(eq((schema as any).propertyInspections.status, filters.status));
+    return db.select().from((schema as any).propertyInspections).where(and(...conditions)).orderBy(desc((schema as any).propertyInspections.createdAt));
   }
   async createPropertyInspection(inspection: InsertPropertyInspection): Promise<PropertyInspection> {
     const id = generateId();
-    const [created] = await db.insert(schema.propertyInspections).values({ ...inspection, id, createdAt: now(), updatedAt: now() }).returning();
+    const [created] = await db.insert((schema as any).propertyInspections).values({ ...inspection, id, createdAt: now(), updatedAt: now() }).returning();
     return created;
   }
   async updatePropertyInspection(id: string, inspection: Partial<InsertPropertyInspection>): Promise<PropertyInspection | undefined> {
-    const [updated] = await db.update(schema.propertyInspections).set({ ...inspection, updatedAt: now() }).where(eq(schema.propertyInspections.id, id)).returning();
+    const [updated] = await db.update((schema as any).propertyInspections).set({ ...inspection, updatedAt: now() }).where(eq((schema as any).propertyInspections.id, id)).returning();
     return updated;
   }
   async deletePropertyInspection(id: string): Promise<boolean> {
     const rooms = await this.getInspectionRoomsByInspection(id);
-    for (const room of rooms) { await db.delete(schema.inspectionItems).where(eq(schema.inspectionItems.roomId, room.id)); }
-    await db.delete(schema.inspectionRooms).where(eq(schema.inspectionRooms.inspectionId, id));
-    await db.delete(schema.propertyInspections).where(eq(schema.propertyInspections.id, id));
+    for (const room of rooms) { await db.delete((schema as any).inspectionItems).where(eq((schema as any).inspectionItems.roomId, room.id)); }
+    await db.delete((schema as any).inspectionRooms).where(eq((schema as any).inspectionRooms.inspectionId, id));
+    await db.delete((schema as any).propertyInspections).where(eq((schema as any).propertyInspections.id, id));
     return true;
   }
   async getInspectionRoomsByInspection(inspectionId: string): Promise<InspectionRoom[]> {
-    return db.select().from(schema.inspectionRooms).where(eq(schema.inspectionRooms.inspectionId, inspectionId)).orderBy(schema.inspectionRooms.order);
+    return db.select().from((schema as any).inspectionRooms).where(eq((schema as any).inspectionRooms.inspectionId, inspectionId)).orderBy((schema as any).inspectionRooms.order);
   }
   async getInspectionRoom(id: string): Promise<InspectionRoom | undefined> {
-    const [r] = await db.select().from(schema.inspectionRooms).where(eq(schema.inspectionRooms.id, id));
+    const [r] = await db.select().from((schema as any).inspectionRooms).where(eq((schema as any).inspectionRooms.id, id));
     return r;
   }
   async createInspectionRoom(room: InsertInspectionRoom): Promise<InspectionRoom> {
     const id = generateId();
-    const [created] = await db.insert(schema.inspectionRooms).values({ ...room, id }).returning();
+    const [created] = await db.insert((schema as any).inspectionRooms).values({ ...room, id }).returning();
     return created;
   }
   async updateInspectionRoom(id: string, room: Partial<InsertInspectionRoom>): Promise<InspectionRoom | undefined> {
-    const [updated] = await db.update(schema.inspectionRooms).set(room).where(eq(schema.inspectionRooms.id, id)).returning();
+    const [updated] = await db.update((schema as any).inspectionRooms).set(room).where(eq((schema as any).inspectionRooms.id, id)).returning();
     return updated;
   }
   async deleteInspectionRoom(id: string): Promise<boolean> {
-    await db.delete(schema.inspectionItems).where(eq(schema.inspectionItems.roomId, id));
-    await db.delete(schema.inspectionRooms).where(eq(schema.inspectionRooms.id, id));
+    await db.delete((schema as any).inspectionItems).where(eq((schema as any).inspectionItems.roomId, id));
+    await db.delete((schema as any).inspectionRooms).where(eq((schema as any).inspectionRooms.id, id));
     return true;
   }
   async getInspectionItemsByRoom(roomId: string): Promise<InspectionItem[]> {
-    return db.select().from(schema.inspectionItems).where(eq(schema.inspectionItems.roomId, roomId)).orderBy(schema.inspectionItems.order);
+    return db.select().from((schema as any).inspectionItems).where(eq((schema as any).inspectionItems.roomId, roomId)).orderBy((schema as any).inspectionItems.order);
   }
   async getInspectionItem(id: string): Promise<InspectionItem | undefined> {
-    const [i] = await db.select().from(schema.inspectionItems).where(eq(schema.inspectionItems.id, id));
+    const [i] = await db.select().from((schema as any).inspectionItems).where(eq((schema as any).inspectionItems.id, id));
     return i;
   }
   async createInspectionItem(item: InsertInspectionItem): Promise<InspectionItem> {
     const id = generateId();
-    const [created] = await db.insert(schema.inspectionItems).values({ ...item, id }).returning();
+    const [created] = await db.insert((schema as any).inspectionItems).values({ ...item, id }).returning();
     return created;
   }
   async updateInspectionItem(id: string, item: Partial<InsertInspectionItem>): Promise<InspectionItem | undefined> {
-    const [updated] = await db.update(schema.inspectionItems).set(item).where(eq(schema.inspectionItems.id, id)).returning();
+    const [updated] = await db.update((schema as any).inspectionItems).set(item).where(eq((schema as any).inspectionItems.id, id)).returning();
     return updated;
   }
   async deleteInspectionItem(id: string): Promise<boolean> {
-    await db.delete(schema.inspectionItems).where(eq(schema.inspectionItems.id, id));
+    await db.delete((schema as any).inspectionItems).where(eq((schema as any).inspectionItems.id, id));
     return true;
   }
 
   // ==================== PORTAL ====================
   async getPortalAccess(id: string): Promise<ClientPortalAccess | undefined> {
-    const [a] = await db.select().from(schema.clientPortalAccess).where(eq(schema.clientPortalAccess.id, id));
+    const [a] = await db.select().from((schema as any).clientPortalAccess).where(eq((schema as any).clientPortalAccess.id, id));
     return a;
   }
   async getPortalAccessByEmail(email: string): Promise<ClientPortalAccess | undefined> {
-    const [a] = await db.select().from(schema.clientPortalAccess).where(eq(schema.clientPortalAccess.email, email));
+    const [a] = await db.select().from((schema as any).clientPortalAccess).where(eq((schema as any).clientPortalAccess.email, email));
     return a;
   }
   async getPortalAccessesByTenant(tenantId: string): Promise<ClientPortalAccess[]> {
-    return db.select().from(schema.clientPortalAccess).where(eq(schema.clientPortalAccess.tenantId, tenantId)).orderBy(desc(schema.clientPortalAccess.createdAt));
+    return db.select().from((schema as any).clientPortalAccess).where(eq((schema as any).clientPortalAccess.tenantId, tenantId)).orderBy(desc((schema as any).clientPortalAccess.createdAt));
   }
   async getPortalAccessesByClient(clientType: string, clientId: string): Promise<ClientPortalAccess[]> {
-    return db.select().from(schema.clientPortalAccess).where(and(eq(schema.clientPortalAccess.clientType, clientType), eq(schema.clientPortalAccess.clientId, clientId)));
+    return db.select().from((schema as any).clientPortalAccess).where(and(eq((schema as any).clientPortalAccess.clientType, clientType), eq((schema as any).clientPortalAccess.clientId, clientId)));
   }
   async createPortalAccess(data: InsertClientPortalAccess): Promise<ClientPortalAccess> {
     const id = generateId();
-    await db.insert(schema.clientPortalAccess).values({ ...data, id, createdAt: now(), updatedAt: now() });
+    await db.insert((schema as any).clientPortalAccess).values({ ...data, id, createdAt: now(), updatedAt: now() });
     return (await this.getPortalAccess(id))!;
   }
   async updatePortalAccess(id: string, data: Partial<InsertClientPortalAccess>): Promise<ClientPortalAccess | undefined> {
-    await db.update(schema.clientPortalAccess).set({ ...data, updatedAt: now() }).where(eq(schema.clientPortalAccess.id, id));
+    await db.update((schema as any).clientPortalAccess).set({ ...data, updatedAt: now() }).where(eq((schema as any).clientPortalAccess.id, id));
     return this.getPortalAccess(id);
   }
   async deletePortalAccess(id: string): Promise<boolean> {
-    await db.delete(schema.clientPortalAccess).where(eq(schema.clientPortalAccess.id, id));
+    await db.delete((schema as any).clientPortalAccess).where(eq((schema as any).clientPortalAccess.id, id));
     return true;
   }
   async getMaintenanceTicket(id: string): Promise<MaintenanceTicket | undefined> {
-    const [t] = await db.select().from(schema.maintenanceTickets).where(eq(schema.maintenanceTickets.id, id));
+    const [t] = await db.select().from((schema as any).maintenanceTickets).where(eq((schema as any).maintenanceTickets.id, id));
     return t;
   }
   async getMaintenanceTicketsByTenant(tenantId: string): Promise<MaintenanceTicket[]> {
-    return db.select().from(schema.maintenanceTickets).where(eq(schema.maintenanceTickets.tenantId, tenantId)).orderBy(desc(schema.maintenanceTickets.createdAt));
+    return db.select().from((schema as any).maintenanceTickets).where(eq((schema as any).maintenanceTickets.tenantId, tenantId)).orderBy(desc((schema as any).maintenanceTickets.createdAt));
   }
   async getMaintenanceTicketsByProperty(propertyId: string): Promise<MaintenanceTicket[]> {
-    return db.select().from(schema.maintenanceTickets).where(eq(schema.maintenanceTickets.propertyId, propertyId)).orderBy(desc(schema.maintenanceTickets.createdAt));
+    return db.select().from((schema as any).maintenanceTickets).where(eq((schema as any).maintenanceTickets.propertyId, propertyId)).orderBy(desc((schema as any).maintenanceTickets.createdAt));
   }
   async getMaintenanceTicketsByRequester(requestedById: string): Promise<MaintenanceTicket[]> {
-    return db.select().from(schema.maintenanceTickets).where(eq(schema.maintenanceTickets.requestedById, requestedById)).orderBy(desc(schema.maintenanceTickets.createdAt));
+    return db.select().from((schema as any).maintenanceTickets).where(eq((schema as any).maintenanceTickets.requestedById, requestedById)).orderBy(desc((schema as any).maintenanceTickets.createdAt));
   }
   async createMaintenanceTicket(data: InsertMaintenanceTicket): Promise<MaintenanceTicket> {
     const id = generateId();
-    await db.insert(schema.maintenanceTickets).values({ ...data, id, createdAt: now(), updatedAt: now() });
+    await db.insert((schema as any).maintenanceTickets).values({ ...data, id, createdAt: now(), updatedAt: now() });
     return (await this.getMaintenanceTicket(id))!;
   }
   async updateMaintenanceTicket(id: string, data: Partial<InsertMaintenanceTicket>): Promise<MaintenanceTicket | undefined> {
-    await db.update(schema.maintenanceTickets).set({ ...data, updatedAt: now() }).where(eq(schema.maintenanceTickets.id, id));
+    await db.update((schema as any).maintenanceTickets).set({ ...data, updatedAt: now() }).where(eq((schema as any).maintenanceTickets.id, id));
     return this.getMaintenanceTicket(id);
   }
 
   // ==================== ANALYTICS ====================
   async createAnalyticsEvent(event: InsertAnalyticsEvent): Promise<AnalyticsEvent> {
     const id = generateId();
-    await db.insert(schema.analyticsEvents).values({ ...event, id, createdAt: now() });
-    const [result] = await db.select().from(schema.analyticsEvents).where(eq(schema.analyticsEvents.id, id));
+    await db.insert((schema as any).analyticsEvents).values({ ...event, id, createdAt: now() });
+    const [result] = await db.select().from((schema as any).analyticsEvents).where(eq((schema as any).analyticsEvents.id, id));
     return result;
   }
   async getAnalyticsEventsByTenant(tenantId: string, filters?: { eventType?: string; startDate?: string; endDate?: string; limit?: number }): Promise<AnalyticsEvent[]> {
-    const conditions = [eq(schema.analyticsEvents.tenantId, tenantId)];
-    if (filters?.eventType) conditions.push(eq(schema.analyticsEvents.eventType, filters.eventType));
-    if (filters?.startDate) conditions.push(sql`${schema.analyticsEvents.createdAt} >= ${filters.startDate}`);
-    if (filters?.endDate) conditions.push(sql`${schema.analyticsEvents.createdAt} <= ${filters.endDate}`);
-    const query = db.select().from(schema.analyticsEvents).where(and(...conditions)).orderBy(desc(schema.analyticsEvents.createdAt));
+    const conditions = [eq((schema as any).analyticsEvents.tenantId, tenantId)];
+    if (filters?.eventType) conditions.push(eq((schema as any).analyticsEvents.eventType, filters.eventType));
+    if (filters?.startDate) conditions.push(sql`${(schema as any).analyticsEvents.createdAt} >= ${filters.startDate}`);
+    if (filters?.endDate) conditions.push(sql`${(schema as any).analyticsEvents.createdAt} <= ${filters.endDate}`);
+    const query = db.select().from((schema as any).analyticsEvents).where(and(...conditions)).orderBy(desc((schema as any).analyticsEvents.createdAt));
     if (filters?.limit) return query.limit(filters.limit);
     return query;
   }
@@ -3640,17 +3669,17 @@ export class DbStorage implements IStorage {
     if (period === 'today') startDate = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate()).toISOString();
     else if (period === 'week') { const d = new Date(nowDate); d.setDate(d.getDate() - 7); startDate = d.toISOString(); }
     else { const d = new Date(nowDate); d.setDate(d.getDate() - 30); startDate = d.toISOString(); }
-    const baseCondition = and(eq(schema.analyticsEvents.tenantId, tenantId), sql`${schema.analyticsEvents.createdAt} >= ${startDate}`);
-    const [pvResult] = await db.select({ count: sql<number>`count(*)` }).from(schema.analyticsEvents).where(and(baseCondition, eq(schema.analyticsEvents.eventType, 'pageview')));
+    const baseCondition = and(eq((schema as any).analyticsEvents.tenantId, tenantId), sql`${(schema as any).analyticsEvents.createdAt} >= ${startDate}`);
+    const [pvResult] = await db.select({ count: sql<number>`count(*)` }).from((schema as any).analyticsEvents).where(and(baseCondition, eq((schema as any).analyticsEvents.eventType, 'pageview')));
     const totalPageviews = Number(pvResult?.count || 0);
-    const topPages = await db.select({ path: schema.analyticsEvents.path, count: sql<number>`count(*)` }).from(schema.analyticsEvents).where(and(baseCondition, eq(schema.analyticsEvents.eventType, 'pageview'))).groupBy(schema.analyticsEvents.path).orderBy(sql`count(*) desc`).limit(10);
-    const vitalsRaw = await db.select({ name: schema.analyticsEvents.metricName, avg: sql<number>`avg(${schema.analyticsEvents.metricValue})` }).from(schema.analyticsEvents).where(and(baseCondition, eq(schema.analyticsEvents.eventType, 'vital'))).groupBy(schema.analyticsEvents.metricName);
+    const topPages = await db.select({ path: (schema as any).analyticsEvents.path, count: sql<number>`count(*)` }).from((schema as any).analyticsEvents).where(and(baseCondition, eq((schema as any).analyticsEvents.eventType, 'pageview'))).groupBy((schema as any).analyticsEvents.path).orderBy(sql`count(*) desc`).limit(10);
+    const vitalsRaw = await db.select({ name: (schema as any).analyticsEvents.metricName, avg: sql<number>`avg(${(schema as any).analyticsEvents.metricValue})` }).from((schema as any).analyticsEvents).where(and(baseCondition, eq((schema as any).analyticsEvents.eventType, 'vital'))).groupBy((schema as any).analyticsEvents.metricName);
     const webVitals = vitalsRaw.map((v: any) => { const avg = Number(v.avg || 0); let rating = 'good'; if (v.name === 'LCP') rating = avg <= 2500 ? 'good' : avg <= 4000 ? 'needs-improvement' : 'poor'; else if (v.name === 'CLS') rating = avg <= 0.1 ? 'good' : avg <= 0.25 ? 'needs-improvement' : 'poor'; return { name: v.name || '', avg: Math.round(avg * 100) / 100, rating }; });
-    const [errResult] = await db.select({ count: sql<number>`count(*)` }).from(schema.analyticsEvents).where(and(baseCondition, eq(schema.analyticsEvents.eventType, 'error')));
+    const [errResult] = await db.select({ count: sql<number>`count(*)` }).from((schema as any).analyticsEvents).where(and(baseCondition, eq((schema as any).analyticsEvents.eventType, 'error')));
     const errorCount = Number(errResult?.count || 0);
-    const [sessResult] = await db.select({ count: sql<number>`count(distinct ${schema.analyticsEvents.sessionId})` }).from(schema.analyticsEvents).where(baseCondition);
+    const [sessResult] = await db.select({ count: sql<number>`count(distinct ${(schema as any).analyticsEvents.sessionId})` }).from((schema as any).analyticsEvents).where(baseCondition);
     const uniqueSessions = Number(sessResult?.count || 0);
-    const pageviewsByDay = await db.select({ date: sql<string>`date(${schema.analyticsEvents.createdAt})`, count: sql<number>`count(*)` }).from(schema.analyticsEvents).where(and(baseCondition, eq(schema.analyticsEvents.eventType, 'pageview'))).groupBy(sql`date(${schema.analyticsEvents.createdAt})`).orderBy(sql`date(${schema.analyticsEvents.createdAt})`);
+    const pageviewsByDay = await db.select({ date: sql<string>`date(${(schema as any).analyticsEvents.createdAt})`, count: sql<number>`count(*)` }).from((schema as any).analyticsEvents).where(and(baseCondition, eq((schema as any).analyticsEvents.eventType, 'pageview'))).groupBy(sql`date(${(schema as any).analyticsEvents.createdAt})`).orderBy(sql`date(${(schema as any).analyticsEvents.createdAt})`);
     return { totalPageviews, topPages: topPages.map((p: any) => ({ path: p.path || '/', count: Number(p.count) })), webVitals, errorCount, uniqueSessions, pageviewsByDay: pageviewsByDay.map((d: any) => ({ date: d.date, count: Number(d.count) })) };
   }
 

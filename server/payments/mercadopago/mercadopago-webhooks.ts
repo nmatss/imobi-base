@@ -9,42 +9,129 @@ import { storage } from '../../storage';
 import * as Sentry from '@sentry/node';
 
 /**
+ * Extract tenant ID from payment metadata.
+ * MercadoPagoService stores it as metadata.tenant_id when creating payments.
+ */
+function getTenantIdFromMetadata(metadata: Record<string, any> | undefined): string | null {
+  if (!metadata) return null;
+  // MercadoPago lowercases and snake_cases metadata keys
+  return metadata.tenant_id || metadata.tenantId || null;
+}
+
+/**
  * Handle payment notification
  */
 async function handlePaymentNotification(paymentId: string): Promise<void> {
   try {
     const paymentStatus = await MercadoPagoService.getPaymentStatus(paymentId);
 
-    console.log(`📨 Payment notification received: ${paymentId}, status: ${paymentStatus.status}`);
+    console.log(`Payment notification received: ${paymentId}, status: ${paymentStatus.status}`);
 
-    // Get tenant from payment metadata
-    // Note: You'll need to store payment records in your database with tenant association
-    // For now, we'll just log the payment status
+    const tenantId = getTenantIdFromMetadata(paymentStatus.metadata);
+    if (!tenantId) {
+      console.warn(`No tenant ID found in payment metadata for payment ${paymentId}`);
+      Sentry.captureMessage('Payment webhook missing tenant ID in metadata', {
+        level: 'warning',
+        tags: { webhook: 'mercadopago', event: 'payment' },
+        extra: { paymentId, metadata: paymentStatus.metadata },
+      });
+      return;
+    }
 
     if (paymentStatus.status === 'approved') {
-      console.log(`✅ Payment approved: ${paymentId}, amount: R$ ${paymentStatus.transactionAmount}`);
+      const now = new Date();
+      const periodEnd = new Date(now);
+      periodEnd.setDate(periodEnd.getDate() + 30);
 
-      // Here you would:
-      // 1. Update tenant subscription status to active
-      // 2. Generate and send invoice
-      // 3. Send payment confirmation email
-      // 4. Update billing records
+      await storage.updateTenantSubscription(tenantId, {
+        status: 'active',
+        currentPeriodStart: now,
+        currentPeriodEnd: periodEnd,
+      });
+
+      console.log(
+        `Payment approved for tenant ${tenantId}: ${paymentId}, amount: R$ ${paymentStatus.transactionAmount}`
+      );
     } else if (paymentStatus.status === 'rejected') {
-      console.log(`❌ Payment rejected: ${paymentId}, reason: ${paymentStatus.statusDetail}`);
+      console.log(
+        `Payment rejected for tenant ${tenantId}: ${paymentId}, reason: ${paymentStatus.statusDetail}`
+      );
 
-      // Here you would:
-      // 1. Send payment failure notification
-      // 2. Allow retry
+      Sentry.captureMessage('MercadoPago payment rejected', {
+        level: 'warning',
+        tags: { webhook: 'mercadopago', event: 'payment_rejected' },
+        extra: {
+          paymentId,
+          tenantId,
+          statusDetail: paymentStatus.statusDetail,
+          transactionAmount: paymentStatus.transactionAmount,
+        },
+      });
+    } else if (paymentStatus.status === 'refunded') {
+      await storage.updateTenantSubscription(tenantId, {
+        status: 'suspended',
+      });
+
+      console.log(`Payment refunded for tenant ${tenantId}: ${paymentId}`);
+
+      Sentry.captureMessage('MercadoPago payment refunded', {
+        level: 'info',
+        tags: { webhook: 'mercadopago', event: 'payment_refunded' },
+        extra: { paymentId, tenantId, transactionAmount: paymentStatus.transactionAmount },
+      });
     } else if (paymentStatus.status === 'in_process') {
-      console.log(`⏳ Payment in process: ${paymentId}`);
-
+      console.log(`Payment in process for tenant ${tenantId}: ${paymentId}`);
       // For PIX and Boleto, this is the initial state
-      // Payment is waiting for customer action
+      // Payment is waiting for customer action -- no subscription update needed
     }
   } catch (error) {
     Sentry.captureException(error, {
       tags: { webhook: 'mercadopago', event: 'payment' },
       extra: { paymentId },
+    });
+    throw error;
+  }
+}
+
+/**
+ * Handle subscription preapproval notification.
+ * Fired when a MercadoPago subscription is created or updated.
+ */
+async function handleSubscriptionPreapproval(dataId: string): Promise<void> {
+  try {
+    // Subscription preapproval events indicate subscription lifecycle changes.
+    // The data.id refers to the preapproval (subscription) ID.
+    // Since we create payments with tenant_id in metadata, we log and track
+    // but actual subscription state changes happen through payment notifications.
+    console.log(`Subscription preapproval notification: ${dataId}`);
+
+    Sentry.addBreadcrumb({
+      category: 'mercadopago',
+      message: `Subscription preapproval received: ${dataId}`,
+      level: 'info',
+    });
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { webhook: 'mercadopago', event: 'subscription_preapproval' },
+      extra: { dataId },
+    });
+    throw error;
+  }
+}
+
+/**
+ * Handle subscription authorized payment notification.
+ * Fired when a recurring subscription payment is authorized by MercadoPago.
+ */
+async function handleSubscriptionAuthorizedPayment(dataId: string): Promise<void> {
+  try {
+    // The authorized_payment data.id is a payment ID -- process it like a regular payment
+    console.log(`Subscription authorized payment notification: ${dataId}`);
+    await handlePaymentNotification(dataId);
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { webhook: 'mercadopago', event: 'subscription_authorized_payment' },
+      extra: { dataId },
     });
     throw error;
   }
@@ -75,7 +162,7 @@ export async function handleMercadoPagoWebhook(req: Request, res: Response): Pro
       }
     }
 
-    console.log(`📨 Mercado Pago webhook: ${type}`);
+    console.log(`Mercado Pago webhook: ${type}`);
 
     // Handle different notification types
     switch (type) {
@@ -86,12 +173,15 @@ export async function handleMercadoPagoWebhook(req: Request, res: Response): Pro
         break;
 
       case 'subscription_preapproval':
-        console.log('Subscription notification received:', data);
-        // Handle subscription notifications if using Mercado Pago subscriptions
+        if (data?.id) {
+          await handleSubscriptionPreapproval(data.id);
+        }
         break;
 
       case 'subscription_authorized_payment':
-        console.log('Subscription payment authorized:', data);
+        if (data?.id) {
+          await handleSubscriptionAuthorizedPayment(data.id);
+        }
         break;
 
       default:
@@ -123,7 +213,7 @@ export async function handleMercadoPagoIPN(req: Request, res: Response): Promise
       return;
     }
 
-    console.log(`📨 Mercado Pago IPN: topic=${topic}, id=${id}`);
+    console.log(`Mercado Pago IPN: topic=${topic}, id=${id}`);
 
     if (topic === 'payment') {
       await handlePaymentNotification(id as string);

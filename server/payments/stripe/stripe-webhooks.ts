@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Stripe Webhook Handlers
  * Processes Stripe webhook events
@@ -8,6 +7,7 @@ import type { Request, Response } from 'express';
 import Stripe from 'stripe';
 import { StripeService } from './stripe-service';
 import { storage } from '../../storage';
+import { getEmailService } from '../../email/email-service';
 import * as Sentry from '@sentry/node';
 
 /**
@@ -30,10 +30,11 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription): Pro
     }
 
     // Update tenant subscription status
+    const firstItem = subscription.items.data[0];
     await storage.updateTenantSubscription(tenantId, {
       status: subscription.status === 'trialing' ? 'trial' : 'active',
-      currentPeriodStart: new Date(subscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      currentPeriodStart: firstItem ? new Date(firstItem.current_period_start * 1000) : new Date(),
+      currentPeriodEnd: firstItem ? new Date(firstItem.current_period_end * 1000) : new Date(),
       trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
     });
 
@@ -75,10 +76,11 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Pro
       status = 'trial';
     }
 
+    const firstItem = subscription.items.data[0];
     await storage.updateTenantSubscription(tenantId, {
       status,
-      currentPeriodStart: new Date(subscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      currentPeriodStart: firstItem ? new Date(firstItem.current_period_start * 1000) : new Date(),
+      currentPeriodEnd: firstItem ? new Date(firstItem.current_period_end * 1000) : new Date(),
       cancelledAt: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
     });
 
@@ -152,10 +154,36 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice): Promise<v
     // Log successful payment
     console.log(`✅ Payment succeeded for tenant ${tenantId}, amount: ${(invoice.amount_paid / 100).toFixed(2)} ${invoice.currency}`);
 
-    // Here you could:
-    // - Send payment confirmation email
-    // - Generate and send invoice PDF
-    // - Update internal billing records
+    // Send payment confirmation email
+    try {
+      const tenant = await storage.getTenant(tenantId);
+      if (tenant?.email) {
+        const emailService = getEmailService();
+        await emailService.sendTemplate(
+          'payment-confirmation',
+          tenant.email,
+          'Pagamento Confirmado',
+          {
+            clientName: tenant.name,
+            amount: `R$ ${(invoice.amount_paid / 100).toFixed(2)}`,
+            transactionId: invoice.id,
+            paymentDate: new Date().toLocaleDateString('pt-BR'),
+            invoiceNumber: invoice.number || undefined,
+            paymentMethod: invoice.collection_method === 'charge_automatically' ? 'Cartão de Crédito' : 'Boleto',
+            receiptUrl: invoice.hosted_invoice_url || undefined,
+          },
+          { companyName: tenant.name, email: tenant.email },
+          { queue: true }
+        );
+        console.log(`📧 Payment confirmation email sent to ${tenant.email}`);
+      }
+    } catch (emailError) {
+      console.error(`Failed to send payment confirmation email for tenant ${tenantId}:`, emailError);
+      Sentry.captureException(emailError, {
+        tags: { webhook: 'stripe', event: 'invoice.payment_succeeded', action: 'send_email' },
+        extra: { tenantId, invoiceId: invoice.id },
+      });
+    }
   } catch (error) {
     Sentry.captureException(error, {
       tags: { webhook: 'stripe', event: 'invoice.payment_succeeded' },
@@ -195,14 +223,102 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void
 
     console.log(`⚠️  Payment failed for tenant ${tenantId}, invoice: ${invoice.id}`);
 
-    // Here you could:
-    // - Send payment failure notification
-    // - Update billing status
-    // - Restrict access to features
+    // Send payment failure notification email
+    try {
+      const tenant = await storage.getTenant(tenantId);
+      if (tenant?.email) {
+        const emailService = getEmailService();
+        const lastError = invoice.last_finalization_error;
+        await emailService.sendTemplate(
+          'payment-failed',
+          tenant.email,
+          'Falha no Pagamento - Ação Necessária',
+          {
+            clientName: tenant.name,
+            amount: `R$ ${(invoice.amount_due / 100).toFixed(2)}`,
+            invoiceNumber: invoice.number || invoice.id,
+            failureReason: lastError?.message || 'O pagamento não pôde ser processado. Verifique seus dados de pagamento.',
+            retryUrl: invoice.hosted_invoice_url || undefined,
+          },
+          { companyName: tenant.name, email: tenant.email },
+          { queue: true }
+        );
+        console.log(`📧 Payment failure notification sent to ${tenant.email}`);
+      }
+    } catch (emailError) {
+      console.error(`Failed to send payment failure email for tenant ${tenantId}:`, emailError);
+      Sentry.captureException(emailError, {
+        tags: { webhook: 'stripe', event: 'invoice.payment_failed', action: 'send_email' },
+        extra: { tenantId, invoiceId: invoice.id },
+      });
+    }
   } catch (error) {
     Sentry.captureException(error, {
       tags: { webhook: 'stripe', event: 'invoice.payment_failed' },
       extra: { invoiceId: invoice.id },
+    });
+    throw error;
+  }
+}
+
+/**
+ * Handle customer.subscription.trial_will_end event
+ */
+async function handleTrialWillEnd(subscription: Stripe.Subscription): Promise<void> {
+  try {
+    const customerId = typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer.id;
+
+    const customer = await StripeService.getCustomer(customerId);
+    if ('deleted' in customer) {
+      throw new Error('Customer has been deleted');
+    }
+
+    const tenantId = customer.metadata?.tenantId;
+    if (!tenantId) {
+      throw new Error('Tenant ID not found in customer metadata');
+    }
+
+    console.log(`⏰ Trial ending soon for tenant ${tenantId}, subscription: ${subscription.id}`);
+
+    // Send trial ending notification email
+    try {
+      const tenant = await storage.getTenant(tenantId);
+      if (tenant?.email) {
+        const trialEnd = subscription.trial_end
+          ? new Date(subscription.trial_end * 1000)
+          : new Date();
+        const daysRemaining = Math.max(0, Math.ceil((trialEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+
+        const emailService = getEmailService();
+        await emailService.sendTemplate(
+          'subscription-ending',
+          tenant.email,
+          'Seu período de teste está acabando',
+          {
+            userName: tenant.name,
+            daysRemaining,
+            planName: subscription.items.data[0]?.price?.nickname || 'ImobiBase',
+            expirationDate: trialEnd.toLocaleDateString('pt-BR'),
+            renewUrl: `${process.env.APP_URL || 'https://app.imobibase.com'}/settings/billing`,
+          },
+          { companyName: tenant.name, email: tenant.email },
+          { queue: true }
+        );
+        console.log(`📧 Trial ending notification sent to ${tenant.email}`);
+      }
+    } catch (emailError) {
+      console.error(`Failed to send trial ending email for tenant ${tenantId}:`, emailError);
+      Sentry.captureException(emailError, {
+        tags: { webhook: 'stripe', event: 'trial_will_end', action: 'send_email' },
+        extra: { tenantId, subscriptionId: subscription.id },
+      });
+    }
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { webhook: 'stripe', event: 'trial_will_end' },
+      extra: { subscriptionId: subscription.id },
     });
     throw error;
   }
@@ -251,8 +367,7 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
         break;
 
       case 'customer.subscription.trial_will_end':
-        // Handle trial ending soon (send notification)
-        console.log(`⏰ Trial ending soon for subscription: ${event.data.object.id}`);
+        await handleTrialWillEnd(event.data.object as Stripe.Subscription);
         break;
 
       default:

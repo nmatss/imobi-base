@@ -19,13 +19,6 @@ initializeAnalytics();
 if (import.meta.env.PROD) {
   import('web-vitals').then(({ onCLS, onFCP, onLCP, onTTFB, onINP }) => {
     const sendToAnalytics = ({ name, value, id, rating }: { name: string; value: number; id: string; rating: 'good' | 'needs-improvement' | 'poor' }) => {
-      // Log to console in production
-      console.log(`[Web Vital] ${name}:`, {
-        value: Math.round(name === 'CLS' ? value * 1000 : value),
-        id,
-        rating,
-      });
-
       // Track in analytics
       trackWebVital(name, value, id, rating);
 

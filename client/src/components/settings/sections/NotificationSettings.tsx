@@ -72,7 +72,7 @@ export function NotificationSettings() {
     onSave: async (data) => {
       // Simular API call
       await new Promise((resolve) => setTimeout(resolve, 500));
-      console.log("Saving notification preferences:", data);
+      if (import.meta.env.DEV) console.log("Saving notification preferences:", data);
     },
     delay: 1000,
     enabled: true,

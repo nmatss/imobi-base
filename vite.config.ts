@@ -20,42 +20,41 @@ export default defineConfig(({ mode }) => ({
       brotliSize: true,
       template: "treemap", // 'sunburst', 'treemap', 'network', 'raw-data', 'list'
     }),
-    // PWA Support - DISABLED TEMPORARILY FOR DEBUGGING
-    // VitePWA({
-    //   registerType: 'autoUpdate',
-    //   includeAssets: ['favicon.ico'],
-    //   manifest: {
-    //     name: 'ImobiBase',
-    //     short_name: 'ImobiBase',
-    //     description: 'Sistema de gestão imobiliária completo',
-    //     theme_color: '#1E7BE8',
-    //     background_color: '#ffffff',
-    //     display: 'standalone',
-    //     icons: [
-    //       {
-    //         src: '/favicon.ico',
-    //         sizes: 'any',
-    //         type: 'image/x-icon',
-    //       },
-    //     ],
-    //   },
-    //   workbox: {
-    //     globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-    //     runtimeCaching: [
-    //       {
-    //         urlPattern: /^https:\/\/api\./,
-    //         handler: 'NetworkFirst',
-    //         options: {
-    //           cacheName: 'api-cache',
-    //           expiration: {
-    //             maxEntries: 100,
-    //             maxAgeSeconds: 60 * 60, // 1 hour
-    //           },
-    //         },
-    //       },
-    //     ],
-    //   },
-    // }),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.ico'],
+      manifest: {
+        name: 'ImobiBase',
+        short_name: 'ImobiBase',
+        description: 'Sistema de gestão imobiliária completo',
+        theme_color: '#1E7BE8',
+        background_color: '#ffffff',
+        display: 'standalone',
+        icons: [
+          {
+            src: '/favicon.ico',
+            sizes: 'any',
+            type: 'image/x-icon',
+          },
+        ],
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/api\./,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-cache',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60,
+              },
+            },
+          },
+        ],
+      },
+    }),
     // Sentry plugin - Upload source maps in production
     mode === 'production' && process.env.SENTRY_AUTH_TOKEN && sentryVitePlugin({
       org: process.env.SENTRY_ORG,

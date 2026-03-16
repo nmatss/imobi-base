@@ -25,11 +25,13 @@ import cors from "cors";
 import { registerSecurityRoutes } from "./routes-security";
 import { registerFeatureRoutes } from "./routes-features";
 import { registerPaymentRoutes } from "./routes-payments";
+import { registerCronRoutes } from "./routes-cron";
 import mapsRouter from "./routes-maps";
 import analyticsRouter from "./routes-analytics";
 import { secretManager } from "./security/secret-manager";
 const { Pool } = pkg;
 import { generateRateLimitKey } from "./middleware/rate-limit-key-generator";
+import { subscriptionGuard } from "./middleware/subscription-guard";
 
 // ===== VALIDATION HELPERS =====
 const isValidEmail = (email: string): boolean => {
@@ -118,7 +120,7 @@ const csrfExcludedPaths = [
  * Validates that cookie token matches header token for state-changing requests
  * Uses timing-safe comparison to prevent timing attacks
  */
-function csrfProtection(req: Request, res: Response, next: NextFunction): void {
+function csrfProtection(req: Request, res: Response, next: NextFunction): void | Response {
   const method = req.method.toUpperCase();
 
   // Skip safe methods
@@ -626,6 +628,9 @@ export async function registerRoutes(
       }
     };
   };
+
+  // Subscription enforcement - blocks suspended/cancelled tenants
+  app.use(subscriptionGuard);
 
   // ===== HEALTH CHECK & MONITORING =====
   /**
@@ -2899,6 +2904,9 @@ export async function registerRoutes(
 
   // Register analytics routes
   app.use('/api/analytics', analyticsRouter);
+
+  // Register Vercel Cron endpoints (protected by CRON_SECRET)
+  registerCronRoutes(app);
 
   // ===== CORS ERROR HANDLER =====
   // Handle CORS violations with proper logging

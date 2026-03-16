@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Mercado Pago Service
  * Handles Mercado Pago payment operations (PIX, Boleto, Credit Card)
@@ -56,6 +55,7 @@ export interface MercadoPagoPaymentStatus {
   qrCode?: string;
   qrCodeBase64?: string;
   boletoUrl?: string;
+  metadata?: Record<string, any>;
 }
 
 export class MercadoPagoService {
@@ -208,6 +208,7 @@ export class MercadoPagoService {
         qrCode: result.point_of_interaction?.transaction_data?.qr_code,
         qrCodeBase64: result.point_of_interaction?.transaction_data?.qr_code_base64,
         boletoUrl: result.transaction_details?.external_resource_url,
+        metadata: result.metadata,
       };
     } catch (error) {
       Sentry.captureException(error, {
@@ -238,6 +239,7 @@ export class MercadoPagoService {
    */
   static async createPreference(data: {
     items: Array<{
+      id: string;
       title: string;
       quantity: number;
       unit_price: number;

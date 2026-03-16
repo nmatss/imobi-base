@@ -115,14 +115,14 @@ export function AdvancedFiltersExample() {
                   featured={property.featured}
                   imageUrl={property.images?.[0]}
                   imageCount={property.images?.length || 0}
-                  onView={(id) => console.log("View:", id)}
-                  onEdit={(id) => console.log("Edit:", id)}
-                  onDelete={(id) => console.log("Delete:", id)}
-                  onShare={(id) => console.log("Share:", id)}
-                  onToggleFeatured={(id) => console.log("Toggle Featured:", id)}
-                  onCopyLink={(id) => console.log("Copy Link:", id)}
-                  onScheduleVisit={(id) => console.log("Schedule Visit:", id)}
-                  onImageClick={(id) => console.log("Image Click:", id)}
+                  onView={(id) => { if (import.meta.env.DEV) console.log("View:", id); }}
+                  onEdit={(id) => { if (import.meta.env.DEV) console.log("Edit:", id); }}
+                  onDelete={(id) => { if (import.meta.env.DEV) console.log("Delete:", id); }}
+                  onShare={(id) => { if (import.meta.env.DEV) console.log("Share:", id); }}
+                  onToggleFeatured={(id) => { if (import.meta.env.DEV) console.log("Toggle Featured:", id); }}
+                  onCopyLink={(id) => { if (import.meta.env.DEV) console.log("Copy Link:", id); }}
+                  onScheduleVisit={(id) => { if (import.meta.env.DEV) console.log("Schedule Visit:", id); }}
+                  onImageClick={(id) => { if (import.meta.env.DEV) console.log("Image Click:", id); }}
                 />
               ))}
             </div>

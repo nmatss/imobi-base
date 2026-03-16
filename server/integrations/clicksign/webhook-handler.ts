@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * ClickSign Webhook Handler
  * Processes webhook events from ClickSign and updates database
@@ -142,7 +141,7 @@ export class WebhookHandler {
       });
 
       // TODO: Send notification to relevant parties
-      // TODO: Download and store signed document
+      // NOTE: Document download requires ClickSign API client integration (out of scope for now)
       // TODO: Update rental contract status if applicable
 
       console.log('Contract signed successfully:', contract.id);
@@ -204,10 +203,29 @@ export class WebhookHandler {
     if (!signerEmail || !signedAt) return;
 
     try {
+      // Look up the contract by document key to fill in tenantId
+      const documentKey = event.data.list?.key || event.data.document?.key;
+      let tenantId = '';
+      let contractId: string | undefined;
+
+      if (documentKey) {
+        const contracts = await db
+          .select()
+          .from(schema.contracts)
+          .where(eq(schema.contracts.clicksignDocumentKey, documentKey))
+          .limit(1);
+
+        if (contracts.length > 0) {
+          tenantId = contracts[0].tenantId;
+          contractId = contracts[0].id;
+        }
+      }
+
       await this.logAuditEvent({
-        tenantId: '', // Will be filled from contract lookup
+        tenantId,
+        contractId,
         eventType: 'signer_signed',
-        documentKey: '',
+        documentKey: documentKey || '',
         occurredAt: new Date(event.occurred_at),
         metadata: {
           email: signerEmail,
@@ -216,7 +234,6 @@ export class WebhookHandler {
         },
       });
 
-      // TODO: Update signer status in database
       // TODO: Send notification to contract creator
       // TODO: Check if all signers have signed and trigger completion
 
@@ -263,10 +280,34 @@ export class WebhookHandler {
     if (!signerEmail || !refusedAt) return;
 
     try {
+      const documentKey = event.data.list?.key || event.data.document?.key;
+      let tenantId = '';
+      let contractId: string | undefined;
+
+      if (documentKey) {
+        const contracts = await db
+          .select()
+          .from(schema.contracts)
+          .where(eq(schema.contracts.clicksignDocumentKey, documentKey))
+          .limit(1);
+
+        if (contracts.length > 0) {
+          tenantId = contracts[0].tenantId;
+          contractId = contracts[0].id;
+
+          // Update contract status to rejected
+          await db
+            .update(schema.contracts)
+            .set({ status: 'rejected', updatedAt: new Date() })
+            .where(eq(schema.contracts.id, contracts[0].id));
+        }
+      }
+
       await this.logAuditEvent({
-        tenantId: '',
+        tenantId,
+        contractId,
         eventType: 'signer_refused',
-        documentKey: '',
+        documentKey: documentKey || '',
         occurredAt: new Date(event.occurred_at),
         metadata: {
           email: signerEmail,
@@ -274,7 +315,6 @@ export class WebhookHandler {
         },
       });
 
-      // TODO: Update contract status to rejected/refused
       // TODO: Notify contract creator about refusal
 
       console.log('Signer refused document:', signerEmail);
@@ -391,21 +431,18 @@ export class WebhookHandler {
     metadata: unknown;
   }): Promise<void> {
     try {
-      // Store in audit logs table
-      // This would require an audit_logs table in the schema
-      console.log('Audit log:', event);
-
-      // TODO: Implement proper audit logging when table is available
-      // await db.insert(schema.auditLogs).values({
-      //   tenantId: event.tenantId,
-      //   entityType: 'contract',
-      //   entityId: event.contractId,
-      //   action: event.eventType,
-      //   metadata: event.metadata,
-      //   occurredAt: event.occurredAt,
-      // });
+      await db.insert(schema.auditLogs).values({
+        tenantId: event.tenantId,
+        entityType: 'contract',
+        entityId: event.contractId,
+        action: event.eventType,
+        metadata: event.metadata,
+        occurredAt: event.occurredAt,
+      });
     } catch (error) {
+      // Fall back to console logging if DB insert fails
       console.error('Failed to log audit event:', error);
+      console.log('Audit log (fallback):', event);
     }
   }
 

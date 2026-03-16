@@ -57,7 +57,7 @@ export function initializeAnalytics() {
         }
       },
     });
-    console.log("✅ PostHog initialized");
+    if (isDevelopment) console.log("PostHog initialized");
   }
 
   // Google Analytics 4
@@ -68,11 +68,11 @@ export function initializeAnalytics() {
         cookieFlags: "SameSite=None;Secure",
       },
     });
-    console.log("✅ Google Analytics initialized");
+    if (isDevelopment) console.log("Google Analytics initialized");
   }
 
   // Web Vitals (already initialized in main.tsx)
-  console.log("✅ Analytics providers initialized");
+  if (isDevelopment) console.log("Analytics providers initialized");
 }
 
 /**

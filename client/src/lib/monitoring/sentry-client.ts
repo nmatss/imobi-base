@@ -146,7 +146,7 @@ export function initializeSentryClient() {
     release: import.meta.env.VITE_VERCEL_GIT_COMMIT_SHA || "development",
   });
 
-  console.log("✅ Sentry client initialized for error tracking");
+  if (isDevelopment) console.log("Sentry client initialized for error tracking");
 }
 
 /**
@@ -175,7 +175,7 @@ export function captureMessage(
   context?: Record<string, any>
 ) {
   if (!SENTRY_DSN) {
-    console.log(`[${level}]`, message, context);
+    if (isDevelopment) console.log(`[${level}]`, message, context);
     return;
   }
 

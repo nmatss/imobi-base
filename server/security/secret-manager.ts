@@ -48,6 +48,36 @@ const SECRET_CONFIGS: Record<string, SecretConfig> = {
     pattern: /^SG\./,
     description: 'SendGrid API key for emails',
   },
+  MERCADOPAGO_ACCESS_TOKEN: {
+    required: false,
+    pattern: /^APP_USR-/,
+    description: 'MercadoPago access token for payments (Brazil)',
+  },
+  SENTRY_DSN: {
+    required: false,
+    pattern: /^https:\/\/.*\.ingest\.sentry\.io/,
+    description: 'Sentry DSN for error tracking',
+  },
+  CLICKSIGN_API_KEY: {
+    required: false,
+    pattern: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+    description: 'ClickSign API key for e-signatures (UUID format)',
+  },
+  CLICKSIGN_WEBHOOK_SECRET: {
+    required: false,
+    minLength: 16,
+    description: 'ClickSign webhook HMAC verification secret',
+  },
+  REDIS_URL: {
+    required: false,
+    pattern: /^rediss?:\/\//,
+    description: 'Redis connection URL for caching and sessions',
+  },
+  CRON_SECRET: {
+    required: false,
+    minLength: 32,
+    description: 'Secret for authenticating Vercel Cron job requests',
+  },
 };
 
 class SecretManager {

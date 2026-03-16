@@ -142,6 +142,7 @@ export const contracts = sqliteTable("contracts", {
   status: text("status").notNull().default("draft"),
   value: text("value").notNull(),
   terms: text("terms"),
+  clicksignDocumentKey: text("clicksign_document_key"),
   signedAt: text("signed_at"),
   createdAt: text("created_at").notNull().default(now()),
   updatedAt: text("updated_at").notNull().default(now()),
@@ -643,6 +644,7 @@ export const auditLogs = sqliteTable("audit_logs", {
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
   metadata: text("metadata"), // Additional context as JSON
+  occurredAt: text("occurred_at").notNull().default(now()),
   createdAt: text("created_at").notNull().default(now()),
 });
 
