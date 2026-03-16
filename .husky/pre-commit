@@ -4,9 +4,9 @@
 # Run lint-staged
 npx lint-staged
 
-# Run type check on staged files
-echo "Running TypeScript type check..."
-npx tsc --noEmit
+# Run type check (skip full project check - use CI for that)
+# echo "Running TypeScript type check..."
+# npx tsc --noEmit
 
 # Run tests related to changed files
 echo "Running tests for changed files..."

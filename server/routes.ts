@@ -58,9 +58,9 @@ const isValidDate = (dateString: string): boolean => {
   return !isNaN(date.getTime());
 };
 
-const sanitizePagination = (page: unknown, limit: unknown, maxLimit: number = 100): { page: number; limit: number } => {
-  const parsedPage = Math.max(1, parseInt(page) || 1);
-  const parsedLimit = Math.min(maxLimit, Math.max(1, parseInt(limit) || 50));
+const sanitizePagination = (page: string | number | undefined, limit: string | number | undefined, maxLimit: number = 100): { page: number; limit: number } => {
+  const parsedPage = Math.max(1, parseInt(String(page)) || 1);
+  const parsedLimit = Math.min(maxLimit, Math.max(1, parseInt(String(limit)) || 50));
   return { page: parsedPage, limit: parsedLimit };
 };
 
@@ -281,11 +281,13 @@ export async function registerRoutes(
         styleSrc: [
           "'self'",
           "https://fonts.googleapis.com",
-          (_req: Request, res: Response) => `'nonce-${res.locals.cspNonce}'`,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (_req: any, res: any) => `'nonce-${res.locals.cspNonce}'`,
         ],
         scriptSrc: [
           "'self'",
-          (_req: Request, res: Response) => `'nonce-${res.locals.cspNonce}'`,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (_req: any, res: any) => `'nonce-${res.locals.cspNonce}'`,
         ],
         imgSrc: [
           "'self'",
@@ -619,7 +621,7 @@ export async function registerRoutes(
           return res.status(403).json({ error: "Permissões não configuradas" });
         }
 
-        const modulePerms = permissions[module];
+        const modulePerms = (permissions as Record<string, Record<string, boolean>>)[module];
         if (!modulePerms || typeof modulePerms !== 'object') {
           return res.status(403).json({ error: `Sem acesso ao módulo ${module}` });
         }

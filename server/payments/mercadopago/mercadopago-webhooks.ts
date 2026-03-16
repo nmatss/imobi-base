@@ -15,7 +15,7 @@ import * as Sentry from '@sentry/node';
 function getTenantIdFromMetadata(metadata: Record<string, unknown> | undefined): string | null {
   if (!metadata) return null;
   // MercadoPago lowercases and snake_cases metadata keys
-  return metadata.tenant_id || metadata.tenantId || null;
+  return (metadata.tenant_id as string) || (metadata.tenantId as string) || null;
 }
 
 /**
