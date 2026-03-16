@@ -1229,3 +1229,28 @@ export const files = sqliteTable("files", {
 export const insertFileSchema = createInsertSchema(files).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertFile = z.infer<typeof insertFileSchema>;
 export type File = typeof files.$inferSelect;
+
+export const analyticsEvents = sqliteTable("analytics_events", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id"),
+  eventType: text("event_type").notNull(), // pageview, event, vital, error
+  eventName: text("event_name"), // for custom events
+  path: text("path"),
+  // Web Vitals
+  metricName: text("metric_name"), // CLS, FCP, LCP, TTFB, INP, FID
+  metricValue: real("metric_value"),
+  metricRating: text("metric_rating"), // good, needs-improvement, poor
+  // Error tracking
+  errorMessage: text("error_message"),
+  errorStack: text("error_stack"),
+  // Metadata
+  properties: text("properties"), // JSON
+  userAgent: text("user_agent"),
+  sessionId: text("session_id"),
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+export const insertAnalyticsEventSchema = createInsertSchema(analyticsEvents).omit({ id: true, createdAt: true });
+export type InsertAnalyticsEvent = z.infer<typeof insertAnalyticsEventSchema>;
+export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;

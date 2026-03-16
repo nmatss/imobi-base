@@ -12,6 +12,7 @@ import { storage } from './storage';
 import * as Sentry from '@sentry/node';
 import { validateBody } from './middleware/validate';
 import { asyncHandler, AuthError } from './middleware/error-handler';
+import { idempotencyCheck } from './middleware/idempotency';
 import {
   createStripeSubscriptionSchema,
   cancelStripeSubscriptionSchema,
@@ -29,7 +30,7 @@ export function registerPaymentRoutes(app: Express): void {
   /**
    * Create Stripe subscription
    */
-  app.post('/api/payments/stripe/create-subscription', validateBody(createStripeSubscriptionSchema), asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/payments/stripe/create-subscription', idempotencyCheck, validateBody(createStripeSubscriptionSchema), asyncHandler(async (req: Request, res: Response) => {
     if (!req.user) {
       throw new AuthError();
     }
@@ -244,7 +245,7 @@ export function registerPaymentRoutes(app: Express): void {
   /**
    * Create PIX payment
    */
-  app.post('/api/payments/mercadopago/create-pix', async (req: Request, res: Response) => {
+  app.post('/api/payments/mercadopago/create-pix', idempotencyCheck, async (req: Request, res: Response) => {
     try {
       if (!req.user) {
         res.status(401).json({ error: 'Unauthorized' });
@@ -277,7 +278,7 @@ export function registerPaymentRoutes(app: Express): void {
   /**
    * Create Boleto payment
    */
-  app.post('/api/payments/mercadopago/create-boleto', async (req: Request, res: Response) => {
+  app.post('/api/payments/mercadopago/create-boleto', idempotencyCheck, async (req: Request, res: Response) => {
     try {
       if (!req.user) {
         res.status(401).json({ error: 'Unauthorized' });

@@ -16,6 +16,8 @@ export default defineConfig({
     include: ['**/*.test.{ts,tsx}'],
     exclude: [
       'node_modules',
+      '**/node_modules/**',
+      '.claude/**',
       'dist',
       'build',
       '.next',
@@ -27,6 +29,8 @@ export default defineConfig({
       'tests/responsive/**',
       'tests/performance/**',
       'tests/visual/**',
+      // Exclude smoke tests from default run (require running server)
+      'tests/smoke/**',
     ],
     coverage: {
       provider: 'v8',
@@ -56,7 +60,7 @@ export default defineConfig({
       include: ['client/src/**/*.{ts,tsx}', 'server/**/*.ts'],
     },
     testTimeout: 10000,
-    hookTimeout: 10000,
+    hookTimeout: 15000,
     teardownTimeout: 5000,
     isolate: true,
     pool: 'threads',

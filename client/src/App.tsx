@@ -29,6 +29,23 @@ const TenantLanding = lazy(() => import("@/pages/public/landing"));
 const PropertyDetails = lazy(() => import("@/pages/public/property-details"));
 const PublicProperties = lazy(() => import("@/pages/public/properties"));
 const ProductLanding = lazy(() => import("@/pages/public/product-landing"));
+const SignupPage = lazy(() => import("@/pages/auth/signup"));
+const AutoMarketingPage = lazy(() => import("@/pages/auto-marketing"));
+const AvmPage = lazy(() => import("@/pages/avm"));
+const IsaPage = lazy(() => import("@/pages/isa"));
+const AnalyticsPage = lazy(() => import("@/pages/analytics"));
+const InspectionsPage = lazy(() => import("@/pages/inspections"));
+const InspectionDetailPage = lazy(() => import("@/pages/inspections/detail"));
+const InspectionComparisonPage = lazy(() => import("@/pages/inspections/comparison"));
+const PortalLogin = lazy(() => import("@/pages/portal/portal-login"));
+const OwnerPortal = lazy(() => import("@/pages/portal/owner-portal"));
+const RenterPortal = lazy(() => import("@/pages/portal/renter-portal"));
+const PortalAdmin = lazy(() => import("@/pages/portal/portal-admin"));
+const OnboardingPage = lazy(() => import("@/pages/onboarding"));
+const PricingPage = lazy(() => import("@/pages/public/pricing"));
+const TermsPage = lazy(() => import("@/pages/public/terms"));
+const PrivacyPage = lazy(() => import("@/pages/public/privacy"));
+const CheckoutPage = lazy(() => import("@/pages/checkout"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 const AdminDashboard = lazy(() => import("@/pages/admin"));
 const TenantsPage = lazy(() => import("@/pages/admin/tenants"));
@@ -157,7 +174,7 @@ function LoginPage() {
                 name="email"
                 type="email"
                 placeholder="seu@email.com"
-                defaultValue="admin@demo.com"
+                defaultValue=""
                 required
                 className="h-12"
                 data-testid="input-email"
@@ -173,7 +190,7 @@ function LoginPage() {
                 id="password"
                 name="password"
                 type="password"
-                defaultValue="demo123" 
+                defaultValue=""
                 required 
                 className="h-12"
                 data-testid="input-password"
@@ -201,7 +218,7 @@ function LoginPage() {
           
           <p className="text-center text-sm text-muted-foreground">
             Não tem uma conta?{" "}
-            <a href="#" className="text-primary font-medium hover:underline">Criar conta grátis</a>
+            <a href="/signup" className="text-primary font-medium hover:underline">Criar conta grátis</a>
           </p>
         </div>
       </div>
@@ -286,6 +303,16 @@ function Router() {
         {/* App Routes */}
         <Route key="landing" path="/" component={() => <ErrorBoundary><ProductLanding /></ErrorBoundary>} />
         <Route key="login" path="/login" component={() => <ErrorBoundary><LoginPage /></ErrorBoundary>} />
+        <Route key="signup" path="/signup" component={() => <ErrorBoundary><SignupPage /></ErrorBoundary>} />
+        <Route key="pricing" path="/pricing" component={() => <ErrorBoundary><PricingPage /></ErrorBoundary>} />
+        <Route key="termos" path="/termos" component={() => <ErrorBoundary><TermsPage /></ErrorBoundary>} />
+        <Route key="privacidade" path="/privacidade" component={() => <ErrorBoundary><PrivacyPage /></ErrorBoundary>} />
+
+        {/* Portal Routes (standalone) */}
+        <Route key="portal-login" path="/portal/login" component={() => <ErrorBoundary><PortalLogin /></ErrorBoundary>} />
+        <Route key="portal-owner" path="/portal/owner" component={() => <ErrorBoundary><OwnerPortal /></ErrorBoundary>} />
+        <Route key="portal-renter" path="/portal/renter" component={() => <ErrorBoundary><RenterPortal /></ErrorBoundary>} />
+
         <Route key="dashboard" path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
         <Route key="properties" path="/properties" component={() => <ProtectedRoute component={PropertiesList} />} />
         <Route key="property-details" path="/properties/:id" component={() => <ProtectedRoute component={PropertyDetailsPage} />} />
@@ -296,6 +323,16 @@ function Router() {
         <Route key="vendas" path="/vendas" component={() => <ProtectedRoute component={VendasPage} />} />
         <Route key="financeiro" path="/financeiro" component={() => <ProtectedRoute component={FinanceiroPage} />} />
         <Route key="reports" path="/reports" component={() => <ProtectedRoute component={ReportsPage} />} />
+        <Route key="marketing" path="/marketing" component={() => <ProtectedRoute component={AutoMarketingPage} />} />
+        <Route key="avaliacoes" path="/avaliacoes" component={() => <ProtectedRoute component={AvmPage} />} />
+        <Route key="isa" path="/isa" component={() => <ProtectedRoute component={IsaPage} />} />
+        <Route key="analytics" path="/analytics" component={() => <ProtectedRoute component={AnalyticsPage} />} />
+        <Route key="vistorias" path="/vistorias" component={() => <ProtectedRoute component={InspectionsPage} />} />
+        <Route key="vistoria-detail" path="/vistorias/:id" component={() => <ProtectedRoute component={InspectionDetailPage} />} />
+        <Route key="vistoria-comparison" path="/vistorias/:id/comparacao" component={() => <ProtectedRoute component={InspectionComparisonPage} />} />
+        <Route key="portal-admin" path="/portal/admin" component={() => <ProtectedRoute component={PortalAdmin} />} />
+        <Route key="onboarding" path="/onboarding" component={() => <ProtectedRoute component={OnboardingPage} />} />
+        <Route key="checkout" path="/checkout/:planId" component={() => <ProtectedRoute component={CheckoutPage} />} />
         <Route key="settings" path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
 
         {/* Admin Routes (SuperAdmin only) */}

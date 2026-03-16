@@ -13,6 +13,7 @@ import { whatsappAutoResponses, whatsappConversations, tenantSettings } from "@s
 import { eq, and, isNull } from "drizzle-orm";
 import { messageQueue } from "./message-queue";
 import { log } from "../../index";
+import { isAIAvailable, generateLeadResponse, type ISAContext } from "../../services/ai-service";
 
 interface ProcessMessageParams {
   tenantId: string;
@@ -160,10 +161,35 @@ export class AutoResponder {
   }
 
   /**
-   * Send auto-response
+   * Send auto-response, optionally enhanced with AI for more natural conversation
    */
   private async sendAutoResponse(autoResponse: any, params: ProcessMessageParams): Promise<void> {
     log(`Sending auto-response: ${autoResponse.name}`, "whatsapp");
+
+    let responseText = autoResponse.responseText;
+    let aiGenerated = false;
+
+    // Try AI-enhanced response if available (for keyword and first_contact triggers)
+    if (isAIAvailable() && (autoResponse.triggerType === 'keyword' || autoResponse.triggerType === 'first_contact')) {
+      try {
+        const isaContext: ISAContext = {
+          phoneNumber: params.phoneNumber,
+          messageText: params.messageText,
+          conversationHistory: [],
+        };
+
+        const aiResponse = await generateLeadResponse(isaContext);
+
+        if (aiResponse) {
+          responseText = aiResponse;
+          aiGenerated = true;
+          log(`AI-enhanced response generated for: ${autoResponse.name}`, "whatsapp");
+        }
+      } catch (error: any) {
+        // AI failure is non-critical - fall back to template response
+        log(`AI response failed, using template fallback: ${error.message}`, "whatsapp");
+      }
+    }
 
     // Queue the response message
     await messageQueue.queueMessage({
@@ -171,13 +197,14 @@ export class AutoResponder {
       phoneNumber: params.phoneNumber,
       messageType: autoResponse.templateId ? "template" : "text",
       templateId: autoResponse.templateId,
-      content: autoResponse.responseText,
+      content: responseText,
       priority: 8, // High priority for auto-responses
       metadata: {
         autoResponse: true,
         autoResponseId: autoResponse.id,
         autoResponseName: autoResponse.name,
         conversationId: params.conversationId,
+        aiGenerated,
       },
     });
   }

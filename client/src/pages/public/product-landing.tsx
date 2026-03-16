@@ -104,12 +104,16 @@ export default function ProductLanding() {
           </div>
 
           <nav className="hidden md:flex gap-8 text-sm font-medium text-muted-foreground">
-            {["Recursos", "Soluções", "Preços", "Empresa"].map((item) => (
+            {["Recursos", "Soluções", "Empresa"].map((item) => (
               <a key={item} href={`#${item.toLowerCase()}`} className="hover:text-primary transition-colors relative group">
                 {item}
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all group-hover:w-full" />
               </a>
             ))}
+            <Link href="/pricing" className="hover:text-primary transition-colors relative group">
+              Preços
+              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all group-hover:w-full" />
+            </Link>
           </nav>
 
           <div className="hidden md:flex items-center gap-4">
@@ -139,11 +143,14 @@ export default function ProductLanding() {
             className="fixed top-16 left-0 w-full bg-background border-b z-40 md:hidden overflow-hidden"
           >
             <div className="p-4 flex flex-col gap-4">
-              {["Recursos", "Soluções", "Preços", "Empresa"].map((item) => (
+              {["Recursos", "Soluções", "Empresa"].map((item) => (
                 <a key={item} href={`#${item.toLowerCase()}`} className="text-lg font-medium p-2 hover:bg-muted rounded-lg" onClick={() => setMobileMenuOpen(false)}>
                   {item}
                 </a>
               ))}
+              <Link href="/pricing" className="text-lg font-medium p-2 hover:bg-muted rounded-lg" onClick={() => setMobileMenuOpen(false)}>
+                Preços
+              </Link>
               <div className="h-px bg-border my-2" />
               <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
                 <Button variant="outline" className="w-full justify-start">Entrar</Button>
@@ -597,7 +604,7 @@ export default function ProductLanding() {
                   <li><a href="#" className="hover:text-primary transition-colors">Criador de Sites</a></li>
                   <li><a href="#" className="hover:text-primary transition-colors">Gestão de Contratos</a></li>
                   <li><a href="#" className="hover:text-primary transition-colors">Integrações</a></li>
-                  <li><a href="#" className="hover:text-primary transition-colors">Preços</a></li>
+                  <li><Link href="/pricing" className="hover:text-primary transition-colors">Preços</Link></li>
                 </ul>
               </div>
 
@@ -629,8 +636,8 @@ export default function ProductLanding() {
             <div className="border-t pt-8 flex flex-col md:flex-row justify-between items-center text-sm text-muted-foreground">
               <p>&copy; 2024 ImobiBase Tecnologia Ltda. CNPJ 00.000.000/0001-00.</p>
               <div className="flex gap-8 mt-4 md:mt-0">
-                <a href="#" className="hover:text-foreground">Termos</a>
-                <a href="#" className="hover:text-foreground">Privacidade</a>
+                <Link href="/termos" className="hover:text-foreground">Termos</Link>
+                <Link href="/privacidade" className="hover:text-foreground">Privacidade</Link>
                 <a href="#" className="hover:text-foreground">Cookies</a>
               </div>
             </div>

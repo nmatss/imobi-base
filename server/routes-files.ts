@@ -36,11 +36,19 @@ import {
 } from './storage/image-processor';
 import { storage } from './storage';
 
-// Configure Multer for memory storage
+// Configure Multer for memory storage - default 10MB limit
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB max
+    fileSize: 10 * 1024 * 1024, // 10MB max (default)
+  },
+});
+
+// Larger limit for property image uploads - 50MB
+const uploadPropertyImages = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB max for property images
   },
 });
 
@@ -361,7 +369,7 @@ export function registerFileRoutes(app: Express) {
   app.post(
     '/api/files/upload/property-images',
     requireAuth,
-    upload.array('images', 20),
+    uploadPropertyImages.array('images', 20),
     async (req: Request, res: Response) => {
       try {
         const files = req.files as Express.Multer.File[];
@@ -757,5 +765,24 @@ export function registerFileRoutes(app: Express) {
         error: error instanceof Error ? error.message : 'Cleanup failed',
       });
     }
+  });
+
+  // Multer error handler - catches file size limit errors and returns 413
+  app.use((err: any, req: Request, res: Response, next: Function) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({
+          error: 'File too large. Maximum upload size exceeded.',
+          code: 'FILE_TOO_LARGE',
+          status: 413,
+        });
+      }
+      return res.status(400).json({
+        error: `Upload error: ${err.message}`,
+        code: 'UPLOAD_ERROR',
+        status: 400,
+      });
+    }
+    next(err);
   });
 }

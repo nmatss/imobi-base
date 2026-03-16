@@ -1,10 +1,6 @@
 name: CI - Test & Build
 
-on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
+on: [push, pull_request]
 
 # Cancel previous runs if a new one is triggered
 concurrency:
@@ -107,6 +103,11 @@ jobs:
 
       - name: Run integration tests
         run: npm run test:integration || echo "No integration tests found"
+
+      - name: Run all tests with verbose output
+        run: npm test -- --reporter=verbose
+        env:
+          CI: true
 
       - name: Run all tests with coverage
         run: npm run test:coverage

@@ -8,6 +8,12 @@ import { registerJobRoutes } from "./routes-jobs";
 import { registerAuthenticationRoutes } from "./auth";
 import { registerFileRoutes } from "./routes-files";
 import { registerSitemapRoutes } from "./routes-sitemap";
+import { registerAutoMarketingRoutes } from "./routes-auto-marketing";
+import { registerAVMRoutes as registerAvmRoutes } from "./routes-avm";
+import { registerIsaRoutes } from "./routes-isa";
+import { registerInspectionRoutes } from "./routes-inspections";
+import { registerPortalRoutes } from "./routes-portal";
+import { registerExtensionRoutes } from "./routes-extensions";
 // import smsRoutes from "./routes-sms"; // Disabled - SMS schema not defined
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -106,6 +112,24 @@ app.use((req, res, next) => {
 
   // Register sitemap routes (SEO)
   registerSitemapRoutes(app);
+
+  // Register auto-marketing routes (AI content generation)
+  registerAutoMarketingRoutes(app);
+
+  // Register AVM routes (property valuation)
+  registerAvmRoutes(app);
+
+  // Register ISA routes (virtual sales agent)
+  registerIsaRoutes(app);
+
+  // Register inspection routes (vistoria digital)
+  registerInspectionRoutes(app);
+
+  // Register portal routes (owner/renter self-service)
+  registerPortalRoutes(app);
+
+  // Register extension routes (settings, roles, permissions, integrations)
+  registerExtensionRoutes(app);
 
   // Register SMS routes
   // app.use('/api/sms', smsRoutes); // Disabled - SMS schema not defined

@@ -23,7 +23,12 @@ import {
   DollarSign,
   Wallet,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Sparkles,
+  Calculator,
+  Bot,
+  ClipboardCheck,
+  Activity
 } from "lucide-react";
 import { format, isToday, isPast } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -176,13 +181,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         { href: "/contracts", label: "Propostas", icon: FileText },
         { href: "/vendas", label: "Vendas", icon: DollarSign },
         { href: "/rentals", label: "Aluguéis", icon: Home },
+        { href: "/vistorias", label: "Vistorias", icon: ClipboardCheck },
         { href: "/financeiro", label: "Financeiro", icon: Wallet },
+        { href: "/portal/admin", label: "Portal", icon: Users },
       ]
     },
     {
-      group: "Análise",
+      group: "Inteligência",
       items: [
         { href: "/reports", label: "Relatórios", icon: BarChart3 },
+        { href: "/marketing", label: "Marketing IA", icon: Sparkles },
+        { href: "/avaliacoes", label: "Avaliações", icon: Calculator },
+        { href: "/isa", label: "ISA Virtual", icon: Bot },
+        { href: "/analytics", label: "Analytics", icon: Activity },
       ]
     },
     {

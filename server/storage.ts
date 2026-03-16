@@ -29,7 +29,19 @@ import type {
   UserRole, InsertUserRole,
   IntegrationConfig, InsertIntegrationConfig,
   NotificationPreference, InsertNotificationPreference,
-  SavedReport, InsertSavedReport
+  SavedReport, InsertSavedReport,
+  AutoMarketingContent, InsertAutoMarketingContent,
+  PropertyValuation, InsertPropertyValuation,
+  MarketIndex, InsertMarketIndex,
+  IsaConversation, InsertIsaConversation,
+  IsaMessage, InsertIsaMessage,
+  IsaSettings, InsertIsaSettings,
+  PropertyInspection, InsertPropertyInspection,
+  InspectionRoom, InsertInspectionRoom,
+  InspectionItem, InsertInspectionItem,
+  ClientPortalAccess, InsertClientPortalAccess,
+  MaintenanceTicket, InsertMaintenanceTicket,
+  AnalyticsEvent, InsertAnalyticsEvent
 } from "@shared/schema-sqlite";
 
 // Helper to generate IDs
@@ -295,6 +307,64 @@ export interface IStorage {
   toggleReportFavorite(id: string): Promise<SavedReport | undefined>;
   seedDefaultCategories(tenantId: string): Promise<FinanceCategory[]>;
   checkDatabaseConnection(): Promise<boolean>;
+  // Auto-Marketing
+  getAutoMarketingContent(propertyId: string): Promise<AutoMarketingContent | undefined>;
+  createAutoMarketingContent(content: InsertAutoMarketingContent): Promise<AutoMarketingContent>;
+  updateAutoMarketingContent(id: string, content: Partial<InsertAutoMarketingContent>): Promise<AutoMarketingContent | undefined>;
+  deleteAutoMarketingContent(id: string): Promise<boolean>;
+  getAutoMarketingContentsByTenant(tenantId: string): Promise<AutoMarketingContent[]>;
+  // AVM
+  createPropertyValuation(valuation: InsertPropertyValuation): Promise<PropertyValuation>;
+  getPropertyValuation(id: string): Promise<PropertyValuation | undefined>;
+  getPropertyValuationsByTenant(tenantId: string): Promise<PropertyValuation[]>;
+  deletePropertyValuation(id: string): Promise<boolean>;
+  getMarketIndicesByTenant(tenantId: string, filters?: { city?: string; propertyType?: string; category?: string }): Promise<MarketIndex[]>;
+  createMarketIndex(index: InsertMarketIndex): Promise<MarketIndex>;
+  // ISA
+  getIsaConversation(id: string): Promise<IsaConversation | undefined>;
+  getIsaConversationsByTenant(tenantId: string, filters?: { status?: string; temperature?: string }): Promise<IsaConversation[]>;
+  getIsaConversationByPhone(tenantId: string, phoneNumber: string): Promise<IsaConversation | undefined>;
+  createIsaConversation(conversation: InsertIsaConversation): Promise<IsaConversation>;
+  updateIsaConversation(id: string, conversation: Partial<InsertIsaConversation>): Promise<IsaConversation | undefined>;
+  getIsaMessages(conversationId: string): Promise<IsaMessage[]>;
+  createIsaMessage(message: InsertIsaMessage): Promise<IsaMessage>;
+  getIsaSettings(tenantId: string): Promise<IsaSettings | undefined>;
+  createOrUpdateIsaSettings(tenantId: string, data: Partial<InsertIsaSettings>): Promise<IsaSettings>;
+  getIsaStats(tenantId: string): Promise<{ total: number; active: number; qualified: number; transferred: number; closed: number; hot: number; warm: number; cold: number; visitsScheduled: number }>;
+  // Inspections
+  getPropertyInspection(id: string): Promise<PropertyInspection | undefined>;
+  getPropertyInspectionsByTenant(tenantId: string, filters?: { propertyId?: string; type?: string; status?: string }): Promise<PropertyInspection[]>;
+  createPropertyInspection(inspection: InsertPropertyInspection): Promise<PropertyInspection>;
+  updatePropertyInspection(id: string, inspection: Partial<InsertPropertyInspection>): Promise<PropertyInspection | undefined>;
+  deletePropertyInspection(id: string): Promise<boolean>;
+  getInspectionRoomsByInspection(inspectionId: string): Promise<InspectionRoom[]>;
+  getInspectionRoom(id: string): Promise<InspectionRoom | undefined>;
+  createInspectionRoom(room: InsertInspectionRoom): Promise<InspectionRoom>;
+  updateInspectionRoom(id: string, room: Partial<InsertInspectionRoom>): Promise<InspectionRoom | undefined>;
+  deleteInspectionRoom(id: string): Promise<boolean>;
+  getInspectionItemsByRoom(roomId: string): Promise<InspectionItem[]>;
+  getInspectionItem(id: string): Promise<InspectionItem | undefined>;
+  createInspectionItem(item: InsertInspectionItem): Promise<InspectionItem>;
+  updateInspectionItem(id: string, item: Partial<InsertInspectionItem>): Promise<InspectionItem | undefined>;
+  deleteInspectionItem(id: string): Promise<boolean>;
+  // Portal
+  getPortalAccess(id: string): Promise<ClientPortalAccess | undefined>;
+  getPortalAccessByEmail(email: string): Promise<ClientPortalAccess | undefined>;
+  getPortalAccessesByTenant(tenantId: string): Promise<ClientPortalAccess[]>;
+  getPortalAccessesByClient(clientType: string, clientId: string): Promise<ClientPortalAccess[]>;
+  createPortalAccess(data: InsertClientPortalAccess): Promise<ClientPortalAccess>;
+  updatePortalAccess(id: string, data: Partial<InsertClientPortalAccess>): Promise<ClientPortalAccess | undefined>;
+  deletePortalAccess(id: string): Promise<boolean>;
+  getMaintenanceTicket(id: string): Promise<MaintenanceTicket | undefined>;
+  getMaintenanceTicketsByTenant(tenantId: string): Promise<MaintenanceTicket[]>;
+  getMaintenanceTicketsByProperty(propertyId: string): Promise<MaintenanceTicket[]>;
+  getMaintenanceTicketsByRequester(requestedById: string): Promise<MaintenanceTicket[]>;
+  createMaintenanceTicket(data: InsertMaintenanceTicket): Promise<MaintenanceTicket>;
+  updateMaintenanceTicket(id: string, data: Partial<InsertMaintenanceTicket>): Promise<MaintenanceTicket | undefined>;
+  // Analytics
+  createAnalyticsEvent(event: InsertAnalyticsEvent): Promise<AnalyticsEvent>;
+  getAnalyticsEventsByTenant(tenantId: string, filters?: { eventType?: string; startDate?: string; endDate?: string; limit?: number }): Promise<AnalyticsEvent[]>;
+  getAnalyticsSummary(tenantId: string, period: 'today' | 'week' | 'month'): Promise<any>;
 }
 
 export class DbStorage implements IStorage {
@@ -3322,6 +3392,266 @@ export class DbStorage implements IStorage {
       .orderBy(desc(schema.properties.updatedAt));
 
     return properties;
+  }
+
+  // ==================== AUTO-MARKETING ====================
+  async getAutoMarketingContent(propertyId: string): Promise<AutoMarketingContent | undefined> {
+    const [content] = await db.select().from(schema.autoMarketingContent).where(eq(schema.autoMarketingContent.propertyId, propertyId));
+    return content;
+  }
+  async createAutoMarketingContent(content: InsertAutoMarketingContent): Promise<AutoMarketingContent> {
+    const id = generateId();
+    const [created] = await db.insert(schema.autoMarketingContent).values({ ...content, id, createdAt: now() }).returning();
+    return created;
+  }
+  async updateAutoMarketingContent(id: string, content: Partial<InsertAutoMarketingContent>): Promise<AutoMarketingContent | undefined> {
+    const [updated] = await db.update(schema.autoMarketingContent).set({ ...content, updatedAt: now() }).where(eq(schema.autoMarketingContent.id, id)).returning();
+    return updated;
+  }
+  async deleteAutoMarketingContent(id: string): Promise<boolean> {
+    await db.delete(schema.autoMarketingContent).where(eq(schema.autoMarketingContent.id, id));
+    return true;
+  }
+  async getAutoMarketingContentsByTenant(tenantId: string): Promise<AutoMarketingContent[]> {
+    return db.select().from(schema.autoMarketingContent).where(eq(schema.autoMarketingContent.tenantId, tenantId)).orderBy(desc(schema.autoMarketingContent.createdAt));
+  }
+
+  // ==================== AVM ====================
+  async createPropertyValuation(valuation: InsertPropertyValuation): Promise<PropertyValuation> {
+    const id = generateId();
+    const [created] = await db.insert(schema.propertyValuations).values({ ...valuation, id, createdAt: now() }).returning();
+    return created;
+  }
+  async getPropertyValuation(id: string): Promise<PropertyValuation | undefined> {
+    const [valuation] = await db.select().from(schema.propertyValuations).where(eq(schema.propertyValuations.id, id));
+    return valuation;
+  }
+  async getPropertyValuationsByTenant(tenantId: string): Promise<PropertyValuation[]> {
+    return db.select().from(schema.propertyValuations).where(eq(schema.propertyValuations.tenantId, tenantId)).orderBy(desc(schema.propertyValuations.createdAt));
+  }
+  async deletePropertyValuation(id: string): Promise<boolean> {
+    await db.delete(schema.propertyValuations).where(eq(schema.propertyValuations.id, id));
+    return true;
+  }
+  async getMarketIndicesByTenant(tenantId: string, filters?: { city?: string; propertyType?: string; category?: string }): Promise<MarketIndex[]> {
+    const conditions = [eq(schema.marketIndices.tenantId, tenantId)];
+    if (filters?.city) conditions.push(eq(schema.marketIndices.city, filters.city));
+    if (filters?.propertyType) conditions.push(eq(schema.marketIndices.propertyType, filters.propertyType));
+    if (filters?.category) conditions.push(eq(schema.marketIndices.category, filters.category));
+    return db.select().from(schema.marketIndices).where(and(...conditions)).orderBy(desc(schema.marketIndices.period));
+  }
+  async createMarketIndex(index: InsertMarketIndex): Promise<MarketIndex> {
+    const id = generateId();
+    const [created] = await db.insert(schema.marketIndices).values({ ...index, id, createdAt: now() }).returning();
+    return created;
+  }
+
+  // ==================== ISA ====================
+  async getIsaConversation(id: string): Promise<IsaConversation | undefined> {
+    const [c] = await db.select().from(schema.isaConversations).where(eq(schema.isaConversations.id, id));
+    return c;
+  }
+  async getIsaConversationsByTenant(tenantId: string, filters?: { status?: string; temperature?: string }): Promise<IsaConversation[]> {
+    let conditions = [eq(schema.isaConversations.tenantId, tenantId)];
+    if (filters?.status) conditions.push(eq(schema.isaConversations.status, filters.status));
+    if (filters?.temperature) conditions.push(eq(schema.isaConversations.temperature, filters.temperature));
+    return db.select().from(schema.isaConversations).where(and(...conditions)).orderBy(desc(schema.isaConversations.lastMessageAt));
+  }
+  async getIsaConversationByPhone(tenantId: string, phoneNumber: string): Promise<IsaConversation | undefined> {
+    const [c] = await db.select().from(schema.isaConversations).where(and(eq(schema.isaConversations.tenantId, tenantId), eq(schema.isaConversations.phoneNumber, phoneNumber), eq(schema.isaConversations.status, "active")));
+    return c;
+  }
+  async createIsaConversation(conversation: InsertIsaConversation): Promise<IsaConversation> {
+    const id = generateId();
+    const [created] = await db.insert(schema.isaConversations).values({ ...conversation, id, createdAt: now() }).returning();
+    return created;
+  }
+  async updateIsaConversation(id: string, conversation: Partial<InsertIsaConversation>): Promise<IsaConversation | undefined> {
+    const [updated] = await db.update(schema.isaConversations).set({ ...conversation, updatedAt: now() }).where(eq(schema.isaConversations.id, id)).returning();
+    return updated;
+  }
+  async getIsaMessages(conversationId: string): Promise<IsaMessage[]> {
+    return db.select().from(schema.isaMessages).where(eq(schema.isaMessages.conversationId, conversationId)).orderBy(schema.isaMessages.sentAt);
+  }
+  async createIsaMessage(message: InsertIsaMessage): Promise<IsaMessage> {
+    const id = generateId();
+    const [created] = await db.insert(schema.isaMessages).values({ ...message, id }).returning();
+    return created;
+  }
+  async getIsaSettings(tenantId: string): Promise<IsaSettings | undefined> {
+    const [s] = await db.select().from(schema.isaSettings).where(eq(schema.isaSettings.tenantId, tenantId));
+    return s;
+  }
+  async createOrUpdateIsaSettings(tenantId: string, data: Partial<InsertIsaSettings>): Promise<IsaSettings> {
+    const existing = await this.getIsaSettings(tenantId);
+    if (existing) {
+      const [updated] = await db.update(schema.isaSettings).set({ ...data, updatedAt: now() }).where(eq(schema.isaSettings.tenantId, tenantId)).returning();
+      return updated;
+    }
+    const id = generateId();
+    const [created] = await db.insert(schema.isaSettings).values({ ...data, id, tenantId, createdAt: now() }).returning();
+    return created;
+  }
+  async getIsaStats(tenantId: string): Promise<{ total: number; active: number; qualified: number; transferred: number; closed: number; hot: number; warm: number; cold: number; visitsScheduled: number }> {
+    const convs = await db.select().from(schema.isaConversations).where(eq(schema.isaConversations.tenantId, tenantId));
+    return { total: convs.length, active: convs.filter(c => c.status === "active").length, qualified: convs.filter(c => c.status === "qualified").length, transferred: convs.filter(c => c.status === "transferred").length, closed: convs.filter(c => c.status === "closed").length, hot: convs.filter(c => c.temperature === "hot").length, warm: convs.filter(c => c.temperature === "warm").length, cold: convs.filter(c => c.temperature === "cold").length, visitsScheduled: convs.filter(c => c.visitScheduledId != null).length };
+  }
+
+  // ==================== INSPECTIONS ====================
+  async getPropertyInspection(id: string): Promise<PropertyInspection | undefined> {
+    const [i] = await db.select().from(schema.propertyInspections).where(eq(schema.propertyInspections.id, id));
+    return i;
+  }
+  async getPropertyInspectionsByTenant(tenantId: string, filters?: { propertyId?: string; type?: string; status?: string }): Promise<PropertyInspection[]> {
+    const conditions = [eq(schema.propertyInspections.tenantId, tenantId)];
+    if (filters?.propertyId) conditions.push(eq(schema.propertyInspections.propertyId, filters.propertyId));
+    if (filters?.type) conditions.push(eq(schema.propertyInspections.type, filters.type));
+    if (filters?.status) conditions.push(eq(schema.propertyInspections.status, filters.status));
+    return db.select().from(schema.propertyInspections).where(and(...conditions)).orderBy(desc(schema.propertyInspections.createdAt));
+  }
+  async createPropertyInspection(inspection: InsertPropertyInspection): Promise<PropertyInspection> {
+    const id = generateId();
+    const [created] = await db.insert(schema.propertyInspections).values({ ...inspection, id, createdAt: now(), updatedAt: now() }).returning();
+    return created;
+  }
+  async updatePropertyInspection(id: string, inspection: Partial<InsertPropertyInspection>): Promise<PropertyInspection | undefined> {
+    const [updated] = await db.update(schema.propertyInspections).set({ ...inspection, updatedAt: now() }).where(eq(schema.propertyInspections.id, id)).returning();
+    return updated;
+  }
+  async deletePropertyInspection(id: string): Promise<boolean> {
+    const rooms = await this.getInspectionRoomsByInspection(id);
+    for (const room of rooms) { await db.delete(schema.inspectionItems).where(eq(schema.inspectionItems.roomId, room.id)); }
+    await db.delete(schema.inspectionRooms).where(eq(schema.inspectionRooms.inspectionId, id));
+    await db.delete(schema.propertyInspections).where(eq(schema.propertyInspections.id, id));
+    return true;
+  }
+  async getInspectionRoomsByInspection(inspectionId: string): Promise<InspectionRoom[]> {
+    return db.select().from(schema.inspectionRooms).where(eq(schema.inspectionRooms.inspectionId, inspectionId)).orderBy(schema.inspectionRooms.order);
+  }
+  async getInspectionRoom(id: string): Promise<InspectionRoom | undefined> {
+    const [r] = await db.select().from(schema.inspectionRooms).where(eq(schema.inspectionRooms.id, id));
+    return r;
+  }
+  async createInspectionRoom(room: InsertInspectionRoom): Promise<InspectionRoom> {
+    const id = generateId();
+    const [created] = await db.insert(schema.inspectionRooms).values({ ...room, id }).returning();
+    return created;
+  }
+  async updateInspectionRoom(id: string, room: Partial<InsertInspectionRoom>): Promise<InspectionRoom | undefined> {
+    const [updated] = await db.update(schema.inspectionRooms).set(room).where(eq(schema.inspectionRooms.id, id)).returning();
+    return updated;
+  }
+  async deleteInspectionRoom(id: string): Promise<boolean> {
+    await db.delete(schema.inspectionItems).where(eq(schema.inspectionItems.roomId, id));
+    await db.delete(schema.inspectionRooms).where(eq(schema.inspectionRooms.id, id));
+    return true;
+  }
+  async getInspectionItemsByRoom(roomId: string): Promise<InspectionItem[]> {
+    return db.select().from(schema.inspectionItems).where(eq(schema.inspectionItems.roomId, roomId)).orderBy(schema.inspectionItems.order);
+  }
+  async getInspectionItem(id: string): Promise<InspectionItem | undefined> {
+    const [i] = await db.select().from(schema.inspectionItems).where(eq(schema.inspectionItems.id, id));
+    return i;
+  }
+  async createInspectionItem(item: InsertInspectionItem): Promise<InspectionItem> {
+    const id = generateId();
+    const [created] = await db.insert(schema.inspectionItems).values({ ...item, id }).returning();
+    return created;
+  }
+  async updateInspectionItem(id: string, item: Partial<InsertInspectionItem>): Promise<InspectionItem | undefined> {
+    const [updated] = await db.update(schema.inspectionItems).set(item).where(eq(schema.inspectionItems.id, id)).returning();
+    return updated;
+  }
+  async deleteInspectionItem(id: string): Promise<boolean> {
+    await db.delete(schema.inspectionItems).where(eq(schema.inspectionItems.id, id));
+    return true;
+  }
+
+  // ==================== PORTAL ====================
+  async getPortalAccess(id: string): Promise<ClientPortalAccess | undefined> {
+    const [a] = await db.select().from(schema.clientPortalAccess).where(eq(schema.clientPortalAccess.id, id));
+    return a;
+  }
+  async getPortalAccessByEmail(email: string): Promise<ClientPortalAccess | undefined> {
+    const [a] = await db.select().from(schema.clientPortalAccess).where(eq(schema.clientPortalAccess.email, email));
+    return a;
+  }
+  async getPortalAccessesByTenant(tenantId: string): Promise<ClientPortalAccess[]> {
+    return db.select().from(schema.clientPortalAccess).where(eq(schema.clientPortalAccess.tenantId, tenantId)).orderBy(desc(schema.clientPortalAccess.createdAt));
+  }
+  async getPortalAccessesByClient(clientType: string, clientId: string): Promise<ClientPortalAccess[]> {
+    return db.select().from(schema.clientPortalAccess).where(and(eq(schema.clientPortalAccess.clientType, clientType), eq(schema.clientPortalAccess.clientId, clientId)));
+  }
+  async createPortalAccess(data: InsertClientPortalAccess): Promise<ClientPortalAccess> {
+    const id = generateId();
+    await db.insert(schema.clientPortalAccess).values({ ...data, id, createdAt: now(), updatedAt: now() });
+    return (await this.getPortalAccess(id))!;
+  }
+  async updatePortalAccess(id: string, data: Partial<InsertClientPortalAccess>): Promise<ClientPortalAccess | undefined> {
+    await db.update(schema.clientPortalAccess).set({ ...data, updatedAt: now() }).where(eq(schema.clientPortalAccess.id, id));
+    return this.getPortalAccess(id);
+  }
+  async deletePortalAccess(id: string): Promise<boolean> {
+    await db.delete(schema.clientPortalAccess).where(eq(schema.clientPortalAccess.id, id));
+    return true;
+  }
+  async getMaintenanceTicket(id: string): Promise<MaintenanceTicket | undefined> {
+    const [t] = await db.select().from(schema.maintenanceTickets).where(eq(schema.maintenanceTickets.id, id));
+    return t;
+  }
+  async getMaintenanceTicketsByTenant(tenantId: string): Promise<MaintenanceTicket[]> {
+    return db.select().from(schema.maintenanceTickets).where(eq(schema.maintenanceTickets.tenantId, tenantId)).orderBy(desc(schema.maintenanceTickets.createdAt));
+  }
+  async getMaintenanceTicketsByProperty(propertyId: string): Promise<MaintenanceTicket[]> {
+    return db.select().from(schema.maintenanceTickets).where(eq(schema.maintenanceTickets.propertyId, propertyId)).orderBy(desc(schema.maintenanceTickets.createdAt));
+  }
+  async getMaintenanceTicketsByRequester(requestedById: string): Promise<MaintenanceTicket[]> {
+    return db.select().from(schema.maintenanceTickets).where(eq(schema.maintenanceTickets.requestedById, requestedById)).orderBy(desc(schema.maintenanceTickets.createdAt));
+  }
+  async createMaintenanceTicket(data: InsertMaintenanceTicket): Promise<MaintenanceTicket> {
+    const id = generateId();
+    await db.insert(schema.maintenanceTickets).values({ ...data, id, createdAt: now(), updatedAt: now() });
+    return (await this.getMaintenanceTicket(id))!;
+  }
+  async updateMaintenanceTicket(id: string, data: Partial<InsertMaintenanceTicket>): Promise<MaintenanceTicket | undefined> {
+    await db.update(schema.maintenanceTickets).set({ ...data, updatedAt: now() }).where(eq(schema.maintenanceTickets.id, id));
+    return this.getMaintenanceTicket(id);
+  }
+
+  // ==================== ANALYTICS ====================
+  async createAnalyticsEvent(event: InsertAnalyticsEvent): Promise<AnalyticsEvent> {
+    const id = generateId();
+    await db.insert(schema.analyticsEvents).values({ ...event, id, createdAt: now() });
+    const [result] = await db.select().from(schema.analyticsEvents).where(eq(schema.analyticsEvents.id, id));
+    return result;
+  }
+  async getAnalyticsEventsByTenant(tenantId: string, filters?: { eventType?: string; startDate?: string; endDate?: string; limit?: number }): Promise<AnalyticsEvent[]> {
+    const conditions = [eq(schema.analyticsEvents.tenantId, tenantId)];
+    if (filters?.eventType) conditions.push(eq(schema.analyticsEvents.eventType, filters.eventType));
+    if (filters?.startDate) conditions.push(sql`${schema.analyticsEvents.createdAt} >= ${filters.startDate}`);
+    if (filters?.endDate) conditions.push(sql`${schema.analyticsEvents.createdAt} <= ${filters.endDate}`);
+    const query = db.select().from(schema.analyticsEvents).where(and(...conditions)).orderBy(desc(schema.analyticsEvents.createdAt));
+    if (filters?.limit) return query.limit(filters.limit);
+    return query;
+  }
+  async getAnalyticsSummary(tenantId: string, period: 'today' | 'week' | 'month'): Promise<any> {
+    const nowDate = new Date();
+    let startDate: string;
+    if (period === 'today') startDate = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate()).toISOString();
+    else if (period === 'week') { const d = new Date(nowDate); d.setDate(d.getDate() - 7); startDate = d.toISOString(); }
+    else { const d = new Date(nowDate); d.setDate(d.getDate() - 30); startDate = d.toISOString(); }
+    const baseCondition = and(eq(schema.analyticsEvents.tenantId, tenantId), sql`${schema.analyticsEvents.createdAt} >= ${startDate}`);
+    const [pvResult] = await db.select({ count: sql<number>`count(*)` }).from(schema.analyticsEvents).where(and(baseCondition, eq(schema.analyticsEvents.eventType, 'pageview')));
+    const totalPageviews = Number(pvResult?.count || 0);
+    const topPages = await db.select({ path: schema.analyticsEvents.path, count: sql<number>`count(*)` }).from(schema.analyticsEvents).where(and(baseCondition, eq(schema.analyticsEvents.eventType, 'pageview'))).groupBy(schema.analyticsEvents.path).orderBy(sql`count(*) desc`).limit(10);
+    const vitalsRaw = await db.select({ name: schema.analyticsEvents.metricName, avg: sql<number>`avg(${schema.analyticsEvents.metricValue})` }).from(schema.analyticsEvents).where(and(baseCondition, eq(schema.analyticsEvents.eventType, 'vital'))).groupBy(schema.analyticsEvents.metricName);
+    const webVitals = vitalsRaw.map((v: any) => { const avg = Number(v.avg || 0); let rating = 'good'; if (v.name === 'LCP') rating = avg <= 2500 ? 'good' : avg <= 4000 ? 'needs-improvement' : 'poor'; else if (v.name === 'CLS') rating = avg <= 0.1 ? 'good' : avg <= 0.25 ? 'needs-improvement' : 'poor'; return { name: v.name || '', avg: Math.round(avg * 100) / 100, rating }; });
+    const [errResult] = await db.select({ count: sql<number>`count(*)` }).from(schema.analyticsEvents).where(and(baseCondition, eq(schema.analyticsEvents.eventType, 'error')));
+    const errorCount = Number(errResult?.count || 0);
+    const [sessResult] = await db.select({ count: sql<number>`count(distinct ${schema.analyticsEvents.sessionId})` }).from(schema.analyticsEvents).where(baseCondition);
+    const uniqueSessions = Number(sessResult?.count || 0);
+    const pageviewsByDay = await db.select({ date: sql<string>`date(${schema.analyticsEvents.createdAt})`, count: sql<number>`count(*)` }).from(schema.analyticsEvents).where(and(baseCondition, eq(schema.analyticsEvents.eventType, 'pageview'))).groupBy(sql`date(${schema.analyticsEvents.createdAt})`).orderBy(sql`date(${schema.analyticsEvents.createdAt})`);
+    return { totalPageviews, topPages: topPages.map((p: any) => ({ path: p.path || '/', count: Number(p.count) })), webVitals, errorCount, uniqueSessions, pageviewsByDay: pageviewsByDay.map((d: any) => ({ date: d.date, count: Number(d.count) })) };
   }
 
   // Table accessors for direct database access (needed by compliance and other modules)

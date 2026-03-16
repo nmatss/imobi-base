@@ -207,16 +207,24 @@ export function errorHandler(
     }
   }
 
-  // Build sanitized response
+  // Derive error code if not already set
+  if (!errorCode) {
+    if (err instanceof AppError) {
+      // Generate code from class name: e.g. AuthError -> AUTH_ERROR
+      errorCode = err.constructor.name
+        .replace(/([a-z])([A-Z])/g, '$1_$2')
+        .toUpperCase();
+    } else {
+      errorCode = 'INTERNAL_ERROR';
+    }
+  }
+
+  // Build standardized response: { error, code, status }
   const response: any = {
     error: message,
-    statusCode,
+    code: errorCode,
+    status: statusCode,
   };
-
-  // Add error code for programmatic handling
-  if (errorCode) {
-    response.code = errorCode;
-  }
 
   if (errors) {
     response.errors = errors;

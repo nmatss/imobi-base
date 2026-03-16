@@ -383,10 +383,7 @@ export function registerESignatureRoutes(app: Express) {
       if (contractType === 'rental') {
         result = await contractGenerator.sendRentalContractForSignature(contractData, contractId);
       } else if (contractType === 'sale') {
-        const pdfBuffer = await contractGenerator.generateSaleContract(contractData);
-        // For sale contracts, you'd implement similar sendForSignature method
-        res.status(501).json({ error: 'Sale contract signing not yet implemented' });
-        return;
+        result = await contractGenerator.sendSaleContractForSignature(contractData, contractId);
       } else {
         res.status(400).json({ error: 'Invalid contract type' });
         return;

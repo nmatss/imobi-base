@@ -7,6 +7,13 @@ import { Strategy as LocalStrategy } from "passport-local";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import bcrypt from "bcryptjs";
+import {
+  isAIAvailable,
+  generatePropertyDescription,
+  generateSocialPost,
+  generateContent as generateAIContent,
+  type PropertyData as AIPropertyData,
+} from "./services/ai-service";
 import { isSqlite } from "./db";
 import { insertUserSchema, insertPropertySchema, insertLeadSchema, insertVisitSchema, insertContractSchema, insertNewsletterSchema, insertInteractionSchema, insertOwnerSchema, insertRenterSchema, insertRentalContractSchema, insertRentalPaymentSchema, insertSaleProposalSchema, insertPropertySaleSchema, insertFinanceCategorySchema, insertFinanceEntrySchema, insertLeadTagSchema, insertLeadTagLinkSchema, insertFollowUpSchema, insertRentalTransferSchema, insertCommissionSchema } from "@shared/schema-sqlite";
 import type { User } from "@shared/schema-sqlite";
@@ -707,6 +714,112 @@ export async function registerRoutes(
   });
 
   // ===== AUTH ROUTES =====
+
+  // Registration rate limiter - 5 per hour per IP
+  const registerLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 5,
+    message: { error: "Muitas tentativas de registro. Tente novamente mais tarde." },
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: generateRateLimitKey,
+  });
+
+  // Public plans endpoint (no auth)
+  app.get("/api/plans", (req: Request, res: Response) => {
+    res.json([
+      { id: "free", name: "Grátis", price: 0, interval: "month", features: ["Até 10 imóveis", "Até 50 leads", "1 usuário", "Site público básico"], stripePriceId: null, trialDays: 0 },
+      { id: "basic", name: "Básico", price: 9900, interval: "month", features: ["Até 100 imóveis", "Leads ilimitados", "5 usuários", "WhatsApp", "Relatórios"], stripePriceId: process.env.STRIPE_BASIC_PRICE_ID || null, trialDays: 14 },
+      { id: "pro", name: "Profissional", price: 19900, interval: "month", features: ["Imóveis ilimitados", "Leads ilimitados", "Usuários ilimitados", "Todas integrações", "IA", "Portal", "Vistorias"], stripePriceId: process.env.STRIPE_PRO_PRICE_ID || null, trialDays: 14 },
+    ]);
+  });
+
+  app.post("/api/auth/register", registerLimiter, async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { companyName, slug, name, email, password, phone } = req.body;
+
+      // Validate required fields
+      if (!companyName || !slug || !name || !email || !password) {
+        res.status(400).json({ error: "Todos os campos obrigatórios devem ser preenchidos" });
+        return;
+      }
+
+      // Validate email format
+      if (!isValidEmail(email)) {
+        res.status(400).json({ error: "Email inválido" });
+        return;
+      }
+
+      // Validate password strength
+      const { validatePasswordStrength } = await import("./auth/security");
+      const passwordCheck = validatePasswordStrength(password);
+      if (!passwordCheck.valid) {
+        res.status(400).json({ error: passwordCheck.message || "Senha não atende os requisitos de segurança" });
+        return;
+      }
+
+      // Normalize slug
+      const normalizedSlug = slug.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      if (normalizedSlug.length < 3) {
+        res.status(400).json({ error: "O slug deve ter pelo menos 3 caracteres" });
+        return;
+      }
+
+      // Check email uniqueness
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        res.status(409).json({ error: "Este email já está em uso" });
+        return;
+      }
+
+      // Check slug uniqueness
+      const existingTenant = await storage.getTenantBySlug(normalizedSlug);
+      if (existingTenant) {
+        res.status(409).json({ error: "Este slug já está em uso. Escolha outro identificador." });
+        return;
+      }
+
+      // Create tenant
+      const tenant = await storage.createTenant({
+        name: companyName,
+        slug: normalizedSlug,
+        phone: phone || null,
+        email: email,
+      });
+
+      // Setup default roles, categories, settings
+      const { setupNewTenant } = await import("./seed-defaults");
+      await setupNewTenant(storage, tenant);
+
+      // Create admin user
+      const hashedPwd = await hashPassword(password);
+      const user = await storage.createUser({
+        tenantId: tenant.id,
+        name,
+        email,
+        password: hashedPwd,
+        role: "admin",
+      });
+
+      // Send verification email (non-blocking - don't fail registration if email fails)
+      try {
+        const { sendVerificationTokenToUser } = await import("./auth/email-verification");
+        await sendVerificationTokenToUser(user.id, email, name);
+      } catch (emailError) {
+        console.error("Failed to send verification email:", emailError);
+      }
+
+      res.status(201).json({
+        message: "Conta criada com sucesso! Verifique seu email.",
+        tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
+        user: { id: user.id, name: user.name, email: user.email },
+      });
+    } catch (error: any) {
+      console.error("Registration error:", error);
+      res.status(500).json({ error: "Erro ao criar conta. Tente novamente." });
+    }
+  });
+
   app.post("/api/auth/login", authLimiter, (req, res, next) => {
     passport.authenticate("local", (err: any, user: User | false, info: any) => {
       if (err) return next(err);
