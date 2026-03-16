@@ -376,7 +376,7 @@ export class WebhookHandler {
       }
 
       return isValid;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[CLICKSIGN] Signature validation error:', error);
       return false;
     }

@@ -12,7 +12,7 @@ import * as Sentry from '@sentry/node';
  * Extract tenant ID from payment metadata.
  * MercadoPagoService stores it as metadata.tenant_id when creating payments.
  */
-function getTenantIdFromMetadata(metadata: Record<string, any> | undefined): string | null {
+function getTenantIdFromMetadata(metadata: Record<string, unknown> | undefined): string | null {
   if (!metadata) return null;
   // MercadoPago lowercases and snake_cases metadata keys
   return metadata.tenant_id || metadata.tenantId || null;

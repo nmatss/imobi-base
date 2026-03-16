@@ -33,6 +33,15 @@ const { Pool } = pkg;
 import { generateRateLimitKey } from "./middleware/rate-limit-key-generator";
 import { subscriptionGuard } from "./middleware/subscription-guard";
 
+// ===== ERROR HELPER =====
+function toHttpError(error: unknown): { status: number; message: string } {
+  const err = error as { status?: number; message?: string } | undefined;
+  return {
+    status: err?.status || 500,
+    message: err?.message || "Erro interno do servidor",
+  };
+}
+
 // ===== VALIDATION HELPERS =====
 const isValidEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -49,7 +58,7 @@ const isValidDate = (dateString: string): boolean => {
   return !isNaN(date.getTime());
 };
 
-const sanitizePagination = (page: any, limit: any, maxLimit: number = 100): { page: number; limit: number } => {
+const sanitizePagination = (page: unknown, limit: unknown, maxLimit: number = 100): { page: number; limit: number } => {
   const parsedPage = Math.max(1, parseInt(page) || 1);
   const parsedLimit = Math.min(maxLimit, Math.max(1, parseInt(limit) || 50));
   return { page: parsedPage, limit: parsedLimit };
@@ -272,11 +281,11 @@ export async function registerRoutes(
         styleSrc: [
           "'self'",
           "https://fonts.googleapis.com",
-          (req: any, res: any) => `'nonce-${res.locals.cspNonce}'`,
+          (_req: Request, res: Response) => `'nonce-${res.locals.cspNonce}'`,
         ],
         scriptSrc: [
           "'self'",
-          (req: any, res: any) => `'nonce-${res.locals.cspNonce}'`,
+          (_req: Request, res: Response) => `'nonce-${res.locals.cspNonce}'`,
         ],
         imgSrc: [
           "'self'",
@@ -594,18 +603,18 @@ export async function registerRoutes(
         }
 
         // Se não tem roleId, usa role padrão (legado)
-        if (!(user as any).roleId) {
+        if (!(user as User & { roleId?: string }).roleId) {
           return next(); // Compatibilidade com sistema antigo
         }
 
         // Busca as permissões da role
-        const role = await storage.getUserRole((user as any).roleId);
+        const role = await storage.getUserRole((user as User & { roleId: string }).roleId);
         if (!role) {
           return res.status(403).json({ error: "Role não encontrada" });
         }
 
         // Verifica permissão
-        const permissions = role.permissions as any;
+        const permissions = role.permissions as Record<string, unknown>;
         if (!permissions || typeof permissions !== 'object') {
           return res.status(403).json({ error: "Permissões não configuradas" });
         }
@@ -819,14 +828,14 @@ export async function registerRoutes(
         tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
         user: { id: user.id, name: user.name, email: user.email },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Registration error:", error);
       res.status(500).json({ error: "Erro ao criar conta. Tente novamente." });
     }
   });
 
   app.post("/api/auth/login", authLimiter, (req, res, next) => {
-    passport.authenticate("local", (err: any, user: User | false, info: any) => {
+    passport.authenticate("local", (err: unknown, user: User | false, info: { message?: string } | undefined) => {
       if (err) return next(err);
       if (!user) {
         return res.status(401).json({ error: info?.message || "Credenciais inválidas" });
@@ -899,14 +908,14 @@ export async function registerRoutes(
   function clearSensitiveData(req: Request): void {
     if (req.user) {
       // Clear user object
-      delete (req as any).user;
+      delete (req as unknown as Record<string, unknown>).user;
     }
 
     if (req.session) {
       // Clear session data except cookie
       Object.keys(req.session).forEach(key => {
         if (key !== 'cookie') {
-          delete (req.session as any)[key];
+          delete (req.session as unknown as Record<string, unknown>)[key];
         }
       });
     }
@@ -1009,7 +1018,7 @@ export async function registerRoutes(
           });
         });
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Logout all sessions error:', error);
       res.status(500).json({
         error: 'Failed to logout all sessions'
@@ -1174,10 +1183,10 @@ export async function registerRoutes(
       // IDOR Protection: Validate tenant ownership
       await validateResourceTenant(property, req.user!.tenantId, "Imóvel");
       res.json(property);
-    } catch (error: any) {
-      const status = error?.status || 500;
-      const message = error?.message || "Erro ao buscar imóvel";
-      res.status(status).json({ error: message });
+    } catch (error: unknown) {
+      const httpErr = toHttpError(error);
+      const message = httpErr.message ||"Erro ao buscar imóvel";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -1186,8 +1195,8 @@ export async function registerRoutes(
       const data = insertPropertySchema.parse({ ...req.body, tenantId: req.user!.tenantId });
       const property = await storage.createProperty(data);
       res.status(201).json(property);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao criar imóvel" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar imóvel" });
     }
   });
 
@@ -1200,10 +1209,10 @@ export async function registerRoutes(
       const property = await storage.updateProperty(req.params.id, req.body);
       if (!property) return res.status(404).json({ error: "Imóvel não encontrado" });
       res.json(property);
-    } catch (error: any) {
-      const status = error?.status || 400;
-      const message = error?.message || "Erro ao atualizar imóvel";
-      res.status(status).json({ error: message });
+    } catch (error: unknown) {
+      const httpErr = toHttpError(error);
+      const message = httpErr.message ||"Erro ao atualizar imóvel";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -1216,10 +1225,10 @@ export async function registerRoutes(
       const success = await storage.deleteProperty(req.params.id);
       if (!success) return res.status(404).json({ error: "Imóvel não encontrado" });
       res.json({ success: true });
-    } catch (error: any) {
-      const status = error?.status || 500;
-      const message = error?.message || "Erro ao deletar imóvel";
-      res.status(status).json({ error: message });
+    } catch (error: unknown) {
+      const httpErr = toHttpError(error);
+      const message = httpErr.message ||"Erro ao deletar imóvel";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -1238,8 +1247,8 @@ export async function registerRoutes(
       const data = insertLeadSchema.parse(req.body);
       const lead = await storage.createLead(data);
       res.status(201).json({ success: true, lead });
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao criar lead" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar lead" });
     }
   });
 
@@ -1258,10 +1267,10 @@ export async function registerRoutes(
       // IDOR Protection: Validate tenant ownership
       await validateResourceTenant(lead, req.user!.tenantId, "Lead");
       res.json(lead);
-    } catch (error: any) {
-      const status = error?.status || 500;
-      const message = error?.message || "Erro ao buscar lead";
-      res.status(status).json({ error: message });
+    } catch (error: unknown) {
+      const httpErr = toHttpError(error);
+      const message = httpErr.message ||"Erro ao buscar lead";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -1270,8 +1279,8 @@ export async function registerRoutes(
       const data = insertLeadSchema.parse({ ...req.body, tenantId: req.user!.tenantId });
       const lead = await storage.createLead(data);
       res.status(201).json(lead);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao criar lead" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar lead" });
     }
   });
 
@@ -1284,10 +1293,10 @@ export async function registerRoutes(
       const lead = await storage.updateLead(req.params.id, req.body);
       if (!lead) return res.status(404).json({ error: "Lead não encontrado" });
       res.json(lead);
-    } catch (error: any) {
-      const status = error?.status || 400;
-      const message = error?.message || "Erro ao atualizar lead";
-      res.status(status).json({ error: message });
+    } catch (error: unknown) {
+      const httpErr = toHttpError(error);
+      const message = httpErr.message ||"Erro ao atualizar lead";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -1300,10 +1309,10 @@ export async function registerRoutes(
       const success = await storage.deleteLead(req.params.id);
       if (!success) return res.status(404).json({ error: "Lead não encontrado" });
       res.json({ success: true });
-    } catch (error: any) {
-      const status = error?.status || 500;
-      const message = error?.message || "Erro ao deletar lead";
-      res.status(status).json({ error: message });
+    } catch (error: unknown) {
+      const httpErr = toHttpError(error);
+      const message = httpErr.message ||"Erro ao deletar lead";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -1332,8 +1341,8 @@ export async function registerRoutes(
       const data = insertInteractionSchema.parse({ ...req.body, userId: req.user!.id });
       const interaction = await storage.createInteraction(data);
       res.status(201).json(interaction);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao criar interação" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar interação" });
     }
   });
 
@@ -1352,8 +1361,8 @@ export async function registerRoutes(
       const data = insertVisitSchema.parse({ ...req.body, tenantId: req.user!.tenantId });
       const visit = await storage.createVisit(data);
       res.status(201).json(visit);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao criar visita" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar visita" });
     }
   });
 
@@ -1366,10 +1375,10 @@ export async function registerRoutes(
       const visit = await storage.updateVisit(req.params.id, req.body);
       if (!visit) return res.status(404).json({ error: "Visita não encontrada" });
       res.json(visit);
-    } catch (error: any) {
-      const status = error?.status || 400;
-      const message = error?.message || "Erro ao atualizar visita";
-      res.status(status).json({ error: message });
+    } catch (error: unknown) {
+      const httpErr = toHttpError(error);
+      const message = httpErr.message ||"Erro ao atualizar visita";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -1382,10 +1391,10 @@ export async function registerRoutes(
       const success = await storage.deleteVisit(req.params.id);
       if (!success) return res.status(404).json({ error: "Visita não encontrada" });
       res.json({ success: true });
-    } catch (error: any) {
-      const status = error?.status || 500;
-      const message = error?.message || "Erro ao deletar visita";
-      res.status(status).json({ error: message });
+    } catch (error: unknown) {
+      const httpErr = toHttpError(error);
+      const message = httpErr.message ||"Erro ao deletar visita";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -1405,10 +1414,10 @@ export async function registerRoutes(
       // IDOR Protection: Validate tenant ownership
       await validateResourceTenant(contract, req.user!.tenantId, "Contrato");
       res.json(contract);
-    } catch (error: any) {
-      const status = error?.status || 500;
-      const message = error?.message || "Erro ao buscar contrato";
-      res.status(status).json({ error: message });
+    } catch (error: unknown) {
+      const httpErr = toHttpError(error);
+      const message = httpErr.message ||"Erro ao buscar contrato";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -1417,8 +1426,8 @@ export async function registerRoutes(
       const data = insertContractSchema.parse({ ...req.body, tenantId: req.user!.tenantId });
       const contract = await storage.createContract(data);
       res.status(201).json(contract);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao criar contrato" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar contrato" });
     }
   });
 
@@ -1431,10 +1440,10 @@ export async function registerRoutes(
       const contract = await storage.updateContract(req.params.id, req.body);
       if (!contract) return res.status(404).json({ error: "Contrato não encontrado" });
       res.json(contract);
-    } catch (error: any) {
-      const status = error?.status || 400;
-      const message = error?.message || "Erro ao atualizar contrato";
-      res.status(status).json({ error: message });
+    } catch (error: unknown) {
+      const httpErr = toHttpError(error);
+      const message = httpErr.message ||"Erro ao atualizar contrato";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -1448,8 +1457,8 @@ export async function registerRoutes(
       const data = insertNewsletterSchema.parse(req.body);
       const subscription = await storage.subscribeNewsletter(data);
       res.status(201).json(subscription);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao inscrever newsletter" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao inscrever newsletter" });
     }
   });
 
@@ -1502,8 +1511,8 @@ export async function registerRoutes(
       const data = insertOwnerSchema.parse({ ...req.body, tenantId: req.user!.tenantId });
       const owner = await storage.createOwner(data);
       res.status(201).json(owner);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao criar locador" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar locador" });
     }
   });
 
@@ -1515,8 +1524,8 @@ export async function registerRoutes(
       const { tenantId, id, ...allowedFields } = req.body;
       const owner = await storage.updateOwner(req.params.id, allowedFields);
       res.json(owner);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao atualizar locador" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao atualizar locador" });
     }
   });
 
@@ -1557,8 +1566,8 @@ export async function registerRoutes(
       const data = insertRenterSchema.parse({ ...req.body, tenantId: req.user!.tenantId });
       const renter = await storage.createRenter(data);
       res.status(201).json(renter);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao criar inquilino" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar inquilino" });
     }
   });
 
@@ -1570,8 +1579,8 @@ export async function registerRoutes(
       const { tenantId, id, ...allowedFields } = req.body;
       const renter = await storage.updateRenter(req.params.id, allowedFields);
       res.json(renter);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao atualizar inquilino" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao atualizar inquilino" });
     }
   });
 
@@ -1612,8 +1621,8 @@ export async function registerRoutes(
       const data = insertRentalContractSchema.parse({ ...req.body, tenantId: req.user!.tenantId });
       const contract = await storage.createRentalContract(data);
       res.status(201).json(contract);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao criar contrato de aluguel" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar contrato de aluguel" });
     }
   });
 
@@ -1625,8 +1634,8 @@ export async function registerRoutes(
       const { tenantId, id, ...allowedFields } = req.body;
       const contract = await storage.updateRentalContract(req.params.id, allowedFields);
       res.json(contract);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao atualizar contrato de aluguel" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao atualizar contrato de aluguel" });
     }
   });
 
@@ -1668,8 +1677,8 @@ export async function registerRoutes(
       const data = insertRentalPaymentSchema.parse({ ...req.body, tenantId: req.user!.tenantId });
       const payment = await storage.createRentalPayment(data);
       res.status(201).json(payment);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao criar pagamento" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar pagamento" });
     }
   });
 
@@ -1681,8 +1690,8 @@ export async function registerRoutes(
       const { tenantId, id, ...allowedFields } = req.body;
       const payment = await storage.updateRentalPayment(req.params.id, allowedFields);
       res.json(payment);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao atualizar pagamento" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao atualizar pagamento" });
     }
   });
 
@@ -1812,8 +1821,8 @@ export async function registerRoutes(
 
       const transfer = await storage.createRentalTransfer(data);
       res.status(201).json(transfer);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao criar repasse" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar repasse" });
     }
   });
 
@@ -1825,8 +1834,8 @@ export async function registerRoutes(
       const { tenantId, id, ...allowedFields } = req.body;
       const transfer = await storage.updateRentalTransfer(req.params.id, allowedFields);
       res.json(transfer);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao atualizar repasse" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao atualizar repasse" });
     }
   });
 
@@ -1848,8 +1857,8 @@ export async function registerRoutes(
       if (!referenceMonth) return res.status(400).json({ error: "Mês de referência é obrigatório" });
       const transfers = await storage.generateTransfersForMonth(req.user!.tenantId, referenceMonth);
       res.status(201).json(transfers);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao gerar repasses" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao gerar repasses" });
     }
   });
 
@@ -1932,8 +1941,8 @@ export async function registerRoutes(
       const data = insertSaleProposalSchema.parse({ ...req.body, tenantId: req.user!.tenantId });
       const proposal = await storage.createSaleProposal(data);
       res.status(201).json(proposal);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao criar proposta" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar proposta" });
     }
   });
 
@@ -1945,8 +1954,8 @@ export async function registerRoutes(
       const { tenantId, id, ...allowedFields } = req.body;
       const proposal = await storage.updateSaleProposal(req.params.id, allowedFields);
       res.json(proposal);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao atualizar proposta" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao atualizar proposta" });
     }
   });
 
@@ -1987,8 +1996,8 @@ export async function registerRoutes(
       const data = insertPropertySaleSchema.parse({ ...req.body, tenantId: req.user!.tenantId });
       const sale = await storage.createPropertySale(data);
       res.status(201).json(sale);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao registrar venda" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao registrar venda" });
     }
   });
 
@@ -2000,8 +2009,8 @@ export async function registerRoutes(
       const { tenantId, id, ...allowedFields } = req.body;
       const sale = await storage.updatePropertySale(req.params.id, allowedFields);
       res.json(sale);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao atualizar venda" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao atualizar venda" });
     }
   });
 
@@ -2020,8 +2029,8 @@ export async function registerRoutes(
       const data = insertFinanceCategorySchema.parse({ ...req.body, tenantId: req.user!.tenantId });
       const category = await storage.createFinanceCategory(data);
       res.status(201).json(category);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao criar categoria" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar categoria" });
     }
   });
 
@@ -2033,8 +2042,8 @@ export async function registerRoutes(
       const { tenantId, id, ...allowedFields } = req.body;
       const category = await storage.updateFinanceCategory(req.params.id, allowedFields);
       res.json(category);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao atualizar categoria" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao atualizar categoria" });
     }
   });
 
@@ -2082,8 +2091,8 @@ export async function registerRoutes(
       const data = insertFinanceEntrySchema.parse({ ...req.body, tenantId: req.user!.tenantId });
       const entry = await storage.createFinanceEntry(data);
       res.status(201).json(entry);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao criar lançamento" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar lançamento" });
     }
   });
 
@@ -2095,8 +2104,8 @@ export async function registerRoutes(
       const { tenantId, id, ...allowedFields } = req.body;
       const entry = await storage.updateFinanceEntry(req.params.id, allowedFields);
       res.json(entry);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao atualizar lançamento" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao atualizar lançamento" });
     }
   });
 
@@ -2127,8 +2136,8 @@ export async function registerRoutes(
       const data = insertLeadTagSchema.parse({ ...req.body, tenantId: req.user!.tenantId });
       const tag = await storage.createLeadTag(data);
       res.status(201).json(tag);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao criar tag" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar tag" });
     }
   });
 
@@ -2140,8 +2149,8 @@ export async function registerRoutes(
       const { tenantId, id, ...allowedFields } = req.body;
       const tag = await storage.updateLeadTag(req.params.id, allowedFields);
       res.json(tag);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao atualizar tag" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao atualizar tag" });
     }
   });
 
@@ -2181,8 +2190,8 @@ export async function registerRoutes(
       const data = insertLeadTagLinkSchema.parse({ leadId: req.params.leadId, tagId: req.body.tagId });
       const link = await storage.addTagToLead(data);
       res.status(201).json(link);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao adicionar tag" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao adicionar tag" });
     }
   });
 
@@ -2279,8 +2288,8 @@ export async function registerRoutes(
       const data = insertFollowUpSchema.parse({ ...req.body, tenantId: req.user!.tenantId });
       const followUp = await storage.createFollowUp(data);
       res.status(201).json(followUp);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao criar follow-up" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar follow-up" });
     }
   });
 
@@ -2292,8 +2301,8 @@ export async function registerRoutes(
       const { tenantId, id, ...allowedFields } = req.body;
       const followUp = await storage.updateFollowUp(req.params.id, allowedFields);
       res.json(followUp);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao atualizar follow-up" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao atualizar follow-up" });
     }
   });
 
@@ -2481,8 +2490,8 @@ export async function registerRoutes(
       }
       const role = await storage.createUserRole({ ...req.body, tenantId: req.user!.tenantId });
       res.status(201).json(role);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao criar função" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar função" });
     }
   });
 
@@ -2497,8 +2506,8 @@ export async function registerRoutes(
       const { tenantId, id, ...allowedFields } = req.body;
       const role = await storage.updateUserRole(req.params.id, allowedFields);
       res.json(role);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao atualizar função" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao atualizar função" });
     }
   });
 
@@ -2555,8 +2564,8 @@ export async function registerRoutes(
       }
       const integration = await storage.createOrUpdateIntegration(req.user!.tenantId, req.params.name, req.body);
       res.json(integration);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao salvar integração" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao salvar integração" });
     }
   });
 
@@ -2581,8 +2590,8 @@ export async function registerRoutes(
         req.body
       );
       res.json(preference);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao salvar preferência" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao salvar preferência" });
     }
   });
 
@@ -2604,8 +2613,8 @@ export async function registerRoutes(
         userId: req.user!.id,
       });
       res.status(201).json(report);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao criar relatório" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar relatório" });
     }
   });
 
@@ -2617,8 +2626,8 @@ export async function registerRoutes(
       const { tenantId, id, userId, ...allowedFields } = req.body;
       const report = await storage.updateSavedReport(req.params.id, allowedFields);
       res.json(report);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao atualizar relatório" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao atualizar relatório" });
     }
   });
 
@@ -2686,8 +2695,8 @@ export async function registerRoutes(
     try {
       const tenant = await storage.createTenantWithSubscription(req.body);
       res.status(201).json(tenant);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao criar tenant" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar tenant" });
     }
   });
 
@@ -2696,8 +2705,8 @@ export async function registerRoutes(
       const tenant = await storage.updateTenantAdmin(req.params.id, req.body);
       if (!tenant) return res.status(404).json({ error: "Tenant não encontrado" });
       res.json(tenant);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao atualizar tenant" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao atualizar tenant" });
     }
   });
 
@@ -2726,8 +2735,8 @@ export async function registerRoutes(
       const plan = await storage.updatePlan(req.params.id, req.body);
       if (!plan) return res.status(404).json({ error: "Plano não encontrado" });
       res.json(plan);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message || "Erro ao atualizar plano" });
+    } catch (error: unknown) {
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao atualizar plano" });
     }
   });
 
@@ -2823,7 +2832,7 @@ export async function registerRoutes(
         return res.status(403).json({ error: "Acesso negado" });
       }
 
-      const updateData: any = { status };
+      const updateData: Record<string, unknown> = { status };
       if (status === 'approved') {
         updateData.approvedAt = new Date().toISOString();
       } else if (status === 'paid') {
@@ -2865,9 +2874,9 @@ export async function registerRoutes(
 
       const commission = await storage.createCommission(data);
       res.status(201).json(commission);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating commission:", error);
-      res.status(400).json({ error: error.message || "Erro ao criar comissão" });
+      res.status(400).json({ error: error instanceof Error ? error.message :"Erro ao criar comissão" });
     }
   });
 
@@ -2910,8 +2919,9 @@ export async function registerRoutes(
 
   // ===== CORS ERROR HANDLER =====
   // Handle CORS violations with proper logging
-  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-    if (err.message && err.message.includes('CORS')) {
+  app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+    const errObj = err as { message?: string };
+    if (errObj.message && errObj.message.includes('CORS')) {
       console.warn('[SECURITY] CORS violation', {
         origin: req.headers.origin,
         method: req.method,

@@ -160,7 +160,7 @@ export async function runDatabaseBackup(): Promise<void> {
 // to use node-cron for in-process scheduling.
 // ===================================================================
 
-let scheduledTasks: any[] = [];
+const scheduledTasks: { stop: () => void; getStatus: () => string }[] = [];
 
 /**
  * Initialize all scheduled jobs using node-cron.
@@ -177,7 +177,7 @@ export function initializeScheduledJobs(): void {
   }
 
   // Dynamic import to avoid loading node-cron on Vercel where it's unnecessary
-  let cron: any;
+  let cron: { schedule: (expression: string, fn: () => void, options: object) => { stop: () => void; getStatus: () => string } };
   try {
     cron = require('node-cron');
   } catch {

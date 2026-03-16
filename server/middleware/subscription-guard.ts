@@ -75,7 +75,7 @@ export async function subscriptionGuard(
       return;
     }
 
-    const tenantId = (req.user as any).tenantId;
+    const tenantId = (req.user as { tenantId?: string }).tenantId;
 
     if (!tenantId) {
       next();
@@ -141,7 +141,7 @@ export async function subscriptionGuard(
   } catch (error) {
     Sentry.captureException(error, {
       tags: { middleware: 'subscription-guard' },
-      extra: { path: req.path, userId: (req.user as any)?.id },
+      extra: { path: req.path, userId: (req.user as { id?: string })?.id },
     });
 
     // Fail open – don't block requests due to internal errors

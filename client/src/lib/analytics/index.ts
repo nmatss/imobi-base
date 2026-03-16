@@ -23,7 +23,7 @@ interface AnalyticsUser {
   name?: string;
   tenantId?: string;
   role?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 interface AnalyticsEvent {
@@ -31,7 +31,7 @@ interface AnalyticsEvent {
   action: string;
   label?: string;
   value?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -177,7 +177,7 @@ export function trackEvent(eventName: string, properties?: AnalyticsEvent) {
 /**
  * Track feature usage
  */
-export function trackFeature(featureName: string, action: string, metadata?: Record<string, any>) {
+export function trackFeature(featureName: string, action: string, metadata?: Record<string, unknown>) {
   trackEvent(`feature_${featureName}`, {
     category: "Feature Usage",
     action,
@@ -189,7 +189,7 @@ export function trackFeature(featureName: string, action: string, metadata?: Rec
 /**
  * Track conversion/goal
  */
-export function trackConversion(goalName: string, value?: number, metadata?: Record<string, any>) {
+export function trackConversion(goalName: string, value?: number, metadata?: Record<string, unknown>) {
   trackEvent(`conversion_${goalName}`, {
     category: "Conversion",
     action: goalName,
@@ -201,7 +201,7 @@ export function trackConversion(goalName: string, value?: number, metadata?: Rec
 /**
  * Track error
  */
-export function trackError(error: Error, context?: Record<string, any>) {
+export function trackError(error: Error, context?: Record<string, unknown>) {
   if (isDevelopment) {
     console.log("📊 Error tracked:", error.message, context);
     return;

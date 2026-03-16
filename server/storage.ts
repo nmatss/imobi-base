@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Drizzle ORM dual-DB (SQLite + PG) requires `as any` casts for type bridging */
 // Drizzle ORM with dual database support (SQLite + PostgreSQL)
 import { eq, and, desc, sql, like, or, inArray } from "drizzle-orm";
 import { db, schema, isSqlite } from "./db";
@@ -294,8 +295,7 @@ export interface IStorage {
     avgTimeToRent: number;
     byType: { type: string; count: number; avgPrice: number }[];
     byCity: { city: string; count: number }[];
-    ownerIndicators: { owner: any; activeProperties: number; avgVacancy: number; totalReturn: number }[];
-  }>;
+    ownerIndicators: { owner: any; activeProperties: number; avgVacancy: number; totalReturn: number }[];  }>;
   getFinancialSummaryReport(tenantId: string, filters?: { startDate?: Date; endDate?: Date }): Promise<{
     salesRevenue: number;
     rentalRevenue: number;
@@ -393,8 +393,7 @@ export interface IStorage {
   // Analytics
   createAnalyticsEvent(event: InsertAnalyticsEvent): Promise<AnalyticsEvent>;
   getAnalyticsEventsByTenant(tenantId: string, filters?: { eventType?: string; startDate?: string; endDate?: string; limit?: number }): Promise<AnalyticsEvent[]>;
-  getAnalyticsSummary(tenantId: string, period: 'today' | 'week' | 'month'): Promise<any>;
-}
+  getAnalyticsSummary(tenantId: string, period: 'today' | 'week' | 'month'): Promise<any>;}
 
 export class DbStorage implements IStorage {
   // Tenants
@@ -456,7 +455,7 @@ export class DbStorage implements IStorage {
   }
 
   async getPropertiesByTenant(tenantId: string, filters?: { type?: string; category?: string; status?: string; featured?: boolean }): Promise<Property[]> {
-    let query = db.select().from(schema.properties).where(eq(schema.properties.tenantId, tenantId));
+    const query = db.select().from(schema.properties).where(eq(schema.properties.tenantId, tenantId));
 
     const conditions = [eq(schema.properties.tenantId, tenantId)];
     if (filters?.type) conditions.push(eq(schema.properties.type, filters.type));
@@ -2607,8 +2606,7 @@ export class DbStorage implements IStorage {
     avgTimeToRent: number;
     byType: { type: string; count: number; avgPrice: number }[];
     byCity: { city: string; count: number }[];
-    ownerIndicators: { owner: any; activeProperties: number; avgVacancy: number; totalReturn: number }[];
-  }> {
+    ownerIndicators: { owner: any; activeProperties: number; avgVacancy: number; totalReturn: number }[];  }> {
     // Get all available properties
     const properties = await db.select().from(schema.properties)
       .where(and(
@@ -3481,7 +3479,7 @@ export class DbStorage implements IStorage {
     return c;
   }
   async getIsaConversationsByTenant(tenantId: string, filters?: { status?: string; temperature?: string }): Promise<IsaConversation[]> {
-    let conditions = [eq((schema as any).isaConversations.tenantId, tenantId)];
+    const conditions = [eq((schema as any).isaConversations.tenantId, tenantId)];
     if (filters?.status) conditions.push(eq((schema as any).isaConversations.status, filters.status));
     if (filters?.temperature) conditions.push(eq((schema as any).isaConversations.temperature, filters.temperature));
     return db.select().from((schema as any).isaConversations).where(and(...conditions)).orderBy(desc((schema as any).isaConversations.lastMessageAt));

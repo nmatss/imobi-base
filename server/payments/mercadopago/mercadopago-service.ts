@@ -21,7 +21,7 @@ export interface MercadoPagoPixData {
   email: string;
   cpfCnpj: string;
   tenantId: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface MercadoPagoBoletoData {
@@ -32,7 +32,7 @@ export interface MercadoPagoBoletoData {
   firstName: string;
   lastName: string;
   tenantId: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface MercadoPagoCreditCardData {
@@ -42,7 +42,7 @@ export interface MercadoPagoCreditCardData {
   token: string;
   installments: number;
   tenantId: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface MercadoPagoPaymentStatus {
@@ -55,7 +55,7 @@ export interface MercadoPagoPaymentStatus {
   qrCode?: string;
   qrCodeBase64?: string;
   boletoUrl?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export class MercadoPagoService {
@@ -248,7 +248,7 @@ export class MercadoPagoService {
       email?: string;
       name?: string;
     };
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
     backUrls?: {
       success: string;
       failure: string;

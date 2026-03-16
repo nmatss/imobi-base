@@ -62,11 +62,13 @@ export class SendGridService {
         success: true,
         messageId: response.headers['x-message-id'] as string,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('SendGrid error:', error);
 
+      const err = error as { code?: number; message?: string };
+
       // Handle rate limiting
-      if (error.code === 429) {
+      if (err.code === 429) {
         return {
           success: false,
           error: 'Rate limit exceeded. Please try again later.',
@@ -75,7 +77,7 @@ export class SendGridService {
 
       return {
         success: false,
-        error: error.message || 'Failed to send email',
+        error: err.message || 'Failed to send email',
       };
     }
   }
@@ -100,7 +102,7 @@ export class SendGridService {
     const failed = results.length - sent;
     const errors = results
       .filter(r => r.status === 'fulfilled' && !r.value.success)
-      .map(r => (r as PromiseFulfilledResult<any>).value.error);
+      .map(r => (r as PromiseFulfilledResult<{ success: boolean; error?: string }>).value.error);
 
     return {
       success: failed === 0,
@@ -126,13 +128,13 @@ export class SendGridService {
         url: '/v3/user/profile',
       };
 
-      await (sgMail as any).client.request(request);
+      await (sgMail as unknown as { client: { request: (req: { method: string; url: string }) => Promise<unknown> } }).client.request(request);
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       return {
         success: false,
-        error: error.message || 'Failed to verify SendGrid connection',
+        error: error instanceof Error ? error.message : 'Failed to verify SendGrid connection',
       };
     }
   }

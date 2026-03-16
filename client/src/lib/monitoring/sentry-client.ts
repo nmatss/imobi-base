@@ -154,7 +154,7 @@ export function initializeSentryClient() {
  */
 export function captureException(
   error: Error,
-  context?: Record<string, any>
+  context?: Record<string, unknown>
 ) {
   if (!SENTRY_DSN) {
     console.error("Error (Sentry not configured):", error, context);
@@ -172,7 +172,7 @@ export function captureException(
 export function captureMessage(
   message: string,
   level: Sentry.SeverityLevel = "info",
-  context?: Record<string, any>
+  context?: Record<string, unknown>
 ) {
   if (!SENTRY_DSN) {
     if (isDevelopment) console.log(`[${level}]`, message, context);
@@ -218,7 +218,7 @@ export function clearUser() {
 export function addBreadcrumb(
   message: string,
   category: string,
-  data?: Record<string, any>
+  data?: Record<string, unknown>
 ) {
   if (!SENTRY_DSN) return;
 
@@ -242,7 +242,7 @@ export function setTag(key: string, value: string) {
 /**
  * Set custom context
  */
-export function setContext(name: string, context: Record<string, any>) {
+export function setContext(name: string, context: Record<string, unknown>) {
   if (!SENTRY_DSN) return;
   Sentry.setContext(name, context);
 }

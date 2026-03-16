@@ -7,7 +7,7 @@ export interface EmailJobData {
   html: string;
   text?: string;
   templateName?: string;
-  templateData?: Record<string, any>;
+  templateData?: Record<string, unknown>;
   attachments?: Array<{
     content: string;
     filename: string;
@@ -152,7 +152,15 @@ export class EmailQueue {
     );
   }
 
-  async getJobStatus(jobId: string): Promise<any> {
+  async getJobStatus(jobId: string): Promise<{
+    id: string | undefined;
+    state: string;
+    data: EmailJobData;
+    progress: number | object;
+    returnvalue: unknown;
+    failedReason: string | undefined;
+    attemptsMade: number;
+  } | null> {
     if (!this.queue) {
       return null;
     }
@@ -174,7 +182,13 @@ export class EmailQueue {
     };
   }
 
-  async getQueueStats(): Promise<any> {
+  async getQueueStats(): Promise<{
+    waiting: number;
+    active: number;
+    completed: number;
+    failed: number;
+    delayed: number;
+  } | null> {
     if (!this.queue) {
       return null;
     }

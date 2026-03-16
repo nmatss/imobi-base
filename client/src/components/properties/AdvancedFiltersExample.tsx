@@ -110,7 +110,7 @@ export function AdvancedFiltersExample() {
                   bedrooms={property.bedrooms}
                   bathrooms={property.bathrooms}
                   area={property.area}
-                  status={property.status as any}
+                  status={property.status as "available" | "rented" | "sold" | "reserved" | "pending"}
                   type={property.category as "sale" | "rent"}
                   featured={property.featured}
                   imageUrl={property.images?.[0]}

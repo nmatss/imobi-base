@@ -79,8 +79,8 @@ export default function PropertyDetails() {
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   const [showContactForm, setShowContactForm] = useState(false);
 
-  const slug = (params as any)?.slug || "";
-  const propertyId = (params as any)?.propertyId || "";
+  const slug = (params as Record<string, string> | null)?.slug || "";
+  const propertyId = (params as Record<string, string> | null)?.propertyId || "";
 
   useEffect(() => {
     if (!slug || !propertyId) return;
@@ -292,11 +292,9 @@ export default function PropertyDetails() {
         <div className="bg-muted/30 border-b">
           <div className="container mx-auto px-4 py-3">
             <nav className="flex items-center gap-2 text-sm text-muted-foreground overflow-x-auto">
-              <Link href={`/e/${slug}`}>
-                <a className="hover:text-foreground transition-colors flex items-center gap-1">
+              <Link href={`/e/${slug}`} className="hover:text-foreground transition-colors flex items-center gap-1">
                   <Home className="h-4 w-4" />
                   Início
-                </a>
               </Link>
               <span>/</span>
               <span>Imóveis</span>
@@ -316,6 +314,9 @@ export default function PropertyDetails() {
               alt={property.title}
               className="w-full h-full object-cover cursor-pointer"
               onClick={() => setLightboxOpen(true)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setLightboxOpen(true); }}
+              role="button"
+              tabIndex={0}
               loading="eager"
             />
 
@@ -423,11 +424,9 @@ export default function PropertyDetails() {
 
                   {/* Financing Calculator Link */}
                   {property.category === "sale" && (
-                    <Button variant="link" className="h-auto p-0 text-primary" asChild>
-                      <a href="#" onClick={(e) => { e.preventDefault(); alert('Calculadora de financiamento em breve!'); }}>
+                    <Button variant="link" className="h-auto p-0 text-primary" onClick={() => { alert('Calculadora de financiamento em breve!'); }}>
                         <Calculator className="h-4 w-4 mr-1" />
                         Simular financiamento
-                      </a>
                     </Button>
                   )}
                 </div>
@@ -818,8 +817,8 @@ export default function PropertyDetails() {
 
       {/* Mobile Contact Form Modal */}
       {showContactForm && (
-        <div className="fixed inset-0 z-50 bg-black/50 sm:hidden" onClick={() => setShowContactForm(false)}>
-          <div className="fixed bottom-0 left-0 right-0 bg-background rounded-t-2xl p-6 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/50 sm:hidden" onClick={() => setShowContactForm(false)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setShowContactForm(false); }} role="button" tabIndex={0}>
+          <div className="fixed bottom-0 left-0 right-0 bg-background rounded-t-2xl p-6 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} role="presentation">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-heading font-bold">Entre em contato</h3>
               <Button variant="ghost" size="icon" onClick={() => setShowContactForm(false)}>

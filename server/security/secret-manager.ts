@@ -86,7 +86,7 @@ class SecretManager {
   /**
    * Inicializa e valida todos os secrets
    */
-  initialize(env: NodeJS.ProcessEnv): void {
+  initialize(env: Record<string, string | undefined>): void {
     const errors: string[] = [];
     const warnings: string[] = [];
 
