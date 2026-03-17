@@ -23,18 +23,24 @@
 
 ## Modulos
 
-| Modulo            | Descricao                                                   |
-| ----------------- | ----------------------------------------------------------- |
-| **Dashboard**     | KPIs em tempo real, graficos, lembretes                     |
-| **Imoveis**       | Cadastro completo com fotos, mapa, filtros                  |
-| **CRM / Leads**   | Kanban drag-and-drop, tags, follow-ups, match de imoveis    |
-| **Agenda**        | Visitas agendadas com calendario                            |
-| **Contratos**     | Propostas e contratos de venda                              |
-| **Alugueis**      | Contratos de locacao, proprietarios, inquilinos, pagamentos |
-| **Vendas**        | Propostas, registro de vendas, comissoes                    |
-| **Financeiro**    | Entradas, saidas, categorias, relatorios                    |
-| **Relatorios**    | Inadimplencia, ocupacao, vendas, comissoes                  |
-| **Landing Pages** | Site publico por imobiliaria (`/e/{slug}`)                  |
+| Modulo             | Descricao                                                   |
+| ------------------ | ----------------------------------------------------------- |
+| **Dashboard**      | KPIs em tempo real, graficos, lembretes                     |
+| **Imoveis**        | Cadastro completo com fotos, mapa, filtros                  |
+| **CRM / Leads**    | Kanban drag-and-drop, tags, follow-ups, match de imoveis    |
+| **Agenda**         | Visitas agendadas com calendario                            |
+| **Contratos**      | Propostas e contratos de venda                              |
+| **Alugueis**       | Contratos de locacao, proprietarios, inquilinos, pagamentos |
+| **Vendas**         | Propostas, registro de vendas, comissoes                    |
+| **Financeiro**     | Entradas, saidas, categorias, relatorios                    |
+| **Relatorios**     | Inadimplencia, ocupacao, vendas, comissoes                  |
+| **Landing Pages**  | Site publico por imobiliaria (`/e/{slug}`)                  |
+| **Auto Marketing** | Descricoes e posts com IA (Claude)                          |
+| **AVM**            | Avaliacao automatica de imoveis                             |
+| **ISA**            | Agente virtual de vendas (WhatsApp)                         |
+| **Inspecoes**      | Vistorias digitais de imoveis                               |
+| **Portal**         | Portal do proprietario e inquilino                          |
+| **Compliance**     | LGPD, termos de uso, audit logs                             |
 
 ---
 
@@ -173,6 +179,14 @@ docker-compose exec app npm run db:push
 
 Consulte [DEPLOYMENT.md](DEPLOYMENT.md) para guia completo.
 
+### Vercel Cron Jobs
+
+9 jobs agendados via Vercel Cron (configurados em `vercel.json`):
+
+- Payment reminders, Daily/Weekly/Monthly reports
+- Session cleanup, Log cleanup, Database backup
+- Veja [DEPLOYMENT.md](DEPLOYMENT.md) para detalhes.
+
 ---
 
 ## Seguranca
@@ -212,7 +226,7 @@ server/
 ├── security/       # CSRF, IDS, validacao
 ├── middleware/     # Headers, rate limit, logger
 ├── email/          # SendGrid, Resend
-├── jobs/           # BullMQ workers
+├── jobs/           # Scheduled jobs (Vercel Cron + node-cron)
 └── cache/          # Redis
 
 shared/

@@ -1,108 +1,124 @@
-# Contribuindo com o ImobiBase
+# Contribuindo para o ImobiBase
+
+Obrigado pelo interesse em contribuir! Este guia explica como participar do desenvolvimento do projeto.
 
 ## Como Contribuir
 
-1. Faça um fork do repositório
-2. Crie uma branch para sua feature (`git checkout -b feature/minha-feature`)
-3. Commit suas alterações (`git commit -m 'feat: adicionar minha feature'`)
-4. Push para a branch (`git push origin feature/minha-feature`)
-5. Abra um Pull Request
+1. Faca um fork do repositorio
+2. Crie uma branch para sua feature ou correcao
+3. Implemente suas alteracoes com testes
+4. Abra um Pull Request para `main`
 
-## Padrões de Código
+## Pre-requisitos
 
-### Commits
+- **Node.js** 20+
+- **PostgreSQL** 14+ (ou SQLite para desenvolvimento local com `USE_SQLITE=true`)
+- **Redis** (opcional, usado para filas e cache)
 
-Seguimos [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-feat: nova funcionalidade
-fix: correção de bug
-docs: alteração de documentação
-style: formatação (sem mudança de lógica)
-refactor: refatoração de código
-test: adição ou correção de testes
-chore: manutenção geral
-```
-
-### TypeScript
-
-- Strict mode habilitado
-- Validação de tipos com Zod para inputs externos
-- Sem `any` — use tipos específicos ou `unknown`
-
-### Frontend
-
-- Componentes funcionais com hooks
-- shadcn/ui para componentes base
-- Tailwind CSS para estilização
-- React Query para data fetching
-- Lazy loading para páginas
-
-### Backend
-
-- Validação de input em todas as rotas
-- Queries parametrizadas (nunca string interpolation)
-- Rate limiting em endpoints sensíveis
-- Logging estruturado com Winston
-
-## Ambiente de Desenvolvimento
+## Setup do Ambiente
 
 ```bash
-# Instalar dependências
+git clone https://github.com/nmatss/imobi-base.git
+cd imobi-base
 npm install
-
-# Copiar variáveis de ambiente
 cp .env.example .env
-
-# Criar banco
+# Edite .env com suas credenciais locais
 npm run db:push
-
-# Dados de demonstração
-npm run db:seed
-
-# Iniciar servidor
+npm run db:seed  # dados de demonstracao
 npm run dev
 ```
 
-## Testes
+O servidor estara disponivel em `http://localhost:5000`.
 
-Antes de submeter um PR, execute:
+## Estrutura do Projeto
 
-```bash
-# Testes unitários
-npm test
+| Diretorio  | Descricao                                      |
+| ---------- | ---------------------------------------------- |
+| `client/`  | Frontend React (Vite, TailwindCSS, shadcn/ui)  |
+| `server/`  | Backend Express (rotas, servicos, integracoes) |
+| `shared/`  | Schemas Drizzle e tipos compartilhados         |
+| `tests/`   | Testes unitarios e E2E                         |
+| `docs/`    | Documentacao tecnica e guias                   |
+| `scripts/` | Scripts de automacao, seed e migracao          |
 
-# Verificação de tipos
-npm run check
+## Padrao de Commits
 
-# Linting
-npm run lint
+Seguimos [Conventional Commits](https://www.conventionalcommits.org/pt-br/):
 
-# Testes E2E (requer servidor rodando)
-npm run test:e2e
+```
+<tipo>: <descricao curta>
 ```
 
-## Estrutura de Diretórios
+| Tipo       | Uso                                 |
+| ---------- | ----------------------------------- |
+| `feat`     | Nova funcionalidade                 |
+| `fix`      | Correcao de bug                     |
+| `docs`     | Apenas documentacao                 |
+| `refactor` | Refatoracao sem mudar comportamento |
+| `test`     | Adicao ou ajuste de testes          |
+| `chore`    | Manutencao geral                    |
 
-- `client/src/components/` — Componentes React reutilizáveis
-- `client/src/pages/` — Páginas da aplicação
-- `client/src/hooks/` — Hooks customizados
-- `client/src/lib/` — Utilitários e contextos
-- `server/` — Backend Express
-- `shared/` — Schemas e tipos compartilhados
-- `tests/` — Testes E2E, segurança, acessibilidade
-- `docs/` — Documentação técnica
+Exemplos:
 
-## Segurança
+```
+feat: adicionar filtro por bairro na busca de imoveis
+fix: corrigir calculo de comissao no fechamento
+docs: atualizar guia de deploy
+```
 
-- Nunca commite `.env`, credenciais ou chaves de API
-- Use `npm run validate:secrets` para verificar vazamentos
-- Siga as práticas documentadas em [SECURITY.md](SECURITY.md)
-- Reporte vulnerabilidades por email (veja SECURITY.md)
+## Pre-commit Hooks
+
+Ao fazer commit, os seguintes checks rodam automaticamente nos arquivos staged:
+
+- **ESLint + Prettier** (via `lint-staged`) -- formatacao e analise estatica
+- **Vitest** -- testes relacionados aos arquivos alterados
+
+Esses hooks rodam apenas nos arquivos staged, entao sao rapidos. Se algum check falhar, o commit sera bloqueado ate a correcao.
+
+## Testes
+
+```bash
+# Testes unitarios
+npm test
+
+# Testes E2E com Playwright
+npm run test:e2e
+
+# Relatorio de cobertura
+npm run test:coverage
+```
+
+- O threshold minimo de cobertura e **70%**.
+- Novas features devem incluir testes unitarios.
+- Alteracoes em fluxos criticos devem incluir testes E2E.
+
+## Code Style
+
+- TypeScript em **strict mode**
+- Use `unknown` em vez de `any`
+- Prefira `const` sobre `let`
+- Use `import.meta.env.DEV` para codigo exclusivo de desenvolvimento
+- Siga os padroes ja existentes no codebase
+- Nomeie arquivos em `kebab-case`
 
 ## Pull Requests
 
-- PRs devem ter descrição clara do que foi alterado e por quê
-- Inclua screenshots para mudanças visuais
-- Testes devem passar no CI
-- Mantenha PRs focados — uma feature/fix por PR
+1. Crie uma branch a partir de `main`:
+   ```bash
+   git checkout -b feat/minha-feature main
+   ```
+2. Mantenha PRs focados e pequenos (uma feature ou correcao por PR)
+3. Escreva testes para funcionalidades novas
+4. Garanta que todos os checks passam antes de solicitar review
+5. Descreva claramente o que foi feito e por que no corpo do PR
+
+## Seguranca
+
+- **Nunca** commite arquivos `.env` ou credenciais
+- Use `SecretManager` para registrar novos secrets
+- Siga as diretrizes do [OWASP Top 10](https://owasp.org/www-project-top-ten/)
+- Reporte vulnerabilidades de forma **privada** via email ou pela aba Security do GitHub
+
+## Duvidas?
+
+Abra uma [issue](https://github.com/nmatss/imobi-base/issues) ou inicie uma discussao no repositorio.

@@ -1,82 +1,40 @@
 # Changelog
 
-Todas as mudanças notáveis do projeto estão documentadas neste arquivo.
+Todas as mudancas notaveis deste projeto serao documentadas neste arquivo.
 
-O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/) e o projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
+O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
+e este projeto adere ao [Versionamento Semantico](https://semver.org/lang/pt-BR/).
 
----
-
-## [1.0.0] - 2026-03-14
+## [1.0.0] - 2026-03-16
 
 ### Adicionado
 
-#### Módulos Principais
+- Sistema CRM imobiliario multi-tenant completo
+- 17+ modulos: Dashboard, Imoveis, Leads/CRM, Agenda, Contratos, Alugueis, Vendas, Financeiro, Relatorios, Landing Pages, Auto Marketing (AI), AVM (valuation), ISA (virtual agent), Inspections, Portal, Extensions
+- Integracoes: WhatsApp Business API, Stripe, Mercado Pago, ClickSign, Twilio, SendGrid, Google Maps, Sentry, PostHog
+- Autenticacao: Local + OAuth 2.0 (Google, Microsoft), 2FA
+- Seguranca: CSRF, Rate Limiting, Helmet, Input Validation, Webhook HMAC, IDS
+- Subscription guard com grace period de 7 dias
+- Vercel Cron endpoints para 9 scheduled jobs
+- PWA com autoUpdate para suporte offline
+- CI/CD: GitHub Actions (CI, deploy preview, deploy production, security scan)
+- 58 arquivos de teste (unit, integration, E2E, accessibility, security)
+- Documentacao completa (36+ docs)
+- Docker + Docker Compose para deploy self-hosted
+- Internacionalizacao (i18n) com PT-BR e EN
 
-- **Dashboard** com KPIs em tempo real, gráficos Recharts e lembretes
-- **Imóveis** — CRUD completo com galeria de fotos, mapa, filtros avançados
-- **CRM/Leads** — Kanban drag-and-drop, tags, follow-ups, match de imóveis
-- **Agenda** — Calendário de visitas com agendamento
-- **Contratos** — Gestão de propostas e contratos de venda
-- **Aluguéis** — Contratos de locação, proprietários, inquilinos, pagamentos
-- **Vendas** — Propostas, registro de vendas, comissões
-- **Financeiro** — Controle de entradas e saídas por categorias
-- **Relatórios** — Inadimplência, ocupação, vendas, comissões
-- **Landing Pages** — Site público personalizado por imobiliária
+### Seguranca
 
-#### Arquitetura
+- SecretManager com validacao de 12+ secrets
+- HSTS, CSP com nonce, X-Frame-Options, Permissions-Policy
+- Rate limiting multi-camada (global, auth, API, email)
+- Testes de seguranca (SQL injection, CSRF, SSRF, file upload)
+- Audit logs para compliance LGPD
 
-- Multi-tenancy com isolamento completo por `tenantId`
-- Autenticação local (bcrypt 12 rounds) + OAuth 2.0 (Google, Microsoft)
-- API RESTful com validação Zod em todas as rotas
-- React Query para gerenciamento de estado e cache
-- Lazy loading de páginas e code splitting
-- Internacionalização (i18next)
+### Infraestrutura
 
-#### Integrações
-
-- WhatsApp Business API (chat, auto-responder, templates, webhooks)
-- Stripe e Mercado Pago (pagamentos e assinaturas)
-- Twilio (SMS e 2FA)
-- SendGrid / Resend (email transacional)
-- Google Maps / Leaflet (geolocalização)
-- ClickSign (assinatura digital)
-- Supabase (storage e banco de dados)
-- Sentry (error tracking front + back)
-- PostHog (analytics e feature flags)
-
-#### Segurança
-
-- CSRF double-submit cookie
-- Rate limiting em endpoints sensíveis
-- Proteção contra SQL injection, XSS, SSRF
-- Validação de uploads com magic bytes
-- Webhook HMAC validation
-- Security headers (Helmet)
-- Intrusion detection system
-- Secret rotation management
-- Account lockout após tentativas falhas
-
-#### Infraestrutura
-
-- CI/CD com GitHub Actions (lint, testes, deploy)
-- Deploy Vercel com auto-rollback
-- Docker e Docker Compose
-- Redis para cache e BullMQ para jobs
-- Sentry releases e source maps
-
-#### Testes
-
-- Testes unitários e integração (Vitest)
-- Testes E2E multi-browser (Playwright)
-- Testes de acessibilidade WCAG AA (Axe Core)
-- Testes de segurança (SQL injection, CSRF, SSRF)
-- Testes de responsividade mobile
-- Lighthouse CI para performance
-
-#### Documentação
-
-- 35+ docs técnicos em `docs/`
-- Guia de deploy completo (Vercel, Docker, servidor)
-- Documentação de todas as integrações
-- Design system guide com exemplos
-- Política de segurança e compliance LGPD
+- PostgreSQL (Drizzle ORM) com 19+ tabelas
+- Redis para cache e sessions
+- BullMQ para background jobs (com fallback Vercel Cron)
+- Performance indexes (85+ indexes)
+- Structured logging com Winston
