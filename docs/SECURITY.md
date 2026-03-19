@@ -14,6 +14,7 @@ This document provides comprehensive security guidelines for developers, adminis
 6. [Incident Response](#incident-response)
 7. [Security Configuration](#security-configuration)
 8. [Security Testing](#security-testing)
+9. [Recent Security Improvements (v2.0)](#recent-security-improvements-v20)
 
 ---
 
@@ -25,17 +26,19 @@ ImobiBase uses a **multi-tenant architecture** with strict data isolation:
 
 ```typescript
 // Every database query MUST include tenant validation
-const properties = await db.select()
+const properties = await db
+  .select()
   .from(properties)
   .where(
     and(
       eq(properties.tenantId, req.user.tenantId), // REQUIRED
-      eq(properties.id, propertyId)
-    )
+      eq(properties.id, propertyId),
+    ),
   );
 ```
 
 **Best Practices:**
+
 - Always filter by `tenantId` in database queries
 - Validate tenant ownership before any operation
 - Use middleware for tenant validation
@@ -44,12 +47,14 @@ const properties = await db.select()
 ### Database Security
 
 **Protection Mechanisms:**
+
 - Parameterized queries via Drizzle ORM (prevents SQL injection)
 - Connection pooling with limits
 - Read replicas for scaling
 - Encrypted connections (SSL/TLS)
 
 **Recommendations:**
+
 - Enable PostgreSQL Row-Level Security (RLS)
 - Implement database encryption at rest
 - Regular backups with encryption
@@ -62,6 +67,7 @@ const properties = await db.select()
 ### Password Security
 
 **Requirements:**
+
 - Minimum 8 characters
 - At least one uppercase letter
 - At least one lowercase letter
@@ -69,8 +75,9 @@ const properties = await db.select()
 - At least one special character
 
 **Implementation:**
+
 ```typescript
-import { hashPassword, comparePassword } from './server/routes';
+import { hashPassword, comparePassword } from "./server/routes";
 
 // Hash password using scrypt
 const hashed = await hashPassword(password); // 64-byte hash with random salt
@@ -80,6 +87,7 @@ const isValid = await comparePassword(supplied, stored);
 ```
 
 **Password History:**
+
 - Last 5 passwords tracked
 - Prevents password reuse
 - Automatically managed
@@ -87,6 +95,7 @@ const isValid = await comparePassword(supplied, stored);
 ### Two-Factor Authentication (2FA)
 
 **Setup Process:**
+
 1. User enables 2FA in settings
 2. System generates TOTP secret
 3. User scans QR code with authenticator app
@@ -94,8 +103,9 @@ const isValid = await comparePassword(supplied, stored);
 5. Backup codes generated (10 codes)
 
 **Implementation:**
+
 ```typescript
-import { verifyTOTP, generateBackupCodes } from './server/routes-security';
+import { verifyTOTP, generateBackupCodes } from "./server/routes-security";
 
 // Verify TOTP token
 const isValid = verifyTOTP(secret, token);
@@ -107,10 +117,12 @@ const codes = generateBackupCodes(10);
 ### OAuth Integration
 
 **Supported Providers:**
+
 - Google OAuth 2.0
 - Microsoft OAuth 2.0
 
 **Security Considerations:**
+
 - Verify OAuth state parameter (CSRF protection)
 - Validate redirect URIs
 - Store minimal user data
@@ -119,21 +131,23 @@ const codes = generateBackupCodes(10);
 ### Session Management
 
 **Configuration:**
+
 ```typescript
 session({
   secret: process.env.SESSION_SECRET, // Strong random secret
   cookie: {
-    httpOnly: true,      // Prevents XSS
-    secure: true,        // HTTPS only (production)
-    sameSite: 'strict',  // CSRF protection
+    httpOnly: true, // Prevents XSS
+    secure: true, // HTTPS only (production)
+    sameSite: "strict", // CSRF protection
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   },
   resave: false,
   saveUninitialized: false,
-})
+});
 ```
 
 **Best Practices:**
+
 - Regenerate session ID after login
 - Invalidate session on logout
 - Use PostgreSQL session store (production)
@@ -142,21 +156,23 @@ session({
 ### Account Lockout
 
 **Configuration:**
+
 - Max failed attempts: 5
 - Lockout duration: 30 minutes
 - Automatic unlock after duration
 - Notification email sent
 
 **Implementation:**
+
 ```typescript
-import { handleFailedLogin, checkAccountLock } from './server/auth/security';
+import { handleFailedLogin, checkAccountLock } from "./server/auth/security";
 
 // Record failed login
 const { locked, remainingAttempts } = await handleFailedLogin(
   userId,
   email,
-  'invalid_password',
-  req
+  "invalid_password",
+  req,
 );
 
 // Check if account is locked
@@ -170,11 +186,13 @@ const lockStatus = await checkAccountLock(userId);
 ### Encryption
 
 **In Transit:**
+
 - HTTPS/TLS 1.2+ enforced
 - Strong cipher suites
 - HSTS enabled
 
 **At Rest:**
+
 - Database encryption (recommended)
 - File encryption for sensitive documents
 - Environment variable encryption
@@ -190,7 +208,7 @@ import {
   sanitizeEmail,
   sanitizeHtml,
   sanitizeFilename,
-} from './server/security/input-validation';
+} from "./server/security/input-validation";
 
 // Sanitize user input
 const clean = sanitizeString(userInput, 255);
@@ -202,8 +220,8 @@ const filename = sanitizeFilename(uploadedFile.name);
 **Use Zod schemas for validation:**
 
 ```typescript
-import { z } from 'zod';
-import { commonSchemas } from './server/security/input-validation';
+import { z } from "zod";
+import { commonSchemas } from "./server/security/input-validation";
 
 const schema = z.object({
   email: commonSchemas.email,
@@ -216,6 +234,7 @@ const schema = z.object({
 ### File Upload Security
 
 **Validation:**
+
 - MIME type checking
 - File extension validation
 - File size limits
@@ -223,12 +242,13 @@ const schema = z.object({
 - Path traversal prevention
 
 **Implementation:**
+
 ```typescript
-import { validateFile, sanitizeFilename } from './server/storage/file-upload';
+import { validateFile, sanitizeFilename } from "./server/storage/file-upload";
 
 // Validate before upload
 const validation = validateFile(file, {
-  fileType: 'image',
+  fileType: "image",
   maxSize: 10 * 1024 * 1024, // 10MB
 });
 
@@ -238,13 +258,14 @@ if (!validation.valid) {
 ```
 
 **Malware Scanning:**
+
 ```typescript
 // TODO: Implement virus scanning
-import { scanFile } from './server/security/malware-scanner';
+import { scanFile } from "./server/security/malware-scanner";
 
 const isSafe = await scanFile(file.buffer);
 if (!isSafe) {
-  throw new Error('Malicious file detected');
+  throw new Error("Malicious file detected");
 }
 ```
 
@@ -257,22 +278,25 @@ if (!isSafe) {
 **Implementation:**
 
 ```typescript
-import { csrfProtection, generateCsrfTokenForSession } from './server/security/csrf-protection';
+import {
+  csrfProtection,
+  generateCsrfTokenForSession,
+} from "./server/security/csrf-protection";
 
 // Apply CSRF protection middleware
 app.use(csrfProtection);
 
 // Generate token for user
-app.get('/api/csrf-token', (req, res) => {
+app.get("/api/csrf-token", (req, res) => {
   const token = generateCsrfTokenForSession(req, res);
   res.json({ csrfToken: token });
 });
 
 // Client must include token in requests
-fetch('/api/endpoint', {
-  method: 'POST',
+fetch("/api/endpoint", {
+  method: "POST",
   headers: {
-    'X-CSRF-Token': csrfToken,
+    "X-CSRF-Token": csrfToken,
   },
   body: JSON.stringify(data),
 });
@@ -283,12 +307,13 @@ fetch('/api/endpoint', {
 **Configuration:**
 
 ```typescript
-import rateLimit from 'express-rate-limit';
+import rateLimit from "express-rate-limit";
 
-// General API rate limit
+// General API rate limit (Redis-backed in production for cross-instance consistency)
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 500, // 500 requests per window
+  store: redisStore, // Redis store in production
 });
 
 // Auth endpoint rate limit
@@ -297,14 +322,14 @@ const authLimiter = rateLimit({
   max: 20, // 20 requests per window
 });
 
-app.use('/api/', apiLimiter);
-app.use('/api/login', authLimiter);
+app.use("/api/", apiLimiter);
+app.use("/api/login", authLimiter);
 ```
 
 **Composite Rate Limiting:**
 
 ```typescript
-import { compositeRateLimit } from './server/security/intrusion-detection';
+import { compositeRateLimit } from "./server/security/intrusion-detection";
 
 // Rate limit by IP + fingerprint
 app.use(compositeRateLimit(60000, 100)); // 100 requests per minute
@@ -314,10 +339,10 @@ app.use(compositeRateLimit(60000, 100)); // 100 requests per minute
 
 ```typescript
 // TODO: Implement API key authentication
-import { validateApiKey } from './server/security/api-security';
+import { validateApiKey } from "./server/security/api-security";
 
-app.use('/api/', async (req, res, next) => {
-  const apiKey = req.headers['x-api-key'];
+app.use("/api/", async (req, res, next) => {
+  const apiKey = req.headers["x-api-key"];
   if (apiKey) {
     const isValid = await validateApiKey(apiKey);
     if (isValid) {
@@ -340,21 +365,21 @@ app.use('/api/', async (req, res, next) => {
 import {
   logSecurityEvent,
   SecurityEventType,
-} from './server/security/security-monitor';
+} from "./server/security/security-monitor";
 
 // Log security events
 logSecurityEvent(
   SecurityEventType.LOGIN_SUCCESS,
-  'User logged in successfully',
+  "User logged in successfully",
   req,
-  { userId: user.id }
+  { userId: user.id },
 );
 
 logSecurityEvent(
   SecurityEventType.PERMISSION_DENIED,
-  'User attempted to access unauthorized resource',
+  "User attempted to access unauthorized resource",
   req,
-  { resource: 'admin_panel' }
+  { resource: "admin_panel" },
 );
 ```
 
@@ -365,14 +390,14 @@ import {
   detectMaliciousPatterns,
   blockBlacklistedIps,
   recordSuspiciousActivity,
-} from './server/security/intrusion-detection';
+} from "./server/security/intrusion-detection";
 
 // Apply intrusion detection middleware
 app.use(blockBlacklistedIps);
 app.use(detectMaliciousPatterns);
 
 // Manually record suspicious activity
-recordSuspiciousActivity(req, 'unusual_pattern');
+recordSuspiciousActivity(req, "unusual_pattern");
 ```
 
 ### Audit Logging
@@ -387,18 +412,19 @@ All sensitive operations are automatically logged:
 - Failed access attempts
 
 Access audit logs:
+
 ```typescript
-import { createAuditLog } from './server/routes-security';
+import { createAuditLog } from "./server/routes-security";
 
 await createAuditLog(
   tenantId,
   userId,
-  'update',
-  'property',
+  "update",
+  "property",
   propertyId,
   oldValues,
   newValues,
-  req
+  req,
 );
 ```
 
@@ -409,6 +435,7 @@ await createAuditLog(
 ### Detection
 
 **Monitor for:**
+
 - Unusual login patterns
 - High number of failed logins
 - Access to sensitive data
@@ -449,6 +476,7 @@ await createAuditLog(
 ### Notification Requirements
 
 Under LGPD/GDPR, notify affected users within 72 hours if:
+
 - Personal data was accessed or stolen
 - There's a risk to user rights and freedoms
 - Data was not encrypted
@@ -462,6 +490,7 @@ Contact: dpo@imobibase.com
 ### Environment Variables
 
 **Required:**
+
 ```bash
 # Strong random secret (min 32 characters)
 SESSION_SECRET=your-strong-random-secret-here
@@ -475,6 +504,7 @@ SENTRY_ENVIRONMENT=production
 ```
 
 **Optional but Recommended:**
+
 ```bash
 # HTTPS enforcement
 FORCE_HTTPS=true
@@ -496,35 +526,41 @@ RATE_LIMIT_MAX_REQUESTS=500
 Configured via Helmet.js:
 
 ```typescript
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'nonce-{random}'"],  // Use nonce, not unsafe-inline
-      styleSrc: ["'self'", "https://fonts.googleapis.com"],
-      imgSrc: ["'self'", "data:", "https:"],
-      connectSrc: ["'self'", "https:"],
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'nonce-{random}'"], // Use nonce, not unsafe-inline
+        styleSrc: ["'self'", "https://fonts.googleapis.com"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'", "https:"],
+      },
     },
-  },
-  hsts: {
-    maxAge: 31536000,  // 1 year
-    includeSubDomains: true,
-    preload: true,
-  },
-}));
+    hsts: {
+      maxAge: 31536000, // 1 year
+      includeSubDomains: true,
+      preload: true,
+    },
+  }),
+);
 ```
 
 ### CORS Configuration
 
 ```typescript
-import cors from 'cors';
+import cors from "cors";
 
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['https://yourdomain.com'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
-}));
+app.use(
+  cors({
+    origin: process.env.ALLOWED_ORIGINS?.split(",") || [
+      "https://yourdomain.com",
+    ],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"],
+  }),
+);
 ```
 
 ---
@@ -534,6 +570,7 @@ app.use(cors({
 ### Manual Testing
 
 Run penetration tests:
+
 ```bash
 # Start the server
 npm run dev
@@ -576,7 +613,7 @@ jobs:
       - uses: actions/setup-node@v2
       - run: npm ci
       - run: npm audit
-      - run: npm run test:security  # Add this script
+      - run: npm run test:security # Add this script
 ```
 
 ### Security Checklist
@@ -599,6 +636,72 @@ Before deployment, verify:
 
 ---
 
+## Recent Security Improvements (v2.0)
+
+This section documents the security hardening changes introduced in v2.0.
+
+### Portal Authentication (httpOnly Cookies)
+
+- Portal JWT tokens are now stored as httpOnly cookies instead of localStorage
+- Prevents XSS-based token theft
+- Cookie path restricted to `/api/portal/`
+- Secure flag enabled in production with SameSite=strict
+- New POST `/api/portal/logout` endpoint clears the cookie
+
+### Session Management
+
+- Rolling sessions with 30-minute idle timeout in production
+- Client-side session refresh every 20 minutes prevents unexpected logouts
+- Session refresh endpoint: POST `/api/auth/refresh`
+
+### Rate Limiting (Redis-backed)
+
+- All rate limiters now use Redis store in production for consistency across serverless instances
+- AVM evaluation endpoint limited to 3 requests/hour
+- Global API: 500 req/15min, Auth: 20 req/15min, Public: 30 req/hour
+
+### CSRF Protection
+
+- Double Submit Cookie pattern applied globally
+- Timing-safe comparison prevents timing attacks
+- Portal routes excluded (use JWT instead)
+- Webhook routes excluded (use signature verification)
+
+### Tenant Isolation Middleware
+
+- New `ensureTenantOwnership` middleware in `server/middleware/tenant-isolation.ts`
+- Applied to routes-auto-marketing.ts to fix write-then-check vulnerability
+- AVM routes now return 404 instead of 403 for IDOR prevention
+
+### Soft Delete Support
+
+- All major tables now have `deletedAt` field for soft deletion
+- Utility functions: `softDeleteFilter()`, `softDelete()`, `purgeDeletedRecords()`
+- Automated 90-day cleanup via cron job
+
+### Security Alerting
+
+- Critical security events now send email alerts via SendGrid
+- Configure recipients with `SECURITY_ALERT_EMAILS` environment variable
+- All alerts also captured in Sentry
+
+### Admin Access Control
+
+- Job management routes (`/api/admin/jobs/*`) now require `role === 'admin'`
+- Previously only checked authentication, not authorization
+
+### Stripe Key Security
+
+- Removed dummy fallback key `sk_test_dummy_key_for_development_only`
+- Production requires `STRIPE_SECRET_KEY` environment variable
+
+### TypeScript Safety
+
+- Removed `@ts-nocheck` from 6 route files
+- All route handlers now have proper TypeScript checking enabled
+
+---
+
 ## Additional Resources
 
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
@@ -608,5 +711,5 @@ Before deployment, verify:
 
 ---
 
-**Last Updated**: December 24, 2025
+**Last Updated**: March 19, 2026
 **Security Contact**: security@imobibase.com

@@ -1,40 +1,78 @@
 # Changelog
 
-Todas as mudancas notaveis deste projeto serao documentadas neste arquivo.
+All notable changes to ImobiBase are documented in this file.
 
-O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/),
-e este projeto adere ao [Versionamento Semantico](https://semver.org/lang/pt-BR/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [1.0.0] - 2026-03-16
+## [2.0.0] - 2026-03-19
 
-### Adicionado
+### Security
 
-- Sistema CRM imobiliario multi-tenant completo
-- 17+ modulos: Dashboard, Imoveis, Leads/CRM, Agenda, Contratos, Alugueis, Vendas, Financeiro, Relatorios, Landing Pages, Auto Marketing (AI), AVM (valuation), ISA (virtual agent), Inspections, Portal, Extensions
-- Integracoes: WhatsApp Business API, Stripe, Mercado Pago, ClickSign, Twilio, SendGrid, Google Maps, Sentry, PostHog
-- Autenticacao: Local + OAuth 2.0 (Google, Microsoft), 2FA
-- Seguranca: CSRF, Rate Limiting, Helmet, Input Validation, Webhook HMAC, IDS
-- Subscription guard com grace period de 7 dias
-- Vercel Cron endpoints para 9 scheduled jobs
-- PWA com autoUpdate para suporte offline
-- CI/CD: GitHub Actions (CI, deploy preview, deploy production, security scan)
-- 58 arquivos de teste (unit, integration, E2E, accessibility, security)
-- Documentacao completa (36+ docs)
-- Docker + Docker Compose para deploy self-hosted
-- Internacionalizacao (i18n) com PT-BR e EN
+- **Portal tokens migrated to httpOnly cookies** - JWT tokens for owner/renter portal moved from localStorage to httpOnly cookies, preventing XSS token theft
+- **Stripe fallback key removed** - No more dummy `sk_test_dummy_key` fallback in production
+- **Admin role enforcement** - Job management routes now require `role === 'admin'`
+- **Session idle timeout** - Rolling sessions with 30min idle timeout in production
+- **@ts-nocheck removed** from 6 server route files (esignature, inspections, portal, auto-marketing, avm, isa)
+- **Tenant isolation middleware** - New reusable middleware prevents cross-tenant data access
+- **Security email alerts** - Critical events trigger email notifications via SendGrid
+- **Redis-backed rate limiting** - All rate limiters use Redis in production for multi-instance consistency
+- **AVM rate limit** - Property valuation endpoint limited to 3 requests/hour
+- **Compliance path randomization** - Export/deletion certificate paths include UUID to prevent guessing
+- **CSRF exclusions** - Portal JWT routes and cron endpoints properly excluded from CSRF checks
 
-### Seguranca
+### Added
 
-- SecretManager com validacao de 12+ secrets
-- HSTS, CSP com nonce, X-Frame-Options, Permissions-Policy
-- Rate limiting multi-camada (global, auth, API, email)
-- Testes de seguranca (SQL injection, CSRF, SSRF, file upload)
-- Audit logs para compliance LGPD
+- `server/middleware/tenant-isolation.ts` - Reusable tenant ownership verification
+- `server/utils/soft-delete.ts` - Soft delete utilities (filter, delete, purge)
+- `server/utils/api-response.ts` - Standardized API response helpers
+- `server/docs/openapi.ts` - OpenAPI 3.0 specification (22 endpoints)
+- `server/routes-docs.ts` - Serves OpenAPI spec at `/api/docs/openapi.json`
+- `client/src/lib/logger.ts` - Client-side logger (no-op in production)
+- `.vercelignore` - Reduces Vercel upload size
+- `POST /api/portal/logout` endpoint
+- `GET /api/cron/cleanup-soft-deletes` cron job (90-day purge)
+- `deletedAt` field on 9 database tables for soft delete support
+- Client-side session refresh (20min interval)
+- Deploy script exponential backoff health check with auto-rollback
 
-### Infraestrutura
+### Changed
 
-- PostgreSQL (Drizzle ORM) com 19+ tabelas
-- Redis para cache e sessions
-- BullMQ para background jobs (com fallback Vercel Cron)
-- Performance indexes (85+ indexes)
-- Structured logging com Winston
+- Portal login no longer returns token in response body (cookie only)
+- Portal pages use `credentials: 'include'` instead of Authorization headers
+- CI coverage threshold check is now blocking (removed `continue-on-error`)
+- Deploy health check uses exponential backoff (5 attempts) instead of `sleep 5`
+- API response format standardized on 5 key endpoints (properties, leads, auth)
+
+### Removed
+
+- `client/src/pages/settings/tabs/GeneralTabImproved.tsx` (unused duplicate)
+- `client/src/pages/settings/tabs/GeneralTabWithUnsavedChanges.tsx` (unused duplicate)
+- 18 abandoned git worktrees cleaned up
+- `api/index.ts` removed from git tracking
+
+### Fixed
+
+- Auto-marketing routes had write-then-check tenant vulnerability
+- AVM routes leaked resource existence via 403 (now 404)
+- E-signature route used `req.user.username` instead of `req.user.name`
+
+## [1.0.0] - 2026-03-15
+
+### Added
+
+- Initial production-ready release
+- Multi-tenant real estate management platform
+- Property CRUD with image management
+- Lead management with Kanban board
+- Rental contract management with payment tracking
+- Owner/Renter self-service portal
+- WhatsApp integration (ISA AI assistant)
+- E-signature integration (ClickSign)
+- Automated Valuation Model (AVM)
+- Auto-marketing with AI content generation
+- Financial management (categories, entries, reports)
+- Background job system (BullMQ + Redis)
+- Vercel Cron integration
+- Comprehensive security middleware (Helmet, CORS, CSRF, rate limiting)
+- Sentry error tracking
+- CI/CD pipeline (GitHub Actions)
