@@ -2,8 +2,10 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __filename = typeof import.meta?.url === 'string'
+  ? fileURLToPath(import.meta.url)
+  : __filename ?? '';
+const __dirname = __filename ? path.dirname(__filename) : process.cwd();
 
 export interface TemplateData {
   [key: string]: any;

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Auto-Marketing Routes
  * AI-powered marketing content generation for properties
@@ -529,7 +528,7 @@ export function registerAutoMarketingRoutes(app: Express) {
         return res.status(404).json({ error: 'Imovel nao encontrado' });
       }
       if (property.tenantId !== tenantId) {
-        return res.status(403).json({ error: 'Acesso negado' });
+        return res.status(404).json({ error: 'Recurso nao encontrado' });
       }
 
       // Get tenant data for branding
@@ -665,7 +664,7 @@ export function registerAutoMarketingRoutes(app: Express) {
         return res.status(404).json({ error: 'Conteudo de marketing nao encontrado' });
       }
       if (content.tenantId !== tenantId) {
-        return res.status(403).json({ error: 'Acesso negado' });
+        return res.status(404).json({ error: 'Recurso nao encontrado' });
       }
 
       res.json(content);
@@ -685,19 +684,19 @@ export function registerAutoMarketingRoutes(app: Express) {
       const { id } = req.params;
       const updates = req.body;
 
+      // Verify ownership before updating
+      const contents = await storage.getAutoMarketingContentsByTenant(tenantId);
+      const existing = contents.find(c => c.id === id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Conteudo nao encontrado' });
+      }
+
       // Remove fields that shouldn't be updated directly
       delete updates.id;
       delete updates.tenantId;
       delete updates.createdAt;
 
       const content = await storage.updateAutoMarketingContent(id, updates);
-      if (!content) {
-        return res.status(404).json({ error: 'Conteudo nao encontrado' });
-      }
-      if (content.tenantId !== tenantId) {
-        return res.status(403).json({ error: 'Acesso negado' });
-      }
-
       res.json(content);
     } catch (error: any) {
       console.error('Error updating marketing content:', error);
@@ -714,19 +713,19 @@ export function registerAutoMarketingRoutes(app: Express) {
       const tenantId = (req.user as any).tenantId;
       const { id } = req.params;
 
-      const existing = await storage.updateAutoMarketingContent(id, {
+      // Verify ownership before updating
+      const contents = await storage.getAutoMarketingContentsByTenant(tenantId);
+      const existing = contents.find(c => c.id === id);
+      if (!existing) {
+        return res.status(404).json({ error: 'Conteudo nao encontrado' });
+      }
+
+      const updated = await storage.updateAutoMarketingContent(id, {
         status: 'published',
         publishedAt: new Date().toISOString(),
       });
 
-      if (!existing) {
-        return res.status(404).json({ error: 'Conteudo nao encontrado' });
-      }
-      if (existing.tenantId !== tenantId) {
-        return res.status(403).json({ error: 'Acesso negado' });
-      }
-
-      res.json(existing);
+      res.json(updated);
     } catch (error: any) {
       console.error('Error publishing content:', error);
       res.status(500).json({ error: 'Erro ao publicar conteudo' });

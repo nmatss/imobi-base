@@ -74,7 +74,7 @@ export const distanceSchema = z.object({
   origin: z.string().min(3, 'Origin is required'),
   destination: z.string().min(3, 'Destination is required'),
   mode: z.enum(['driving', 'walking', 'bicycling', 'transit'], {
-    errorMap: () => ({ message: 'Mode must be: driving, walking, bicycling, or transit' }),
+    message: 'Mode must be: driving, walking, bicycling, or transit',
   }).optional().default('driving'),
 });
 
@@ -85,7 +85,7 @@ export const directionsSchema = z.object({
   origin: z.string().min(3, 'Origin is required'),
   destination: z.string().min(3, 'Destination is required'),
   mode: z.enum(['driving', 'walking', 'bicycling', 'transit'], {
-    errorMap: () => ({ message: 'Mode must be: driving, walking, bicycling, or transit' }),
+    message: 'Mode must be: driving, walking, bicycling, or transit',
   }).optional().default('driving'),
 });
 
@@ -98,7 +98,7 @@ export const distanceMatrixSchema = z.object({
     .min(1, 'At least one destination is required')
     .max(25, 'Maximum 25 destinations allowed'),
   mode: z.enum(['driving', 'walking', 'bicycling', 'transit'], {
-    errorMap: () => ({ message: 'Mode must be: driving, walking, bicycling, or transit' }),
+    message: 'Mode must be: driving, walking, bicycling, or transit',
   }).optional().default('driving'),
 });
 

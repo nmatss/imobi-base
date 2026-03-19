@@ -20,6 +20,7 @@ import {
   runIntegrationSync,
   runDatabaseBackup,
   runCleanupTempFiles,
+  runCleanupSoftDeletes,
 } from "./jobs/scheduled-jobs";
 
 /**
@@ -156,6 +157,12 @@ export function registerCronRoutes(app: Express): void {
     createCronHandler("cleanup-temp-files", runCleanupTempFiles)
   );
 
+  // Daily at 3 AM (Brazil) - Cleanup soft-deleted records older than 90 days
+  app.get(
+    "/api/cron/cleanup-soft-deletes",
+    createCronHandler("cleanup-soft-deletes", runCleanupSoftDeletes)
+  );
+
   // Health check / status endpoint for all cron jobs
   app.get("/api/cron/status", (req: Request, res: Response) => {
     if (!verifyCronSecret(req, res)) return;
@@ -172,9 +179,10 @@ export function registerCronRoutes(app: Express): void {
         { name: "integration-sync", schedule: "0 */6 * * *", path: "/api/cron/integration-sync" },
         { name: "database-backup", schedule: "0 2 * * *", path: "/api/cron/database-backup" },
         { name: "cleanup-temp-files", schedule: "0 3 * * 0", path: "/api/cron/cleanup-temp-files" },
+        { name: "cleanup-soft-deletes", schedule: "0 3 * * *", path: "/api/cron/cleanup-soft-deletes" },
       ],
     });
   });
 
-  console.log("[Cron] 9 cron endpoints registered under /api/cron/*");
+  console.log("[Cron] 10 cron endpoints registered under /api/cron/*");
 }

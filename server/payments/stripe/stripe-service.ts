@@ -13,12 +13,16 @@ import type {
 } from './stripe-types';
 import * as Sentry from '@sentry/node';
 
-// Initialize Stripe with API key from environment (or dummy key for development)
-const stripeKey = process.env.STRIPE_SECRET_KEY || 'sk_test_dummy_key_for_development_only';
-const stripe = new Stripe(stripeKey, {
-  // apiVersion: '2024-12-18.acacia', // TODO: Update when Stripe updates types
-  typescript: true,
-});
+// Initialize Stripe with API key from environment
+const stripeKey = process.env.STRIPE_SECRET_KEY;
+if (!stripeKey && process.env.NODE_ENV === 'production') {
+  console.error('STRIPE_SECRET_KEY is required in production');
+}
+
+// Only initialize Stripe if key is available
+const stripe = stripeKey
+  ? new Stripe(stripeKey, { typescript: true })
+  : (null as unknown as Stripe); // Will fail at runtime if used without key
 
 export class StripeService {
   /**

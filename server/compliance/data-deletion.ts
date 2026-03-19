@@ -7,7 +7,7 @@
 
 import { db, schema } from "../db";
 import { eq, and } from "drizzle-orm";
-import { randomBytes } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import { logComplianceAudit } from "./audit-logger";
 import {
   anonymizeUser,
@@ -18,15 +18,19 @@ import {
   type RetentionPolicy,
 } from "./anonymizer";
 import PDFDocument from "pdfkit";
-import { createWriteStream, mkdirSync, existsSync } from "fs";
+import { createWriteStream, mkdirSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
 const CERTIFICATES_DIR = join(UPLOAD_DIR, "certificates");
 
-// Ensure certificates directory exists
-if (!existsSync(CERTIFICATES_DIR)) {
-  mkdirSync(CERTIFICATES_DIR, { recursive: true });
+// Ensure certificates directory exists (skip in serverless/read-only environments)
+try {
+  if (!existsSync(CERTIFICATES_DIR)) {
+    mkdirSync(CERTIFICATES_DIR, { recursive: true });
+  }
+} catch {
+  console.warn('[data-deletion] Cannot create certificates directory (serverless environment)');
 }
 
 interface DeletionRequestOptions {
@@ -322,7 +326,7 @@ async function generateDeletionCertificate(
   deletionType: string,
   requestId: string
 ): Promise<string> {
-  const fileName = `deletion-certificate-${certificateNumber}.pdf`;
+  const fileName = `deletion-certificate-${randomUUID()}-${certificateNumber}.pdf`;
   const filePath = join(CERTIFICATES_DIR, fileName);
 
   return new Promise((resolve, reject) => {
@@ -462,8 +466,13 @@ export async function getDeletionCertificate(certificateNumber: string) {
     throw new Error("Certificate not found");
   }
 
-  const fileName = `deletion-certificate-${certificateNumber}.pdf`;
-  const filePath = join(CERTIFICATES_DIR, fileName);
+  // Find the certificate file by matching the certificate number suffix (filename includes a UUID prefix)
+  const files = existsSync(CERTIFICATES_DIR) ? readdirSync(CERTIFICATES_DIR) : [];
+  const matchingFile = files.find(f => f.endsWith(`-${certificateNumber}.pdf`));
+  if (!matchingFile) {
+    throw new Error("Certificate file not found");
+  }
+  const filePath = join(CERTIFICATES_DIR, matchingFile);
 
   return filePath;
 }

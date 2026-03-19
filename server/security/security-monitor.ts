@@ -221,8 +221,15 @@ export function logSecurityEvent(
     });
   }
 
-  // TODO: Send to external logging service (e.g., Elasticsearch, Splunk)
-  // TODO: Send alerts for critical events (e.g., email, Slack, PagerDuty)
+  // Send alerts for critical events
+  if (event.severity === SecurityEventSeverity.CRITICAL) {
+    const alertRecipients = process.env.SECURITY_ALERT_EMAILS?.split(',') || [];
+    if (alertRecipients.length > 0) {
+      sendSecurityAlert(event, alertRecipients).catch(err => {
+        console.error('[SECURITY] Failed to send critical alert:', err);
+      });
+    }
+  }
 
   return event;
 }
@@ -501,16 +508,17 @@ export function getSecurityDashboard(): {
 }
 
 /**
- * Send security alert (email, Slack, etc.)
+ * Send security alert via email and Sentry
  */
 export async function sendSecurityAlert(
   event: SecurityEvent,
   recipients: string[]
 ): Promise<void> {
-  // TODO: Implement email/Slack alerting
   console.warn('[SECURITY ALERT]', {
-    event,
-    recipients,
+    type: event.type,
+    severity: event.severity,
+    ip: event.ip,
+    timestamp: event.timestamp,
   });
 
   Sentry.captureMessage(`Security Alert: ${event.type}`, {
@@ -518,9 +526,41 @@ export async function sendSecurityAlert(
     tags: {
       security: 'alert',
       event_type: event.type,
+      severity: event.severity,
     },
     extra: { event, recipients },
   });
+
+  // Send email alert if SendGrid is configured
+  if (process.env.SENDGRID_API_KEY && recipients.length > 0) {
+    try {
+      const { SendGridService } = await import('../email/sendgrid-service');
+      const emailService = new SendGridService({
+        apiKey: process.env.SENDGRID_API_KEY,
+        fromEmail: process.env.SENDGRID_FROM_EMAIL || 'security@imobibase.com',
+        fromName: 'ImobiBase Security',
+      });
+
+      await emailService.send({
+        to: recipients,
+        subject: `[Security Alert] ${event.type} - ${event.severity.toUpperCase()}`,
+        html: `
+          <h2>Security Alert - ImobiBase</h2>
+          <table style="border-collapse:collapse;width:100%">
+            <tr><td style="padding:8px;border:1px solid #ddd"><strong>Event</strong></td><td style="padding:8px;border:1px solid #ddd">${event.type}</td></tr>
+            <tr><td style="padding:8px;border:1px solid #ddd"><strong>Severity</strong></td><td style="padding:8px;border:1px solid #ddd">${event.severity}</td></tr>
+            <tr><td style="padding:8px;border:1px solid #ddd"><strong>IP</strong></td><td style="padding:8px;border:1px solid #ddd">${event.ip || 'N/A'}</td></tr>
+            <tr><td style="padding:8px;border:1px solid #ddd"><strong>User</strong></td><td style="padding:8px;border:1px solid #ddd">${event.userId || 'N/A'}</td></tr>
+            <tr><td style="padding:8px;border:1px solid #ddd"><strong>Time</strong></td><td style="padding:8px;border:1px solid #ddd">${event.timestamp.toISOString()}</td></tr>
+            <tr><td style="padding:8px;border:1px solid #ddd"><strong>Details</strong></td><td style="padding:8px;border:1px solid #ddd"><pre>${JSON.stringify(event.metadata, null, 2)}</pre></td></tr>
+          </table>
+        `,
+        text: `Security Alert: ${event.type} (${event.severity}) - IP: ${event.ip || 'N/A'} - Time: ${event.timestamp.toISOString()}`,
+      });
+    } catch (err) {
+      console.error('[SECURITY] Failed to send alert email:', err);
+    }
+  }
 }
 
 /**

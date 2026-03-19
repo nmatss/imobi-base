@@ -33,6 +33,10 @@ export async function initializeRedis(): Promise<RedisClient> {
 
   const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
+  if (process.env.NODE_ENV === 'production' && redisUrl && !redisUrl.startsWith('rediss://')) {
+    console.warn('[Redis] WARNING: REDIS_URL should use rediss:// (TLS) in production');
+  }
+
   try {
     redisClient = new Redis(redisUrl, {
       ...defaultOptions,
@@ -92,9 +96,14 @@ export async function initializeRedis(): Promise<RedisClient> {
  */
 export function getRedisClient(): RedisClient {
   if (!redisClient) {
-    throw new Error('Redis client not initialized. Call initializeRedis() first.');
+    // Attempt lazy initialization for serverless environments
+    try {
+      initializeRedis();
+    } catch {
+      throw new Error('Redis client not initialized. Call initializeRedis() first.');
+    }
   }
-  return redisClient;
+  return redisClient!;
 }
 
 /**

@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { registerESignatureRoutes } from "./routes-esignature";
 import { registerWhatsAppRoutes } from "./routes-whatsapp";
@@ -14,6 +15,7 @@ import { registerIsaRoutes } from "./routes-isa";
 import { registerInspectionRoutes } from "./routes-inspections";
 import { registerPortalRoutes } from "./routes-portal";
 import { registerExtensionRoutes } from "./routes-extensions";
+import { registerDocsRoutes } from "./routes-docs";
 // import smsRoutes from "./routes-sms"; // Disabled - SMS schema not defined
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -48,6 +50,7 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -130,6 +133,9 @@ app.use((req, res, next) => {
 
   // Register extension routes (settings, roles, permissions, integrations)
   registerExtensionRoutes(app);
+
+  // Register API docs routes (OpenAPI/Swagger)
+  registerDocsRoutes(app);
 
   // Register SMS routes
   // app.use('/api/sms', smsRoutes); // Disabled - SMS schema not defined

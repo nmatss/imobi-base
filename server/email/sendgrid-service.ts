@@ -102,7 +102,8 @@ export class SendGridService {
     const failed = results.length - sent;
     const errors = results
       .filter(r => r.status === 'fulfilled' && !r.value.success)
-      .map(r => (r as PromiseFulfilledResult<{ success: boolean; error?: string }>).value.error);
+      .map(r => (r as PromiseFulfilledResult<{ success: boolean; error?: string }>).value.error)
+      .filter((e): e is string => e !== undefined);
 
     return {
       success: failed === 0,

@@ -21,12 +21,10 @@ import {
 } from "@/components/ui/select";
 
 function portalFetch(url: string) {
-  const token = localStorage.getItem("portal_token");
   return fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
+    credentials: "include",
   }).then(res => {
     if (res.status === 401) {
-      localStorage.removeItem("portal_token");
       localStorage.removeItem("portal_user");
       localStorage.removeItem("portal_tenant");
       window.location.href = "/portal/login";
@@ -58,8 +56,14 @@ export default function OwnerPortal() {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem("portal_token");
-    if (!token) setLocation("/portal/login");
+    // Check auth via httpOnly cookie
+    fetch("/api/portal/me", { credentials: "include" })
+      .then(res => {
+        if (!res.ok) throw new Error("Not authenticated");
+      })
+      .catch(() => {
+        setLocation("/portal/login");
+      });
   }, [setLocation]);
 
   const { data: dashboard } = useQuery({
@@ -97,8 +101,8 @@ export default function OwnerPortal() {
     enabled: activeTab === "income",
   });
 
-  const handleLogout = () => {
-    localStorage.removeItem("portal_token");
+  const handleLogout = async () => {
+    await fetch("/api/portal/logout", { method: "POST", credentials: "include" }).catch(() => {});
     localStorage.removeItem("portal_user");
     localStorage.removeItem("portal_tenant");
     setLocation("/portal/login");
@@ -106,14 +110,13 @@ export default function OwnerPortal() {
 
   const handleApproveTicket = async (approved: boolean) => {
     if (!selectedTicket) return;
-    const token = localStorage.getItem("portal_token");
     try {
       await fetch(`/api/portal/owner/maintenance/${selectedTicket.id}/approve`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
+        credentials: "include",
         body: JSON.stringify({ approved, notes: approveNotes }),
       });
       setApproveDialogOpen(false);

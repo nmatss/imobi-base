@@ -29,18 +29,17 @@ import { generateRateLimitKey } from './middleware/rate-limit-key-generator';
  * All routes require admin authentication
  */
 export function registerJobRoutes(app: Express): void {
-  // Middleware to check admin authentication
+  // Middleware to check admin authentication and role
   const requireAdmin = (req: Request, res: Response, next: Function) => {
-    // In production, check if user is admin
-    // For now, we'll allow access if user is authenticated
     if (!req.isAuthenticated || !req.isAuthenticated()) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // TODO: Check if user has admin role
-    // if (!req.user.isAdmin) {
-    //   return res.status(403).json({ error: 'Forbidden' });
-    // }
+    // Check if user has admin role
+    const user = req.user as { role?: string } | undefined;
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ error: 'Forbidden: admin access required' });
+    }
 
     next();
   };

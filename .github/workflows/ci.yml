@@ -146,8 +146,6 @@ jobs:
           else
             echo "⚠️  Coverage summary not found, skipping threshold check"
           fi
-        continue-on-error: true
-
       - name: Generate coverage report
         if: always()
         run: |

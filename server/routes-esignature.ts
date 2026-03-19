@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * E-Signature Routes
  * RESTful API for managing electronic signatures via ClickSign
@@ -286,7 +285,7 @@ export function registerESignatureRoutes(app: Express) {
         tenantId,
         documentId: documentKey,
         userId: req.user!.id,
-        userName: req.user!.username || 'Unknown',
+        userName: req.user!.name || 'Unknown',
         action: 'download',
         ipAddress: req.ip,
       });

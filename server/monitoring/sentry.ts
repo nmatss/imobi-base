@@ -6,13 +6,23 @@
  */
 
 import * as Sentry from "@sentry/node";
-import { nodeProfilingIntegration } from "@sentry/profiling-node";
 import {
   httpIntegration,
   expressIntegration,
   postgresIntegration,
 } from "@sentry/node";
 import type { Express, Request, Response, NextFunction } from "express";
+
+// Lazy-load profiling (native addon not available in serverless)
+function getProfilingIntegration(): Sentry.Integration | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { nodeProfilingIntegration } = require("@sentry/profiling-node");
+    return nodeProfilingIntegration();
+  } catch {
+    return null;
+  }
+}
 
 const isDevelopment = process.env.NODE_ENV !== "production";
 const SENTRY_DSN = process.env.SENTRY_DSN;
@@ -44,11 +54,11 @@ export function initializeSentry(app: Express) {
       httpIntegration(),
       expressIntegration(),
 
-      // Performance profiling
-      nodeProfilingIntegration(),
-
       // Database query tracking (PostgreSQL)
       postgresIntegration(),
+
+      // Performance profiling (only when native module available)
+      ...(getProfilingIntegration() ? [getProfilingIntegration()!] : []),
     ],
 
     // Filter sensitive data

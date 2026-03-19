@@ -279,6 +279,28 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
     };
   }, [checkAuth]);
 
+  // Periodic session refresh to prevent idle timeout (every 20 minutes)
+  useEffect(() => {
+    if (!user) return;
+
+    const refreshInterval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/auth/refresh", {
+          method: "POST",
+          credentials: "include",
+        });
+        if (!res.ok && res.status === 401) {
+          setUser(null);
+          setTenant(null);
+        }
+      } catch {
+        // Network error - session will be refreshed on next successful request
+      }
+    }, 20 * 60 * 1000); // 20 minutes
+
+    return () => clearInterval(refreshInterval);
+  }, [user]);
+
   // Fetch data when user/tenant changes
   useEffect(() => {
     if (user && tenant) {

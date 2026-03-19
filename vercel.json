@@ -4,21 +4,23 @@
   "buildCommand": "npm run build",
   "installCommand": "npm install",
   "framework": null,
+  "outputDirectory": "dist/public",
   "regions": ["gru1"],
   "functions": {
-    "api/index.ts": {
-      "maxDuration": 30,
-      "memory": 1024
+    "api/index.mjs": {
+      "maxDuration": 60,
+      "memory": 1024,
+      "includeFiles": "api/_handler.mjs"
     }
   },
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "/api/index.ts"
+      "destination": "/api/index.mjs"
     },
     {
       "source": "/((?!api/).*)",
-      "destination": "/dist/public/$1"
+      "destination": "/index.html"
     }
   ],
   "headers": [
@@ -71,9 +73,9 @@
     { "path": "/api/cron/daily-reports", "schedule": "0 3 * * *" },
     { "path": "/api/cron/weekly-reports", "schedule": "0 11 * * 1" },
     { "path": "/api/cron/monthly-reports", "schedule": "0 11 1 * *" },
-    { "path": "/api/cron/cleanup-sessions", "schedule": "0 * * * *" },
-    { "path": "/api/cron/cleanup-logs", "schedule": "0 */6 * * *" },
-    { "path": "/api/cron/integration-sync", "schedule": "0 */6 * * *" },
+    { "path": "/api/cron/cleanup-sessions", "schedule": "0 2 * * *" },
+    { "path": "/api/cron/cleanup-logs", "schedule": "0 4 * * *" },
+    { "path": "/api/cron/integration-sync", "schedule": "0 6 * * *" },
     { "path": "/api/cron/database-backup", "schedule": "0 5 * * *" },
     { "path": "/api/cron/cleanup-temp-files", "schedule": "0 6 * * 0" }
   ],

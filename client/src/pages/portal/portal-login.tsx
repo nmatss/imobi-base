@@ -17,19 +17,22 @@ export default function PortalLogin() {
   const [forgotMessage, setForgotMessage] = useState("");
 
   useEffect(() => {
-    // Check if already authenticated
-    const token = localStorage.getItem("portal_token");
-    const userData = localStorage.getItem("portal_user");
-    if (token && userData) {
-      try {
-        const user = JSON.parse(userData);
-        if (user.clientType === "owner") {
+    // Check if already authenticated via httpOnly cookie
+    fetch("/api/portal/me", { credentials: "include" })
+      .then(res => {
+        if (res.ok) return res.json();
+        throw new Error("Not authenticated");
+      })
+      .then(data => {
+        if (data.user?.clientType === "owner") {
           setLocation("/portal/owner");
-        } else if (user.clientType === "renter") {
+        } else if (data.user?.clientType === "renter") {
           setLocation("/portal/renter");
         }
-      } catch {}
-    }
+      })
+      .catch(() => {
+        // Not authenticated, stay on login page
+      });
   }, [setLocation]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -41,6 +44,7 @@ export default function PortalLogin() {
       const res = await fetch("/api/portal/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
 
@@ -51,7 +55,6 @@ export default function PortalLogin() {
         return;
       }
 
-      localStorage.setItem("portal_token", data.token);
       localStorage.setItem("portal_user", JSON.stringify(data.user));
       localStorage.setItem("portal_tenant", JSON.stringify(data.tenant));
 

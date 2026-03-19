@@ -1,24 +1,25 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "../server/routes";
-import { registerESignatureRoutes } from "../server/routes-esignature";
-import { registerWhatsAppRoutes } from "../server/routes-whatsapp";
-import { registerComplianceRoutes } from "../server/compliance/routes-compliance";
-import { registerEmailRoutes } from "../server/routes-email";
-import { registerJobRoutes } from "../server/routes-jobs";
-import { registerAuthenticationRoutes } from "../server/auth";
-import { registerFileRoutes } from "../server/routes-files";
-import { registerSitemapRoutes } from "../server/routes-sitemap";
-import { registerAutoMarketingRoutes } from "../server/routes-auto-marketing";
-import { registerAVMRoutes as registerAvmRoutes } from "../server/routes-avm";
-import { registerIsaRoutes } from "../server/routes-isa";
-import { registerInspectionRoutes } from "../server/routes-inspections";
-import { registerPortalRoutes } from "../server/routes-portal";
-import { registerExtensionRoutes } from "../server/routes-extensions";
+import { registerRoutes } from "./routes";
+import { registerESignatureRoutes } from "./routes-esignature";
+import { registerWhatsAppRoutes } from "./routes-whatsapp";
+import { registerComplianceRoutes } from "./compliance/routes-compliance";
+import { registerEmailRoutes } from "./routes-email";
+import { registerJobRoutes } from "./routes-jobs";
+import { registerAuthenticationRoutes } from "./auth";
+import { registerFileRoutes } from "./routes-files";
+import { registerSitemapRoutes } from "./routes-sitemap";
+import { registerAutoMarketingRoutes } from "./routes-auto-marketing";
+import { registerAVMRoutes as registerAvmRoutes } from "./routes-avm";
+import { registerIsaRoutes } from "./routes-isa";
+import { registerInspectionRoutes } from "./routes-inspections";
+import { registerPortalRoutes } from "./routes-portal";
+import { registerExtensionRoutes } from "./routes-extensions";
+import { registerDocsRoutes } from "./routes-docs";
 import { createServer } from "http";
-import { initializeSentry, addSentryErrorHandler } from "../server/monitoring/sentry";
-import { initializeRedis } from "../server/cache/redis-client";
-import { sanitizeResponse, shouldSkipDetailedLogging } from "../server/utils/log-sanitizer";
-import { secretManager } from "../server/security/secret-manager";
+import { initializeSentry, addSentryErrorHandler } from "./monitoring/sentry";
+import { initializeRedis } from "./cache/redis-client";
+import { sanitizeResponse, shouldSkipDetailedLogging } from "./utils/log-sanitizer";
+import { secretManager } from "./security/secret-manager";
 
 const app = express();
 const httpServer = createServer(app);
@@ -176,6 +177,9 @@ app.use((req, res, next) => {
   // Register extension routes (settings, roles, permissions, integrations)
   registerExtensionRoutes(app);
 
+  // Register API docs routes (OpenAPI/Swagger)
+  registerDocsRoutes(app);
+
   // Add Sentry error handler (must be before custom error handlers)
   addSentryErrorHandler(app);
 
@@ -188,4 +192,25 @@ app.use((req, res, next) => {
   });
 })();
 
-export default app;
+// Debug: catch startup errors and expose them
+let startupError: Error | null = null;
+
+const handler = (req: Request, res: Response, next: NextFunction) => {
+  if (startupError) {
+    res.status(500).json({
+      error: 'Startup failed',
+      message: startupError.message,
+      stack: startupError.stack?.split('\n').slice(0, 5),
+    });
+    return;
+  }
+  app(req, res, next);
+};
+
+// Wrap the async init to capture errors
+process.on('unhandledRejection', (reason: any) => {
+  startupError = reason instanceof Error ? reason : new Error(String(reason));
+  console.error('Unhandled rejection during startup:', reason);
+});
+
+export default handler;

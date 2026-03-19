@@ -1,10 +1,10 @@
-// @ts-nocheck
 /**
  * AVM (Automated Valuation Model) Routes
  * RESTful API for property valuation and market analysis
  */
 
 import type { Express, Request, Response } from "express";
+import rateLimit from "express-rate-limit";
 import { requireAuth } from "./middleware/auth";
 import { storage } from "./storage";
 import {
@@ -15,6 +15,14 @@ import {
 } from "./services/avm-engine";
 import type { ValuationInput } from "./services/avm-engine";
 
+const avmEvaluateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3,
+  message: { error: 'Limite de avaliações atingido. Tente novamente em 1 hora.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 export function registerAVMRoutes(app: Express) {
   // Apply authentication middleware to ALL AVM routes
   app.use("/api/avm", requireAuth);
@@ -23,7 +31,7 @@ export function registerAVMRoutes(app: Express) {
    * POST /api/avm/evaluate
    * Run a full valuation for a property (with or without an existing propertyId)
    */
-  app.post("/api/avm/evaluate", async (req: Request, res: Response) => {
+  app.post("/api/avm/evaluate", avmEvaluateLimiter, async (req: Request, res: Response) => {
     try {
       const tenantId = (req.user as any).tenantId;
       const userId = (req.user as any).id;
@@ -112,7 +120,7 @@ export function registerAVMRoutes(app: Express) {
       }
 
       if (property.tenantId !== tenantId) {
-        return res.status(403).json({ error: "Acesso nao autorizado" });
+        return res.status(404).json({ error: "Imovel nao encontrado" });
       }
 
       // Parse features
@@ -204,7 +212,7 @@ export function registerAVMRoutes(app: Express) {
         return res.status(404).json({ error: "Avaliacao nao encontrada" });
       }
       if (valuation.tenantId !== tenantId) {
-        return res.status(403).json({ error: "Acesso nao autorizado" });
+        return res.status(404).json({ error: "Avaliacao nao encontrada" });
       }
       res.json(valuation);
     } catch (error: any) {
@@ -225,7 +233,7 @@ export function registerAVMRoutes(app: Express) {
         return res.status(404).json({ error: "Avaliacao nao encontrada" });
       }
       if (valuation.tenantId !== tenantId) {
-        return res.status(403).json({ error: "Acesso nao autorizado" });
+        return res.status(404).json({ error: "Avaliacao nao encontrada" });
       }
       await storage.deletePropertyValuation(req.params.id);
       res.json({ success: true });
@@ -286,7 +294,7 @@ export function registerAVMRoutes(app: Express) {
         return res.status(404).json({ error: "Imovel nao encontrado" });
       }
       if (property.tenantId !== tenantId) {
-        return res.status(403).json({ error: "Acesso nao autorizado" });
+        return res.status(404).json({ error: "Imovel nao encontrado" });
       }
 
       const input: ValuationInput = {

@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Portal Self-Service Routes
  * Separate authentication for owners and renters
@@ -35,15 +34,18 @@ declare global {
   }
 }
 
-// Portal auth middleware - validates JWT token
+// Portal auth middleware - validates JWT token (from httpOnly cookie or Authorization header)
 function requirePortalAuth(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.split(" ")[1]
+    : req.cookies?.portal_token;
+
+  if (!token) {
     res.status(401).json({ error: "Token de acesso não fornecido", code: "UNAUTHORIZED" });
     return;
   }
 
-  const token = authHeader.split(" ")[1];
   try {
     const decoded = jwt.verify(token, PORTAL_JWT_SECRET) as PortalUser;
     req.portalUser = decoded;
@@ -129,8 +131,16 @@ export function registerPortalRoutes(app: Express): void {
         loginCount: (access.loginCount || 0) + 1,
       } as any);
 
+      // Set JWT as httpOnly cookie (prevents XSS token theft)
+      res.cookie('portal_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
+        maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        path: '/api/portal',
+      });
+
       res.json({
-        token,
         user: {
           id: access.id,
           email: access.email,
@@ -178,6 +188,12 @@ export function registerPortalRoutes(app: Express): void {
       console.error("Portal forgot password error:", err);
       res.status(500).json({ error: "Erro interno do servidor" });
     }
+  });
+
+  // POST /api/portal/logout
+  app.post("/api/portal/logout", (_req: Request, res: Response) => {
+    res.clearCookie('portal_token', { path: '/api/portal' });
+    res.json({ message: "Logout realizado com sucesso" });
   });
 
   // GET /api/portal/me

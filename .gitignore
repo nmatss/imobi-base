@@ -8,6 +8,11 @@ dist
 build
 .next
 out
+api/handler.mjs
+api/_handler.mjs
+api/index.mjs
+api/index.ts
+api/debug.mjs
 
 # IDE
 .idea

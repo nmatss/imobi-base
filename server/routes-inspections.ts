@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Property Inspections (Vistorias) Routes
  * Digital inspection system for move-in/move-out property inspections

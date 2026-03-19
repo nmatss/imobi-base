@@ -14,9 +14,10 @@ export const tenants = pgTable("tenants", {
   email: text("email"),
   address: text("address"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
 });
 
-export const insertTenantSchema = createInsertSchema(tenants).omit({ id: true, createdAt: true });
+export const insertTenantSchema = createInsertSchema(tenants).omit({ id: true, createdAt: true, deletedAt: true });
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
 export type Tenant = typeof tenants.$inferSelect;
 
@@ -29,9 +30,10 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("user"),
   avatar: text("avatar"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, deletedAt: true });
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
@@ -56,9 +58,10 @@ export const properties = pgTable("properties", {
   featured: boolean("featured").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
 });
 
-export const insertPropertySchema = createInsertSchema(properties).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPropertySchema = createInsertSchema(properties).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertProperty = z.infer<typeof insertPropertySchema>;
 export type Property = typeof properties.$inferSelect;
 
@@ -82,9 +85,10 @@ export const leads = pgTable("leads", {
   maxBedrooms: integer("max_bedrooms"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
 });
 
-export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertLead = z.infer<typeof insertLeadSchema>;
 export type Lead = typeof leads.$inferSelect;
 
@@ -130,9 +134,10 @@ export const contracts = pgTable("contracts", {
   signedAt: timestamp("signed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
 });
 
-export const insertContractSchema = createInsertSchema(contracts).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertContractSchema = createInsertSchema(contracts).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertContract = z.infer<typeof insertContractSchema>;
 export type Contract = typeof contracts.$inferSelect;
 
@@ -162,9 +167,10 @@ export const owners = pgTable("owners", {
   pixKey: text("pix_key"),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
 });
 
-export const insertOwnerSchema = createInsertSchema(owners).omit({ id: true, createdAt: true });
+export const insertOwnerSchema = createInsertSchema(owners).omit({ id: true, createdAt: true, deletedAt: true });
 export type InsertOwner = z.infer<typeof insertOwnerSchema>;
 export type Owner = typeof owners.$inferSelect;
 
@@ -183,9 +189,10 @@ export const renters = pgTable("renters", {
   emergencyPhone: text("emergency_phone"),
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
 });
 
-export const insertRenterSchema = createInsertSchema(renters).omit({ id: true, createdAt: true });
+export const insertRenterSchema = createInsertSchema(renters).omit({ id: true, createdAt: true, deletedAt: true });
 export type InsertRenter = z.infer<typeof insertRenterSchema>;
 export type Renter = typeof renters.$inferSelect;
 
@@ -208,9 +215,10 @@ export const rentalContracts = pgTable("rental_contracts", {
   notes: text("notes"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
 });
 
-export const insertRentalContractSchema = createInsertSchema(rentalContracts).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertRentalContractSchema = createInsertSchema(rentalContracts).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertRentalContract = z.infer<typeof insertRentalContractSchema>;
 export type RentalContract = typeof rentalContracts.$inferSelect;
 
@@ -311,9 +319,10 @@ export const financeCategories = pgTable("finance_categories", {
   color: text("color").default("#6b7280"),
   isSystemGenerated: boolean("is_system_generated").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at"),
 });
 
-export const insertFinanceCategorySchema = createInsertSchema(financeCategories).omit({ id: true, createdAt: true });
+export const insertFinanceCategorySchema = createInsertSchema(financeCategories).omit({ id: true, createdAt: true, deletedAt: true });
 export type InsertFinanceCategory = z.infer<typeof insertFinanceCategorySchema>;
 export type FinanceCategory = typeof financeCategories.$inferSelect;
 

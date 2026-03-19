@@ -72,7 +72,7 @@ export default defineConfig(({ mode }) => ({
         },
       },
     }),
-  ].filter(Boolean),
+  ].filter(Boolean) as import('vite').PluginOption[],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),

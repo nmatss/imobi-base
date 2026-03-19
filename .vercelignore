@@ -1,0 +1,55 @@
+# Dependencies (installed at build time)
+node_modules
+
+# IDE and editor files
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage
+.nyc_output
+tests
+__tests__
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Documentation
+docs
+*.md
+!README.md
+
+# Development files
+.claude
+.github
+scripts
+storybook-static
+*storybook.log
+
+# Git
+.git
+.gitignore
+
+# Logs
+logs
+*.log
+
+# Local database
+data
+*.db
+
+# Build artifacts
+*.tar.gz
+*.tgz
+
+# Playwright
+playwright-report
+test-results
+e2e

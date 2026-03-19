@@ -165,6 +165,38 @@ export async function runDatabaseBackup(): Promise<void> {
   console.log("[ScheduledJobs] Database backup queued");
 }
 
+/**
+ * Run cleanup of soft-deleted records older than 90 days
+ */
+export async function runCleanupSoftDeletes(): Promise<void> {
+  console.log("[Cron] Cleaning up soft-deleted records older than 90 days...");
+  const { purgeDeletedRecords } = await import("../utils/soft-delete");
+  const { schema } = await import("../db");
+
+  const tables = [
+    schema.tenants,
+    schema.users,
+    schema.properties,
+    schema.leads,
+    schema.contracts,
+    schema.owners,
+    schema.renters,
+    schema.rentalContracts,
+    schema.financeCategories,
+  ];
+
+  let totalDeleted = 0;
+  for (const table of tables) {
+    if ("deletedAt" in table) {
+      const result = await purgeDeletedRecords(table, 90);
+      // result.rowCount may be available depending on driver
+      console.log(`[Cron] Purged soft-deleted records from table`);
+    }
+  }
+
+  console.log("[Cron] Soft-delete cleanup completed");
+}
+
 // ===================================================================
 // NODE-CRON FALLBACK (for non-Vercel deployments: Docker, Railway, etc.)
 //

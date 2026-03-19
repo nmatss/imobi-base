@@ -7,7 +7,7 @@
 
 import { db, schema } from "../db";
 import { eq, and } from "drizzle-orm";
-import { randomBytes } from "crypto";
+import { randomBytes, randomUUID } from "crypto";
 import type { User } from "@shared/schema-sqlite";
 import archiver from "archiver";
 import { createWriteStream, mkdirSync, existsSync } from "fs";
@@ -18,9 +18,13 @@ const EXPORT_EXPIRY_DAYS = 7; // Export links expire after 7 days
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
 const EXPORTS_DIR = join(UPLOAD_DIR, "exports");
 
-// Ensure exports directory exists
-if (!existsSync(EXPORTS_DIR)) {
-  mkdirSync(EXPORTS_DIR, { recursive: true });
+// Ensure exports directory exists (skip in serverless/read-only environments)
+try {
+  if (!existsSync(EXPORTS_DIR)) {
+    mkdirSync(EXPORTS_DIR, { recursive: true });
+  }
+} catch {
+  console.warn('[data-export] Cannot create exports directory (serverless environment)');
 }
 
 interface DataExportOptions {
@@ -127,7 +131,7 @@ async function processDataExport(
     const exportData = await collectUserData(userId, tenantId, includeRelated);
 
     // Generate export file
-    const fileName = `data-export-${userId}-${Date.now()}.${format === "json" ? "zip" : "zip"}`;
+    const fileName = `data-export-${randomUUID()}-${Date.now()}.${format === "json" ? "zip" : "zip"}`;
     const filePath = join(EXPORTS_DIR, fileName);
 
     if (format === "json") {

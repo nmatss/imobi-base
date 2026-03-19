@@ -146,9 +146,8 @@ if [[ -f "migrations/add-performance-indexes.sql" ]]; then
     npm run db:migrate:indexes || log_warn "Database migrations failed"
 fi
 
-# 7. Health check
+# 7. Health check with exponential backoff
 log_info "Performing health check..."
-sleep 5  # Wait for deployment to stabilize
 
 if [[ "$ENVIRONMENT" == "production" ]]; then
     HEALTH_URL="https://imobibase.com/api/health"
@@ -156,12 +155,35 @@ else
     HEALTH_URL="https://staging-imobibase.vercel.app/api/health"
 fi
 
-HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" || echo "000")
+MAX_ATTEMPTS=5
+ATTEMPT=1
+WAIT_TIME=5
 
-if [[ "$HTTP_STATUS" == "200" ]]; then
-    log_info "Health check passed! (HTTP $HTTP_STATUS)"
-else
-    log_error "Health check failed! (HTTP $HTTP_STATUS)"
+while [[ $ATTEMPT -le $MAX_ATTEMPTS ]]; do
+    log_info "Health check attempt $ATTEMPT/$MAX_ATTEMPTS (waiting ${WAIT_TIME}s)..."
+    sleep $WAIT_TIME
+
+    HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$HEALTH_URL" || echo "000")
+
+    if [[ "$HTTP_STATUS" == "200" ]]; then
+        log_info "Health check passed! (HTTP $HTTP_STATUS)"
+        break
+    fi
+
+    log_warn "Health check returned HTTP $HTTP_STATUS"
+    ATTEMPT=$((ATTEMPT + 1))
+    WAIT_TIME=$((WAIT_TIME * 2))  # Exponential backoff: 5, 10, 20, 40s
+done
+
+if [[ "$HTTP_STATUS" != "200" ]]; then
+    log_error "Health check failed after $MAX_ATTEMPTS attempts! (HTTP $HTTP_STATUS)"
+
+    # Auto-rollback for Vercel deployments
+    if command -v vercel &> /dev/null && [[ "$ENVIRONMENT" == "production" ]]; then
+        log_warn "Attempting automatic rollback..."
+        vercel rollback --yes || log_error "Automatic rollback failed!"
+    fi
+
     log_error "Deployment may have issues. Please check logs."
     exit 1
 fi

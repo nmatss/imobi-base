@@ -156,7 +156,7 @@ export class EmailQueue {
     id: string | undefined;
     state: string;
     data: EmailJobData;
-    progress: number | object;
+    progress: string | boolean | number | object;
     returnvalue: unknown;
     failedReason: string | undefined;
     attemptsMade: number;

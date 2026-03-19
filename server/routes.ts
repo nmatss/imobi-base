@@ -41,8 +41,10 @@ import type { User } from "@shared/schema-sqlite";
 import connectPg from "connect-pg-simple";
 import pkg from "pg";
 import rateLimit from "express-rate-limit";
+import RedisStore from "rate-limit-redis";
 import helmet from "helmet";
 import cors from "cors";
+import { apiResponse, apiError, apiPaginated } from "./utils/api-response";
 import { registerSecurityRoutes } from "./routes-security";
 import { registerFeatureRoutes } from "./routes-features";
 import { registerPaymentRoutes } from "./routes-payments";
@@ -153,6 +155,10 @@ const csrfExcludedPaths = [
   "/api/health",
   "/api/ready",
   "/api/live",
+  "/api/portal/login",
+  "/api/portal/forgot-password",
+  "/api/portal/logout",
+  "/api/cron/",
 ];
 
 /**
@@ -255,7 +261,8 @@ export async function registerRoutes(
   app.use(
     cors({
       origin: (origin, callback) => {
-        // Allow requests with no origin (mobile apps, curl, Postman, etc)
+        // No Origin header: same-origin requests or non-browser clients
+        // Browsers always send Origin for cross-origin requests
         if (!origin) {
           return callback(null, true);
         }
@@ -421,6 +428,25 @@ export async function registerRoutes(
     next();
   });
 
+  // Redis store for rate limiting in production (falls back to in-memory)
+  let rateLimitStore: RedisStore | undefined;
+  try {
+    const { getRedisClient } = await import("./cache/redis-client");
+    const client = getRedisClient();
+    if (client) {
+      rateLimitStore = new RedisStore({
+        sendCommand: (...args: string[]) =>
+          client.call(args[0], ...args.slice(1)) as Promise<
+            boolean | number | string | (boolean | number | string)[]
+          >,
+        prefix: "rl:",
+      });
+      console.log("[RateLimit] Using Redis store");
+    }
+  } catch {
+    console.log("[RateLimit] Redis not available, using in-memory store");
+  }
+
   // Rate limiting - general API limiter
   const apiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -428,6 +454,7 @@ export async function registerRoutes(
     message: { error: "Muitas requisições. Tente novamente mais tarde." },
     standardHeaders: true,
     legacyHeaders: false,
+    store: rateLimitStore,
   });
 
   // Stricter rate limiting for auth routes
@@ -439,6 +466,7 @@ export async function registerRoutes(
     },
     standardHeaders: true,
     legacyHeaders: false,
+    store: rateLimitStore,
   });
 
   // Stricter rate limiting for public routes (lead creation, newsletter)
@@ -448,6 +476,7 @@ export async function registerRoutes(
     message: { error: "Muitas requisições. Tente novamente mais tarde." },
     standardHeaders: true,
     legacyHeaders: false,
+    store: rateLimitStore,
   });
 
   // Rate limiter para endpoints administrativos
@@ -458,6 +487,7 @@ export async function registerRoutes(
     keyGenerator: generateRateLimitKey,
     standardHeaders: true,
     legacyHeaders: false,
+    store: rateLimitStore,
   });
 
   // Apply general rate limiting to all API routes
@@ -565,14 +595,17 @@ export async function registerRoutes(
       secret: sessionSecret || "imobibase-secret-key-change-in-production",
       resave: false,
       saveUninitialized: false,
+      rolling: true, // Reset maxAge on each request (idle timeout)
       name: "imobibase.sid",
       cookie: {
-        maxAge: 1000 * 60 * 60 * 24, // 24 hours (reduced from 7 days)
+        maxAge: isProduction
+          ? 1000 * 60 * 30 // 30 minutes idle timeout in production
+          : 1000 * 60 * 60 * 24, // 24 hours in development
         httpOnly: true,
-        sameSite: isLocalDev ? "lax" : "strict", // STRICT in production for better security
+        sameSite: isLocalDev ? "lax" : "strict",
         secure: !isLocalDev,
         path: "/",
-        domain: process.env.COOKIE_DOMAIN, // Optional: for multi-subdomain setups
+        domain: process.env.COOKIE_DOMAIN,
       },
     }),
   );
@@ -1208,19 +1241,13 @@ export async function registerRoutes(
       const tenant = await storage.getTenant(user.tenantId);
 
       if (!tenant) {
-        return res.status(404).json({
-          error: "Tenant não encontrado",
-          code: "TENANT_NOT_FOUND",
-        });
+        return apiError(res, 404, "Tenant não encontrado", "TENANT_NOT_FOUND");
       }
 
-      res.json({ user, tenant });
+      apiResponse(res, { user, tenant });
     } catch (error: unknown) {
       console.error("Error in /api/auth/me:", error);
-      res.status(500).json({
-        error: "Erro ao buscar dados do usuário",
-        code: "INTERNAL_ERROR",
-      });
+      apiError(res, 500, "Erro ao buscar dados do usuário", "INTERNAL_ERROR");
     }
   });
 
@@ -1321,7 +1348,8 @@ export async function registerRoutes(
   // ===== PROPERTY ROUTES =====
   app.get("/api/properties", requireAuth, async (req, res) => {
     try {
-      const { type, category, status, featured } = req.query;
+      const { type, category, status, featured, page, limit } = req.query;
+      const { page: p, limit: l } = sanitizePagination(page as string, limit as string);
       const properties = await storage.getPropertiesByTenant(
         req.user!.tenantId,
         {
@@ -1336,9 +1364,9 @@ export async function registerRoutes(
                 : undefined,
         },
       );
-      res.json(properties);
+      apiPaginated(res, properties, properties.length, p, l);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar imóveis" });
+      apiError(res, 500, "Erro ao buscar imóveis");
     }
   });
 
@@ -1391,14 +1419,13 @@ export async function registerRoutes(
         tenantId: req.user!.tenantId,
       });
       const property = await storage.createProperty(data);
-      res.status(201).json(property);
+      apiResponse(res, property, undefined, 201);
     } catch (error: unknown) {
-      res
-        .status(400)
-        .json({
-          error:
-            error instanceof Error ? error.message : "Erro ao criar imóvel",
-        });
+      apiError(
+        res,
+        400,
+        error instanceof Error ? error.message : "Erro ao criar imóvel",
+      );
     }
   });
 
@@ -1462,10 +1489,12 @@ export async function registerRoutes(
 
   app.get("/api/leads", requireAuth, async (req, res) => {
     try {
+      const { page, limit } = req.query;
+      const { page: p, limit: l } = sanitizePagination(page as string, limit as string);
       const leads = await storage.getLeadsByTenant(req.user!.tenantId);
-      res.json(leads);
+      apiPaginated(res, leads, leads.length, p, l);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar leads" });
+      apiError(res, 500, "Erro ao buscar leads");
     }
   });
 
@@ -1489,13 +1518,13 @@ export async function registerRoutes(
         tenantId: req.user!.tenantId,
       });
       const lead = await storage.createLead(data);
-      res.status(201).json(lead);
+      apiResponse(res, lead, undefined, 201);
     } catch (error: unknown) {
-      res
-        .status(400)
-        .json({
-          error: error instanceof Error ? error.message : "Erro ao criar lead",
-        });
+      apiError(
+        res,
+        400,
+        error instanceof Error ? error.message : "Erro ao criar lead",
+      );
     }
   });
 

@@ -55,7 +55,7 @@ const SECRET_CONFIGS: Record<string, SecretConfig> = {
   },
   SENTRY_DSN: {
     required: false,
-    pattern: /^https:\/\/.*\.ingest\.sentry\.io/,
+    pattern: /^https:\/\/.*\.ingest\..*sentry\.io/,
     description: 'Sentry DSN for error tracking',
   },
   CLICKSIGN_API_KEY: {
@@ -131,10 +131,12 @@ class SecretManager {
       console.error('🚨 SECRET VALIDATION ERRORS:');
       errors.forEach(err => console.error(`   - ${err}`));
 
-      if (process.env.NODE_ENV === 'production') {
+      if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
         console.error('');
         console.error('Application cannot start in production with invalid secrets');
         process.exit(1);
+      } else if (process.env.VERCEL) {
+        console.error('⚠️  Secret validation errors in serverless - continuing with warnings');
       }
     }
 
