@@ -3,9 +3,9 @@
  * Enforces subscription plan limits on resources
  */
 
-import type { Request, Response, NextFunction } from 'express';
-import { storage } from '../storage';
-import * as Sentry from '@sentry/node';
+import type { Request, Response, NextFunction } from "express";
+import { storage } from "../storage";
+import * as Sentry from "@sentry/node";
 
 export interface PlanLimits {
   maxUsers: number;
@@ -29,13 +29,15 @@ const FREE_PLAN_LIMITS: PlanLimits = {
   maxProperties: 15,
   maxLeads: 30,
   maxIntegrations: 0,
-  features: ['basic_site', 'basic_crm'],
+  features: ["basic_site", "basic_crm"],
 };
 
 /**
  * Get tenant's plan limits
  */
-export async function getTenantPlanLimits(tenantId: string): Promise<PlanLimits> {
+export async function getTenantPlanLimits(
+  tenantId: string,
+): Promise<PlanLimits> {
   try {
     const subscription = await storage.getTenantSubscription(tenantId);
 
@@ -52,13 +54,13 @@ export async function getTenantPlanLimits(tenantId: string): Promise<PlanLimits>
     return {
       maxUsers: plan.maxUsers ?? 1,
       maxProperties: plan.maxProperties ?? 15,
-      maxLeads: (plan as any).maxLeads ?? -1,
+      maxLeads: ((plan as Record<string, unknown>).maxLeads as number) ?? -1,
       maxIntegrations: plan.maxIntegrations ?? 0,
       features: (plan.features as string[]) || [],
     };
   } catch (error) {
     Sentry.captureException(error, {
-      tags: { middleware: 'plan-limits', operation: 'getTenantPlanLimits' },
+      tags: { middleware: "plan-limits", operation: "getTenantPlanLimits" },
       extra: { tenantId },
     });
 
@@ -69,17 +71,22 @@ export async function getTenantPlanLimits(tenantId: string): Promise<PlanLimits>
 /**
  * Get tenant's subscription status
  */
-export async function getTenantSubscriptionStatus(tenantId: string): Promise<string> {
+export async function getTenantSubscriptionStatus(
+  tenantId: string,
+): Promise<string> {
   try {
     const subscription = await storage.getTenantSubscription(tenantId);
-    if (!subscription) return 'free';
-    return subscription.status || 'free';
+    if (!subscription) return "free";
+    return subscription.status || "free";
   } catch (error) {
     Sentry.captureException(error, {
-      tags: { middleware: 'plan-limits', operation: 'getTenantSubscriptionStatus' },
+      tags: {
+        middleware: "plan-limits",
+        operation: "getTenantSubscriptionStatus",
+      },
       extra: { tenantId },
     });
-    return 'free';
+    return "free";
   }
 }
 
@@ -88,7 +95,7 @@ export async function getTenantSubscriptionStatus(tenantId: string): Promise<str
  */
 export async function isSubscriptionActive(tenantId: string): Promise<boolean> {
   const status = await getTenantSubscriptionStatus(tenantId);
-  return status === 'active' || status === 'trial' || status === 'free';
+  return status === "active" || status === "trial" || status === "free";
 }
 
 /**
@@ -106,15 +113,16 @@ async function checkResourceLimit(
     const tenantId = req.user?.tenantId;
 
     if (!tenantId) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: "Unauthorized" });
       return;
     }
 
     const isActive = await isSubscriptionActive(tenantId);
     if (!isActive) {
       res.status(403).json({
-        error: 'Subscription not active',
-        message: 'Sua assinatura não está ativa. Atualize seu método de pagamento.',
+        error: "Subscription not active",
+        message:
+          "Sua assinatura não está ativa. Atualize seu método de pagamento.",
       });
       return;
     }
@@ -135,7 +143,7 @@ async function checkResourceLimit(
         limitReached: true,
         currentUsage: currentCount,
         maxAllowed,
-        planName: 'current',
+        planName: "current",
         upgradeMessage: `Você atingiu o limite de ${resourceName} (${maxAllowed}) do seu plano. Faça upgrade para continuar.`,
       };
 
@@ -149,7 +157,10 @@ async function checkResourceLimit(
     next();
   } catch (error) {
     Sentry.captureException(error, {
-      tags: { middleware: 'plan-limits', operation: `check${resourceName}Limit` },
+      tags: {
+        middleware: "plan-limits",
+        operation: `check${resourceName}Limit`,
+      },
     });
     next(error);
   }
@@ -158,49 +169,98 @@ async function checkResourceLimit(
 /**
  * Middleware to check user creation limit
  */
-export async function checkUserLimit(req: Request, res: Response, next: NextFunction): Promise<void> {
-  return checkResourceLimit(req, res, next, 'usuários', (l) => l.maxUsers, (tid) => storage.getTenantUserCount(tid));
+export async function checkUserLimit(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  return checkResourceLimit(
+    req,
+    res,
+    next,
+    "usuários",
+    (l) => l.maxUsers,
+    (tid) => storage.getTenantUserCount(tid),
+  );
 }
 
 /**
  * Middleware to check property creation limit
  */
-export async function checkPropertyLimit(req: Request, res: Response, next: NextFunction): Promise<void> {
-  return checkResourceLimit(req, res, next, 'imóveis', (l) => l.maxProperties, (tid) => storage.getTenantPropertyCount(tid));
+export async function checkPropertyLimit(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  return checkResourceLimit(
+    req,
+    res,
+    next,
+    "imóveis",
+    (l) => l.maxProperties,
+    (tid) => storage.getTenantPropertyCount(tid),
+  );
 }
 
 /**
  * Middleware to check lead creation limit (monthly)
  */
-export async function checkLeadLimit(req: Request, res: Response, next: NextFunction): Promise<void> {
-  return checkResourceLimit(req, res, next, 'leads/mês', (l) => l.maxLeads, (tid) => storage.getTenantLeadCountThisMonth(tid));
+export async function checkLeadLimit(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  return checkResourceLimit(
+    req,
+    res,
+    next,
+    "leads/mês",
+    (l) => l.maxLeads,
+    (tid) => storage.getTenantLeadCountThisMonth(tid),
+  );
 }
 
 /**
  * Middleware to check integration creation limit
  */
-export async function checkIntegrationLimit(req: Request, res: Response, next: NextFunction): Promise<void> {
-  return checkResourceLimit(req, res, next, 'integrações', (l) => l.maxIntegrations, (tid) => storage.getTenantIntegrationCount(tid));
+export async function checkIntegrationLimit(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  return checkResourceLimit(
+    req,
+    res,
+    next,
+    "integrações",
+    (l) => l.maxIntegrations,
+    (tid) => storage.getTenantIntegrationCount(tid),
+  );
 }
 
 /**
  * Middleware to check feature access
  */
 export function checkFeatureAccess(featureName: string) {
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  return async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       const tenantId = req.user?.tenantId;
 
       if (!tenantId) {
-        res.status(401).json({ error: 'Unauthorized' });
+        res.status(401).json({ error: "Unauthorized" });
         return;
       }
 
       const isActive = await isSubscriptionActive(tenantId);
       if (!isActive) {
         res.status(403).json({
-          error: 'Subscription not active',
-          message: 'Sua assinatura não está ativa. Atualize seu método de pagamento.',
+          error: "Subscription not active",
+          message:
+            "Sua assinatura não está ativa. Atualize seu método de pagamento.",
         });
         return;
       }
@@ -209,7 +269,7 @@ export function checkFeatureAccess(featureName: string) {
 
       if (!limits.features.includes(featureName)) {
         res.status(403).json({
-          error: 'Feature not available',
+          error: "Feature not available",
           feature: featureName,
           message: `Este recurso não está disponível no seu plano atual. Faça upgrade para acessar.`,
           upgradeRequired: true,
@@ -220,7 +280,7 @@ export function checkFeatureAccess(featureName: string) {
       next();
     } catch (error) {
       Sentry.captureException(error, {
-        tags: { middleware: 'plan-limits', operation: 'checkFeatureAccess' },
+        tags: { middleware: "plan-limits", operation: "checkFeatureAccess" },
         extra: { featureName },
       });
       next(error);
@@ -243,12 +303,13 @@ export async function getUsageStats(tenantId: string): Promise<{
     const limits = await getTenantPlanLimits(tenantId);
     const status = await getTenantSubscriptionStatus(tenantId);
 
-    const [userCount, propertyCount, leadCount, integrationCount] = await Promise.all([
-      storage.getTenantUserCount(tenantId),
-      storage.getTenantPropertyCount(tenantId),
-      storage.getTenantLeadCountThisMonth(tenantId),
-      storage.getTenantIntegrationCount(tenantId),
-    ]);
+    const [userCount, propertyCount, leadCount, integrationCount] =
+      await Promise.all([
+        storage.getTenantUserCount(tenantId),
+        storage.getTenantPropertyCount(tenantId),
+        storage.getTenantLeadCountThisMonth(tenantId),
+        storage.getTenantIntegrationCount(tenantId),
+      ]);
 
     return {
       users: { current: userCount, max: limits.maxUsers },
@@ -260,7 +321,7 @@ export async function getUsageStats(tenantId: string): Promise<{
     };
   } catch (error) {
     Sentry.captureException(error, {
-      tags: { middleware: 'plan-limits', operation: 'getUsageStats' },
+      tags: { middleware: "plan-limits", operation: "getUsageStats" },
       extra: { tenantId },
     });
     throw error;
