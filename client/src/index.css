@@ -12,285 +12,290 @@
     /* Responsive spacing scale (8pt grid) */
     --spacing-responsive-xs: 4px;
     --spacing-responsive-sm: 8px;
-  --spacing-responsive-md: 16px;
-  --spacing-responsive-lg: 24px;
-  --spacing-responsive-xl: 32px;
-  --spacing-responsive-2xl: 48px;
+    --spacing-responsive-md: 16px;
+    --spacing-responsive-lg: 24px;
+    --spacing-responsive-xl: 32px;
+    --spacing-responsive-2xl: 48px;
 
-  /* Brand Colors - Navy Blue & Clean Slate */
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-  
-  --color-card: hsl(var(--card));
-  --color-card-foreground: hsl(var(--card-foreground));
-  
-  --color-popover: hsl(var(--popover));
-  --color-popover-foreground: hsl(var(--popover-foreground));
-  
-  --color-primary: hsl(var(--primary));
-  --color-primary-foreground: hsl(var(--primary-foreground));
-  
-  --color-secondary: hsl(var(--secondary));
-  --color-secondary-foreground: hsl(var(--secondary-foreground));
-  
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-  
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
-  
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
+    /* Brand Colors - Navy Blue & Clean Slate */
+    --color-background: hsl(var(--background));
+    --color-foreground: hsl(var(--foreground));
 
-  /* Semantic Colors */
-  --color-success: hsl(var(--success));
-  --color-success-foreground: hsl(var(--success-foreground));
-  --color-warning: hsl(var(--warning));
-  --color-warning-foreground: hsl(var(--warning-foreground));
-  --color-info: hsl(var(--info));
-  --color-info-foreground: hsl(var(--info-foreground));
+    --color-card: hsl(var(--card));
+    --color-card-foreground: hsl(var(--card-foreground));
 
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
-  --color-ring: hsl(var(--ring));
+    --color-popover: hsl(var(--popover));
+    --color-popover-foreground: hsl(var(--popover-foreground));
 
-  /* Status Colors - CRM Pipeline & Leads (WCAG AA compliant) */
-  --color-status-new: 142 71% 35%; /* Green-700 for "Novo" */
-  --color-status-qualification: 258 70% 45%; /* Purple-700 for "Em Contato" */
-  --color-status-visit: 25 90% 45%; /* Orange-700 for "Visita" */
-  --color-status-proposal: 189 85% 35%; /* Cyan-700 for "Proposta" */
-  --color-status-negotiation: 330 70% 45%; /* Pink-700 for "Negociação" */
-  --color-status-contract: 142 71% 35%; /* Green-700 for "Fechado" */
-  --color-status-closed: 142 71% 35%; /* Green-700 for "Closed" */
-  --color-status-lost: 0 70% 45%; /* Red-700 for "Perdido" */
+    --color-primary: hsl(var(--primary));
+    --color-primary-foreground: hsl(var(--primary-foreground));
 
-  /* Action Link Colors - WCAG AA compliant */
-  --color-link-action: 217 91% 40%; /* #0066CC - Darker blue for actions */
-  --color-link-hover: 217 91% 35%; /* Even darker on hover */
-  
-  --color-chart-1: hsl(var(--chart-1));
-  --color-chart-2: hsl(var(--chart-2));
-  --color-chart-3: hsl(var(--chart-3));
-  --color-chart-4: hsl(var(--chart-4));
-  --color-chart-5: hsl(var(--chart-5));
-  
-  --color-sidebar: hsl(var(--sidebar));
-  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
-  --color-sidebar-primary: hsl(var(--sidebar-primary));
-  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
-  --color-sidebar-accent: hsl(var(--sidebar-accent));
-  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
-  --color-sidebar-border: hsl(var(--sidebar-border));
-  --color-sidebar-ring: hsl(var(--sidebar-ring));
+    --color-secondary: hsl(var(--secondary));
+    --color-secondary-foreground: hsl(var(--secondary-foreground));
 
-  --font-sans: 'Inter', sans-serif;
-  --font-heading: 'Plus Jakarta Sans', sans-serif;
+    --color-muted: hsl(var(--muted));
+    --color-muted-foreground: hsl(var(--muted-foreground));
 
-  --radius: 0.5rem;
+    --color-accent: hsl(var(--accent));
+    --color-accent-foreground: hsl(var(--accent-foreground));
 
-  /* ==================== DESIGN SYSTEM TOKENS ==================== */
+    --color-destructive: hsl(var(--destructive));
+    --color-destructive-foreground: hsl(var(--destructive-foreground));
 
-  /* Brand Colors */
-  --brand-primary: #0066FF;
-  --brand-primary-light: #3385FF;
-  --brand-primary-dark: #0052CC;
-  --brand-secondary: #00AA44;
-  --brand-secondary-light: #00D455;
-  --brand-secondary-dark: #008835;
+    /* Semantic Colors */
+    --color-success: hsl(var(--success));
+    --color-success-foreground: hsl(var(--success-foreground));
+    --color-warning: hsl(var(--warning));
+    --color-warning-foreground: hsl(var(--warning-foreground));
+    --color-info: hsl(var(--info));
+    --color-info-foreground: hsl(var(--info-foreground));
 
-  /* Card Sizes */
-  --card-compact-padding: 0.75rem;    /* 12px */
-  --card-compact-gap: 0.5rem;         /* 8px */
-  --card-compact-min-height: 80px;
+    --color-border: hsl(var(--border));
+    --color-input: hsl(var(--input));
+    --color-ring: hsl(var(--ring));
 
-  --card-normal-padding: 1rem;        /* 16px */
-  --card-normal-gap: 0.75rem;         /* 12px */
-  --card-normal-min-height: 120px;
+    /* Status Colors - CRM Pipeline & Leads (WCAG AA compliant) */
+    --color-status-new: 142 71% 35%; /* Green-700 for "Novo" */
+    --color-status-qualification: 258 70% 45%; /* Purple-700 for "Em Contato" */
+    --color-status-visit: 25 90% 45%; /* Orange-700 for "Visita" */
+    --color-status-proposal: 189 85% 35%; /* Cyan-700 for "Proposta" */
+    --color-status-negotiation: 330 70% 45%; /* Pink-700 for "Negociação" */
+    --color-status-contract: 142 71% 35%; /* Green-700 for "Fechado" */
+    --color-status-closed: 142 71% 35%; /* Green-700 for "Closed" */
+    --color-status-lost: 0 70% 45%; /* Red-700 for "Perdido" */
 
-  --card-expanded-padding: 1.5rem;    /* 24px */
-  --card-expanded-gap: 1rem;          /* 16px */
-  --card-expanded-min-height: 160px;
+    /* Action Link Colors - WCAG AA compliant */
+    --color-link-action: 217 91% 40%; /* #0066CC - Darker blue for actions */
+    --color-link-hover: 217 91% 35%; /* Even darker on hover */
 
-  /* Icon Sizes */
-  --icon-sm: 1rem;      /* 16px */
-  --icon-md: 1.25rem;   /* 20px */
-  --icon-lg: 1.5rem;    /* 24px */
-  --icon-xl: 2rem;      /* 32px */
-  --icon-2xl: 2.5rem;   /* 40px */
-  --icon-3xl: 3rem;     /* 48px */
-}
+    --color-chart-1: hsl(var(--chart-1));
+    --color-chart-2: hsl(var(--chart-2));
+    --color-chart-3: hsl(var(--chart-3));
+    --color-chart-4: hsl(var(--chart-4));
+    --color-chart-5: hsl(var(--chart-5));
 
-:root {
-  /* ==================== PREMIUM COLOR PALETTE ==================== */
+    --color-sidebar: hsl(var(--sidebar));
+    --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+    --color-sidebar-primary: hsl(var(--sidebar-primary));
+    --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+    --color-sidebar-accent: hsl(var(--sidebar-accent));
+    --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+    --color-sidebar-border: hsl(var(--sidebar-border));
+    --color-sidebar-ring: hsl(var(--sidebar-ring));
 
-  /* Base - Consistent gray scale */
-  --background: 210 20% 98%; /* #F9FAFB - Soft gray-blue */
-  --foreground: 222 47% 11%; /* #0F172A - Deep slate */
+    --font-sans: "Inter", sans-serif;
+    --font-heading: "Plus Jakarta Sans", sans-serif;
 
-  --card: 0 0% 100%; /* Pure white cards */
-  --card-foreground: 222 47% 11%;
+    --radius: 0.5rem;
 
-  --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
+    /* ==================== DESIGN SYSTEM TOKENS ==================== */
 
-  /* Primary - WCAG AA compliant blue (contrast 4.5:1+) */
-  --primary: 217 91% 45%; /* #0066CC - Darker blue for better contrast */
-  --primary-foreground: 0 0% 100%;
+    /* Brand Colors */
+    --brand-primary: #0066ff;
+    --brand-primary-light: #3385ff;
+    --brand-primary-dark: #0052cc;
+    --brand-secondary: #00aa44;
+    --brand-secondary-light: #00d455;
+    --brand-secondary-dark: #008835;
 
-  --secondary: 210 20% 96%; /* #F1F5F9 */
-  --secondary-foreground: 222 47% 11%;
+    /* Card Sizes */
+    --card-compact-padding: 0.75rem; /* 12px */
+    --card-compact-gap: 0.5rem; /* 8px */
+    --card-compact-min-height: 80px;
 
-  /* Muted - Higher contrast for accessibility (WCAG AA - 4.5:1+) */
-  --muted: 210 20% 96%;
-  --muted-foreground: 215 25% 30%; /* #3E4C59 - Even better contrast */
+    --card-normal-padding: 1rem; /* 16px */
+    --card-normal-gap: 0.75rem; /* 12px */
+    --card-normal-min-height: 120px;
 
-  --accent: 210 20% 96%;
-  --accent-foreground: 222 47% 11%;
+    --card-expanded-padding: 1.5rem; /* 24px */
+    --card-expanded-gap: 1rem; /* 16px */
+    --card-expanded-min-height: 160px;
 
-  /* Semantic Colors - Full palette */
-  --destructive: 0 72% 51%; /* #DC2626 - Error red */
-  --destructive-foreground: 0 0% 100%;
+    /* Icon Sizes */
+    --icon-sm: 1rem; /* 16px */
+    --icon-md: 1.25rem; /* 20px */
+    --icon-lg: 1.5rem; /* 24px */
+    --icon-xl: 2rem; /* 32px */
+    --icon-2xl: 2.5rem; /* 40px */
+    --icon-3xl: 3rem; /* 48px */
+  }
 
-  --success: 160 84% 39%; /* #10B981 - Emerald green */
-  --success-foreground: 0 0% 100%;
+  :root {
+    /* ==================== PREMIUM COLOR PALETTE ==================== */
 
-  --warning: 38 92% 38%; /* #B45309 - Amber-700 (WCAG AA: 4.6:1 contrast) */
-  --warning-foreground: 0 0% 100%;
+    /* Base - Consistent gray scale */
+    --background: 210 20% 98%; /* #F9FAFB - Soft gray-blue */
+    --foreground: 222 47% 11%; /* #0F172A - Deep slate */
 
-  --info: 199 89% 48%; /* #0EA5E9 - Sky blue */
-  --info-foreground: 0 0% 100%;
+    --card: 0 0% 100%; /* Pure white cards */
+    --card-foreground: 222 47% 11%;
 
-  /* Borders & Inputs - Consistent gray */
-  --border: 214 32% 91%; /* #E2E8F0 */
-  --input: 214 32% 91%;
-  --ring: 217 91% 50%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
 
-  --radius: 0.5rem;
+    /* Primary - WCAG AA compliant blue (contrast 4.5:1+) */
+    --primary: 217 91% 45%; /* #0066CC - Darker blue for better contrast */
+    --primary-foreground: 0 0% 100%;
 
-  /* Chart colors - Harmonious palette */
-  --chart-1: 217 91% 50%; /* Primary blue */
-  --chart-2: 160 84% 39%; /* Success green */
-  --chart-3: 38 92% 50%; /* Warning amber */
-  --chart-4: 280 68% 60%; /* Purple */
-  --chart-5: 0 72% 51%; /* Red */
+    --secondary: 210 20% 96%; /* #F1F5F9 */
+    --secondary-foreground: 222 47% 11%;
 
-  /* Sidebar - Dark professional */
-  --sidebar: 222 47% 11%; /* #1E293B */
-  --sidebar-foreground: 210 20% 98%;
-  --sidebar-primary: 217 91% 50%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 217 33% 17%;
-  --sidebar-accent-foreground: 210 20% 98%;
-  --sidebar-border: 217 33% 20%;
-  --sidebar-ring: 217 91% 50%;
+    /* Muted - Higher contrast for accessibility (WCAG AA - 4.5:1+) */
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 25% 30%; /* #3E4C59 - Even better contrast */
 
-  /* ==================== TYPOGRAPHY SCALE ==================== */
-  /* Using 8pt grid system with 1.25 scale ratio */
-  --text-xs: 0.75rem;    /* 12px */
-  --text-sm: 0.875rem;   /* 14px */
-  --text-base: 1rem;     /* 16px */
-  --text-lg: 1.125rem;   /* 18px */
-  --text-xl: 1.25rem;    /* 20px */
-  --text-2xl: 1.5rem;    /* 24px */
-  --text-3xl: 1.875rem;  /* 30px */
-  --text-4xl: 2.25rem;   /* 36px */
+    --accent: 210 20% 96%;
+    --accent-foreground: 222 47% 11%;
 
-  /* Line heights */
-  --leading-tight: 1.25;
-  --leading-snug: 1.4;
-  --leading-normal: 1.5;
-  --leading-relaxed: 1.6;
+    /* Semantic Colors - Full palette */
+    --destructive: 0 72% 51%; /* #DC2626 - Error red */
+    --destructive-foreground: 0 0% 100%;
 
-  /* ==================== SPACING (8pt grid) - SIMPLIFIED ==================== */
-  --space-1: 0.25rem;  /* 4px  - micro spacing */
-  --space-2: 0.5rem;   /* 8px  - tight spacing */
-  --space-3: 0.75rem;  /* 12px - compact */
-  --space-4: 1rem;     /* 16px - base spacing */
-  --space-6: 1.5rem;   /* 24px - comfortable */
-  --space-8: 2rem;     /* 32px - spacious */
-  --space-12: 3rem;    /* 48px - section divider */
+    --success: 160 84% 39%; /* #10B981 - Emerald green */
+    --success-foreground: 0 0% 100%;
 
-  /* Card spacing defaults */
-  --card-padding-mobile: var(--space-4);  /* 16px */
-  --card-padding-desktop: var(--space-6); /* 24px */
-  --card-gap: var(--space-6);             /* 24px between cards */
-  --card-header-gap: var(--space-2);      /* 8px between title and description */
-}
+    --warning: 38 92% 38%; /* #B45309 - Amber-700 (WCAG AA: 4.6:1 contrast) */
+    --warning-foreground: 0 0% 100%;
 
-.dark {
-  --background: 222 47% 11%;
-  --foreground: 210 20% 98%;
+    --info: 199 89% 48%; /* #0EA5E9 - Sky blue */
+    --info-foreground: 0 0% 100%;
 
-  --card: 217 33% 17%;
-  --card-foreground: 210 20% 98%;
+    /* Borders & Inputs - Consistent gray */
+    --border: 214 32% 91%; /* #E2E8F0 */
+    --input: 214 32% 91%;
+    --ring: 217 91% 50%;
 
-  --popover: 222 47% 11%;
-  --popover-foreground: 210 20% 98%;
+    --radius: 0.5rem;
 
-  --primary: 217 91% 60%;
-  --primary-foreground: 0 0% 100%;
+    /* Chart colors - Harmonious palette */
+    --chart-1: 217 91% 50%; /* Primary blue */
+    --chart-2: 160 84% 39%; /* Success green */
+    --chart-3: 38 92% 50%; /* Warning amber */
+    --chart-4: 280 68% 60%; /* Purple */
+    --chart-5: 0 72% 51%; /* Red */
 
-  --secondary: 217 33% 17%;
-  --secondary-foreground: 210 20% 98%;
+    /* Sidebar - Dark professional */
+    --sidebar: 222 47% 11%; /* #1E293B */
+    --sidebar-foreground: 210 20% 98%;
+    --sidebar-primary: 217 91% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 210 20% 98%;
+    --sidebar-border: 217 33% 20%;
+    --sidebar-ring: 217 91% 50%;
 
-  --muted: 217 33% 17%;
-  --muted-foreground: 215 20% 65%;
+    /* ==================== TYPOGRAPHY SCALE ==================== */
+    /* Using 8pt grid system with 1.25 scale ratio */
+    --text-xs: 0.75rem; /* 12px */
+    --text-sm: 0.875rem; /* 14px */
+    --text-base: 1rem; /* 16px */
+    --text-lg: 1.125rem; /* 18px */
+    --text-xl: 1.25rem; /* 20px */
+    --text-2xl: 1.5rem; /* 24px */
+    --text-3xl: 1.875rem; /* 30px */
+    --text-4xl: 2.25rem; /* 36px */
 
-  --accent: 217 33% 17%;
-  --accent-foreground: 210 20% 98%;
+    /* Line heights */
+    --leading-tight: 1.25;
+    --leading-snug: 1.4;
+    --leading-normal: 1.5;
+    --leading-relaxed: 1.6;
 
-  /* Semantic Colors - Dark mode */
-  --destructive: 0 72% 51%;
-  --destructive-foreground: 0 0% 100%;
+    /* ==================== SPACING (8pt grid) - SIMPLIFIED ==================== */
+    --space-1: 0.25rem; /* 4px  - micro spacing */
+    --space-2: 0.5rem; /* 8px  - tight spacing */
+    --space-3: 0.75rem; /* 12px - compact */
+    --space-4: 1rem; /* 16px - base spacing */
+    --space-6: 1.5rem; /* 24px - comfortable */
+    --space-8: 2rem; /* 32px - spacious */
+    --space-12: 3rem; /* 48px - section divider */
 
-  --success: 160 84% 39%;
-  --success-foreground: 0 0% 100%;
+    /* Card spacing defaults */
+    --card-padding-mobile: var(--space-4); /* 16px */
+    --card-padding-desktop: var(--space-6); /* 24px */
+    --card-gap: var(--space-6); /* 24px between cards */
+    --card-header-gap: var(--space-2); /* 8px between title and description */
+  }
 
-  --warning: 38 92% 38%; /* Amber-700 for WCAG AA compliance */
-  --warning-foreground: 0 0% 100%;
+  .dark {
+    --background: 222 47% 11%;
+    --foreground: 210 20% 98%;
 
-  --info: 199 89% 48%;
-  --info-foreground: 0 0% 100%;
+    --card: 217 33% 17%;
+    --card-foreground: 210 20% 98%;
 
-  --border: 217 33% 22%;
-  --input: 217 33% 22%;
-  --ring: 224.3 76.3% 48%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 20% 98%;
 
-  /* Status Colors - Dark Mode (same as light) */
-  --color-status-new: 217 91% 60%;
-  --color-status-qualification: 258 90% 66%;
-  --color-status-visit: 25 95% 53%;
-  --color-status-proposal: 189 94% 43%;
-  --color-status-negotiation: 330 81% 60%;
-  --color-status-contract: 142 71% 45%;
-  --color-status-closed: 142 71% 45%;
-  --color-status-lost: 0 72% 60%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
 
-  --sidebar: 217 33% 17%;
-  --sidebar-foreground: 210 40% 98%;
-  --sidebar-primary: 221 83% 53%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 217 33% 17%;
-  --sidebar-accent-foreground: 210 40% 98%;
-  --sidebar-border: 217 33% 17%;
-  --sidebar-ring: 217 91% 60%;
-}
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 20% 98%;
 
-* {
-  @apply border-border;
-}
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
 
-html {
-  scroll-behavior: smooth;
-}
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 20% 98%;
 
-body {
-  @apply font-sans antialiased bg-background text-foreground;
-}
+    /* Semantic Colors - Dark mode */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
 
-h1, h2, h3, h4, h5, h6 {
-  @apply font-heading font-bold tracking-tight;
-}
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 38%; /* Amber-700 for WCAG AA compliance */
+    --warning-foreground: 0 0% 100%;
+
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 217 33% 22%;
+    --input: 217 33% 22%;
+    --ring: 224.3 76.3% 48%;
+
+    /* Status Colors - Dark Mode (same as light) */
+    --color-status-new: 217 91% 60%;
+    --color-status-qualification: 258 90% 66%;
+    --color-status-visit: 25 95% 53%;
+    --color-status-proposal: 189 94% 43%;
+    --color-status-negotiation: 330 81% 60%;
+    --color-status-contract: 142 71% 45%;
+    --color-status-closed: 142 71% 45%;
+    --color-status-lost: 0 72% 60%;
+
+    --sidebar: 217 33% 17%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 221 83% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 33% 17%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 217 91% 60%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading font-bold tracking-tight;
+  }
 }
 
 @layer utilities {
@@ -830,8 +835,12 @@ h1, h2, h3, h4, h5, h6 {
     animation: fadeIn 0.2s ease-out;
   }
   @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   /* Slide in from right (for sheets/panels) */
@@ -959,7 +968,7 @@ h1, h2, h3, h4, h5, h6 {
     @apply relative;
   }
   .link-animated::after {
-    content: '';
+    content: "";
     @apply absolute bottom-0 left-0 w-0 h-0.5 bg-primary transition-all duration-200;
   }
   .link-animated:hover::after {
@@ -1275,7 +1284,9 @@ h1, h2, h3, h4, h5, h6 {
   .high-contrast [tabindex]:focus-visible {
     outline: 3px solid currentColor;
     outline-offset: 2px;
-    box-shadow: 0 0 0 3px hsl(var(--background)), 0 0 0 6px currentColor;
+    box-shadow:
+      0 0 0 3px hsl(var(--background)),
+      0 0 0 6px currentColor;
   }
 
   /* Screen reader mode optimizations */
@@ -1508,8 +1519,12 @@ h1, h2, h3, h4, h5, h6 {
 
   /* Fade In - Smooth entrance */
   @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   .animate-fadeIn {
@@ -1517,8 +1532,12 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   @keyframes fadeOut {
-    from { opacity: 1; }
-    to { opacity: 0; }
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
   }
 
   .animate-fadeOut {
@@ -1665,7 +1684,8 @@ h1, h2, h3, h4, h5, h6 {
 
   /* Pulse - Subtle attention */
   @keyframes pulse-subtle {
-    0%, 100% {
+    0%,
+    100% {
       opacity: 1;
     }
     50% {
@@ -1679,7 +1699,8 @@ h1, h2, h3, h4, h5, h6 {
 
   /* Bounce - Gentle */
   @keyframes bounce-gentle {
-    0%, 100% {
+    0%,
+    100% {
       transform: translateY(0);
     }
     50% {
@@ -1693,9 +1714,23 @@ h1, h2, h3, h4, h5, h6 {
 
   /* Shake - Error indication */
   @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
-    20%, 40%, 60%, 80% { transform: translateX(4px); }
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    10%,
+    30%,
+    50%,
+    70%,
+    90% {
+      transform: translateX(-4px);
+    }
+    20%,
+    40%,
+    60%,
+    80% {
+      transform: translateX(4px);
+    }
   }
 
   .animate-shake {
@@ -1724,16 +1759,58 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   /* Stagger delay utilities for list animations */
-  .animation-delay-100 { animation-delay: 100ms; }
-  .animation-delay-200 { animation-delay: 200ms; }
-  .animation-delay-300 { animation-delay: 300ms; }
-  .animation-delay-400 { animation-delay: 400ms; }
-  .animation-delay-500 { animation-delay: 500ms; }
+  .animation-delay-100 {
+    animation-delay: 100ms;
+  }
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+  .animation-delay-300 {
+    animation-delay: 300ms;
+  }
+  .animation-delay-400 {
+    animation-delay: 400ms;
+  }
+  .animation-delay-500 {
+    animation-delay: 500ms;
+  }
 
   /* Animation fill modes */
-  .animation-fill-forwards { animation-fill-mode: forwards; }
-  .animation-fill-backwards { animation-fill-mode: backwards; }
-  .animation-fill-both { animation-fill-mode: both; }
+  .animation-fill-forwards {
+    animation-fill-mode: forwards;
+  }
+  .animation-fill-backwards {
+    animation-fill-mode: backwards;
+  }
+  .animation-fill-both {
+    animation-fill-mode: both;
+  }
+
+  /* Float animations for landing page */
+  @keyframes float-slow {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+  @keyframes float-delayed {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+  .animate-float-slow {
+    animation: float-slow 4s ease-in-out infinite;
+  }
+  .animate-float-delayed {
+    animation: float-delayed 5s ease-in-out 1s infinite;
+  }
 
   /* ==================== FOCUS STATES (Accessibility) ==================== */
 
