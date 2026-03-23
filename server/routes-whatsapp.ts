@@ -78,6 +78,7 @@ const bulkWhatsAppLimiter = rateLimit({
 
 export function registerWhatsAppRoutes(app: Express) {
   // Gate all WhatsApp routes behind feature flag (webhooks use /api/webhooks/ prefix, unaffected)
+  // Individual routes already use requireAuth; this gates feature access for all WhatsApp API routes
   app.use("/api/whatsapp", checkFeatureAccess('whatsapp'));
 
   // ==================== MESSAGES ====================

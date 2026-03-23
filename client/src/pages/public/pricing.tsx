@@ -29,31 +29,31 @@ import { plans, CONTACT_EMAIL } from "@/lib/plans-config";
 const faqs = [
   {
     q: "Posso testar o ImobiBase antes de assinar?",
-    a: "Sim! O plano Gratis permite que voce utilize o sistema sem custo, com ate 10 imoveis e 50 leads. Voce pode fazer upgrade a qualquer momento.",
+    a: "Sim! O plano Gratuito permite que você utilize o sistema sem custo, com até 15 imóveis e 30 leads/mês. Você pode fazer upgrade a qualquer momento.",
   },
   {
     q: "Como funciona o pagamento?",
-    a: "Aceitamos cartao de credito e boleto bancario. No plano anual, voce economiza 20% e paga em ate 12x sem juros no cartao.",
+    a: "Aceitamos cartão de crédito e boleto bancário. No plano anual, você economiza 20% e paga em até 12x sem juros no cartão.",
   },
   {
     q: "Consigo migrar meus dados de outro sistema?",
-    a: "Sim! Oferecemos ferramentas de importacao via CSV e nossa equipe de suporte auxilia na migracao nos planos Basico, Profissional e Enterprise.",
+    a: "Sim! Oferecemos ferramentas de importação via CSV e nossa equipe de suporte auxilia na migração nos planos Starter, Profissional e superiores.",
   },
   {
     q: "Tem fidelidade ou multa de cancelamento?",
-    a: "Nao. Voce pode cancelar a qualquer momento sem multas. Acreditamos na qualidade do nosso produto para manter voce conosco.",
+    a: "Não. Você pode cancelar a qualquer momento sem multas. Acreditamos na qualidade do nosso produto para manter você conosco.",
   },
   {
-    q: "O que acontece se eu ultrapassar o limite de imoveis?",
-    a: "Voce recebera uma notificacao sugerindo o upgrade de plano. Seus imoveis existentes continuam funcionando, mas nao sera possivel cadastrar novos ate fazer o upgrade.",
+    q: "O que acontece se eu ultrapassar o limite de imóveis?",
+    a: "Você receberá uma notificação sugerindo o upgrade de plano. Seus imóveis existentes continuam funcionando, mas não será possível cadastrar novos até fazer o upgrade.",
   },
   {
-    q: "A integracao com WhatsApp funciona automaticamente?",
-    a: "Sim, nos planos Basico e superiores. Voce conecta seu numero e o sistema gerencia mensagens de leads automaticamente, incluindo respostas rapidas e notificacoes.",
+    q: "A integração com WhatsApp funciona automaticamente?",
+    a: "Sim, nos planos Starter e superiores. Você conecta seu número e o sistema gerencia mensagens de leads automaticamente, incluindo respostas rápidas e notificações.",
   },
   {
     q: "Como funciona a IA do plano Profissional?",
-    a: "A IA inclui geracao de descricoes de imoveis para marketing, avaliacao automatica de mercado (AVM) e um assistente inteligente para atendimento de leads (ISA).",
+    a: "A IA inclui geração de descrições de imóveis para marketing, avaliação automática de mercado (AVM) e um assistente inteligente para atendimento de leads (ISA).",
   },
 ];
 
@@ -87,19 +87,19 @@ export default function PricingPage() {
               Recursos
             </Link>
             <Link
-              href="/#solucoes"
+              href="/#como-funciona"
               className="hover:text-primary transition-colors"
             >
-              Solucoes
+              Como Funciona
             </Link>
             <Link href="/pricing" className="text-primary font-semibold">
-              Precos
+              Preços
             </Link>
             <Link
-              href="/#empresa"
+              href="/#depoimentos"
               className="hover:text-primary transition-colors"
             >
-              Empresa
+              Depoimentos
             </Link>
           </nav>
 
@@ -111,7 +111,7 @@ export default function PricingPage() {
             </Link>
             <Link href="/login">
               <Button className="rounded-full px-6 shadow-lg shadow-primary/20">
-                Comecar Gratis
+                Começar Grátis
               </Button>
             </Link>
           </div>
@@ -119,6 +119,7 @@ export default function PricingPage() {
           <button
             className="md:hidden"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Menu"
           >
             {mobileMenuOpen ? <X /> : <Menu />}
           </button>
@@ -134,14 +135,14 @@ export default function PricingPage() {
               className="text-lg font-medium p-2 hover:bg-muted rounded-lg"
               onClick={() => setMobileMenuOpen(false)}
             >
-              Inicio
+              Início
             </Link>
             <Link
               href="/pricing"
               className="text-lg font-medium p-2 hover:bg-muted rounded-lg text-primary"
               onClick={() => setMobileMenuOpen(false)}
             >
-              Precos
+              Preços
             </Link>
             <div className="h-px bg-border my-2" />
             <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
@@ -165,14 +166,14 @@ export default function PricingPage() {
               variant="outline"
               className="mb-4 bg-primary/5 text-primary border-primary/20"
             >
-              Planos e Precos
+              Planos e Preços
             </Badge>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-heading font-bold mb-6 tracking-tight">
               Escolha o plano ideal <br className="hidden sm:block" />
-              para sua imobiliaria
+              para sua imobiliária
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-10">
-              Comece gratis e escale conforme seu negocio cresce. Sem surpresas,
+              Comece grátis e escale conforme seu negócio cresce. Sem surpresas,
               sem taxas escondidas.
             </p>
 
@@ -251,7 +252,7 @@ export default function PricingPage() {
                       ) : (
                         <div className="flex items-baseline gap-1">
                           <span className="text-4xl font-bold">
-                            {price === 0 ? "Gratis" : `R$ ${price}`}
+                            {price === 0 ? "Grátis" : `R$ ${price}`}
                           </span>
                           {price > 0 && (
                             <span className="text-muted-foreground">/mes</span>
@@ -327,18 +328,18 @@ export default function PricingPage() {
           <div className="container mx-auto px-4">
             <div className="text-center mb-12">
               <h2 className="text-3xl font-heading font-bold mb-4">
-                Tudo que voce precisa em um so lugar
+                Tudo que você precisa em um só lugar
               </h2>
               <p className="text-muted-foreground text-lg">
-                Ferramentas poderosas para cada etapa do seu negocio
-                imobiliario.
+                Ferramentas poderosas para cada etapa do seu negócio
+                imobiliário.
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
               {[
                 {
                   icon: Home,
-                  title: "Gestao de Imoveis",
+                  title: "Gestão de Imóveis",
                   desc: "Cadastro completo com fotos, videos e tour virtual.",
                 },
                 {
@@ -359,7 +360,7 @@ export default function PricingPage() {
                 {
                   icon: FileCheck,
                   title: "Contratos",
-                  desc: "Geracao e gestao digital de contratos.",
+                  desc: "Geração e gestão digital de contratos.",
                 },
                 {
                   icon: BarChart3,
@@ -422,11 +423,11 @@ export default function PricingPage() {
 
           <div className="container mx-auto px-4 text-center relative z-10">
             <h2 className="text-3xl md:text-4xl font-heading font-bold mb-6 tracking-tight">
-              Ainda com duvidas?
+              Ainda com dúvidas?
             </h2>
             <p className="text-xl text-background/80 mb-10 max-w-2xl mx-auto">
-              Nossa equipe esta pronta para ajudar voce a escolher o melhor
-              plano e tirar todas as suas duvidas.
+              Nossa equipe está pronta para ajudar você a escolher o melhor
+              plano e tirar todas as suas dúvidas.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <a
@@ -446,7 +447,7 @@ export default function PricingPage() {
                   size="lg"
                   className="h-14 px-10 text-lg rounded-full border-background/30 text-background hover:bg-background/10"
                 >
-                  Comecar gratis <ArrowRight className="ml-2 w-5 h-5" />
+                  Começar grátis <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
             </div>
