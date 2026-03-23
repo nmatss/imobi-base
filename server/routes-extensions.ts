@@ -8,6 +8,7 @@
 
 import type { Express, Request, Response } from 'express';
 import { requireAuth } from './middleware/auth';
+import { checkFeatureAccess } from './middleware/plan-limits';
 import { storage } from './storage';
 import {
   insertTenantSettingsSchema,
@@ -285,7 +286,7 @@ export function registerExtensionRoutes(app: Express) {
    */
 
   // GET /api/reports/saved - List saved reports for current user
-  app.get("/api/reports/saved", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/reports/saved", requireAuth, checkFeatureAccess('advanced_reports'), async (req: Request, res: Response) => {
     try {
       const reports = await storage.getSavedReportsByUser((req.user as any).id);
       res.json(reports);
@@ -295,7 +296,7 @@ export function registerExtensionRoutes(app: Express) {
   });
 
   // POST /api/reports/saved - Save a new report configuration
-  app.post("/api/reports/saved", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/reports/saved", requireAuth, checkFeatureAccess('advanced_reports'), async (req: Request, res: Response) => {
     try {
       const tenantId = (req.user as any).tenantId;
       const data = insertSavedReportSchema.parse({
@@ -311,7 +312,7 @@ export function registerExtensionRoutes(app: Express) {
   });
 
   // PATCH /api/reports/saved/:id - Update saved report
-  app.patch("/api/reports/saved/:id", requireAuth, async (req: Request, res: Response) => {
+  app.patch("/api/reports/saved/:id", requireAuth, checkFeatureAccess('advanced_reports'), async (req: Request, res: Response) => {
     try {
       const existing = await storage.getSavedReport(req.params.id);
       if (!existing) return res.status(404).json({ error: "Relatório não encontrado" });
@@ -326,7 +327,7 @@ export function registerExtensionRoutes(app: Express) {
   });
 
   // DELETE /api/reports/saved/:id - Delete saved report
-  app.delete("/api/reports/saved/:id", requireAuth, async (req: Request, res: Response) => {
+  app.delete("/api/reports/saved/:id", requireAuth, checkFeatureAccess('advanced_reports'), async (req: Request, res: Response) => {
     try {
       const existing = await storage.getSavedReport(req.params.id);
       if (!existing) return res.status(404).json({ error: "Relatório não encontrado" });
@@ -340,7 +341,7 @@ export function registerExtensionRoutes(app: Express) {
   });
 
   // POST /api/reports/saved/:id/favorite - Toggle favorite status
-  app.post("/api/reports/saved/:id/favorite", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/reports/saved/:id/favorite", requireAuth, checkFeatureAccess('advanced_reports'), async (req: Request, res: Response) => {
     try {
       const existing = await storage.getSavedReport(req.params.id);
       if (!existing) return res.status(404).json({ error: "Relatório não encontrado" });

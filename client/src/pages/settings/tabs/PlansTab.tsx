@@ -37,9 +37,27 @@ import {
   AlertCircle,
   Check,
   ArrowUpRight,
+  UserSearch,
+  Plug,
+  Infinity,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+
+interface UsageResource {
+  current: number;
+  max: number;
+}
+
+interface UsageData {
+  plan: { name: string; slug: string };
+  status: string;
+  users: UsageResource;
+  properties: UsageResource;
+  leads: UsageResource;
+  integrations: UsageResource;
+  features: string[];
+}
 
 interface SubscriptionStatus {
   status: string;
@@ -94,12 +112,15 @@ export function PlansTab() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loadingSub, setLoadingSub] = useState(true);
   const [loadingInvoices, setLoadingInvoices] = useState(true);
+  const [usage, setUsage] = useState<UsageData | null>(null);
+  const [loadingUsage, setLoadingUsage] = useState(true);
   const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     fetchSubscription();
     fetchInvoices();
     fetchPlans();
+    fetchUsage();
   }, []);
 
   async function fetchSubscription() {
@@ -139,6 +160,20 @@ export function PlansTab() {
       }
     } catch {
       // Silently fail
+    }
+  }
+
+  async function fetchUsage() {
+    try {
+      const res = await fetch("/api/subscription/usage", { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setUsage(data);
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setLoadingUsage(false);
     }
   }
 
@@ -193,9 +228,10 @@ export function PlansTab() {
     return p.price > currentPlanDetails.price;
   });
 
-  // Usage stats (static for now - would come from API)
-  const usersUsage = (3 / 10) * 100;
-  const propertiesUsage = (450 / 2000) * 100;
+  const formatMax = (max: number) => (max === -1 ? "Ilimitado" : max.toLocaleString("pt-BR"));
+  const formatUsageLabel = (current: number, max: number) =>
+    max === -1 ? `${current.toLocaleString("pt-BR")}` : `${current.toLocaleString("pt-BR")} de ${max.toLocaleString("pt-BR")}`;
+  const calcPercent = (current: number, max: number) => (max <= 0 ? 0 : Math.min((current / max) * 100, 100));
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -346,27 +382,95 @@ export function PlansTab() {
             <div className="mt-6 space-y-4">
               <h4 className="font-semibold text-sm">Uso do Plano</h4>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground flex items-center gap-2">
-                    <Users className="w-4 h-4" />
-                    Usuários
-                  </span>
-                  <span className="font-medium">3 de 10</span>
+              {loadingUsage ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                 </div>
-                <Progress value={usersUsage} className="h-2" />
-              </div>
+              ) : usage ? (
+                <>
+                  {/* Users */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground flex items-center gap-2">
+                        <Users className="w-4 h-4" />
+                        Usuários
+                      </span>
+                      <span className="font-medium">
+                        {usage.users.max === -1 ? (
+                          <span className="flex items-center gap-1">{usage.users.current.toLocaleString("pt-BR")} <Infinity className="w-4 h-4 text-muted-foreground" /> Ilimitado</span>
+                        ) : (
+                          formatUsageLabel(usage.users.current, usage.users.max)
+                        )}
+                      </span>
+                    </div>
+                    {usage.users.max !== -1 && (
+                      <Progress value={calcPercent(usage.users.current, usage.users.max)} className="h-2" />
+                    )}
+                  </div>
 
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground flex items-center gap-2">
-                    <Building2 className="w-4 h-4" />
-                    Imóveis
-                  </span>
-                  <span className="font-medium">450 de 2.000</span>
-                </div>
-                <Progress value={propertiesUsage} className="h-2" />
-              </div>
+                  {/* Properties */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground flex items-center gap-2">
+                        <Building2 className="w-4 h-4" />
+                        Imóveis
+                      </span>
+                      <span className="font-medium">
+                        {usage.properties.max === -1 ? (
+                          <span className="flex items-center gap-1">{usage.properties.current.toLocaleString("pt-BR")} <Infinity className="w-4 h-4 text-muted-foreground" /> Ilimitado</span>
+                        ) : (
+                          formatUsageLabel(usage.properties.current, usage.properties.max)
+                        )}
+                      </span>
+                    </div>
+                    {usage.properties.max !== -1 && (
+                      <Progress value={calcPercent(usage.properties.current, usage.properties.max)} className="h-2" />
+                    )}
+                  </div>
+
+                  {/* Leads */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground flex items-center gap-2">
+                        <UserSearch className="w-4 h-4" />
+                        Leads
+                      </span>
+                      <span className="font-medium">
+                        {usage.leads.max === -1 ? (
+                          <span className="flex items-center gap-1">{usage.leads.current.toLocaleString("pt-BR")} <Infinity className="w-4 h-4 text-muted-foreground" /> Ilimitado</span>
+                        ) : (
+                          formatUsageLabel(usage.leads.current, usage.leads.max)
+                        )}
+                      </span>
+                    </div>
+                    {usage.leads.max !== -1 && (
+                      <Progress value={calcPercent(usage.leads.current, usage.leads.max)} className="h-2" />
+                    )}
+                  </div>
+
+                  {/* Integrations */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground flex items-center gap-2">
+                        <Plug className="w-4 h-4" />
+                        Integrações
+                      </span>
+                      <span className="font-medium">
+                        {usage.integrations.max === -1 ? (
+                          <span className="flex items-center gap-1">{usage.integrations.current.toLocaleString("pt-BR")} <Infinity className="w-4 h-4 text-muted-foreground" /> Ilimitado</span>
+                        ) : (
+                          formatUsageLabel(usage.integrations.current, usage.integrations.max)
+                        )}
+                      </span>
+                    </div>
+                    {usage.integrations.max !== -1 && (
+                      <Progress value={calcPercent(usage.integrations.current, usage.integrations.max)} className="h-2" />
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Não foi possível carregar os dados de uso.</p>
+              )}
             </div>
           </>
         )}

@@ -16,6 +16,7 @@ import { eq } from 'drizzle-orm';
 import { validateBody } from './middleware/validate';
 import { asyncHandler, BadRequestError } from './middleware/error-handler';
 import { requireAuth } from './middleware/auth';
+import { checkFeatureAccess } from './middleware/plan-limits';
 import {
   uploadDocumentSchema,
   createSignatureRequestSchema,
@@ -29,8 +30,8 @@ const documentService = new DocumentService();
 const signerService = new SignerService();
 
 export function registerESignatureRoutes(app: Express) {
-  // Apply authentication middleware to ALL e-signature routes
-  app.use('/api/esignature', requireAuth);
+  // Apply authentication and feature flag to ALL e-signature routes
+  app.use('/api/esignature', requireAuth, checkFeatureAccess('digital_contracts'));
 
   /**
    * Upload document for signature

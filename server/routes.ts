@@ -45,6 +45,7 @@ import RedisStore from "rate-limit-redis";
 import helmet from "helmet";
 import cors from "cors";
 import { apiResponse, apiError, apiPaginated } from "./utils/api-response";
+import { checkFeatureAccess } from "./middleware/plan-limits";
 import { registerSecurityRoutes } from "./routes-security";
 import { registerFeatureRoutes } from "./routes-features";
 import { registerPaymentRoutes } from "./routes-payments";
@@ -3513,7 +3514,7 @@ export async function registerRoutes(
   // ============== COMMISSIONS ROUTES ==============
 
   // GET /api/commissions - Get all commissions with filters
-  app.get("/api/commissions", requireAuth, async (req, res) => {
+  app.get("/api/commissions", requireAuth, checkFeatureAccess('commission_management'), async (req, res) => {
     try {
       const { period, status, type, brokerId } = req.query;
 
@@ -3552,7 +3553,7 @@ export async function registerRoutes(
   });
 
   // GET /api/commissions/:id - Get specific commission
-  app.get("/api/commissions/:id", requireAuth, async (req, res) => {
+  app.get("/api/commissions/:id", requireAuth, checkFeatureAccess('commission_management'), async (req, res) => {
     try {
       const commission = await storage.getCommission(req.params.id);
       if (!commission) {
@@ -3569,7 +3570,7 @@ export async function registerRoutes(
   });
 
   // PATCH /api/commissions/:id/status - Update commission status
-  app.patch("/api/commissions/:id/status", requireAuth, async (req, res) => {
+  app.patch("/api/commissions/:id/status", requireAuth, checkFeatureAccess('commission_management'), async (req, res) => {
     try {
       const { status } = req.body;
 
@@ -3604,7 +3605,7 @@ export async function registerRoutes(
   });
 
   // POST /api/commissions - Create new commission
-  app.post("/api/commissions", requireAuth, async (req, res) => {
+  app.post("/api/commissions", requireAuth, checkFeatureAccess('commission_management'), async (req, res) => {
     try {
       // Validate using schema
       const data = insertCommissionSchema.parse({
@@ -3643,7 +3644,7 @@ export async function registerRoutes(
   });
 
   // DELETE /api/commissions/:id - Delete commission
-  app.delete("/api/commissions/:id", requireAuth, async (req, res) => {
+  app.delete("/api/commissions/:id", requireAuth, checkFeatureAccess('commission_management'), async (req, res) => {
     try {
       const existing = await storage.getCommission(req.params.id);
       if (!existing) {

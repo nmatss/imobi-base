@@ -31,12 +31,26 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription): Pro
 
     // Update tenant subscription status
     const firstItem = subscription.items.data[0];
-    await storage.updateTenantSubscription(tenantId, {
+    const updateData: Record<string, unknown> = {
       status: subscription.status === 'trialing' ? 'trial' : 'active',
       currentPeriodStart: firstItem ? new Date(firstItem.current_period_start * 1000) : new Date(),
       currentPeriodEnd: firstItem ? new Date(firstItem.current_period_end * 1000) : new Date(),
       trialEndsAt: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
-    });
+    };
+
+    // Resolve plan from Stripe price ID
+    const priceId = subscription.items?.data?.[0]?.price?.id;
+    if (priceId) {
+      const allPlans = await storage.getActivePlans();
+      const matchedPlan = allPlans.find(
+        (p: Record<string, unknown>) => p.stripePriceId === priceId || p.stripeYearlyPriceId === priceId
+      );
+      if (matchedPlan) {
+        updateData.planId = matchedPlan.id;
+      }
+    }
+
+    await storage.updateTenantSubscription(tenantId, updateData);
 
     console.log(`✅ Subscription created for tenant ${tenantId}`);
   } catch (error) {
@@ -77,12 +91,26 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Pro
     }
 
     const firstItem = subscription.items.data[0];
-    await storage.updateTenantSubscription(tenantId, {
+    const updateData: Record<string, unknown> = {
       status,
       currentPeriodStart: firstItem ? new Date(firstItem.current_period_start * 1000) : new Date(),
       currentPeriodEnd: firstItem ? new Date(firstItem.current_period_end * 1000) : new Date(),
       cancelledAt: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
-    });
+    };
+
+    // Resolve plan from Stripe price ID for upgrade/downgrade
+    const priceId = subscription.items?.data?.[0]?.price?.id;
+    if (priceId) {
+      const allPlans = await storage.getActivePlans();
+      const matchedPlan = allPlans.find(
+        (p: Record<string, unknown>) => p.stripePriceId === priceId || p.stripeYearlyPriceId === priceId
+      );
+      if (matchedPlan) {
+        updateData.planId = matchedPlan.id;
+      }
+    }
+
+    await storage.updateTenantSubscription(tenantId, updateData);
 
     console.log(`✅ Subscription updated for tenant ${tenantId}, status: ${status}`);
   } catch (error) {

@@ -19,6 +19,7 @@ import { webhookHandler } from "./integrations/whatsapp/webhook-handler";
 import { log } from "./index";
 import { validateExternalUrl } from "./security/url-validator";
 import { generateRateLimitKey } from "./middleware/rate-limit-key-generator";
+import { checkFeatureAccess } from "./middleware/plan-limits";
 
 // ==================== RATE LIMITERS ====================
 
@@ -76,6 +77,9 @@ const bulkWhatsAppLimiter = rateLimit({
 });
 
 export function registerWhatsAppRoutes(app: Express) {
+  // Gate all WhatsApp routes behind feature flag (webhooks use /api/webhooks/ prefix, unaffected)
+  app.use("/api/whatsapp", checkFeatureAccess('whatsapp'));
+
   // ==================== MESSAGES ====================
 
   /**

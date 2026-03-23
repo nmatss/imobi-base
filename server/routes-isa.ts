@@ -13,6 +13,7 @@ import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
 import { processIncomingMessage, getConversationState } from "./integrations/whatsapp/isa-engine";
 import { log } from "./index";
+import { checkFeatureAccess } from "./middleware/plan-limits";
 
 export function registerIsaRoutes(app: Express) {
   // Auth middleware (reuses the same pattern from routes.ts)
@@ -29,7 +30,7 @@ export function registerIsaRoutes(app: Express) {
    * GET /api/isa/conversations
    * List all ISA conversations for the tenant, with optional filters
    */
-  app.get("/api/isa/conversations", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/isa/conversations", requireAuth, checkFeatureAccess('ai_isa'), async (req: Request, res: Response) => {
     try {
       const tenantId = (req.user as any).tenantId;
       const { status, temperature } = req.query;
@@ -50,7 +51,7 @@ export function registerIsaRoutes(app: Express) {
    * GET /api/isa/conversations/:id
    * Get a single conversation with all its messages
    */
-  app.get("/api/isa/conversations/:id", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/isa/conversations/:id", requireAuth, checkFeatureAccess('ai_isa'), async (req: Request, res: Response) => {
     try {
       const tenantId = (req.user as any).tenantId;
       const conversationState = await getConversationState(req.params.id);
@@ -70,7 +71,7 @@ export function registerIsaRoutes(app: Express) {
    * POST /api/isa/conversations/:id/transfer
    * Transfer conversation to a human agent
    */
-  app.post("/api/isa/conversations/:id/transfer", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/isa/conversations/:id/transfer", requireAuth, checkFeatureAccess('ai_isa'), async (req: Request, res: Response) => {
     try {
       const tenantId = (req.user as any).tenantId;
       const conversation = await storage.getIsaConversation(req.params.id);
@@ -98,7 +99,7 @@ export function registerIsaRoutes(app: Express) {
    * POST /api/isa/conversations/:id/close
    * Close a conversation
    */
-  app.post("/api/isa/conversations/:id/close", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/isa/conversations/:id/close", requireAuth, checkFeatureAccess('ai_isa'), async (req: Request, res: Response) => {
     try {
       const tenantId = (req.user as any).tenantId;
       const conversation = await storage.getIsaConversation(req.params.id);
@@ -124,7 +125,7 @@ export function registerIsaRoutes(app: Express) {
    * GET /api/isa/settings
    * Get ISA settings for the current tenant
    */
-  app.get("/api/isa/settings", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/isa/settings", requireAuth, checkFeatureAccess('ai_isa'), async (req: Request, res: Response) => {
     try {
       const tenantId = (req.user as any).tenantId;
       const settings = await storage.getIsaSettings(tenantId);
@@ -154,7 +155,7 @@ export function registerIsaRoutes(app: Express) {
    * PUT /api/isa/settings
    * Update ISA settings for the current tenant
    */
-  app.put("/api/isa/settings", requireAuth, async (req: Request, res: Response) => {
+  app.put("/api/isa/settings", requireAuth, checkFeatureAccess('ai_isa'), async (req: Request, res: Response) => {
     try {
       const tenantId = (req.user as any).tenantId;
       const {
@@ -192,7 +193,7 @@ export function registerIsaRoutes(app: Express) {
    * GET /api/isa/stats
    * Get ISA dashboard statistics
    */
-  app.get("/api/isa/stats", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/isa/stats", requireAuth, checkFeatureAccess('ai_isa'), async (req: Request, res: Response) => {
     try {
       const tenantId = (req.user as any).tenantId;
       const stats = await storage.getIsaStats(tenantId);
@@ -257,7 +258,7 @@ export function registerIsaRoutes(app: Express) {
    * POST /api/isa/test
    * Test ISA with a simulated message (for configuration testing)
    */
-  app.post("/api/isa/test", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/isa/test", requireAuth, checkFeatureAccess('ai_isa'), async (req: Request, res: Response) => {
     try {
       const tenantId = (req.user as any).tenantId;
       const { phoneNumber, message } = req.body;

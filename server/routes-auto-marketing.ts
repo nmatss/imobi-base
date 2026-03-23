@@ -7,6 +7,7 @@
 import type { Express, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { requireAuth } from './middleware/auth';
+import { checkFeatureAccess } from './middleware/plan-limits';
 import { storage } from './storage';
 import { generateRateLimitKey } from './middleware/rate-limit-key-generator';
 import type { Property } from '@shared/schema-sqlite';
@@ -464,8 +465,8 @@ function generateMicrositeContent(property: PropertyData, tone: Tone): string {
 // ==================== ROUTE REGISTRATION ====================
 
 export function registerAutoMarketingRoutes(app: Express) {
-  // Apply authentication to all auto-marketing routes
-  app.use('/api/auto-marketing', requireAuth);
+  // Apply authentication and feature flag to all auto-marketing routes
+  app.use('/api/auto-marketing', requireAuth, checkFeatureAccess('ai_marketing'));
 
   /**
    * GET /api/auto-marketing/templates

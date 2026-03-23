@@ -14,6 +14,7 @@ import {
   getPriceMapData,
 } from "./services/avm-engine";
 import type { ValuationInput } from "./services/avm-engine";
+import { checkFeatureAccess } from "./middleware/plan-limits";
 
 const avmEvaluateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
@@ -24,8 +25,8 @@ const avmEvaluateLimiter = rateLimit({
 });
 
 export function registerAVMRoutes(app: Express) {
-  // Apply authentication middleware to ALL AVM routes
-  app.use("/api/avm", requireAuth);
+  // Apply authentication and feature flag to ALL AVM routes
+  app.use("/api/avm", requireAuth, checkFeatureAccess('ai_avm'));
 
   /**
    * POST /api/avm/evaluate
