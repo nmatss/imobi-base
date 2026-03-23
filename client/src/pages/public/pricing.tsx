@@ -23,88 +23,7 @@ import {
   Smartphone,
   Zap,
 } from "lucide-react";
-
-const plans = [
-  {
-    id: "free",
-    name: "Gratis",
-    monthlyPrice: 0,
-    yearlyPrice: 0,
-    description: "Para comecar sua jornada digital.",
-    features: [
-      "Ate 10 imoveis",
-      "Ate 50 leads",
-      "1 usuario",
-      "Site publico basico",
-    ],
-    cta: "Comecar gratis",
-    ctaLink: "/login",
-    variant: "outline" as const,
-    popular: false,
-  },
-  {
-    id: "basico",
-    name: "Basico",
-    monthlyPrice: 99,
-    yearlyPrice: 79,
-    description: "Para quem quer crescer com eficiencia.",
-    features: [
-      "Ate 100 imoveis",
-      "Leads ilimitados",
-      "5 usuarios",
-      "Integracao WhatsApp",
-      "Relatorios basicos",
-      "Suporte por email",
-    ],
-    cta: "Assinar Basico",
-    ctaLink: "/login?plan=basico",
-    variant: "outline" as const,
-    popular: false,
-  },
-  {
-    id: "pro",
-    name: "Profissional",
-    monthlyPrice: 199,
-    yearlyPrice: 159,
-    description: "Para quem quer escalar vendas.",
-    features: [
-      "Imoveis ilimitados",
-      "Leads ilimitados",
-      "Usuarios ilimitados",
-      "Todas as integracoes",
-      "IA (Marketing, AVM, ISA)",
-      "Portal do cliente",
-      "Vistorias digitais",
-      "Relatorios avancados",
-      "Suporte prioritario",
-    ],
-    cta: "Assinar Pro",
-    ctaLink: "/login?plan=pro",
-    variant: "default" as const,
-    popular: true,
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    monthlyPrice: -1,
-    yearlyPrice: -1,
-    description: "Para redes e franquias.",
-    features: [
-      "Tudo do Profissional",
-      "API personalizada",
-      "Suporte dedicado",
-      "SLA garantido",
-      "Multi-filiais",
-      "Onboarding assistido",
-      "Gerente de conta",
-    ],
-    cta: "Falar com vendas",
-    ctaLink: "https://wa.me/5511999999999?text=Ol%C3%A1%2C%20tenho%20interesse%20no%20plano%20Enterprise%20do%20ImobiBase",
-    variant: "outline" as const,
-    popular: false,
-    isEnterprise: true,
-  },
-];
+import { plans, CONTACT_EMAIL } from "@/lib/plans-config";
 
 const faqs = [
   {
@@ -413,9 +332,7 @@ export default function PricingPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <a
-                href="https://wa.me/5511999999999?text=Ol%C3%A1%2C%20tenho%20d%C3%BAvidas%20sobre%20os%20planos%20do%20ImobiBase"
-                target="_blank"
-                rel="noopener noreferrer"
+                href={`mailto:${CONTACT_EMAIL}?subject=Dúvidas sobre os planos do ImobiBase`}
               >
                 <Button
                   size="lg"
@@ -447,7 +364,7 @@ export default function PricingPage() {
                 </div>
                 ImobiBase
               </div>
-              <p>&copy; 2024 ImobiBase Tecnologia Ltda.</p>
+              <p>&copy; {new Date().getFullYear()} ImobiBase Tecnologia Ltda.</p>
               <div className="flex gap-6 mt-4 md:mt-0">
                 <a href="#" className="hover:text-foreground">
                   Termos
