@@ -211,13 +211,15 @@ export default function PricingPage() {
         {/* Plans Grid */}
         <section className="pb-24">
           <div className="container mx-auto px-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 max-w-7xl mx-auto">
               {plans.map((plan) => {
                 const price =
                   billingCycle === "monthly"
                     ? plan.monthlyPrice
                     : plan.yearlyPrice;
-                const isExternal = plan.ctaLink.startsWith("http");
+                const isExternal =
+                  plan.ctaLink.startsWith("http") ||
+                  plan.ctaLink.startsWith("mailto:");
 
                 return (
                   <div
