@@ -93,6 +93,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Seed canonical plan definitions before routes
+  const { seedPlans } = await import("./seed-plans");
+  await seedPlans();
+
   await registerRoutes(httpServer, app);
 
   // Register e-signature routes

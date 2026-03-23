@@ -3169,44 +3169,43 @@ export class DbStorage implements IStorage {
   }
 
   async getAllPlans(): Promise<any[]> {
-    // Return default plans since plans table may not be implemented
-    return [
-      {
-        id: 'basic',
-        name: 'Básico',
-        price: '99.00',
-        maxUsers: 3,
-        maxProperties: 50,
-        features: ['CRM básico', 'Gestão de imóveis', 'Relatórios'],
-        isActive: true,
-      },
-      {
-        id: 'pro',
-        name: 'Profissional',
-        price: '199.00',
-        maxUsers: 10,
-        maxProperties: 200,
-        features: ['CRM completo', 'Gestão de imóveis', 'Relatórios avançados', 'Integrações'],
-        isActive: true,
-      },
-      {
-        id: 'enterprise',
-        name: 'Empresarial',
-        price: '499.00',
-        maxUsers: -1, // Unlimited
-        maxProperties: -1, // Unlimited
-        features: ['Tudo do Pro', 'API acesso', 'Suporte prioritário', 'Customizações'],
-        isActive: true,
-      },
-    ];
+    return await db
+      .select()
+      .from((schema as any).plans)
+      .orderBy((schema as any).plans.price);
   }
 
   async updatePlan(id: string, data: any): Promise<any | undefined> {
-    // Plans are static for now, return the updated data
-    const plans = await this.getAllPlans();
-    const plan = plans.find(p => p.id === id);
-    if (!plan) return undefined;
-    return { ...plan, ...data };
+    const [updated] = await db
+      .update((schema as any).plans)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq((schema as any).plans.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getPlanBySlug(slug: string) {
+    const [plan] = await db
+      .select()
+      .from((schema as any).plans)
+      .where(eq((schema as any).plans.slug, slug))
+      .limit(1);
+    return plan || null;
+  }
+
+  async getTenantLeadCountThisMonth(tenantId: string): Promise<number> {
+    const now = new Date();
+    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const result = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(schema.leads)
+      .where(
+        and(
+          eq(schema.leads.tenantId, tenantId),
+          sql`${schema.leads.createdAt} >= ${firstOfMonth.toISOString()}`
+        )
+      );
+    return result[0]?.count || 0;
   }
 
   async getUsageLogs(page: number, limit: number, filters?: { action?: string; startDate?: Date }): Promise<{

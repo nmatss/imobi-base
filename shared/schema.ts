@@ -624,12 +624,18 @@ export type SavedReport = typeof savedReports.$inferSelect;
  */
 export const plans = pgTable("plans", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: varchar("slug").notNull().unique(),
   name: text("name").notNull(),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  yearlyPrice: decimal("yearly_price", { precision: 10, scale: 2 }),
   maxUsers: integer("max_users").notNull().default(5),
   maxProperties: integer("max_properties").notNull().default(100),
+  maxLeads: integer("max_leads").notNull().default(-1),
   maxIntegrations: integer("max_integrations").notNull().default(3),
   features: json("features").notNull().default('[]'),
+  stripePriceId: varchar("stripe_price_id"),
+  stripeYearlyPriceId: varchar("stripe_yearly_price_id"),
+  trialDays: integer("trial_days").notNull().default(0),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

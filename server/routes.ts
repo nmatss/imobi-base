@@ -867,56 +867,49 @@ export async function registerRoutes(
     keyGenerator: generateRateLimitKey,
   });
 
-  // Public plans endpoint (no auth)
-  app.get("/api/plans", (req: Request, res: Response) => {
-    res.json([
-      {
-        id: "free",
-        name: "Grátis",
-        price: 0,
+  // Public plans endpoint (no auth) - reads from database
+  app.get("/api/plans", async (req: Request, res: Response) => {
+    try {
+      const dbPlans = await storage.getActivePlans();
+      const mapped = dbPlans.map((p: any) => ({
+        id: p.slug || p.id,
+        name: p.name,
+        price: Math.round(parseFloat(p.price) * 100), // cents for Stripe compat
+        monthlyPrice: parseFloat(p.price),
+        yearlyPrice: p.yearlyPrice ? parseFloat(p.yearlyPrice) : null,
         interval: "month",
-        features: [
-          "Até 10 imóveis",
-          "Até 50 leads",
-          "1 usuário",
-          "Site público básico",
-        ],
-        stripePriceId: null,
-        trialDays: 0,
-      },
-      {
-        id: "basic",
-        name: "Básico",
-        price: 9900,
-        interval: "month",
-        features: [
-          "Até 100 imóveis",
-          "Leads ilimitados",
-          "5 usuários",
-          "WhatsApp",
-          "Relatórios",
-        ],
-        stripePriceId: process.env.STRIPE_BASIC_PRICE_ID || null,
-        trialDays: 14,
-      },
-      {
-        id: "pro",
-        name: "Profissional",
-        price: 19900,
-        interval: "month",
-        features: [
-          "Imóveis ilimitados",
-          "Leads ilimitados",
-          "Usuários ilimitados",
-          "Todas integrações",
-          "IA",
-          "Portal",
-          "Vistorias",
-        ],
-        stripePriceId: process.env.STRIPE_PRO_PRICE_ID || null,
-        trialDays: 14,
-      },
-    ]);
+        maxUsers: p.maxUsers,
+        maxProperties: p.maxProperties,
+        maxLeads: p.maxLeads,
+        maxIntegrations: p.maxIntegrations,
+        features: p.features,
+        stripePriceId: p.stripePriceId || null,
+        stripeYearlyPriceId: p.stripeYearlyPriceId || null,
+        trialDays: p.trialDays || 0,
+      }));
+      res.json(mapped);
+    } catch (error) {
+      console.error("Error fetching plans:", error);
+      res.status(500).json({ error: "Erro ao buscar planos" });
+    }
+  });
+
+  // Subscription usage stats (authenticated)
+  app.get("/api/subscription/usage", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const tenantId = req.user!.tenantId;
+      const { getUsageStats } = await import("./middleware/plan-limits");
+      const usage = await getUsageStats(tenantId);
+      const subscription = await storage.getTenantSubscription(tenantId);
+      const plan = subscription ? await storage.getPlan(subscription.planId) : null;
+      res.json({
+        plan: { name: (plan as any)?.name || "Gratuito", slug: (plan as any)?.slug || "free" },
+        ...usage,
+      });
+    } catch (error) {
+      console.error("Error fetching usage:", error);
+      res.status(500).json({ error: "Erro ao buscar uso" });
+    }
   });
 
   app.post(
@@ -998,6 +991,20 @@ export async function registerRoutes(
         // Setup default roles, categories, settings
         const { setupNewTenant } = await import("./seed-defaults");
         await setupNewTenant(storage, tenant);
+
+        // Create free plan subscription for new tenant
+        try {
+          const freePlan = await storage.getPlanBySlug("free");
+          if (freePlan) {
+            await storage.createTenantSubscription({
+              tenantId: tenant.id,
+              planId: freePlan.id,
+              status: "active",
+            });
+          }
+        } catch (subError) {
+          console.error("Failed to create free subscription:", subError);
+        }
 
         // Create admin user
         const hashedPwd = await hashPassword(password);
