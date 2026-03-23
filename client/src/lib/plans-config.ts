@@ -133,7 +133,5 @@ export const plans: Plan[] = [
   },
 ];
 
-/** Subset of plans shown on the main landing page (3 most relevant) */
-export const landingPlans = plans.filter(
-  (p) => p.id === "free" || p.id === "pro" || p.id === "business",
-);
+/** Subset of plans shown on the main landing page (4 plans, excluding Enterprise) */
+export const landingPlans = plans.filter((p) => p.id !== "enterprise");

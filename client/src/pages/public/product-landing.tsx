@@ -939,7 +939,7 @@ export default function ProductLanding() {
               </div>
             </ScrollReveal>
 
-            <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
               {landingPlans.map((plan, i) => {
                 const price =
                   billingCycle === "monthly"
@@ -954,7 +954,7 @@ export default function ProductLanding() {
                     <div
                       className={`bg-card rounded-2xl border p-8 flex flex-col h-full transition-all hover:shadow-lg relative ${
                         plan.popular
-                          ? "border-2 border-primary shadow-2xl md:scale-105 z-10"
+                          ? "border-2 border-primary shadow-2xl z-10"
                           : "hover:border-primary/50"
                       }`}
                     >
@@ -1029,9 +1029,13 @@ export default function ProductLanding() {
                       <div className="space-y-3 text-sm flex-1">
                         {plan.id !== "free" && (
                           <p className="font-medium text-foreground text-xs uppercase tracking-wider">
-                            {plan.isEnterprise
-                              ? "Tudo do Pro, mais:"
-                              : "Tudo do Grátis, mais:"}
+                            {plan.id === "starter"
+                              ? "Tudo do Gratuito, mais:"
+                              : plan.id === "pro"
+                                ? "Tudo do Starter, mais:"
+                                : plan.id === "business"
+                                  ? "Tudo do Pro, mais:"
+                                  : "Tudo do Business, mais:"}
                           </p>
                         )}
                         <ul className="space-y-3">

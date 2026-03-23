@@ -297,11 +297,13 @@ export default function PricingPage() {
                     <div className="space-y-3 text-sm flex-1">
                       {plan.id !== "free" && (
                         <p className="font-medium text-foreground text-xs uppercase tracking-wider">
-                          {plan.isEnterprise
-                            ? "Tudo do Pro, mais:"
-                            : plan.id === "basico"
-                              ? "Tudo do Gratis, mais:"
-                              : "Tudo do Basico, mais:"}
+                          {plan.id === "starter"
+                            ? "Tudo do Gratuito, mais:"
+                            : plan.id === "pro"
+                              ? "Tudo do Starter, mais:"
+                              : plan.id === "business"
+                                ? "Tudo do Pro, mais:"
+                                : "Tudo do Business, mais:"}
                         </p>
                       )}
                       <ul className="space-y-3">
