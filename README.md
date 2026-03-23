@@ -60,17 +60,40 @@
 
 ---
 
+## Planos e Precificacao
+
+5 tiers com enforcement por tenant (limites, feature flags, Stripe):
+
+| Plano        | Mensal | Anual  | Users     | Imoveis   | Leads/mes |
+| ------------ | ------ | ------ | --------- | --------- | --------- |
+| Gratuito     | R$ 0   | R$ 0   | 1         | 15        | 30        |
+| Starter      | R$ 89  | R$ 69  | 3         | 100       | Ilimitado |
+| Profissional | R$ 199 | R$ 159 | 10        | 500       | Ilimitado |
+| Business     | R$ 399 | R$ 319 | Ilimitado | Ilimitado | Ilimitado |
+| Enterprise   | R$ 799 | R$ 639 | Ilimitado | Ilimitado | Ilimitado |
+
+Feature flags por plano controlam acesso a: WhatsApp, IA Marketing, AVM, ISA, Contratos Digitais, Multi-filiais, API, Vistorias, Comissoes, Relatorios Avancados.
+
+Consulte [docs/PLANS.md](docs/PLANS.md) para detalhes.
+
+---
+
 ## Banco de Dados
 
-19 tabelas com isolamento multi-tenant por `tenantId`:
+45+ tabelas com isolamento multi-tenant por `tenantId`:
 
 ```
 tenants → users, properties, leads, owners, renters
+plans → tenant_subscriptions (1:1 com tenants)
 properties → visits, contracts, sale_proposals, property_sales
 leads → interactions, lead_tags, lead_tag_links, follow_ups
-owners + renters → rental_contracts → rental_payments
-finance_categories → finance_entries
-newsletter_subscriptions
+owners + renters → rental_contracts → rental_payments, rental_transfers
+finance_categories → finance_entries, commissions
+whatsapp_templates → conversations → messages, message_queue
+integration_configs, notification_preferences, ai_settings
+user_roles → user_permissions
+compliance: audit_logs, user_consents, data_breach_incidents
+newsletter_subscriptions, files, saved_reports
 ```
 
 ---
@@ -224,7 +247,7 @@ server/
 ├── integrations/   # WhatsApp, ClickSign, Twilio, Maps
 ├── payments/       # Stripe, Mercado Pago
 ├── security/       # CSRF, IDS, validacao
-├── middleware/     # Headers, rate limit, logger
+├── middleware/     # Auth, rate limit, plan-limits, subscription-guard
 ├── email/          # SendGrid, Resend
 ├── jobs/           # Scheduled jobs (Vercel Cron + node-cron)
 └── cache/          # Redis
@@ -270,6 +293,7 @@ GitHub Actions pipelines:
 | [docs/ESIGNATURE_SETUP.md](docs/ESIGNATURE_SETUP.md)                     | Assinatura digital      |
 | [docs/TESTING.md](docs/TESTING.md)                                       | Framework de testes     |
 | [docs/MONITORING_ANALYTICS_GUIDE.md](docs/MONITORING_ANALYTICS_GUIDE.md) | Monitoramento           |
+| [docs/PLANS.md](docs/PLANS.md)                                           | Planos e enforcement    |
 
 ---
 
