@@ -39,7 +39,7 @@ import {
   ArrowUpRight,
   UserSearch,
   Plug,
-  Infinity,
+  Infinity as InfinityIcon,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
@@ -87,7 +87,13 @@ interface Plan {
   stripePriceId: string | null;
 }
 
-const statusLabels: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+const statusLabels: Record<
+  string,
+  {
+    label: string;
+    variant: "default" | "secondary" | "destructive" | "outline";
+  }
+> = {
   active: { label: "Ativo", variant: "default" },
   trial: { label: "Teste", variant: "secondary" },
   trialing: { label: "Teste", variant: "secondary" },
@@ -107,7 +113,9 @@ const invoiceStatusLabels: Record<string, string> = {
 
 export function PlansTab() {
   const [, setLocation] = useLocation();
-  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null);
+  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(
+    null,
+  );
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loadingSub, setLoadingSub] = useState(true);
@@ -125,7 +133,9 @@ export function PlansTab() {
 
   async function fetchSubscription() {
     try {
-      const res = await fetch("/api/payments/subscription-status", { credentials: "include" });
+      const res = await fetch("/api/payments/subscription-status", {
+        credentials: "include",
+      });
       if (res.ok) {
         const data = await res.json();
         setSubscription(data);
@@ -139,7 +149,9 @@ export function PlansTab() {
 
   async function fetchInvoices() {
     try {
-      const res = await fetch("/api/payments/invoices", { credentials: "include" });
+      const res = await fetch("/api/payments/invoices", {
+        credentials: "include",
+      });
       if (res.ok) {
         const data = await res.json();
         setInvoices(data.invoices || []);
@@ -165,7 +177,9 @@ export function PlansTab() {
 
   async function fetchUsage() {
     try {
-      const res = await fetch("/api/subscription/usage", { credentials: "include" });
+      const res = await fetch("/api/subscription/usage", {
+        credentials: "include",
+      });
       if (res.ok) {
         const data = await res.json();
         setUsage(data);
@@ -192,10 +206,13 @@ export function PlansTab() {
         throw new Error(data.error || "Erro ao cancelar assinatura");
       }
 
-      toast.success("Assinatura cancelada. Ela permanecerá ativa até o final do período atual.");
+      toast.success(
+        "Assinatura cancelada. Ela permanecerá ativa até o final do período atual.",
+      );
       fetchSubscription();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erro ao cancelar assinatura";
+      const message =
+        err instanceof Error ? err.message : "Erro ao cancelar assinatura";
       toast.error(message);
     } finally {
       setCancelling(false);
@@ -205,21 +222,32 @@ export function PlansTab() {
   const formatDate = (dateStr?: string | number) => {
     if (!dateStr) return "—";
     const date = new Date(dateStr);
-    return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+    return date.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(amount);
-  };
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(amount);
 
   const currentPlan = subscription?.plan || "Grátis";
-  const statusInfo = statusLabels[subscription?.status || "free"] || statusLabels.free;
-  const isActive = subscription?.status === "active" || subscription?.status === "trialing";
-  const isCancelled = subscription?.status === "cancelled" || subscription?.status === "canceled";
+  const statusInfo =
+    statusLabels[subscription?.status || "free"] || statusLabels.free;
+  const isActive =
+    subscription?.status === "active" || subscription?.status === "trialing";
+  const isCancelled =
+    subscription?.status === "cancelled" || subscription?.status === "canceled";
 
   // Find current plan details from plans list
   const currentPlanDetails = plans.find(
-    (p) => p.name.toLowerCase() === currentPlan.toLowerCase() || p.id === currentPlan.toLowerCase()
+    (p) =>
+      p.name.toLowerCase() === currentPlan.toLowerCase() ||
+      p.id === currentPlan.toLowerCase(),
   );
 
   // Determine upgrade options
@@ -228,10 +256,14 @@ export function PlansTab() {
     return p.price > currentPlanDetails.price;
   });
 
-  const formatMax = (max: number) => (max === -1 ? "Ilimitado" : max.toLocaleString("pt-BR"));
+  const formatMax = (max: number) =>
+    max === -1 ? "Ilimitado" : max.toLocaleString("pt-BR");
   const formatUsageLabel = (current: number, max: number) =>
-    max === -1 ? `${current.toLocaleString("pt-BR")}` : `${current.toLocaleString("pt-BR")} de ${max.toLocaleString("pt-BR")}`;
-  const calcPercent = (current: number, max: number) => (max <= 0 ? 0 : Math.min((current / max) * 100, 100));
+    max === -1
+      ? `${current.toLocaleString("pt-BR")}`
+      : `${current.toLocaleString("pt-BR")} de ${max.toLocaleString("pt-BR")}`;
+  const calcPercent = (current: number, max: number) =>
+    max <= 0 ? 0 : Math.min((current / max) * 100, 100);
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -245,7 +277,10 @@ export function PlansTab() {
             {isActive && !isCancelled && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="link" className="text-muted-foreground px-0 sm:px-4 order-2 sm:order-1">
+                  <Button
+                    variant="link"
+                    className="text-muted-foreground px-0 sm:px-4 order-2 sm:order-1"
+                  >
                     Cancelar assinatura
                   </Button>
                 </AlertDialogTrigger>
@@ -253,11 +288,13 @@ export function PlansTab() {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Cancelar assinatura?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Sua assinatura permanecerá ativa até o final do período atual
+                      Sua assinatura permanecerá ativa até o final do período
+                      atual
                       {subscription?.currentPeriodEnd && (
                         <> ({formatDate(subscription.currentPeriodEnd)})</>
                       )}
-                      . Após isso, sua conta será rebaixada para o plano gratuito.
+                      . Após isso, sua conta será rebaixada para o plano
+                      gratuito.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -331,7 +368,9 @@ export function PlansTab() {
                     <Calendar className="w-4 h-4 hidden sm:inline" />
                     Próxima cobrança
                   </span>
-                  <span className="font-medium">{formatDate(subscription.currentPeriodEnd)}</span>
+                  <span className="font-medium">
+                    {formatDate(subscription.currentPeriodEnd)}
+                  </span>
                 </div>
               )}
               {subscription?.trialEndsAt && (
@@ -340,7 +379,9 @@ export function PlansTab() {
                     <Calendar className="w-4 h-4 hidden sm:inline" />
                     Fim do período de teste
                   </span>
-                  <span className="font-medium">{formatDate(subscription.trialEndsAt)}</span>
+                  <span className="font-medium">
+                    {formatDate(subscription.trialEndsAt)}
+                  </span>
                 </div>
               )}
               {currentPlanDetails && (
@@ -397,14 +438,24 @@ export function PlansTab() {
                       </span>
                       <span className="font-medium">
                         {usage.users.max === -1 ? (
-                          <span className="flex items-center gap-1">{usage.users.current.toLocaleString("pt-BR")} <Infinity className="w-4 h-4 text-muted-foreground" /> Ilimitado</span>
+                          <span className="flex items-center gap-1">
+                            {usage.users.current.toLocaleString("pt-BR")}{" "}
+                            <InfinityIcon className="w-4 h-4 text-muted-foreground" />{" "}
+                            Ilimitado
+                          </span>
                         ) : (
                           formatUsageLabel(usage.users.current, usage.users.max)
                         )}
                       </span>
                     </div>
                     {usage.users.max !== -1 && (
-                      <Progress value={calcPercent(usage.users.current, usage.users.max)} className="h-2" />
+                      <Progress
+                        value={calcPercent(
+                          usage.users.current,
+                          usage.users.max,
+                        )}
+                        className="h-2"
+                      />
                     )}
                   </div>
 
@@ -417,14 +468,27 @@ export function PlansTab() {
                       </span>
                       <span className="font-medium">
                         {usage.properties.max === -1 ? (
-                          <span className="flex items-center gap-1">{usage.properties.current.toLocaleString("pt-BR")} <Infinity className="w-4 h-4 text-muted-foreground" /> Ilimitado</span>
+                          <span className="flex items-center gap-1">
+                            {usage.properties.current.toLocaleString("pt-BR")}{" "}
+                            <InfinityIcon className="w-4 h-4 text-muted-foreground" />{" "}
+                            Ilimitado
+                          </span>
                         ) : (
-                          formatUsageLabel(usage.properties.current, usage.properties.max)
+                          formatUsageLabel(
+                            usage.properties.current,
+                            usage.properties.max,
+                          )
                         )}
                       </span>
                     </div>
                     {usage.properties.max !== -1 && (
-                      <Progress value={calcPercent(usage.properties.current, usage.properties.max)} className="h-2" />
+                      <Progress
+                        value={calcPercent(
+                          usage.properties.current,
+                          usage.properties.max,
+                        )}
+                        className="h-2"
+                      />
                     )}
                   </div>
 
@@ -437,14 +501,24 @@ export function PlansTab() {
                       </span>
                       <span className="font-medium">
                         {usage.leads.max === -1 ? (
-                          <span className="flex items-center gap-1">{usage.leads.current.toLocaleString("pt-BR")} <Infinity className="w-4 h-4 text-muted-foreground" /> Ilimitado</span>
+                          <span className="flex items-center gap-1">
+                            {usage.leads.current.toLocaleString("pt-BR")}{" "}
+                            <InfinityIcon className="w-4 h-4 text-muted-foreground" />{" "}
+                            Ilimitado
+                          </span>
                         ) : (
                           formatUsageLabel(usage.leads.current, usage.leads.max)
                         )}
                       </span>
                     </div>
                     {usage.leads.max !== -1 && (
-                      <Progress value={calcPercent(usage.leads.current, usage.leads.max)} className="h-2" />
+                      <Progress
+                        value={calcPercent(
+                          usage.leads.current,
+                          usage.leads.max,
+                        )}
+                        className="h-2"
+                      />
                     )}
                   </div>
 
@@ -457,19 +531,34 @@ export function PlansTab() {
                       </span>
                       <span className="font-medium">
                         {usage.integrations.max === -1 ? (
-                          <span className="flex items-center gap-1">{usage.integrations.current.toLocaleString("pt-BR")} <Infinity className="w-4 h-4 text-muted-foreground" /> Ilimitado</span>
+                          <span className="flex items-center gap-1">
+                            {usage.integrations.current.toLocaleString("pt-BR")}{" "}
+                            <InfinityIcon className="w-4 h-4 text-muted-foreground" />{" "}
+                            Ilimitado
+                          </span>
                         ) : (
-                          formatUsageLabel(usage.integrations.current, usage.integrations.max)
+                          formatUsageLabel(
+                            usage.integrations.current,
+                            usage.integrations.max,
+                          )
                         )}
                       </span>
                     </div>
                     {usage.integrations.max !== -1 && (
-                      <Progress value={calcPercent(usage.integrations.current, usage.integrations.max)} className="h-2" />
+                      <Progress
+                        value={calcPercent(
+                          usage.integrations.current,
+                          usage.integrations.max,
+                        )}
+                        className="h-2"
+                      />
                     )}
                   </div>
                 </>
               ) : (
-                <p className="text-sm text-muted-foreground">Não foi possível carregar os dados de uso.</p>
+                <p className="text-sm text-muted-foreground">
+                  Não foi possível carregar os dados de uso.
+                </p>
               )}
             </div>
           </>
@@ -480,7 +569,9 @@ export function PlansTab() {
       {plans.length > 0 && (
         <Card>
           <CardContent className="p-4 sm:p-6">
-            <h3 className="font-semibold text-base sm:text-lg mb-4">Planos Disponíveis</h3>
+            <h3 className="font-semibold text-base sm:text-lg mb-4">
+              Planos Disponíveis
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {plans.map((plan) => {
                 const isCurrent =
@@ -510,27 +601,33 @@ export function PlansTab() {
                           : formatCurrency(plan.price / 100)}
                       </span>
                       {plan.price > 0 && (
-                        <span className="text-muted-foreground text-sm">/mês</span>
+                        <span className="text-muted-foreground text-sm">
+                          /mês
+                        </span>
                       )}
                     </div>
                     <ul className="space-y-1.5">
                       {plan.features.map((feature, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <li
+                          key={i}
+                          className="flex items-start gap-2 text-sm text-muted-foreground"
+                        >
                           <Check className="w-3.5 h-3.5 text-green-500 shrink-0 mt-0.5" />
                           <span>{feature}</span>
                         </li>
                       ))}
                     </ul>
-                    {!isCurrent && plan.price > (currentPlanDetails?.price || 0) && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full mt-2"
-                        onClick={() => setLocation(`/checkout/${plan.id}`)}
-                      >
-                        Fazer Upgrade
-                      </Button>
-                    )}
+                    {!isCurrent &&
+                      plan.price > (currentPlanDetails?.price || 0) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full mt-2"
+                          onClick={() => setLocation(`/checkout/${plan.id}`)}
+                        >
+                          Fazer Upgrade
+                        </Button>
+                      )}
                   </div>
                 );
               })}
@@ -578,37 +675,40 @@ export function PlansTab() {
                       </TableCell>
                       <TableCell>
                         <Badge
-                          variant={invoice.status === "paid" ? "default" : "secondary"}
+                          variant={
+                            invoice.status === "paid" ? "default" : "secondary"
+                          }
                           className={
                             invoice.status === "paid"
                               ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
                               : ""
                           }
                         >
-                          {invoiceStatusLabels[invoice.status] || invoice.status}
+                          {invoiceStatusLabels[invoice.status] ||
+                            invoice.status}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
                           {invoice.pdfUrl && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              asChild
-                            >
-                              <a href={invoice.pdfUrl} target="_blank" rel="noopener noreferrer">
+                            <Button variant="ghost" size="sm" asChild>
+                              <a
+                                href={invoice.pdfUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
                                 PDF
                                 <ExternalLink className="w-3 h-3 ml-1" />
                               </a>
                             </Button>
                           )}
                           {invoice.hostedUrl && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              asChild
-                            >
-                              <a href={invoice.hostedUrl} target="_blank" rel="noopener noreferrer">
+                            <Button variant="ghost" size="sm" asChild>
+                              <a
+                                href={invoice.hostedUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
                                 Ver
                                 <ExternalLink className="w-3 h-3 ml-1" />
                               </a>
@@ -628,7 +728,9 @@ export function PlansTab() {
       {/* Features Card */}
       <Card>
         <CardContent className="p-4 sm:p-6">
-          <h3 className="font-semibold text-base sm:text-lg mb-4">Recursos Inclusos</h3>
+          <h3 className="font-semibold text-base sm:text-lg mb-4">
+            Recursos Inclusos
+          </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
               <div className="p-2 rounded bg-primary/10 text-primary shrink-0">
@@ -636,7 +738,9 @@ export function PlansTab() {
               </div>
               <div>
                 <h4 className="font-medium text-sm">Suporte Prioritário</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">Atendimento em até 2h úteis</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Atendimento em até 2h úteis
+                </p>
               </div>
             </div>
             <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
@@ -645,7 +749,9 @@ export function PlansTab() {
               </div>
               <div>
                 <h4 className="font-medium text-sm">Múltiplos Usuários</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">Até 10 usuários simultâneos</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Até 10 usuários simultâneos
+                </p>
               </div>
             </div>
             <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
@@ -654,7 +760,9 @@ export function PlansTab() {
               </div>
               <div>
                 <h4 className="font-medium text-sm">Imóveis Ilimitados</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">Cadastre até 2.000 imóveis</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Cadastre até 2.000 imóveis
+                </p>
               </div>
             </div>
             <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
@@ -663,7 +771,9 @@ export function PlansTab() {
               </div>
               <div>
                 <h4 className="font-medium text-sm">Sem Taxas Extras</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">Valor fixo mensal</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Valor fixo mensal
+                </p>
               </div>
             </div>
           </div>
