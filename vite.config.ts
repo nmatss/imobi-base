@@ -1,6 +1,8 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
+import tailwindcss from "tailwindcss";
+import autoprefixer from "autoprefixer";
 import { metaImagesPlugin } from "./vite-plugin-meta-images";
 import { visualizer } from "rollup-plugin-visualizer";
 import { VitePWA } from "vite-plugin-pwa";
@@ -82,7 +84,11 @@ export default defineConfig(({ mode }) => ({
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
     },
   },
-  // PostCSS config is loaded from postcss.config.js (tailwindcss + autoprefixer)
+  css: {
+    postcss: {
+      plugins: [tailwindcss(), autoprefixer()],
+    },
+  },
   root: path.resolve(import.meta.dirname, "client"),
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
