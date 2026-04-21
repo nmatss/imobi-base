@@ -1,16 +1,32 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- helpers precisam aceitar tabelas Drizzle genericas (SQLite ou Postgres) */
 /**
  * Soft Delete Utilities
  * Helpers for filtering and performing soft deletes with Drizzle ORM.
  */
 
-import { isNull, lt } from "drizzle-orm";
-import { db, schema, isSqlite } from "../db";
+import { isNull } from "drizzle-orm";
+import { db, isSqlite } from "../db";
 
 /**
  * Returns a Drizzle condition that filters out soft-deleted rows.
  * Usage: db.select().from(table).where(softDeleteFilter(table))
  */
 export function softDeleteFilter(table: { deletedAt: any }) {
+  return isNull(table.deletedAt);
+}
+
+/**
+ * Versao segura para schemas duais (SQLite + PostgreSQL).
+ * SQLite nao tem coluna deletedAt; PostgreSQL tem. Retorna undefined em
+ * SQLite (para que `and(..., undefined)` simplesmente ignore), e
+ * `isNull(deletedAt)` em PG.
+ *
+ * Uso: where(and(eq(table.tenantId, tid), activeRowsFilter(table)))
+ */
+export function activeRowsFilter(table: any) {
+  if (isSqlite) return undefined;
+  if (!table || typeof table !== "object") return undefined;
+  if (!("deletedAt" in table)) return undefined;
   return isNull(table.deletedAt);
 }
 

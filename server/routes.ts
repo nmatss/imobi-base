@@ -56,6 +56,7 @@ import { secretManager } from "./security/secret-manager";
 const { Pool } = pkg;
 import { generateRateLimitKey } from "./middleware/rate-limit-key-generator";
 import { subscriptionGuard } from "./middleware/subscription-guard";
+import { validateResourceTenant } from "./middleware/tenant-resource";
 
 // ===== ERROR HELPER =====
 function toHttpError(error: unknown): { status: number; message: string } {
@@ -112,24 +113,10 @@ async function comparePassword(
 }
 
 // ===== TENANT ISOLATION HELPERS (IDOR Prevention) =====
-/**
- * Validates that a resource belongs to the authenticated user's tenant
- * Throws 403 error if resource belongs to different tenant
- * Returns 404 if resource not found (to avoid leaking information)
- */
-async function validateResourceTenant(
-  resource: { tenantId: string } | null | undefined,
-  userTenantId: string,
-  resourceName: string = "Resource",
-): Promise<void> {
-  if (!resource) {
-    throw { status: 404, message: `${resourceName} not found` };
-  }
-  if (resource.tenantId !== userTenantId) {
-    // Return 404 instead of 403 to avoid leaking information about existence
-    throw { status: 404, message: `${resourceName} not found` };
-  }
-}
+// validateResourceTenant agora centralizado em middleware/tenant-resource.ts.
+// Mantido import acima para preservar os ~11 call-sites existentes sem quebrar.
+// Novas rotas devem preferir `withTenantResource` (mesmo modulo) que combina
+// carregamento, validacao e anexacao a req.resource em uma unica middleware.
 
 // ===== CSRF PROTECTION (Double Submit Cookie Pattern) =====
 /**
@@ -773,44 +760,88 @@ export async function registerRoutes(
    * Used by: GitHub Actions, uptime monitors, load balancers
    */
   app.get("/api/health", async (req, res) => {
+    const startedAt = Date.now();
     const healthCheck = {
-      status: "ok",
+      status: "ok" as "ok" | "degraded" | "error",
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || "development",
       version: process.env.VERCEL_GIT_COMMIT_SHA?.substring(0, 7) || "dev",
+      checks: {} as Record<
+        string,
+        { status: string; latencyMs?: number; error?: string }
+      >,
     };
 
+    // Database
     try {
-      // Test database connection
-      const dbCheck = await storage.checkDatabaseConnection?.();
-
-      // If database check is available and fails, return degraded status
-      if (dbCheck === false) {
-        return res.status(503).json({
-          ...healthCheck,
-          status: "degraded",
-          database: "disconnected",
-          message: "Database connection failed",
-        });
-      }
-
-      // All systems operational
-      return res.status(200).json({
-        ...healthCheck,
-        database: "connected",
-        message: "All systems operational",
-      });
-    } catch (error: unknown) {
-      // Critical failure
-      console.error("Health check failed:", error);
-      return res.status(503).json({
-        ...healthCheck,
-        status: "error",
-        database: "error",
-        message: error instanceof Error ? error.message : "Health check failed",
-      });
+      const t0 = Date.now();
+      const dbOk = (await storage.checkDatabaseConnection?.()) !== false;
+      healthCheck.checks.database = {
+        status: dbOk ? "ok" : "fail",
+        latencyMs: Date.now() - t0,
+      };
+      if (!dbOk) healthCheck.status = "degraded";
+    } catch (err) {
+      healthCheck.checks.database = {
+        status: "fail",
+        error: err instanceof Error ? err.message : String(err),
+      };
+      healthCheck.status = "error";
     }
+
+    // Redis (opcional — so marcar fail se estiver configurado e indisponivel)
+    if (process.env.REDIS_URL) {
+      try {
+        const { checkRedisHealth } = await import("./cache/redis-client");
+        const r = await checkRedisHealth();
+        healthCheck.checks.redis = {
+          status: r.status === "healthy" ? "ok" : "fail",
+          latencyMs: r.latency,
+          error: r.error,
+        };
+        if (r.status !== "healthy" && healthCheck.status === "ok") {
+          healthCheck.status = "degraded";
+        }
+      } catch (err) {
+        healthCheck.checks.redis = {
+          status: "fail",
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    } else {
+      healthCheck.checks.redis = { status: "skipped" };
+    }
+
+    // Stripe — ping leve (Balance.retrieve usa 1 request de API)
+    if (process.env.STRIPE_SECRET_KEY) {
+      try {
+        const t0 = Date.now();
+        const { default: Stripe } = await import("stripe");
+        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+          typescript: true,
+        });
+        await stripe.balance.retrieve();
+        healthCheck.checks.stripe = {
+          status: "ok",
+          latencyMs: Date.now() - t0,
+        };
+      } catch (err) {
+        healthCheck.checks.stripe = {
+          status: "fail",
+          error: err instanceof Error ? err.message : String(err),
+        };
+        if (healthCheck.status === "ok") healthCheck.status = "degraded";
+      }
+    } else {
+      healthCheck.checks.stripe = { status: "skipped" };
+    }
+
+    const httpStatus = healthCheck.status === "error" ? 503 : 200;
+    res.status(httpStatus).json({
+      ...healthCheck,
+      responseTimeMs: Date.now() - startedAt,
+    });
   });
 
   /**
@@ -1362,21 +1393,26 @@ export async function registerRoutes(
         page as string,
         limit as string,
       );
-      const properties = await storage.getPropertiesByTenant(
-        req.user!.tenantId,
-        {
-          type: type as string,
-          category: category as string,
-          status: status as string,
-          featured:
-            featured === "true"
-              ? true
-              : featured === "false"
-                ? false
-                : undefined,
-        },
-      );
-      apiPaginated(res, properties, properties.length, p, l);
+      const filters = {
+        type: type as string | undefined,
+        category: category as string | undefined,
+        status: status as string | undefined,
+        featured:
+          featured === "true"
+            ? true
+            : featured === "false"
+              ? false
+              : undefined,
+      };
+      const offset = (p - 1) * l;
+      const [rows, total] = await Promise.all([
+        storage.getPropertiesByTenant(req.user!.tenantId, filters, {
+          limit: l,
+          offset,
+        }),
+        storage.countPropertiesByTenant(req.user!.tenantId, filters),
+      ]);
+      apiPaginated(res, rows, total, p, l);
     } catch (error: unknown) {
       apiError(res, 500, "Erro ao buscar imóveis");
     }
@@ -1384,13 +1420,21 @@ export async function registerRoutes(
 
   app.get("/api/properties/public/:tenantId", async (req, res) => {
     try {
-      const properties = await storage.getPropertiesByTenant(
-        req.params.tenantId,
-        {
-          status: "available",
-        },
+      const { page, limit } = req.query;
+      const { page: p, limit: l } = sanitizePagination(
+        page as string,
+        limit as string,
       );
-      res.json(properties);
+      const offset = (p - 1) * l;
+      const filters = { status: "available" };
+      const [rows, total] = await Promise.all([
+        storage.getPropertiesByTenant(req.params.tenantId, filters, {
+          limit: l,
+          offset,
+        }),
+        storage.countPropertiesByTenant(req.params.tenantId, filters),
+      ]);
+      res.json({ data: rows, pagination: { page: p, limit: l, total } });
     } catch (error: unknown) {
       res.status(500).json({ error: "Erro ao buscar imóveis" });
     }
@@ -1504,8 +1548,12 @@ export async function registerRoutes(
         page as string,
         limit as string,
       );
-      const leads = await storage.getLeadsByTenant(req.user!.tenantId);
-      apiPaginated(res, leads, leads.length, p, l);
+      const offset = (p - 1) * l;
+      const [rows, total] = await Promise.all([
+        storage.getLeadsByTenant(req.user!.tenantId, { limit: l, offset }),
+        storage.countLeadsByTenant(req.user!.tenantId),
+      ]);
+      apiPaginated(res, rows, total, p, l);
     } catch (error: unknown) {
       apiError(res, 500, "Erro ao buscar leads");
     }

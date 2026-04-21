@@ -2,6 +2,7 @@
 // Drizzle ORM with dual database support (SQLite + PostgreSQL)
 import { eq, and, desc, sql, like, or, inArray } from "drizzle-orm";
 import { db, schema, isSqlite } from "./db";
+import { activeRowsFilter } from "./utils/soft-delete";
 import { nanoid } from "nanoid";
 import type {
   Tenant, InsertTenant,
@@ -86,16 +87,19 @@ export interface IStorage {
   updateTenant(id: string, tenant: Partial<InsertTenant>): Promise<Tenant | undefined>;
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
-  getUsersByTenant(tenantId: string): Promise<User[]>;
+  getUsersByTenant(tenantId: string, pagination?: { limit?: number; offset?: number }): Promise<User[]>;
+  countUsersByTenant(tenantId: string): Promise<number>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined>;
   getProperty(id: string): Promise<Property | undefined>;
-  getPropertiesByTenant(tenantId: string, filters?: { type?: string; category?: string; status?: string; featured?: boolean }): Promise<Property[]>;
+  getPropertiesByTenant(tenantId: string, filters?: { type?: string; category?: string; status?: string; featured?: boolean }, pagination?: { limit?: number; offset?: number }): Promise<Property[]>;
+  countPropertiesByTenant(tenantId: string, filters?: { type?: string; category?: string; status?: string; featured?: boolean }): Promise<number>;
   createProperty(property: InsertProperty): Promise<Property>;
   updateProperty(id: string, property: Partial<InsertProperty>): Promise<Property | undefined>;
   deleteProperty(id: string): Promise<boolean>;
   getLead(id: string): Promise<Lead | undefined>;
-  getLeadsByTenant(tenantId: string): Promise<Lead[]>;
+  getLeadsByTenant(tenantId: string, pagination?: { limit?: number; offset?: number }): Promise<Lead[]>;
+  countLeadsByTenant(tenantId: string): Promise<number>;
   createLead(lead: InsertLead): Promise<Lead>;
   updateLead(id: string, lead: Partial<InsertLead>): Promise<Lead | undefined>;
   deleteLead(id: string): Promise<boolean>;
@@ -433,8 +437,25 @@ export class DbStorage implements IStorage {
     return user;
   }
 
-  async getUsersByTenant(tenantId: string): Promise<User[]> {
-    return db.select().from(schema.users).where(eq(schema.users.tenantId, tenantId));
+  async getUsersByTenant(
+    tenantId: string,
+    pagination?: { limit?: number; offset?: number },
+  ): Promise<User[]> {
+    let q: any = db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.tenantId, tenantId));
+    if (pagination?.limit !== undefined) q = q.limit(pagination.limit);
+    if (pagination?.offset !== undefined) q = q.offset(pagination.offset);
+    return q;
+  }
+
+  async countUsersByTenant(tenantId: string): Promise<number> {
+    const [row] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.users)
+      .where(eq(schema.users.tenantId, tenantId));
+    return Number(row?.count ?? 0);
   }
 
   async createUser(user: InsertUser): Promise<User> {
@@ -454,16 +475,46 @@ export class DbStorage implements IStorage {
     return property;
   }
 
-  async getPropertiesByTenant(tenantId: string, filters?: { type?: string; category?: string; status?: string; featured?: boolean }): Promise<Property[]> {
-    const query = db.select().from(schema.properties).where(eq(schema.properties.tenantId, tenantId));
-
-    const conditions = [eq(schema.properties.tenantId, tenantId)];
+  async getPropertiesByTenant(
+    tenantId: string,
+    filters?: { type?: string; category?: string; status?: string; featured?: boolean },
+    pagination?: { limit?: number; offset?: number },
+  ): Promise<Property[]> {
+    const conditions: any[] = [eq(schema.properties.tenantId, tenantId)];
+    const active = activeRowsFilter(schema.properties);
+    if (active) conditions.push(active);
     if (filters?.type) conditions.push(eq(schema.properties.type, filters.type));
     if (filters?.category) conditions.push(eq(schema.properties.category, filters.category));
     if (filters?.status) conditions.push(eq(schema.properties.status, filters.status));
     if (filters?.featured !== undefined) conditions.push(eq(schema.properties.featured, filters.featured));
 
-    return db.select().from(schema.properties).where(and(...conditions)).orderBy(desc(schema.properties.createdAt));
+    let q: any = db
+      .select()
+      .from(schema.properties)
+      .where(and(...conditions))
+      .orderBy(desc(schema.properties.createdAt));
+    if (pagination?.limit !== undefined) q = q.limit(pagination.limit);
+    if (pagination?.offset !== undefined) q = q.offset(pagination.offset);
+    return q;
+  }
+
+  async countPropertiesByTenant(
+    tenantId: string,
+    filters?: { type?: string; category?: string; status?: string; featured?: boolean },
+  ): Promise<number> {
+    const conditions: any[] = [eq(schema.properties.tenantId, tenantId)];
+    const active = activeRowsFilter(schema.properties);
+    if (active) conditions.push(active);
+    if (filters?.type) conditions.push(eq(schema.properties.type, filters.type));
+    if (filters?.category) conditions.push(eq(schema.properties.category, filters.category));
+    if (filters?.status) conditions.push(eq(schema.properties.status, filters.status));
+    if (filters?.featured !== undefined) conditions.push(eq(schema.properties.featured, filters.featured));
+
+    const [row] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.properties)
+      .where(and(...conditions));
+    return Number(row?.count ?? 0);
   }
 
   async createProperty(property: InsertProperty): Promise<Property> {
@@ -502,8 +553,33 @@ export class DbStorage implements IStorage {
     return lead;
   }
 
-  async getLeadsByTenant(tenantId: string): Promise<Lead[]> {
-    return db.select().from(schema.leads).where(eq(schema.leads.tenantId, tenantId)).orderBy(desc(schema.leads.createdAt));
+  async getLeadsByTenant(
+    tenantId: string,
+    pagination?: { limit?: number; offset?: number },
+  ): Promise<Lead[]> {
+    const conditions: any[] = [eq(schema.leads.tenantId, tenantId)];
+    const active = activeRowsFilter(schema.leads);
+    if (active) conditions.push(active);
+
+    let q: any = db
+      .select()
+      .from(schema.leads)
+      .where(and(...conditions))
+      .orderBy(desc(schema.leads.createdAt));
+    if (pagination?.limit !== undefined) q = q.limit(pagination.limit);
+    if (pagination?.offset !== undefined) q = q.offset(pagination.offset);
+    return q;
+  }
+
+  async countLeadsByTenant(tenantId: string): Promise<number> {
+    const conditions: any[] = [eq(schema.leads.tenantId, tenantId)];
+    const active = activeRowsFilter(schema.leads);
+    if (active) conditions.push(active);
+    const [row] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.leads)
+      .where(and(...conditions));
+    return Number(row?.count ?? 0);
   }
 
   async createLead(lead: InsertLead): Promise<Lead> {

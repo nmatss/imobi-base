@@ -27,6 +27,14 @@ if (useSqlite) {
   console.log("Using PostgreSQL database (production mode)");
   pgPool = new Pool({
     connectionString: process.env.DATABASE_URL,
+    max: Number(process.env.PG_POOL_MAX ?? 20),
+    min: Number(process.env.PG_POOL_MIN ?? 2),
+    idleTimeoutMillis: Number(process.env.PG_POOL_IDLE_TIMEOUT_MS ?? 30000),
+    connectionTimeoutMillis: Number(process.env.PG_POOL_CONN_TIMEOUT_MS ?? 5000),
+    allowExitOnIdle: false,
+  });
+  pgPool.on("error", (err) => {
+    console.error("[pg-pool] unexpected error on idle client", err);
   });
   pgDb = drizzlePg(pgPool, { schema: schemaPg });
 }
