@@ -113,7 +113,11 @@ export function registerPaymentRoutes(app: Express): void {
   }));
 
   /**
-   * Cancel Stripe subscription
+   * Cancel Stripe subscription.
+   *
+   * IDOR protection: ignora qualquer subscriptionId do body e usa SOMENTE a
+   * subscription associada ao tenant autenticado (via
+   * metadata.stripeSubscriptionId no tenant_subscriptions).
    */
   app.post('/api/payments/stripe/cancel-subscription', paymentMutationLimiter, async (req: Request, res: Response) => {
     try {
@@ -122,9 +126,17 @@ export function registerPaymentRoutes(app: Express): void {
         return;
       }
 
-      const { subscriptionId, immediate } = req.body;
+      const tenantId = req.user.tenantId;
+      const tenantSub = await storage.getTenantSubscription(tenantId);
+      const ownedSubId = (tenantSub?.metadata as Record<string, unknown> | undefined)
+        ?.stripeSubscriptionId as string | undefined;
+      if (!ownedSubId) {
+        res.status(404).json({ error: 'Nenhuma assinatura ativa encontrada.' });
+        return;
+      }
 
-      const subscription = await StripeService.cancelSubscription(subscriptionId, immediate);
+      const { immediate } = req.body as { immediate?: boolean };
+      const subscription = await StripeService.cancelSubscription(ownedSubId, immediate);
 
       res.json({
         subscriptionId: subscription.id,
@@ -185,8 +197,26 @@ export function registerPaymentRoutes(app: Express): void {
         return;
       }
 
-      // Reaproveita Stripe Customer se ja existir para este tenant
+      // Bloqueia criacao de checkout se tenant ja tem subscription ativa.
+      // Usuario deve usar o Customer Portal para upgrade/downgrade.
       const existingSub = await storage.getTenantSubscription(tenantId);
+      if (
+        existingSub &&
+        ['active', 'trial', 'trialing', 'past_due'].includes(
+          String(existingSub.status || ''),
+        ) &&
+        (existingSub.metadata as Record<string, unknown> | undefined)
+          ?.stripeSubscriptionId
+      ) {
+        res.status(409).json({
+          error:
+            'Você já possui uma assinatura ativa. Use "Gerenciar no portal" em /settings/billing para mudar de plano.',
+          code: 'subscription_already_active',
+          currentStatus: existingSub.status,
+        });
+        return;
+      }
+
       let customerId = existingSub?.metadata?.stripeCustomerId as
         | string
         | undefined;
@@ -213,8 +243,8 @@ export function registerPaymentRoutes(app: Express): void {
         tenantId,
         successUrl:
           successUrl ||
-          `${appUrl}/settings/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-        cancelUrl: cancelUrl || `${appUrl}/pricing?checkout=cancelled`,
+          `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: cancelUrl || `${appUrl}/checkout/cancel`,
         trialPeriodDays:
           (plan as Record<string, unknown>).trialDays as number | undefined,
       });
@@ -264,8 +294,10 @@ export function registerPaymentRoutes(app: Express): void {
 
   /**
    * Reativa uma assinatura que foi agendada para cancelar no fim do periodo
-   * (cancel_at_period_end=true). O usuario pode tambem fazer via portal,
-   * mas este endpoint e util para confirmar-ao-clique dentro da UI.
+   * (cancel_at_period_end=true).
+   *
+   * IDOR protection: usa SOMENTE a subscription do tenant autenticado (via
+   * metadata.stripeSubscriptionId). body.subscriptionId e ignorado.
    */
   app.post(
     '/api/payments/stripe/reactivate-subscription',
@@ -273,14 +305,19 @@ export function registerPaymentRoutes(app: Express): void {
     asyncHandler(async (req: Request, res: Response) => {
       if (!req.user) throw new AuthError();
 
-      const { subscriptionId } = req.body as { subscriptionId?: string };
-      if (!subscriptionId) {
-        res.status(400).json({ error: 'subscriptionId is required' });
+      const tenantId = req.user.tenantId;
+      const tenantSub = await storage.getTenantSubscription(tenantId);
+      const ownedSubId = (tenantSub?.metadata as Record<string, unknown> | undefined)
+        ?.stripeSubscriptionId as string | undefined;
+      if (!ownedSubId) {
+        res.status(404).json({
+          error: 'Nenhuma assinatura encontrada para reativar.',
+        });
         return;
       }
 
       const subscription =
-        await StripeService.reactivateSubscription(subscriptionId);
+        await StripeService.reactivateSubscription(ownedSubId);
       res.json({
         subscriptionId: subscription.id,
         status: subscription.status,

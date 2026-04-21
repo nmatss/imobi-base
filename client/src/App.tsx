@@ -47,6 +47,8 @@ const PricingPage = lazy(() => import("@/pages/public/pricing"));
 const TermsPage = lazy(() => import("@/pages/public/terms"));
 const PrivacyPage = lazy(() => import("@/pages/public/privacy"));
 const CheckoutPage = lazy(() => import("@/pages/checkout"));
+const CheckoutSuccessPage = lazy(() => import("@/pages/checkout/success"));
+const CheckoutCancelPage = lazy(() => import("@/pages/checkout/cancel"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 const AdminDashboard = lazy(() => import("@/pages/admin"));
 const TenantsPage = lazy(() => import("@/pages/admin/tenants"));
@@ -339,6 +341,8 @@ function Router() {
         <Route key="vistoria-comparison" path="/vistorias/:id/comparacao" component={() => <ProtectedRoute component={InspectionComparisonPage} />} />
         <Route key="portal-admin" path="/portal/admin" component={() => <ProtectedRoute component={PortalAdmin} />} />
         <Route key="onboarding" path="/onboarding" component={() => <ProtectedRoute component={OnboardingPage} />} />
+        <Route key="checkout-success" path="/checkout/success" component={() => <ProtectedRoute component={CheckoutSuccessPage} />} />
+        <Route key="checkout-cancel" path="/checkout/cancel" component={() => <ProtectedRoute component={CheckoutCancelPage} />} />
         <Route key="checkout" path="/checkout/:planId" component={() => <ProtectedRoute component={CheckoutPage} />} />
         <Route key="settings" path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
 

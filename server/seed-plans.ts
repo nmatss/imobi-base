@@ -131,6 +131,19 @@ const PLAN_DEFINITIONS = [
   },
 ];
 
+// Permite rodar diretamente: npx tsx server/seed-plans.ts
+const isDirectRun =
+  import.meta.url === `file://${process.argv[1]}` ||
+  process.argv[1]?.endsWith("seed-plans.ts");
+if (isDirectRun) {
+  seedPlans()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+}
+
 export async function seedPlans(): Promise<void> {
   try {
     for (const plan of PLAN_DEFINITIONS) {
