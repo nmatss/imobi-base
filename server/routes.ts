@@ -773,21 +773,36 @@ export async function registerRoutes(
       >,
     };
 
-    // Database
+    // Database — raw ping para expor erro real (checkDatabaseConnection swallow)
+    const showDbDetails = req.query.debug === process.env.HEALTH_DEBUG_TOKEN;
     try {
       const t0 = Date.now();
-      const dbOk = (await storage.checkDatabaseConnection?.()) !== false;
+      const { db } = await import("./db");
+      const { sql } = await import("drizzle-orm");
+      await db.execute(sql`SELECT 1`);
       healthCheck.checks.database = {
-        status: dbOk ? "ok" : "fail",
+        status: "ok",
         latencyMs: Date.now() - t0,
       };
-      if (!dbOk) healthCheck.status = "degraded";
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Classifica o erro para facilitar diagnostico sem vazar credencial
+      let kind = "unknown";
+      if (/connect ETIMEDOUT|connect ECONNREFUSED|getaddrinfo/i.test(msg))
+        kind = "network";
+      else if (/password authentication|authentication failed|SASL/i.test(msg))
+        kind = "auth";
+      else if (/database .* does not exist/i.test(msg)) kind = "db_missing";
+      else if (/relation .* does not exist|no such table/i.test(msg))
+        kind = "schema_missing";
+      else if (/DATABASE_URL/i.test(msg) || !process.env.DATABASE_URL)
+        kind = "env_missing";
       healthCheck.checks.database = {
         status: "fail",
-        error: err instanceof Error ? err.message : String(err),
-      };
-      healthCheck.status = "error";
+        error: showDbDetails ? msg : `connection ${kind}`,
+        databaseConfigured: Boolean(process.env.DATABASE_URL),
+      } as Record<string, unknown>;
+      healthCheck.status = "degraded";
     }
 
     // Redis (opcional — so marcar fail se estiver configurado e indisponivel)
