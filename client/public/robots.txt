@@ -21,15 +21,13 @@ Disallow: /api/
 Disallow: /admin/
 
 # Bloquear arquivos sensíveis
-Disallow: /*.json$
-Disallow: /*.xml$
 Disallow: /health.json
 
 # Arquivos de build
 Disallow: /assets/*.map
 
 # Sitemap
-Sitemap: https://imobibase.com/sitemap.xml
+Sitemap: https://imobibase.com.br/sitemap.xml
 
 # Crawl delay para bots agressivos
 User-agent: AhrefsBot

@@ -1,7 +1,13 @@
 #!/usr/bin/env tsx
 /**
- * Gera public/sitemap.xml a partir das rotas publicas conhecidas.
- * Executado manualmente (npm run seo:sitemap) e antes do build (script/build.ts).
+ * Gera client/public/sitemap.xml a partir das rotas publicas conhecidas.
+ *
+ * O output vai para `client/public/` (nao `public/` na raiz) porque o Vite e
+ * configurado com `root: "client"` no vite.config.ts — portanto apenas os
+ * arquivos dentro de client/public/ sao copiados para dist/public/ durante
+ * o build.
+ *
+ * Executado manualmente (npm run seo:sitemap) e antes do build (package.json).
  */
 import { writeFile, mkdir } from "fs/promises";
 import { resolve, dirname } from "path";
@@ -22,7 +28,7 @@ type SitemapRoute = {
 const SITE_URL = (
   process.env.SITE_URL ||
   process.env.VITE_SITE_URL ||
-  "https://imobibase.com"
+  "https://imobibase.com.br"
 ).replace(/\/$/, "");
 
 // Apenas rotas publicas indexaveis. login/signup ficam fora (paginas privadas).
@@ -55,7 +61,7 @@ ${urls}
 }
 
 export async function generateSitemap(
-  outputPath = resolve(process.cwd(), "public/sitemap.xml"),
+  outputPath = resolve(process.cwd(), "client/public/sitemap.xml"),
 ): Promise<string> {
   const lastmod = new Date().toISOString().slice(0, 10);
   const xml = buildXml(ROUTES, lastmod);
