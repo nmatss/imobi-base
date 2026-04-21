@@ -67,3 +67,6 @@ data/
 
 *storybook.log
 storybook-static
+
+# Claude Code local state (worktrees, session data)
+.claude/

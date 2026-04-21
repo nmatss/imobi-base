@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Building2, Eye, EyeOff, CheckCircle2 } from "lucide-react";
+import { SeoHead } from "@/components/seo/SeoHead";
 
 function slugify(text: string): string {
   return text
@@ -126,6 +127,12 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen flex">
+      <SeoHead
+        title="Criar Conta Grátis | ImobiBase"
+        description="Crie sua conta ImobiBase gratuitamente em menos de 1 minuto. Acesse CRM, gestão de imóveis e site automático. Sem cartão de crédito no plano Gratuito."
+        path="/signup"
+        noindex
+      />
       {/* Left Side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary via-blue-600 to-indigo-700 p-12 flex-col justify-between relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10" />

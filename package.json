@@ -43,6 +43,8 @@
     "benchmark:security": "tsx server/performance/security-benchmarks.ts",
     "benchmark:all": "npm run benchmark:security",
     "analyze:a11y": "tsx scripts/analyze-a11y.ts",
+    "seo:sitemap": "tsx scripts/generate-sitemap.ts",
+    "assets:optimize": "tsx scripts/optimize-images.ts",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "lint:a11y": "eslint client/src --ext .ts,.tsx --no-eslintrc --config eslint.config.js",

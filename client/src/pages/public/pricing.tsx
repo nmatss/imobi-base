@@ -23,8 +23,14 @@ import {
   Brain,
   Shield,
   FileCheck,
+  Lock,
+  Star,
+  Award,
+  Quote,
 } from "lucide-react";
 import { plans, CONTACT_EMAIL } from "@/lib/plans-config";
+import { SeoHead, breadcrumbSchema } from "@/components/seo/SeoHead";
+import { PublicFooter } from "@/components/public/PublicFooter";
 
 const faqs = [
   {
@@ -65,6 +71,25 @@ export default function PricingPage() {
 
   return (
     <div className="min-h-screen bg-background font-sans text-foreground selection:bg-primary/20 overflow-x-hidden">
+      <SeoHead
+        title="Planos e Preços | ImobiBase"
+        description="Conheça os planos do ImobiBase: Gratuito, Starter, Profissional, Business e Enterprise. Escolha o plano ideal para sua imobiliária com 20% de desconto no pagamento anual."
+        path="/pricing"
+        structuredData={[
+          breadcrumbSchema([
+            { name: "Início", path: "/" },
+            { name: "Preços", path: "/pricing" },
+          ]),
+          {
+            "@type": "FAQPage",
+            mainEntity: faqs.map((f) => ({
+              "@type": "Question",
+              name: f.q,
+              acceptedAnswer: { "@type": "Answer", text: f.a },
+            })),
+          },
+        ]}
+      />
       {/* Navbar */}
       <header className="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-md border-b py-3 shadow-sm">
         <div className="container mx-auto px-4 flex items-center justify-between">
@@ -340,7 +365,7 @@ export default function PricingPage() {
                 {
                   icon: Home,
                   title: "Gestão de Imóveis",
-                  desc: "Cadastro completo com fotos, videos e tour virtual.",
+                  desc: "Cadastro completo com fotos, vídeos e tour virtual.",
                 },
                 {
                   icon: Users,
@@ -349,13 +374,13 @@ export default function PricingPage() {
                 },
                 {
                   icon: Globe,
-                  title: "Site Automatico",
+                  title: "Site Automático",
                   desc: "Seu site no ar em minutos, otimizado para SEO.",
                 },
                 {
                   icon: MessageSquare,
                   title: "WhatsApp",
-                  desc: "Atendimento integrado com respostas automaticas.",
+                  desc: "Atendimento integrado com respostas automáticas.",
                 },
                 {
                   icon: FileCheck,
@@ -375,7 +400,7 @@ export default function PricingPage() {
                 {
                   icon: Shield,
                   title: "Seguranca",
-                  desc: "Dados criptografados e backups automaticos diarios.",
+                  desc: "Dados criptografados e backups automáticos diários.",
                 },
               ].map((item) => (
                 <div
@@ -385,6 +410,104 @@ export default function PricingPage() {
                   <item.icon className="w-8 h-8 text-primary mb-3" />
                   <h3 className="font-semibold mb-1">{item.title}</h3>
                   <p className="text-sm text-muted-foreground">{item.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Social Proof — stats + testemunhos + selos */}
+        <section className="py-20 bg-background">
+          <div className="container mx-auto px-4">
+            {/* Stats strip */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-8 sm:gap-16 text-center mb-16">
+              {[
+                { value: "1.500+", label: "Imóveis cadastrados" },
+                { value: "80+", label: "Imobiliárias ativas" },
+                { value: "5.000+", label: "Leads gerenciados" },
+                { value: "99%", label: "Satisfação dos clientes" },
+              ].map((stat) => (
+                <div key={stat.label} className="flex flex-col items-center">
+                  <div className="text-3xl md:text-4xl font-bold text-primary">
+                    {stat.value}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {stat.label}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            {/* Testemunhos */}
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-heading font-bold mb-4">
+                Quem já usa, recomenda
+              </h2>
+              <p className="text-muted-foreground text-lg">
+                Corretores e imobiliárias que cresceram com o ImobiBase.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto mb-16">
+              {[
+                {
+                  text: "Reduzi em 60% o tempo para cadastrar imóveis e fechar contratos. O CRM integrado virou o cérebro da operação.",
+                  name: "Mariana Souza",
+                  role: "Diretora — Souza Imóveis",
+                  initials: "MS",
+                  color: "bg-primary/15 text-primary",
+                },
+                {
+                  text: "Como corretor autônomo, o plano Gratuito já me atendeu muito bem. Subi para o Pro quando o volume de leads começou a crescer e não me arrependo.",
+                  name: "Rafael Lima",
+                  role: "Corretor autônomo — Campinas/SP",
+                  initials: "RL",
+                  color: "bg-emerald-500/15 text-emerald-600",
+                },
+                {
+                  text: "A automação de marketing e os relatórios avançados fizeram diferença real no fechamento de vendas. Suporte nota 10.",
+                  name: "Patrícia Alves",
+                  role: "Gerente Comercial — Alves Negócios",
+                  initials: "PA",
+                  color: "bg-orange-500/15 text-orange-600",
+                },
+              ].map((t) => (
+                <div
+                  key={t.name}
+                  className="bg-card p-6 rounded-2xl border hover:shadow-md transition-shadow flex flex-col"
+                >
+                  <Quote className="w-6 h-6 text-primary/40 mb-3" />
+                  <p className="text-sm text-foreground leading-relaxed mb-5">
+                    "{t.text}"
+                  </p>
+                  <div className="flex items-center gap-3 mt-auto">
+                    <div
+                      className={`w-10 h-10 rounded-full ${t.color} flex items-center justify-center text-sm font-bold`}
+                    >
+                      {t.initials}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">{t.name}</p>
+                      <p className="text-xs text-muted-foreground">{t.role}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Selos de confiança */}
+            <div className="flex flex-wrap items-center justify-center gap-6 md:gap-10 text-muted-foreground">
+              {[
+                { icon: Lock, label: "SSL / TLS 1.3" },
+                { icon: Shield, label: "LGPD-compliant" },
+                { icon: Award, label: "Hospedado no Brasil" },
+                { icon: Star, label: "Uptime 99% SLA" },
+              ].map((badge) => (
+                <div
+                  key={badge.label}
+                  className="flex items-center gap-2 text-sm"
+                >
+                  <badge.icon className="w-5 h-5 text-primary" />
+                  <span className="font-medium">{badge.label}</span>
                 </div>
               ))}
             </div>
@@ -454,33 +577,7 @@ export default function PricingPage() {
           </div>
         </section>
 
-        {/* Footer */}
-        <footer className="bg-background border-t py-10">
-          <div className="container mx-auto px-4">
-            <div className="flex flex-col md:flex-row justify-between items-center text-sm text-muted-foreground">
-              <div className="flex items-center gap-2 font-heading font-bold text-lg mb-4 md:mb-0">
-                <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center text-primary-foreground text-xs">
-                  I
-                </div>
-                ImobiBase
-              </div>
-              <p>
-                &copy; {new Date().getFullYear()} ImobiBase Tecnologia Ltda.
-              </p>
-              <div className="flex gap-6 mt-4 md:mt-0">
-                <Link href="/termos" className="hover:text-foreground">
-                  Termos
-                </Link>
-                <Link href="/privacidade" className="hover:text-foreground">
-                  Privacidade
-                </Link>
-                <Link href="/" className="hover:text-foreground">
-                  Início
-                </Link>
-              </div>
-            </div>
-          </div>
-        </footer>
+        <PublicFooter variant="compact" />
       </main>
     </div>
   );

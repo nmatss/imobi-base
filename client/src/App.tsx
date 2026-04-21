@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Toaster } from "@/components/ui/sonner";
 import { Building2 } from "lucide-react";
+import { SeoHead } from "@/components/seo/SeoHead";
 
 // Lazy-loaded components for better code splitting
 const Dashboard = lazy(() => import("@/pages/dashboard"));
@@ -101,6 +102,12 @@ function LoginPage() {
 
   return (
     <div className="min-h-screen flex">
+      <SeoHead
+        title="Entrar | ImobiBase"
+        description="Acesse sua conta ImobiBase. Gestão completa da sua imobiliária: CRM, imóveis, contratos, financeiro e site."
+        path="/login"
+        noindex
+      />
       {/* Left Side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary via-blue-600 to-indigo-700 p-12 flex-col justify-between relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10" />

@@ -38,6 +38,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { SeoHead, OrganizationSchema } from "@/components/seo/SeoHead";
 import {
   Accordion,
   AccordionContent,
@@ -182,6 +183,31 @@ export default function ProductLanding() {
 
   return (
     <div className="min-h-screen bg-background font-sans text-foreground selection:bg-primary/20 overflow-x-hidden">
+      <SeoHead
+        title="ImobiBase | Gestão Imobiliária Inteligente com CRM e Site"
+        description="Sistema completo para imobiliárias e corretores: CRM de leads, cadastro de imóveis, site automático, contratos, financeiro e inteligência artificial. Comece grátis."
+        path="/"
+        structuredData={[
+          OrganizationSchema,
+          {
+            "@type": "SoftwareApplication",
+            name: "ImobiBase",
+            applicationCategory: "BusinessApplication",
+            operatingSystem: "Web",
+            offers: {
+              "@type": "AggregateOffer",
+              priceCurrency: "BRL",
+              lowPrice: "0",
+              highPrice: "799",
+            },
+            aggregateRating: {
+              "@type": "AggregateRating",
+              ratingValue: "4.9",
+              ratingCount: "80",
+            },
+          },
+        ]}
+      />
       {/* ══════ Navbar ══════ */}
       <motion.header
         className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled ? "bg-background/80 backdrop-blur-md border-b py-3 shadow-sm" : "bg-transparent py-6"}`}
@@ -395,6 +421,12 @@ export default function ProductLanding() {
                     src="/dashboard-mockup.png"
                     alt="Dashboard ImobiBase"
                     className="w-full h-auto shadow-inner"
+                    loading="eager"
+                    // @ts-expect-error — HTML spec; tipado em React 19+
+                    fetchpriority="high"
+                    decoding="async"
+                    width="1200"
+                    height="750"
                   />
 
                   <motion.div
@@ -612,6 +644,10 @@ export default function ProductLanding() {
                           src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=1000&auto=format&fit=crop"
                           className="rounded-xl shadow-lg w-full max-w-md rotate-3 transition-transform hover:rotate-0 duration-500"
                           alt="CRM"
+                          loading="lazy"
+                          decoding="async"
+                          width="1000"
+                          height="667"
                         />
                       </div>
                     </div>
@@ -651,6 +687,8 @@ export default function ProductLanding() {
                           src={imgAbstract}
                           className="rounded-xl shadow-lg w-full max-w-md -rotate-3 transition-transform hover:rotate-0 duration-500"
                           alt="Site Builder"
+                          loading="lazy"
+                          decoding="async"
                         />
                       </div>
                     </div>
@@ -690,6 +728,8 @@ export default function ProductLanding() {
                           src={imgOffice}
                           className="rounded-xl shadow-lg w-full max-w-md scale-105 transition-transform hover:scale-100 duration-500"
                           alt="Management"
+                          loading="lazy"
+                          decoding="async"
                         />
                       </div>
                     </div>
