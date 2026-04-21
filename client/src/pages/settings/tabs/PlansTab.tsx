@@ -66,6 +66,7 @@ interface SubscriptionStatus {
   currentPeriodEnd?: string;
   trialEndsAt?: string;
   cancelledAt?: string;
+  subscriptionId?: string | null;
 }
 
 interface Invoice {
@@ -219,6 +220,59 @@ export function PlansTab() {
     }
   }
 
+  async function handleManageBilling() {
+    try {
+      const res = await fetch(
+        "/api/payments/stripe/create-portal-session",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+        },
+      );
+      const data = await res.json();
+      if (!res.ok || !data.url) {
+        throw new Error(data.error || "Não foi possível abrir o portal");
+      }
+      window.location.href = data.url;
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Erro ao abrir o portal de gerenciamento";
+      toast.error(message);
+    }
+  }
+
+  async function handleReactivateSubscription() {
+    const subscriptionId = subscription?.subscriptionId;
+    if (!subscriptionId) {
+      toast.error("Assinatura não encontrada");
+      return;
+    }
+    try {
+      const res = await fetch(
+        "/api/payments/stripe/reactivate-subscription",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ subscriptionId }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Erro ao reativar assinatura");
+      }
+      toast.success("Assinatura reativada com sucesso!");
+      fetchSubscription();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Erro ao reativar assinatura";
+      toast.error(message);
+    }
+  }
+
   const formatDate = (dateStr?: string | number) => {
     if (!dateStr) return "—";
     const date = new Date(dateStr);
@@ -317,10 +371,28 @@ export function PlansTab() {
                 </AlertDialogContent>
               </AlertDialog>
             )}
+            {isCancelled && subscription?.subscriptionId && (
+              <Button
+                variant="default"
+                className="w-full sm:w-auto order-0"
+                onClick={handleReactivateSubscription}
+              >
+                Reativar assinatura
+              </Button>
+            )}
+            {subscription?.subscriptionId && (
+              <Button
+                variant="secondary"
+                className="w-full sm:w-auto order-1"
+                onClick={handleManageBilling}
+              >
+                Gerenciar no portal
+              </Button>
+            )}
             {upgradePlans.length > 0 && (
               <Button
                 variant="outline"
-                className="w-full sm:w-auto order-1 sm:order-2"
+                className="w-full sm:w-auto order-2"
                 onClick={() => setLocation(`/checkout/${upgradePlans[0].id}`)}
               >
                 <ArrowUpRight className="w-4 h-4 mr-2" />

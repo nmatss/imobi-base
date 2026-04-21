@@ -361,6 +361,107 @@ export class StripeService {
       throw new Error(`Webhook signature verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
+
+  /**
+   * Criar uma Checkout Session hospedada — a forma mais simples de cobrar.
+   * Stripe hospeda a pagina de pagamento, coleta o cartao com PCI compliance
+   * e redireciona de volta via success_url / cancel_url.
+   *
+   * @returns URL da Checkout Session para o cliente ser redirecionado
+   */
+  static async createCheckoutSession(params: {
+    customerId?: string;
+    customerEmail?: string;
+    priceId: string;
+    tenantId: string;
+    successUrl: string;
+    cancelUrl: string;
+    trialPeriodDays?: number;
+    locale?: Stripe.Checkout.SessionCreateParams.Locale;
+  }): Promise<Stripe.Checkout.Session> {
+    try {
+      const sessionParams: Stripe.Checkout.SessionCreateParams = {
+        mode: 'subscription',
+        payment_method_types: ['card'],
+        line_items: [{ price: params.priceId, quantity: 1 }],
+        success_url: params.successUrl,
+        cancel_url: params.cancelUrl,
+        allow_promotion_codes: true,
+        billing_address_collection: 'required',
+        locale: params.locale ?? 'pt-BR',
+        metadata: { tenantId: params.tenantId },
+        subscription_data: {
+          metadata: { tenantId: params.tenantId },
+          ...(params.trialPeriodDays && params.trialPeriodDays > 0
+            ? { trial_period_days: params.trialPeriodDays }
+            : {}),
+        },
+      };
+
+      if (params.customerId) {
+        sessionParams.customer = params.customerId;
+      } else if (params.customerEmail) {
+        sessionParams.customer_email = params.customerEmail;
+      }
+
+      return await stripe.checkout.sessions.create(sessionParams);
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { service: 'stripe', operation: 'createCheckoutSession' },
+        extra: { priceId: params.priceId, tenantId: params.tenantId },
+      });
+      throw new Error(
+        `Failed to create checkout session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  /**
+   * Criar uma Billing Portal Session — redireciona o cliente para a pagina
+   * self-service do Stripe onde pode: mudar plano (upgrade/downgrade),
+   * atualizar cartao, cancelar, reativar, ver faturas.
+   */
+  static async createPortalSession(params: {
+    customerId: string;
+    returnUrl: string;
+  }): Promise<Stripe.BillingPortal.Session> {
+    try {
+      return await stripe.billingPortal.sessions.create({
+        customer: params.customerId,
+        return_url: params.returnUrl,
+      });
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { service: 'stripe', operation: 'createPortalSession' },
+        extra: { customerId: params.customerId },
+      });
+      throw new Error(
+        `Failed to create portal session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
+
+  /**
+   * Reativar uma subscription que foi cancelada com cancel_at_period_end.
+   * So funciona se ainda estamos no periodo atual (nao foi deletada).
+   */
+  static async reactivateSubscription(
+    subscriptionId: string,
+  ): Promise<Stripe.Subscription> {
+    try {
+      return await stripe.subscriptions.update(subscriptionId, {
+        cancel_at_period_end: false,
+      });
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { service: 'stripe', operation: 'reactivateSubscription' },
+        extra: { subscriptionId },
+      });
+      throw new Error(
+        `Failed to reactivate subscription: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
+    }
+  }
 }
 
 export default StripeService;

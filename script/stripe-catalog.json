@@ -1,0 +1,26 @@
+[
+  {
+    "slug": "starter",
+    "productId": "prod_UNUiFNBYRyESHE",
+    "stripePriceId": "price_1TOjjRKiHzehqo7Zf04As7cI",
+    "stripeYearlyPriceId": "price_1TOjjRKiHzehqo7ZKhhqpGfq"
+  },
+  {
+    "slug": "pro",
+    "productId": "prod_UNUi5EqgV92pMd",
+    "stripePriceId": "price_1TOjjSKiHzehqo7Z28sHV5Mn",
+    "stripeYearlyPriceId": "price_1TOjjTKiHzehqo7ZxEw6wIRx"
+  },
+  {
+    "slug": "business",
+    "productId": "prod_UNUi7d1CnojAwW",
+    "stripePriceId": "price_1TOjjUKiHzehqo7ZY1or0Lwi",
+    "stripeYearlyPriceId": "price_1TOjjVKiHzehqo7ZfVHFFrog"
+  },
+  {
+    "slug": "enterprise",
+    "productId": "prod_UNUi0e4sGIarDK",
+    "stripePriceId": "price_1TOjjWKiHzehqo7ZsBdsX02v",
+    "stripeYearlyPriceId": "price_1TOjjXKiHzehqo7ZMUZyIYKk"
+  }
+]

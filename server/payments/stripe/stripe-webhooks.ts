@@ -92,9 +92,18 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription): Pro
       }
     }
 
+    // Preserva metadata existente (stripeCustomerId vem do checkout) e adiciona
+    // stripeSubscriptionId para reactivate/manage operations futuras.
+    const existing = await storage.getTenantSubscription(tenantId);
+    updateData.metadata = {
+      ...((existing?.metadata as Record<string, unknown>) || {}),
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: subscription.id,
+    };
+
     await storage.updateTenantSubscription(tenantId, updateData);
 
-    console.log(`✅ Subscription created for tenant ${tenantId}`);
+    console.log(`✅ Subscription created for tenant ${tenantId} (sub ${subscription.id})`);
   } catch (error) {
     Sentry.captureException(error, {
       tags: { webhook: 'stripe', event: 'subscription.created' },
@@ -151,6 +160,14 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Pro
         updateData.planId = matchedPlan.id;
       }
     }
+
+    // Preserva metadata existente + garante que subscriptionId esta salvo
+    const existing = await storage.getTenantSubscription(tenantId);
+    updateData.metadata = {
+      ...((existing?.metadata as Record<string, unknown>) || {}),
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: subscription.id,
+    };
 
     await storage.updateTenantSubscription(tenantId, updateData);
 
@@ -413,8 +430,72 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription): Promise<vo
   }
 }
 
+/**
+ * Handle checkout.session.completed — disparado imediatamente apos o usuario
+ * completar o pagamento na Stripe Checkout Session. E a primeira notificacao
+ * que chega (antes mesmo de customer.subscription.created em alguns casos).
+ *
+ * Garante que o stripeCustomerId seja persistido no tenant_subscriptions
+ * mesmo antes do evento de subscription.created chegar. Idempotente: pode
+ * rodar junto com subscription.created sem problema.
+ */
+async function handleCheckoutSessionCompleted(
+  session: Stripe.Checkout.Session,
+): Promise<void> {
+  try {
+    const tenantId = session.metadata?.tenantId;
+    if (!tenantId) {
+      console.warn(
+        `[stripe-webhook] checkout.session.completed sem tenantId em metadata: ${session.id}`,
+      );
+      return;
+    }
+
+    if (session.mode !== 'subscription') {
+      console.log(
+        `[stripe-webhook] checkout.session.completed mode=${session.mode} ignorado`,
+      );
+      return;
+    }
+
+    const customerId =
+      typeof session.customer === 'string'
+        ? session.customer
+        : session.customer?.id;
+
+    if (!customerId) {
+      console.warn(
+        `[stripe-webhook] checkout.session.completed sem customer: ${session.id}`,
+      );
+      return;
+    }
+
+    // Persiste stripeCustomerId o quanto antes. customer.subscription.created
+    // ja atualiza o planId/status; aqui so garantimos que o customerId esta la.
+    await storage.updateTenantSubscription(tenantId, {
+      metadata: { stripeCustomerId: customerId },
+    });
+
+    console.log(
+      `✅ Checkout completed for tenant ${tenantId}, customer ${customerId}, session ${session.id}`,
+    );
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { webhook: 'stripe', event: 'checkout.session.completed' },
+      extra: { sessionId: session.id },
+    });
+    throw error;
+  }
+}
+
 async function dispatchEvent(event: Stripe.Event): Promise<void> {
   switch (event.type) {
+    case 'checkout.session.completed':
+      await handleCheckoutSessionCompleted(
+        event.data.object as Stripe.Checkout.Session,
+      );
+      break;
+
     case 'customer.subscription.created':
       await handleSubscriptionCreated(event.data.object as Stripe.Subscription);
       break;

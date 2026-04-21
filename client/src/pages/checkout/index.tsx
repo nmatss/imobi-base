@@ -57,7 +57,9 @@ export default function CheckoutPage() {
     }
 
     if (!plan.stripePriceId) {
-      toast.error("Este plano ainda não está disponível para assinatura. Configure as chaves do Stripe.");
+      toast.error(
+        "Este plano ainda não está disponível para assinatura. Contate o suporte.",
+      );
       return;
     }
 
@@ -65,28 +67,31 @@ export default function CheckoutPage() {
     setError("");
 
     try {
-      const res = await fetch("/api/payments/stripe/create-subscription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          priceId: plan.stripePriceId,
-          trialDays: 7,
-        }),
-      });
+      // Cria uma Stripe Checkout Session e redireciona. Cartão é coletado
+      // na página hospedada do Stripe (PCI-compliant, sem Stripe Elements).
+      const res = await fetch(
+        "/api/payments/stripe/create-checkout-session",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ priceId: plan.stripePriceId }),
+        },
+      );
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Erro ao criar assinatura");
+      const data = await res.json();
+      if (!res.ok || !data.url) {
+        throw new Error(data.error || "Não foi possível iniciar o checkout");
       }
 
-      toast.success("Assinatura criada com sucesso!");
-      setLocation("/dashboard");
+      // Redireciona para Stripe Checkout. O webhook checkout.session.completed
+      // + customer.subscription.created finaliza a ativação no retorno.
+      window.location.href = data.url;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Erro ao processar pagamento";
+      const message =
+        err instanceof Error ? err.message : "Erro ao processar pagamento";
       setError(message);
       toast.error(message);
-    } finally {
       setSubmitting(false);
     }
   };

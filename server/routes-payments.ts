@@ -143,6 +143,153 @@ export function registerPaymentRoutes(app: Express): void {
   });
 
   /**
+   * Cria uma Stripe Checkout Session — fluxo recomendado para novos
+   * assinantes. Backend cria a session e retorna a URL. Cliente faz
+   * window.location.href = url para ir à página hospedada do Stripe,
+   * onde o cartão é coletado com PCI compliance nativa. Após sucesso,
+   * Stripe redireciona para success_url e o webhook checkout.session.completed
+   * finaliza a persistência no DB.
+   */
+  app.post(
+    '/api/payments/stripe/create-checkout-session',
+    paymentMutationLimiter,
+    asyncHandler(async (req: Request, res: Response) => {
+      if (!req.user) throw new AuthError();
+
+      const { priceId, successUrl, cancelUrl } = req.body as {
+        priceId?: string;
+        successUrl?: string;
+        cancelUrl?: string;
+      };
+
+      if (!priceId) {
+        res.status(400).json({ error: 'priceId is required' });
+        return;
+      }
+
+      const tenantId = req.user.tenantId;
+      const tenant = await storage.getTenantById(tenantId);
+      if (!tenant) {
+        res.status(404).json({ error: 'Tenant not found' });
+        return;
+      }
+
+      // Validar que priceId existe em algum plano ativo (anti-abuse)
+      const allPlans = await storage.getActivePlans();
+      const plan = allPlans.find(
+        (p: Record<string, unknown>) =>
+          p.stripePriceId === priceId || p.stripeYearlyPriceId === priceId,
+      );
+      if (!plan) {
+        res.status(400).json({ error: 'Invalid priceId' });
+        return;
+      }
+
+      // Reaproveita Stripe Customer se ja existir para este tenant
+      const existingSub = await storage.getTenantSubscription(tenantId);
+      let customerId = existingSub?.metadata?.stripeCustomerId as
+        | string
+        | undefined;
+      if (!customerId) {
+        const customer = await StripeService.createCustomer({
+          email: tenant.email || req.user.email,
+          name: tenant.name,
+          tenantId,
+        });
+        customerId = customer.id;
+        await storage.updateTenantSubscription(tenantId, {
+          metadata: { stripeCustomerId: customerId },
+        });
+      }
+
+      const appUrl =
+        process.env.APP_URL ||
+        process.env.VITE_APP_URL ||
+        'https://imobibase.com.br';
+
+      const session = await StripeService.createCheckoutSession({
+        customerId,
+        priceId,
+        tenantId,
+        successUrl:
+          successUrl ||
+          `${appUrl}/settings/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: cancelUrl || `${appUrl}/pricing?checkout=cancelled`,
+        trialPeriodDays:
+          (plan as Record<string, unknown>).trialDays as number | undefined,
+      });
+
+      res.json({ sessionId: session.id, url: session.url });
+    }),
+  );
+
+  /**
+   * Cria Billing Portal Session — unica URL onde o cliente faz TUDO:
+   * upgrade, downgrade, atualizar cartao, cancelar, reativar, ver faturas.
+   * Requer que o tenant ja tenha um stripeCustomerId (vira do Checkout).
+   */
+  app.post(
+    '/api/payments/stripe/create-portal-session',
+    paymentMutationLimiter,
+    asyncHandler(async (req: Request, res: Response) => {
+      if (!req.user) throw new AuthError();
+
+      const tenantId = req.user.tenantId;
+      const subscription = await storage.getTenantSubscription(tenantId);
+      const customerId = subscription?.metadata?.stripeCustomerId as
+        | string
+        | undefined;
+
+      if (!customerId) {
+        res.status(404).json({
+          error:
+            'Nenhuma assinatura encontrada. Complete o checkout antes de acessar o portal.',
+        });
+        return;
+      }
+
+      const appUrl =
+        process.env.APP_URL ||
+        process.env.VITE_APP_URL ||
+        'https://imobibase.com.br';
+
+      const session = await StripeService.createPortalSession({
+        customerId,
+        returnUrl: `${appUrl}/settings/billing`,
+      });
+
+      res.json({ url: session.url });
+    }),
+  );
+
+  /**
+   * Reativa uma assinatura que foi agendada para cancelar no fim do periodo
+   * (cancel_at_period_end=true). O usuario pode tambem fazer via portal,
+   * mas este endpoint e util para confirmar-ao-clique dentro da UI.
+   */
+  app.post(
+    '/api/payments/stripe/reactivate-subscription',
+    paymentMutationLimiter,
+    asyncHandler(async (req: Request, res: Response) => {
+      if (!req.user) throw new AuthError();
+
+      const { subscriptionId } = req.body as { subscriptionId?: string };
+      if (!subscriptionId) {
+        res.status(400).json({ error: 'subscriptionId is required' });
+        return;
+      }
+
+      const subscription =
+        await StripeService.reactivateSubscription(subscriptionId);
+      res.json({
+        subscriptionId: subscription.id,
+        status: subscription.status,
+        cancelAtPeriodEnd: subscription.cancel_at_period_end,
+      });
+    }),
+  );
+
+  /**
    * Update payment method
    */
   app.post('/api/payments/stripe/update-payment-method', paymentMutationLimiter, async (req: Request, res: Response) => {
@@ -202,6 +349,7 @@ export function registerPaymentRoutes(app: Express): void {
       }
 
       const plan = await storage.getPlan(subscription.planId);
+      const metadata = (subscription.metadata || {}) as Record<string, unknown>;
 
       res.json({
         status: subscription.status,
@@ -210,6 +358,8 @@ export function registerPaymentRoutes(app: Express): void {
         currentPeriodEnd: subscription.currentPeriodEnd,
         trialEndsAt: subscription.trialEndsAt,
         cancelledAt: subscription.cancelledAt,
+        subscriptionId:
+          (metadata.stripeSubscriptionId as string | undefined) || null,
       });
     } catch (error) {
       console.error('Error getting subscription status:', error);
