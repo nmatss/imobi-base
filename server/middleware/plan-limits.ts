@@ -289,6 +289,92 @@ export function checkFeatureAccess(featureName: string) {
 }
 
 /**
+ * Revoga integracoes excedentes quando o tenant faz downgrade de plano.
+ *
+ * Features baseadas em flags (`whatsapp`, `ai_marketing`, etc.) sao validadas a
+ * cada request via `checkFeatureAccess`, portanto nao precisam de revogacao
+ * explicita — o acesso simplesmente e negado na proxima chamada. Limites
+ * baseados em contagem de registros ja criados (usuarios, imoveis, leads) nao
+ * devem ser removidos automaticamente (risco de perda de dados). O unico
+ * recurso que REALMENTE vaza apos downgrade sao integracoes ativas, que
+ * continuam sincronizando com sistemas externos apos o plano caducar.
+ *
+ * Esta funcao desconecta as integracoes mais recentes, preservando as mais
+ * antigas (tipicamente as mais criticas para o negocio do tenant).
+ *
+ * @returns numero de integracoes desconectadas
+ */
+export async function enforceIntegrationLimit(tenantId: string): Promise<number> {
+  try {
+    const limits = await getTenantPlanLimits(tenantId);
+    // -1 = ilimitado, nada a fazer
+    if (limits.maxIntegrations === -1) return 0;
+
+    const integrations = await storage.getIntegrationsByTenant(tenantId);
+    const connected = integrations
+      .filter((i) => i.status === "connected")
+      .sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
+
+    if (connected.length <= limits.maxIntegrations) return 0;
+
+    // Desconectar as mais novas, preservando as mais antigas ate o limite
+    const toDisconnect = connected.slice(limits.maxIntegrations);
+    let count = 0;
+    for (const integration of toDisconnect) {
+      try {
+        await storage.createOrUpdateIntegration(
+          tenantId,
+          integration.integrationName,
+          { status: "disconnected", config: integration.config },
+        );
+        count++;
+        console.log(
+          `[enforce-plan] Disconnected integration ${integration.integrationName} for tenant ${tenantId}`,
+        );
+      } catch (err) {
+        console.error(
+          `[enforce-plan] Failed to disconnect ${integration.integrationName}:`,
+          err,
+        );
+        Sentry.captureException(err, {
+          tags: { component: "enforce-plan-limits" },
+          extra: { tenantId, integrationName: integration.integrationName },
+        });
+      }
+    }
+
+    if (count > 0) {
+      console.log(
+        `[enforce-plan] Tenant ${tenantId}: disconnected ${count} integration(s) due to plan downgrade`,
+      );
+    }
+
+    return count;
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { middleware: "plan-limits", operation: "enforceIntegrationLimit" },
+      extra: { tenantId },
+    });
+    return 0;
+  }
+}
+
+/**
+ * Executa todas as verificacoes de enforcement de plano para um tenant.
+ * Chamado (a) no webhook customer.subscription.updated apos mudanca de plano
+ * e (b) diariamente via scheduled-job como safety net.
+ */
+export async function enforceAllPlanLimits(
+  tenantId: string,
+): Promise<{ integrationsDisconnected: number }> {
+  const integrationsDisconnected = await enforceIntegrationLimit(tenantId);
+  return { integrationsDisconnected };
+}
+
+/**
  * Get usage statistics for a tenant
  */
 export async function getUsageStats(tenantId: string): Promise<{

@@ -4,6 +4,7 @@
  */
 
 import type { Express, Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import { StripeService } from './payments/stripe/stripe-service';
 import { handleStripeWebhook } from './payments/stripe/stripe-webhooks';
 import { MercadoPagoService } from './payments/mercadopago/mercadopago-service';
@@ -13,6 +14,7 @@ import * as Sentry from '@sentry/node';
 import { validateBody } from './middleware/validate';
 import { asyncHandler, AuthError } from './middleware/error-handler';
 import { idempotencyCheck } from './middleware/idempotency';
+import { generateRateLimitKey } from './middleware/rate-limit-key-generator';
 import {
   createStripeSubscriptionSchema,
   cancelStripeSubscriptionSchema,
@@ -20,6 +22,29 @@ import {
   createPixPaymentSchema,
   createBoletoPaymentSchema,
 } from './schemas';
+
+/**
+ * Rate limiter para criacao/modificacao de subscriptions e pagamentos.
+ * Protege contra spam que geraria cobrancas/objetos orfaos em Stripe/MercadoPago.
+ * Limite: 5 requisicoes/minuto por tenant ou IP.
+ */
+const paymentMutationLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  keyGenerator: generateRateLimitKey,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Muitas tentativas de pagamento. Aguarde 1 minuto e tente novamente.',
+  },
+  handler: (req, res) => {
+    res.status(429).json({
+      error: 'rate_limit_exceeded',
+      message: 'Muitas tentativas de pagamento. Aguarde 1 minuto.',
+      retryAfter: res.getHeader('Retry-After'),
+    });
+  },
+});
 
 /**
  * Register payment routes
@@ -30,7 +55,7 @@ export function registerPaymentRoutes(app: Express): void {
   /**
    * Create Stripe subscription
    */
-  app.post('/api/payments/stripe/create-subscription', idempotencyCheck, validateBody(createStripeSubscriptionSchema), asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/payments/stripe/create-subscription', paymentMutationLimiter, idempotencyCheck, validateBody(createStripeSubscriptionSchema), asyncHandler(async (req: Request, res: Response) => {
     if (!req.user) {
       throw new AuthError();
     }
@@ -90,7 +115,7 @@ export function registerPaymentRoutes(app: Express): void {
   /**
    * Cancel Stripe subscription
    */
-  app.post('/api/payments/stripe/cancel-subscription', async (req: Request, res: Response) => {
+  app.post('/api/payments/stripe/cancel-subscription', paymentMutationLimiter, async (req: Request, res: Response) => {
     try {
       if (!req.user) {
         res.status(401).json({ error: 'Unauthorized' });
@@ -120,7 +145,7 @@ export function registerPaymentRoutes(app: Express): void {
   /**
    * Update payment method
    */
-  app.post('/api/payments/stripe/update-payment-method', async (req: Request, res: Response) => {
+  app.post('/api/payments/stripe/update-payment-method', paymentMutationLimiter, async (req: Request, res: Response) => {
     try {
       if (!req.user) {
         res.status(401).json({ error: 'Unauthorized' });
@@ -245,7 +270,7 @@ export function registerPaymentRoutes(app: Express): void {
   /**
    * Create PIX payment
    */
-  app.post('/api/payments/mercadopago/create-pix', idempotencyCheck, async (req: Request, res: Response) => {
+  app.post('/api/payments/mercadopago/create-pix', paymentMutationLimiter, idempotencyCheck, async (req: Request, res: Response) => {
     try {
       if (!req.user) {
         res.status(401).json({ error: 'Unauthorized' });
@@ -278,7 +303,7 @@ export function registerPaymentRoutes(app: Express): void {
   /**
    * Create Boleto payment
    */
-  app.post('/api/payments/mercadopago/create-boleto', idempotencyCheck, async (req: Request, res: Response) => {
+  app.post('/api/payments/mercadopago/create-boleto', paymentMutationLimiter, idempotencyCheck, async (req: Request, res: Response) => {
     try {
       if (!req.user) {
         res.status(401).json({ error: 'Unauthorized' });

@@ -77,7 +77,8 @@
     { "path": "/api/cron/cleanup-logs", "schedule": "0 4 * * *" },
     { "path": "/api/cron/integration-sync", "schedule": "0 6 * * *" },
     { "path": "/api/cron/database-backup", "schedule": "0 5 * * *" },
-    { "path": "/api/cron/cleanup-temp-files", "schedule": "0 6 * * 0" }
+    { "path": "/api/cron/cleanup-temp-files", "schedule": "0 6 * * 0" },
+    { "path": "/api/cron/enforce-plan-limits", "schedule": "30 6 * * *" }
   ],
   "env": {
     "NODE_ENV": "production"

@@ -166,6 +166,43 @@ export async function runDatabaseBackup(): Promise<void> {
 }
 
 /**
+ * Revalida limites de plano para todos os tenants ativos.
+ * Safety net diario: desconecta integracoes excedentes em casos onde o webhook
+ * customer.subscription.updated falhou ou o downgrade ocorreu manualmente.
+ * Executar via cron as 3h da manha (baixa carga).
+ */
+export async function runEnforcePlanLimits(): Promise<void> {
+  const { storage } = await import("../storage");
+  const { enforceAllPlanLimits } = await import(
+    "../middleware/plan-limits"
+  );
+
+  console.log("[Cron] Running plan limits enforcement sweep...");
+  const tenants = await storage.getAllTenants();
+  let affected = 0;
+  let total = 0;
+
+  for (const tenant of tenants) {
+    try {
+      const result = await enforceAllPlanLimits(tenant.id);
+      if (result.integrationsDisconnected > 0) {
+        affected++;
+        total += result.integrationsDisconnected;
+      }
+    } catch (err) {
+      Sentry.captureException(err, {
+        tags: { cron: "enforce-plan-limits" },
+        extra: { tenantId: tenant.id },
+      });
+    }
+  }
+
+  console.log(
+    `[Cron] Plan enforcement complete: ${affected} tenants affected, ${total} integrations disconnected`,
+  );
+}
+
+/**
  * Run cleanup of soft-deleted records older than 90 days
  */
 export async function runCleanupSoftDeletes(): Promise<void> {

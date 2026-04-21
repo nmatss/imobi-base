@@ -11,6 +11,48 @@ import { getEmailService } from '../../email/email-service';
 import * as Sentry from '@sentry/node';
 
 /**
+ * Idempotencia via Redis SETNX.
+ * Retorna true se for a primeira vez que vemos este event.id (deve processar).
+ * Retorna false se ja foi processado dentro do TTL (nao processar de novo).
+ * Se Redis estiver indisponivel, returns true (fail-open) e deixa o Stripe
+ * fazer retry — melhor processar duas vezes que perder evento.
+ */
+async function markEventAsProcessing(eventId: string): Promise<boolean> {
+  if (!process.env.REDIS_URL) return true;
+  try {
+    const { getRedisClient } = await import('../../cache/redis-client');
+    const client = getRedisClient();
+    const key = `stripe:webhook:${eventId}`;
+    // NX = only set if not exists. EX = expiration in seconds (24h).
+    const result = await client.set(key, '1', 'EX', 24 * 60 * 60, 'NX');
+    return result === 'OK';
+  } catch (err) {
+    // Fail-open: se Redis falhar, prossegue e aceita risco de dupla execucao
+    console.warn('[stripe-webhook] Idempotency check failed (fail-open):', err);
+    Sentry.captureMessage('Stripe webhook idempotency fail-open', {
+      level: 'warning',
+      extra: { eventId, error: err instanceof Error ? err.message : String(err) },
+    });
+    return true;
+  }
+}
+
+/**
+ * Marca o evento como falhou para permitir retry.
+ * Deleta a chave de idempotencia para que o proximo webhook possa reprocessar.
+ */
+async function markEventAsFailed(eventId: string): Promise<void> {
+  if (!process.env.REDIS_URL) return;
+  try {
+    const { getRedisClient } = await import('../../cache/redis-client');
+    const client = getRedisClient();
+    await client.del(`stripe:webhook:${eventId}`);
+  } catch (err) {
+    console.warn('[stripe-webhook] Failed to clear idempotency key:', err);
+  }
+}
+
+/**
  * Handle customer.subscription.created event
  */
 async function handleSubscriptionCreated(subscription: Stripe.Subscription): Promise<void> {
@@ -113,6 +155,25 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Pro
     await storage.updateTenantSubscription(tenantId, updateData);
 
     console.log(`✅ Subscription updated for tenant ${tenantId}, status: ${status}`);
+
+    // Downgrade enforcement: apos atualizar o plano, revoga integracoes excedentes.
+    // Roda fora do critical path para nao bloquear a resposta ao Stripe em caso de erro.
+    try {
+      const { enforceAllPlanLimits } = await import('../../middleware/plan-limits');
+      const result = await enforceAllPlanLimits(tenantId);
+      if (result.integrationsDisconnected > 0) {
+        console.log(
+          `[stripe-webhook] Tenant ${tenantId}: ${result.integrationsDisconnected} integration(s) disconnected due to plan change`,
+        );
+      }
+    } catch (enforceError) {
+      // Nao propaga — enforcement e safety net, webhook principal ja sucedeu
+      console.error('[stripe-webhook] enforceAllPlanLimits failed:', enforceError);
+      Sentry.captureException(enforceError, {
+        tags: { webhook: 'stripe', event: 'subscription.updated', step: 'enforce' },
+        extra: { tenantId },
+      });
+    }
   } catch (error) {
     Sentry.captureException(error, {
       tags: { webhook: 'stripe', event: 'subscription.updated' },
@@ -352,8 +413,47 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription): Promise<vo
   }
 }
 
+async function dispatchEvent(event: Stripe.Event): Promise<void> {
+  switch (event.type) {
+    case 'customer.subscription.created':
+      await handleSubscriptionCreated(event.data.object as Stripe.Subscription);
+      break;
+
+    case 'customer.subscription.updated':
+      await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
+      break;
+
+    case 'customer.subscription.deleted':
+      await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+      break;
+
+    case 'invoice.payment_succeeded':
+      await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice);
+      break;
+
+    case 'invoice.payment_failed':
+      await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
+      break;
+
+    case 'customer.subscription.trial_will_end':
+      await handleTrialWillEnd(event.data.object as Stripe.Subscription);
+      break;
+
+    default:
+      console.log(`Unhandled event type: ${event.type}`);
+  }
+}
+
 /**
- * Main webhook handler
+ * Main webhook handler.
+ *
+ * Pipeline:
+ * 1. Valida assinatura (signature) — rejeita 400 se falhar. Stripe nao retenta.
+ * 2. Idempotencia via Redis SETNX (24h TTL). Se ja processado, responde 200
+ *    imediatamente sem reprocessar (evita racing em replays).
+ * 3. Dispatch do handler especifico.
+ * 4. Em caso de falha no handler, limpa a chave de idempotencia e responde 500
+ *    para que o Stripe faca retry automatico (com backoff exponencial ate 72h).
  */
 export async function handleStripeWebhook(req: Request, res: Response): Promise<void> {
   const signature = req.headers['stripe-signature'];
@@ -363,53 +463,50 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
     return;
   }
 
+  // 1. Signature verification (sincrono, barato — antes de qualquer outra coisa)
+  let event: Stripe.Event;
   try {
-    // Verify webhook signature
-    const event = StripeService.verifyWebhookSignature(
+    event = StripeService.verifyWebhookSignature(
       req.rawBody as Buffer,
-      signature as string
+      signature as string,
     );
-
-    console.log(`📨 Received Stripe webhook: ${event.type}`);
-
-    // Handle different event types
-    switch (event.type) {
-      case 'customer.subscription.created':
-        await handleSubscriptionCreated(event.data.object as Stripe.Subscription);
-        break;
-
-      case 'customer.subscription.updated':
-        await handleSubscriptionUpdated(event.data.object as Stripe.Subscription);
-        break;
-
-      case 'customer.subscription.deleted':
-        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
-        break;
-
-      case 'invoice.payment_succeeded':
-        await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice);
-        break;
-
-      case 'invoice.payment_failed':
-        await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
-        break;
-
-      case 'customer.subscription.trial_will_end':
-        await handleTrialWillEnd(event.data.object as Stripe.Subscription);
-        break;
-
-      default:
-        console.log(`Unhandled event type: ${event.type}`);
-    }
-
-    res.json({ received: true });
   } catch (error) {
-    console.error('Error processing Stripe webhook:', error);
+    console.error('[stripe-webhook] Signature verification failed:', error);
     Sentry.captureException(error, {
-      tags: { webhook: 'stripe', handler: 'main' },
+      tags: { webhook: 'stripe', handler: 'signature' },
     });
     res.status(400).json({
+      error: error instanceof Error ? error.message : 'Invalid signature',
+    });
+    return;
+  }
+
+  // 2. Idempotencia — processa cada event.id no maximo uma vez por 24h
+  const isNew = await markEventAsProcessing(event.id);
+  if (!isNew) {
+    console.log(`[stripe-webhook] Duplicate event ignored: ${event.id} (${event.type})`);
+    res.json({ received: true, duplicate: true });
+    return;
+  }
+
+  console.log(`📨 [stripe-webhook] Processing: ${event.type} (${event.id})`);
+
+  // 3. Dispatch + handling
+  try {
+    await dispatchEvent(event);
+    res.json({ received: true });
+  } catch (error) {
+    console.error(`[stripe-webhook] Handler failed for ${event.type} (${event.id}):`, error);
+    Sentry.captureException(error, {
+      tags: { webhook: 'stripe', handler: 'dispatch', eventType: event.type },
+      extra: { eventId: event.id },
+    });
+    // Permite retry: limpa a chave de idempotencia e responde com 500
+    // para o Stripe disparar o proximo retry (backoff automatico)
+    await markEventAsFailed(event.id);
+    res.status(500).json({
       error: error instanceof Error ? error.message : 'Webhook processing failed',
+      eventId: event.id,
     });
   }
 }

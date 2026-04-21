@@ -21,6 +21,7 @@ import {
   runDatabaseBackup,
   runCleanupTempFiles,
   runCleanupSoftDeletes,
+  runEnforcePlanLimits,
 } from "./jobs/scheduled-jobs";
 
 /**
@@ -161,6 +162,12 @@ export function registerCronRoutes(app: Express): void {
   app.get(
     "/api/cron/cleanup-soft-deletes",
     createCronHandler("cleanup-soft-deletes", runCleanupSoftDeletes)
+  );
+
+  // Daily at 3:30 AM (Brazil) - Enforce plan limits (revoke integrations over limit)
+  app.get(
+    "/api/cron/enforce-plan-limits",
+    createCronHandler("enforce-plan-limits", runEnforcePlanLimits)
   );
 
   // Health check / status endpoint for all cron jobs
