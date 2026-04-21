@@ -22,6 +22,7 @@ const BYPASS_PREFIXES = [
   '/api/mercadopago',
   '/api/public',
   '/api/portal',
+  '/api/admin/bootstrap',
 ];
 
 /**

@@ -45,6 +45,7 @@
     "analyze:a11y": "tsx scripts/analyze-a11y.ts",
     "seo:sitemap": "tsx script/generate-sitemap.ts",
     "stripe:seed": "tsx script/seed-stripe-prices.ts",
+    "admin:seed": "tsx script/seed-super-admin.ts",
     "assets:optimize": "tsx scripts/optimize-images.ts",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",

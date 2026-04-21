@@ -49,6 +49,7 @@ import { checkFeatureAccess } from "./middleware/plan-limits";
 import { registerSecurityRoutes } from "./routes-security";
 import { registerFeatureRoutes } from "./routes-features";
 import { registerPaymentRoutes } from "./routes-payments";
+import { registerAdminBootstrapRoutes } from "./routes-admin-bootstrap";
 import { registerCronRoutes } from "./routes-cron";
 import mapsRouter from "./routes-maps";
 import analyticsRouter from "./routes-analytics";
@@ -147,6 +148,7 @@ const csrfExcludedPaths = [
   "/api/portal/forgot-password",
   "/api/portal/logout",
   "/api/cron/",
+  "/api/admin/bootstrap",
 ];
 
 /**
@@ -3735,6 +3737,7 @@ export async function registerRoutes(
   registerSecurityRoutes(app);
   registerFeatureRoutes(app);
   registerPaymentRoutes(app);
+  registerAdminBootstrapRoutes(app);
 
   // Register maps/geocoding routes
   app.use("/api/maps", mapsRouter);
