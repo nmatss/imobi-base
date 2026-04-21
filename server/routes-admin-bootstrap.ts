@@ -63,10 +63,17 @@ export function registerAdminBootstrapRoutes(app: Express): void {
         return;
       }
 
-      const { email, password, name } = (req.body || {}) as BootstrapBody;
-      if (!email || !password || !name) {
+      // Credenciais via body ou env fallback (ADMIN_EMAIL/ADMIN_PASSWORD/ADMIN_NAME).
+      // Fallback permite chamar o endpoint com apenas o header de secret,
+      // reaproveitando variaveis ja configuradas na Vercel.
+      const body = (req.body || {}) as BootstrapBody;
+      const email = body.email || process.env.ADMIN_EMAIL;
+      const password = body.password || process.env.ADMIN_PASSWORD;
+      const name = body.name || process.env.ADMIN_NAME || "Admin";
+      if (!email || !password) {
         res.status(400).json({
-          error: "email, password e name são obrigatórios",
+          error:
+            "email e password obrigatórios (via body ou env ADMIN_EMAIL/ADMIN_PASSWORD)",
         });
         return;
       }
