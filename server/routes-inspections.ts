@@ -376,7 +376,7 @@ export function registerInspectionRoutes(app: Express) {
       // Calculate total damages
       const rooms = await storage.getInspectionRoomsByInspection(inspection.id);
       let totalDamages = 0;
-      let conditionCounts: Record<string, number> = { excellent: 0, good: 0, fair: 0, poor: 0 };
+      const conditionCounts: Record<string, number> = { excellent: 0, good: 0, fair: 0, poor: 0 };
 
       for (const room of rooms) {
         const items = await storage.getInspectionItemsByRoom(room.id);

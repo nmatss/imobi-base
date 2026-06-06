@@ -19,7 +19,7 @@ export interface SMSTemplate {
  */
 function shortUrl(url: string): string {
   // In production, integrate with bit.ly, TinyURL, or custom URL shortener
-  return url.length > 30 ? 'imb.li/' + url.slice(-8) : url;
+  return url.length > 30 ? `imb.li/${  url.slice(-8)}` : url;
 }
 
 export const SMS_TEMPLATES: Record<string, SMSTemplate> = {

@@ -1,232 +1,167 @@
 import { Job } from 'bullmq';
-import { ReportJobData, EmailJobData, QueueName } from '../queue-manager';
-import { getQueue } from '../queue-manager';
+import { ReportJobData } from '../queue-manager';
 import * as Sentry from '@sentry/node';
 
-/**
- * Report processor - handles report generation
- */
-export async function processReport(job: Job<ReportJobData>): Promise<void> {
-  const { type, userId, startDate, endDate, format, email } = job.data;
-
-  try {
-    console.log(`[ReportProcessor] Generating ${type} report in ${format} format`);
-
-    await job.updateProgress(10);
-
-    // Step 1: Determine date range
-    const dateRange = calculateDateRange(type, startDate, endDate);
-    console.log(`[ReportProcessor] Date range: ${dateRange.start} to ${dateRange.end}`);
-
-    await job.updateProgress(20);
-
-    // Step 2: Fetch data from database
-    console.log(`[ReportProcessor] Fetching data for report`);
-
-    // In production, fetch actual data from database
-    const reportData = {
-      type,
-      period: {
-        start: dateRange.start,
-        end: dateRange.end,
-      },
-      metrics: {
-        totalProperties: 150,
-        activeContracts: 120,
-        revenue: 180000.00,
-        newLeads: 45,
-        closedDeals: 12,
-        occupancyRate: 0.80,
-      },
-      topProperties: [
-        { id: 1, address: 'Rua A, 123', revenue: 15000 },
-        { id: 2, address: 'Av B, 456', revenue: 12000 },
-        { id: 3, address: 'Rua C, 789', revenue: 10000 },
-      ],
-      recentActivity: [
-        { date: '2025-12-20', type: 'contract_signed', value: 'Property #45' },
-        { date: '2025-12-19', type: 'payment_received', value: 'R$ 3,500' },
-        { date: '2025-12-18', type: 'new_lead', value: 'John Doe' },
-      ],
-    };
-
-    console.log(`[ReportProcessor] Data fetched successfully`);
-    await job.updateProgress(50);
-
-    // Step 3: Generate report in requested format
-    let filePath: string;
-    let fileName: string;
-
-    switch (format) {
-      case 'pdf':
-        filePath = await generatePdfReport(reportData, type);
-        fileName = `report-${type}-${Date.now()}.pdf`;
-        break;
-
-      case 'excel':
-        filePath = await generateExcelReport(reportData, type);
-        fileName = `report-${type}-${Date.now()}.xlsx`;
-        break;
-
-      case 'csv':
-        filePath = await generateCsvReport(reportData, type);
-        fileName = `report-${type}-${Date.now()}.csv`;
-        break;
-
-      default:
-        throw new Error(`Unsupported format: ${format}`);
-    }
-
-    console.log(`[ReportProcessor] Report generated: ${filePath}`);
-    await job.updateProgress(80);
-
-    // Step 4: Upload to storage
-    const storageUrl = `https://storage.imobibase.com/reports/${fileName}`;
-    console.log(`[ReportProcessor] Report uploaded to ${storageUrl}`);
-
-    await job.updateProgress(90);
-
-    // Step 5: Send email notification if email provided
-    if (email) {
-      console.log(`[ReportProcessor] Sending report via email to ${email}`);
-
-      const emailQueue = getQueue<EmailJobData>(QueueName.EMAIL);
-      await emailQueue.add('send-report', {
-        to: email,
-        subject: `Your ${type} report is ready`,
-        template: 'report-ready',
-        data: {
-          reportType: type,
-          period: `${dateRange.start} to ${dateRange.end}`,
-          downloadUrl: storageUrl,
-          generatedAt: new Date().toISOString(),
-        },
-        attachments: [
-          {
-            filename: fileName,
-            path: filePath,
-          },
-        ],
-      });
-
-      console.log(`[ReportProcessor] Email queued`);
-    }
-
-    await job.updateProgress(100);
-
-    console.log(`[ReportProcessor] Report processing completed successfully`);
-
-    Sentry.addBreadcrumb({
-      category: 'report',
-      message: `Report generated: ${type}`,
-      level: 'info',
-      data: {
-        type,
-        format,
-        userId,
-      },
-    });
-  } catch (error) {
-    console.error(`[ReportProcessor] Failed to generate report:`, error);
-
-    Sentry.captureException(error, {
-      tags: {
-        component: 'report-processor',
-        reportType: type,
-        format,
-      },
-      extra: {
-        userId,
-        startDate,
-        endDate,
-      },
-    });
-
-    throw error;
-  }
+export interface ReportContext {
+  type: 'daily' | 'weekly' | 'monthly' | 'custom';
+  tenantId: string;
+  recipientEmail: string;
+  recipientName: string;
+  agencyName: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 /**
- * Calculate date range based on report type
+ * Calculate the date range covered by a report.
  */
-function calculateDateRange(
-  type: string,
+export function calculateDateRange(
+  type: ReportContext['type'],
   startDate?: string,
-  endDate?: string
-): { start: string; end: string } {
+  endDate?: string,
+): { start: Date; end: Date } {
   const now = new Date();
 
   if (type === 'custom' && startDate && endDate) {
-    return { start: startDate, end: endDate };
+    return { start: new Date(startDate), end: new Date(endDate) };
   }
 
   switch (type) {
-    case 'daily':
-      return {
-        start: new Date(now.setHours(0, 0, 0, 0)).toISOString(),
-        end: new Date(now.setHours(23, 59, 59, 999)).toISOString(),
-      };
-
-    case 'weekly':
-      const weekStart = new Date(now);
-      weekStart.setDate(now.getDate() - now.getDay());
-      weekStart.setHours(0, 0, 0, 0);
-
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999);
-
-      return {
-        start: weekStart.toISOString(),
-        end: weekEnd.toISOString(),
-      };
-
-    case 'monthly':
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-
-      return {
-        start: monthStart.toISOString(),
-        end: monthEnd.toISOString(),
-      };
-
+    case 'daily': {
+      const start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(now);
+      end.setHours(23, 59, 59, 999);
+      return { start, end };
+    }
+    case 'weekly': {
+      const start = new Date(now);
+      start.setDate(now.getDate() - now.getDay());
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+      return { start, end };
+    }
+    case 'monthly': {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      const end = new Date(
+        now.getFullYear(),
+        now.getMonth() + 1,
+        0,
+        23,
+        59,
+        59,
+        999,
+      );
+      return { start, end };
+    }
     default:
       throw new Error(`Unknown report type: ${type}`);
   }
 }
 
 /**
- * Generate PDF report
+ * Core report logic, callable directly (inline on serverless) or from the
+ * BullMQ worker. Pulls REAL metrics from storage for the tenant and e-mails a
+ * rendered summary to the recipient.
  */
-async function generatePdfReport(data: any, type: string): Promise<string> {
-  // In production, use pdfkit, puppeteer, or similar
-  console.log(`[ReportProcessor] Generating PDF report for ${type}`);
-  await new Promise((resolve) => setTimeout(resolve, 500));
+export async function runReport(ctx: ReportContext): Promise<void> {
+  const { type, tenantId, recipientEmail, recipientName, agencyName } = ctx;
 
-  const filePath = `/tmp/report-${type}-${Date.now()}.pdf`;
-  return filePath;
+  if (!recipientEmail) {
+    console.warn(
+      `[ReportProcessor] Skipping ${type} report for tenant ${tenantId}: no recipient e-mail`,
+    );
+    return;
+  }
+
+  const range = calculateDateRange(type, ctx.startDate, ctx.endDate);
+  console.log(
+    `[ReportProcessor] Generating ${type} report for tenant ${tenantId} (${range.start.toISOString()} -> ${range.end.toISOString()})`,
+  );
+
+  const { storage } = await import('../../storage');
+
+  // Real metrics from the database.
+  const stats = await storage.getDashboardStats(tenantId);
+  const financial = await storage.getFinancialSummaryReport(tenantId, {
+    startDate: range.start,
+    endDate: range.end,
+  });
+
+  const periodLabel = `${range.start.toLocaleDateString('pt-BR')} - ${range.end.toLocaleDateString('pt-BR')}`;
+  const revenue = financial.salesRevenue + financial.rentalRevenue;
+
+  const { getEmailService } = await import('../../email/email-service');
+  const emailService = getEmailService();
+
+  const result = await emailService.sendTemplate(
+    'monthly-report',
+    recipientEmail,
+    `Seu relatorio ${type} esta pronto`,
+    {
+      userName: recipientName,
+      period: periodLabel,
+      activeProperties: stats.totalProperties,
+      contractsCount: stats.totalContracts,
+      leadsCount: stats.totalLeads,
+      visitsCount: stats.totalVisits,
+      revenue: `R$ ${revenue.toFixed(2)}`,
+      newClients: stats.totalLeads,
+      conversionRate:
+        stats.totalLeads > 0
+          ? `${((stats.totalContracts / stats.totalLeads) * 100).toFixed(1)}%`
+          : '0%',
+      avgResponseTime: 'N/A',
+      currentYear: new Date().getFullYear(),
+    },
+    { companyName: agencyName, email: recipientEmail },
+    { queue: false },
+  );
+
+  if (!result.success) {
+    throw new Error(
+      `Failed to send ${type} report to ${recipientEmail}: ${result.error}`,
+    );
+  }
+
+  console.log(
+    `[ReportProcessor] ${type} report e-mailed to ${recipientEmail} (tenant ${tenantId})`,
+  );
+
+  Sentry.addBreadcrumb({
+    category: 'report',
+    message: `Report generated: ${type}`,
+    level: 'info',
+    data: { type, tenantId },
+  });
 }
 
 /**
- * Generate Excel report
+ * Report processor - BullMQ worker entrypoint.
  */
-async function generateExcelReport(data: any, type: string): Promise<string> {
-  // In production, use exceljs or similar
-  console.log(`[ReportProcessor] Generating Excel report for ${type}`);
-  await new Promise((resolve) => setTimeout(resolve, 500));
+export async function processReport(
+  job: Job<ReportJobData & { context?: ReportContext }>,
+): Promise<void> {
+  const ctx = job.data.context;
 
-  const filePath = `/tmp/report-${type}-${Date.now()}.xlsx`;
-  return filePath;
-}
+  if (!ctx) {
+    throw new Error(
+      '[ReportProcessor] Missing resolved context in job payload',
+    );
+  }
 
-/**
- * Generate CSV report
- */
-async function generateCsvReport(data: any, type: string): Promise<string> {
-  // In production, use fast-csv or similar
-  console.log(`[ReportProcessor] Generating CSV report for ${type}`);
-  await new Promise((resolve) => setTimeout(resolve, 300));
-
-  const filePath = `/tmp/report-${type}-${Date.now()}.csv`;
-  return filePath;
+  try {
+    await job.updateProgress(10);
+    await runReport(ctx);
+    await job.updateProgress(100);
+  } catch (error) {
+    console.error(`[ReportProcessor] Failed to generate report:`, error);
+    Sentry.captureException(error, {
+      tags: { component: 'report-processor', reportType: ctx.type },
+      extra: { tenantId: ctx.tenantId },
+    });
+    throw error;
+  }
 }

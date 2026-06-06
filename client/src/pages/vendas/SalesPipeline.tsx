@@ -82,9 +82,7 @@ export interface SalesPipelineProps {
 }
 
 // Helper to calculate percentage of asking price
-const calculatePricePercentage = (proposed: number, asking: number): number => {
-  return Math.round((proposed / asking) * 100);
-};
+const calculatePricePercentage = (proposed: number, asking: number): number => Math.round((proposed / asking) * 100);
 
 // Helper to get badge variant based on percentage
 const getPriceBadgeVariant = (percentage: number): "default" | "secondary" | "destructive" => {
@@ -94,14 +92,12 @@ const getPriceBadgeVariant = (percentage: number): "default" | "secondary" | "de
 };
 
 // Format currency
-const formatPrice = (value: number): string => {
-  return new Intl.NumberFormat("pt-BR", {
+const formatPrice = (value: number): string => new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);
-};
 
 // Opportunity Card Component
 interface OpportunityCardProps {
@@ -143,14 +139,12 @@ function OpportunityCard({
   const badgeVariant = getPriceBadgeVariant(percentage);
 
   // Get initials for avatar
-  const getInitials = (name: string) => {
-    return name
+  const getInitials = (name: string) => name
       .split(" ")
       .map((n) => n[0])
       .slice(0, 2)
       .join("")
       .toUpperCase();
-  };
 
   return (
     <Card

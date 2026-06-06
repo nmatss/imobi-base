@@ -9,13 +9,13 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Home, ChevronRight } from "lucide-react";
 
-export type BreadcrumbItem = {
+export type BreadcrumbItemData = {
   label: string;
   href?: string;
 };
 
 interface PageBreadcrumbProps {
-  items: BreadcrumbItem[];
+  items: BreadcrumbItemData[];
 }
 
 export function PageBreadcrumb({ items }: PageBreadcrumbProps) {

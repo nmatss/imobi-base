@@ -233,13 +233,14 @@ function getPeriodDates(period: PeriodFilter, customStart?: string, customEnd?: 
       prevEnd = new Date(now.getFullYear(), now.getMonth() - 1, 0, 23, 59, 59);
       break;
 
-    case "last_quarter":
+    case "last_quarter": {
       const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3 - 3;
       start = new Date(now.getFullYear(), quarterStartMonth, 1);
       end = new Date(now.getFullYear(), quarterStartMonth + 3, 0, 23, 59, 59);
       prevStart = new Date(now.getFullYear(), quarterStartMonth - 3, 1);
       prevEnd = new Date(now.getFullYear(), quarterStartMonth, 0, 23, 59, 59);
       break;
+    }
 
     case "year":
       start = new Date(now.getFullYear(), 0, 1);
@@ -994,8 +995,7 @@ export default function FinanceiroPage() {
 
   // ================== DADOS PROCESSADOS ==================
 
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter((t) => {
+  const filteredTransactions = useMemo(() => transactions.filter((t) => {
       // Filtro de busca
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -1017,14 +1017,11 @@ export default function FinanceiroPage() {
       if (categoryFilter && t.categoryId !== categoryFilter) return false;
 
       return true;
-    });
-  }, [transactions, searchQuery, statusFilter, flowFilter, categoryFilter]);
+    }), [transactions, searchQuery, statusFilter, flowFilter, categoryFilter]);
 
-  const sortedTransactions = useMemo(() => {
-    return [...filteredTransactions].sort(
+  const sortedTransactions = useMemo(() => [...filteredTransactions].sort(
       (a, b) => new Date(b.entryDate).getTime() - new Date(a.entryDate).getTime()
-    );
-  }, [filteredTransactions]);
+    ), [filteredTransactions]);
 
   const chartData = useMemo(() => {
     if (chartViewMode === "month") {
@@ -1043,7 +1040,7 @@ export default function FinanceiroPage() {
         .sort(([a], [b]) => a.localeCompare(b))
         .slice(-6)
         .map(([month, data]) => ({
-          name: new Date(month + "-01").toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
+          name: new Date(`${month  }-01`).toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
           receitas: data.income,
           despesas: data.expense,
           margem: data.income - data.expense,
@@ -1116,7 +1113,7 @@ export default function FinanceiroPage() {
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-6)
       .map(([month, data]) => ({
-        name: new Date(month + "-01").toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
+        name: new Date(`${month  }-01`).toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
         margem: data.income - data.expense,
         receitas: data.income,
         despesas: data.expense,
@@ -1126,7 +1123,7 @@ export default function FinanceiroPage() {
   // Contexto para IA
   const aiContextData = useMemo(() => ({
     period: getPeriodLabel(periodFilter),
-    metrics: metrics,
+    metrics,
     totalTransactions: transactions.length,
     totalIncome: transactions.filter(t => t.flow === "income").reduce((sum, t) => sum + parseFloat(t.amount || "0"), 0),
     totalExpense: transactions.filter(t => t.flow === "expense").reduce((sum, t) => sum + parseFloat(t.amount || "0"), 0),

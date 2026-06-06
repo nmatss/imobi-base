@@ -8,8 +8,7 @@ interface HeadingProps extends React.HTMLAttributes<HTMLHeadingElement> {
 }
 
 export const H1 = React.forwardRef<HTMLHeadingElement, HeadingProps>(
-  ({ className, as: Component = "h1", ...props }, ref) => {
-    return (
+  ({ className, as: Component = "h1", ...props }, ref) => (
       <Component
         ref={ref}
         className={cn(
@@ -19,13 +18,11 @@ export const H1 = React.forwardRef<HTMLHeadingElement, HeadingProps>(
         {...props}
       />
     )
-  }
 )
 H1.displayName = "H1"
 
 export const H2 = React.forwardRef<HTMLHeadingElement, HeadingProps>(
-  ({ className, as: Component = "h2", ...props }, ref) => {
-    return (
+  ({ className, as: Component = "h2", ...props }, ref) => (
       <Component
         ref={ref}
         className={cn(
@@ -35,13 +32,11 @@ export const H2 = React.forwardRef<HTMLHeadingElement, HeadingProps>(
         {...props}
       />
     )
-  }
 )
 H2.displayName = "H2"
 
 export const H3 = React.forwardRef<HTMLHeadingElement, HeadingProps>(
-  ({ className, as: Component = "h3", ...props }, ref) => {
-    return (
+  ({ className, as: Component = "h3", ...props }, ref) => (
       <Component
         ref={ref}
         className={cn(
@@ -51,13 +46,11 @@ export const H3 = React.forwardRef<HTMLHeadingElement, HeadingProps>(
         {...props}
       />
     )
-  }
 )
 H3.displayName = "H3"
 
 export const H4 = React.forwardRef<HTMLHeadingElement, HeadingProps>(
-  ({ className, as: Component = "h4", ...props }, ref) => {
-    return (
+  ({ className, as: Component = "h4", ...props }, ref) => (
       <Component
         ref={ref}
         className={cn(
@@ -67,7 +60,6 @@ export const H4 = React.forwardRef<HTMLHeadingElement, HeadingProps>(
         {...props}
       />
     )
-  }
 )
 H4.displayName = "H4"
 
@@ -116,15 +108,13 @@ interface CaptionProps extends React.HTMLAttributes<HTMLElement> {
 }
 
 export const Caption = React.forwardRef<HTMLElement, CaptionProps>(
-  ({ className, as: Component = "span", ...props }, ref) => {
-    return (
+  ({ className, as: Component = "span", ...props }, ref) => (
       <Component
         ref={ref as any}
         className={cn("caption", className)}
         {...props}
       />
     )
-  }
 )
 Caption.displayName = "Caption"
 
@@ -133,8 +123,7 @@ interface LeadProps extends React.HTMLAttributes<HTMLParagraphElement> {
 }
 
 export const Lead = React.forwardRef<HTMLParagraphElement, LeadProps>(
-  ({ className, as: Component = "p", ...props }, ref) => {
-    return (
+  ({ className, as: Component = "p", ...props }, ref) => (
       <Component
         ref={ref}
         className={cn(
@@ -144,7 +133,6 @@ export const Lead = React.forwardRef<HTMLParagraphElement, LeadProps>(
         {...props}
       />
     )
-  }
 )
 Lead.displayName = "Lead"
 
@@ -153,23 +141,20 @@ interface MutedProps extends React.HTMLAttributes<HTMLParagraphElement> {
 }
 
 export const Muted = React.forwardRef<HTMLParagraphElement, MutedProps>(
-  ({ className, as: Component = "p", ...props }, ref) => {
-    return (
+  ({ className, as: Component = "p", ...props }, ref) => (
       <Component
         ref={ref}
         className={cn("body-sm text-muted-foreground", className)}
         {...props}
       />
     )
-  }
 )
 Muted.displayName = "Muted"
 
 interface CodeProps extends React.HTMLAttributes<HTMLElement> {}
 
 export const InlineCode = React.forwardRef<HTMLElement, CodeProps>(
-  ({ className, ...props }, ref) => {
-    return (
+  ({ className, ...props }, ref) => (
       <code
         ref={ref}
         className={cn(
@@ -179,7 +164,6 @@ export const InlineCode = React.forwardRef<HTMLElement, CodeProps>(
         {...props}
       />
     )
-  }
 )
 InlineCode.displayName = "InlineCode"
 
@@ -210,15 +194,13 @@ List.displayName = "List"
 interface ListItemProps extends React.HTMLAttributes<HTMLLIElement> {}
 
 export const ListItem = React.forwardRef<HTMLLIElement, ListItemProps>(
-  ({ className, ...props }, ref) => {
-    return (
+  ({ className, ...props }, ref) => (
       <li
         ref={ref}
         className={cn("body-base", className)}
         {...props}
       />
     )
-  }
 )
 ListItem.displayName = "ListItem"
 
@@ -227,8 +209,7 @@ ListItem.displayName = "ListItem"
 interface BlockquoteProps extends React.HTMLAttributes<HTMLQuoteElement> {}
 
 export const Blockquote = React.forwardRef<HTMLQuoteElement, BlockquoteProps>(
-  ({ className, ...props }, ref) => {
-    return (
+  ({ className, ...props }, ref) => (
       <blockquote
         ref={ref}
         className={cn(
@@ -238,7 +219,6 @@ export const Blockquote = React.forwardRef<HTMLQuoteElement, BlockquoteProps>(
         {...props}
       />
     )
-  }
 )
 Blockquote.displayName = "Blockquote"
 
@@ -249,8 +229,7 @@ interface LabelTextProps extends React.HTMLAttributes<HTMLSpanElement> {
 }
 
 export const LabelText = React.forwardRef<HTMLSpanElement, LabelTextProps>(
-  ({ className, required, children, ...props }, ref) => {
-    return (
+  ({ className, required, children, ...props }, ref) => (
       <span
         ref={ref}
         className={cn("text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70", className)}
@@ -260,6 +239,5 @@ export const LabelText = React.forwardRef<HTMLSpanElement, LabelTextProps>(
         {required && <span className="text-destructive ml-1">*</span>}
       </span>
     )
-  }
 )
 LabelText.displayName = "LabelText"

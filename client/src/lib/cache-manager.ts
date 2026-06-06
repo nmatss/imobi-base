@@ -296,9 +296,7 @@ export const cacheUtils = {
   /**
    * Obtém dados do cache sem fazer request
    */
-  getCachedData: <T>(queryKey: readonly unknown[]): T | undefined => {
-    return queryClient.getQueryData<T>(queryKey);
-  },
+  getCachedData: <T>(queryKey: readonly unknown[]): T | undefined => queryClient.getQueryData<T>(queryKey),
 
   /**
    * Verifica se dados estão no cache e são válidos
@@ -327,9 +325,7 @@ export const cacheUtils = {
   /**
    * Força refetch de uma query
    */
-  refetch: (queryKey: readonly unknown[]) => {
-    return queryClient.refetchQueries({ queryKey });
-  },
+  refetch: (queryKey: readonly unknown[]) => queryClient.refetchQueries({ queryKey }),
 
   /**
    * Limpa cache de queries antigas (garbage collection manual)

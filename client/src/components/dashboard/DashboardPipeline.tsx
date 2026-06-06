@@ -47,8 +47,7 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
-const LeadCard = memo(function LeadCard({ lead, onClick }: { lead: Lead; onClick?: () => void }) {
-  return (
+const LeadCard = memo(({ lead, onClick }: { lead: Lead; onClick?: () => void }) => (
     <Card
       className={cn(
         "cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 border border-border/50",
@@ -96,10 +95,9 @@ const LeadCard = memo(function LeadCard({ lead, onClick }: { lead: Lead; onClick
         </div>
       </CardContent>
     </Card>
-  );
-});
+  ));
 
-const PipelineColumn = memo(function PipelineColumn({
+const PipelineColumn = memo(({
   stage,
   maxCardsVisible = 3,
   onLeadClick,
@@ -107,7 +105,7 @@ const PipelineColumn = memo(function PipelineColumn({
   stage: PipelineStage;
   maxCardsVisible?: number;
   onLeadClick?: (leadId: string) => void;
-}) {
+}) => {
   const visibleLeads = stage.leads.slice(0, maxCardsVisible);
   const remainingCount = Math.max(0, stage.leads.length - maxCardsVisible);
 
@@ -171,11 +169,11 @@ const PipelineColumn = memo(function PipelineColumn({
   );
 });
 
-export const DashboardPipeline = memo(function DashboardPipeline({
+export const DashboardPipeline = memo(({
   stages,
   onLeadClick,
   maxCardsVisible = 3
-}: DashboardPipelineProps) {
+}: DashboardPipelineProps) => {
   const [activeTab, setActiveTab] = useState(stages[0]?.id || '');
 
   return (

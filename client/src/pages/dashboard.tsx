@@ -197,11 +197,9 @@ export default function Dashboard() {
     }
   }
 
-  const totalContractValue = useMemo(() => {
-    return contracts
+  const totalContractValue = useMemo(() => contracts
       .filter(c => c.status === "signed")
-      .reduce((sum, c) => sum + parseCurrencyValue(c.value), 0);
-  }, [contracts]);
+      .reduce((sum, c) => sum + parseCurrencyValue(c.value), 0), [contracts]);
 
   // Action buttons for mobile sheet
   const ActionButtons = ({ inSheet = false }: { inSheet?: boolean }) => (
@@ -661,7 +659,7 @@ export default function Dashboard() {
                                 variant="secondary"
                                 className="text-xs px-2 py-0.5"
                                 style={{
-                                  backgroundColor: LEAD_STATUS_COLORS[lead.status] + "20",
+                                  backgroundColor: `${LEAD_STATUS_COLORS[lead.status]  }20`,
                                   color: LEAD_STATUS_COLORS[lead.status]
                                 }}
                               >

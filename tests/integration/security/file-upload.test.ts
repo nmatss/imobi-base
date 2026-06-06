@@ -388,7 +388,7 @@ describe('File Upload Security Integration Tests', () => {
       const jpegHeader = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46]);
       const jpegContent = Buffer.concat([jpegHeader, Buffer.alloc(100)]);
 
-      const longFilename = 'a'.repeat(300) + '.jpg';
+      const longFilename = `${'a'.repeat(300)  }.jpg`;
 
       const res = await request(app)
         .post('/api/upload')
@@ -404,7 +404,7 @@ describe('File Upload Security Integration Tests', () => {
   describe('MIME Type Validation', () => {
     it('should reject MIME type mismatch', async () => {
       // PDF content declared as image
-      const pdfContent = Buffer.from('%PDF-1.4\n' + 'a'.repeat(100));
+      const pdfContent = Buffer.from(`%PDF-1.4\n${  'a'.repeat(100)}`);
 
       const res = await request(app)
         .post('/api/upload')

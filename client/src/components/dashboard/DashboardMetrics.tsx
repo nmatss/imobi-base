@@ -38,7 +38,7 @@ export interface MetricCardProps {
   iconColor: string;
 }
 
-const MetricCard = memo(function MetricCard({
+const MetricCard = memo(({
   icon: Icon,
   label,
   value,
@@ -48,7 +48,7 @@ const MetricCard = memo(function MetricCard({
   onClick,
   iconBgColor,
   iconColor,
-}: MetricCardProps) {
+}: MetricCardProps) => {
   const TrendIcon = trend?.direction === "up" ? TrendingUp : trend?.direction === "down" ? TrendingDown : Minus;
   const trendColor = trend?.direction === "up" ? "text-green-600" : trend?.direction === "down" ? "text-red-600" : "text-gray-500";
 
@@ -90,7 +90,7 @@ const MetricCard = memo(function MetricCard({
   );
 });
 
-export const DashboardMetrics = memo(function DashboardMetrics({ metrics, isLoading }: DashboardMetricsProps) {
+export const DashboardMetrics = memo(({ metrics, isLoading }: DashboardMetricsProps) => {
   const [, setLocation] = useLocation();
 
   // Calcular trend direction automaticamente

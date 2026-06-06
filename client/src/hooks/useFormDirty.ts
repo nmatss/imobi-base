@@ -58,7 +58,7 @@ export function useFormDirty(
   useEffect(() => {
     if (!enabled || !isDirty) return;
 
-    // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+     
     const handleBeforeUnload = (e: {
       preventDefault: () => void;
       returnValue: string;

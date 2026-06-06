@@ -17,7 +17,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 // Lazy-load profiling (native addon not available in serverless)
 function getProfilingIntegration(): Integration | null {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+     
     const { nodeProfilingIntegration } = require("@sentry/profiling-node");
     return nodeProfilingIntegration();
   } catch {
@@ -207,13 +207,11 @@ export function startTransaction(name: string, op: string) {
   return Sentry.startSpan({
     name,
     op,
-  }, () => {
-    return {
+  }, () => ({
       finish: () => {},
       setStatus: () => {},
       setData: () => {},
-    };
-  });
+    }));
 }
 
 /**

@@ -506,8 +506,7 @@ export default function LeadsKanban() {
 
   // ==================== FILTERING ====================
 
-  const filteredLeads = useMemo(() => {
-    return leads.filter((lead) => {
+  const filteredLeads = useMemo(() => leads.filter((lead) => {
       // Search
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
@@ -541,20 +540,15 @@ export default function LeadsKanban() {
       }
 
       return true;
-    });
-  }, [leads, filters, leadTagsMap]);
+    }), [leads, filters, leadTagsMap]);
 
-  const getLeadsByStatus = (status: LeadStatus) => {
-    return filteredLeads.filter((l) => l.status === status);
-  };
+  const getLeadsByStatus = (status: LeadStatus) => filteredLeads.filter((l) => l.status === status);
 
   // ==================== HOT LEADS & SLA ====================
 
-  const hotLeads = useMemo(() => {
-    return filteredLeads
+  const hotLeads = useMemo(() => filteredLeads
       .filter((lead) => isHotLead(lead, followUps, allInteractions))
-      .slice(0, 5);
-  }, [filteredLeads, followUps, allInteractions]);
+      .slice(0, 5), [filteredLeads, followUps, allInteractions]);
 
   const slaAlerts = useMemo(() => {
     const newLeadsNoContact = filteredLeads.filter((l) => {
@@ -569,9 +563,7 @@ export default function LeadsKanban() {
       return days >= 3;
     });
 
-    const overdueFollowUps = followUps.filter((f) => {
-      return f.status === "pending" && isPast(new Date(f.dueAt)) && !isToday(new Date(f.dueAt));
-    });
+    const overdueFollowUps = followUps.filter((f) => f.status === "pending" && isPast(new Date(f.dueAt)) && !isToday(new Date(f.dueAt)));
 
     return {
       newLeadsNoContact: newLeadsNoContact.length,
@@ -581,14 +573,14 @@ export default function LeadsKanban() {
     };
   }, [filteredLeads, followUps]);
 
-  const columnStats = useMemo(() => {
+  const columnStats = useMemo(() => 
     // Calculate week-over-week change (simplified - just shows current count)
-    return COLUMNS.map((col) => ({
+     COLUMNS.map((col) => ({
       ...col,
       count: getLeadsByStatus(col.id).length,
       change: 0, // Would need historical data to calculate
-    }));
-  }, [filteredLeads]);
+    }))
+  , [filteredLeads]);
 
   // ==================== HANDLERS ====================
 
@@ -878,8 +870,7 @@ export default function LeadsKanban() {
     setActiveView(null);
   };
 
-  const hasActiveFilters = useMemo(() => {
-    return (
+  const hasActiveFilters = useMemo(() => (
       filters.search !== "" ||
       filters.sources.length > 0 ||
       filters.stages.length > 0 ||
@@ -887,8 +878,7 @@ export default function LeadsKanban() {
       filters.budgetMin > 0 ||
       filters.budgetMax < 10000000 ||
       filters.daysWithoutContact !== null
-    );
-  }, [filters]);
+    ), [filters]);
 
   // ==================== BULK ACTIONS ====================
 

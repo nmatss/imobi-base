@@ -108,14 +108,12 @@ export function SignatureStatus({ documentKey, listKey, showActions = true }: Si
     window.open(`/api/esignature/download/${documentKey}`, '_blank');
   };
 
-  const getInitials = (name: string) => {
-    return name
+  const getInitials = (name: string) => name
       .split(' ')
       .map(n => n[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
-  };
 
   return (
     <Card>

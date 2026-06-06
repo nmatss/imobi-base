@@ -105,9 +105,7 @@ export class TemplateRenderer {
    * Gets nested value from object using dot notation
    */
   private getNestedValue(obj: any, path: string): any {
-    return path.split('.').reduce((current, part) => {
-      return current?.[part];
-    }, obj);
+    return path.split('.').reduce((current, part) => current?.[part], obj);
   }
 
   /**

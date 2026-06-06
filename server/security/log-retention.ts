@@ -199,7 +199,7 @@ export async function archiveLogs(
     return {
       success: true,
       archivedCount: 0,
-      archivePath: '/archives/logs/' + logType + '/' + startDate.toISOString(),
+      archivePath: `/archives/logs/${  logType  }/${  startDate.toISOString()}`,
     };
   } catch (error: any) {
     return {

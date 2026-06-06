@@ -229,7 +229,7 @@ export class WebhookHandler {
         occurredAt: new Date(event.occurred_at),
         metadata: {
           email: signerEmail,
-          signedAt: signedAt,
+          signedAt,
           signerKey: event.data.signer?.key,
         },
       });
@@ -260,7 +260,7 @@ export class WebhookHandler {
         occurredAt: new Date(event.occurred_at),
         metadata: {
           email: signerEmail,
-          viewedAt: viewedAt,
+          viewedAt,
         },
       });
 
@@ -311,7 +311,7 @@ export class WebhookHandler {
         occurredAt: new Date(event.occurred_at),
         metadata: {
           email: signerEmail,
-          refusedAt: refusedAt,
+          refusedAt,
         },
       });
 
@@ -370,8 +370,8 @@ export class WebhookHandler {
 
       if (!isValid) {
         console.warn('[CLICKSIGN] Invalid webhook signature', {
-          received: signature.substring(0, 10) + '...',
-          expected: expectedSignature.substring(0, 10) + '...',
+          received: `${signature.substring(0, 10)  }...`,
+          expected: `${expectedSignature.substring(0, 10)  }...`,
         });
       }
 
@@ -402,7 +402,7 @@ export class WebhookHandler {
     if (age > MAX_AGE_SECONDS) {
       console.warn('[CLICKSIGN] Webhook too old', {
         timestamp: webhookTime,
-        age: age,
+        age,
         maxAge: MAX_AGE_SECONDS,
       });
       return false;
@@ -411,7 +411,7 @@ export class WebhookHandler {
     if (age < -30) {
       console.warn('[CLICKSIGN] Webhook from future (clock skew)', {
         timestamp: webhookTime,
-        age: age,
+        age,
       });
       return false;
     }

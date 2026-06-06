@@ -155,10 +155,10 @@ export function useApiMutation<TData = unknown, TVariables = unknown>(
       return false;
     },
 
-    retryDelay: (attemptIndex) => {
+    retryDelay: (attemptIndex) => 
       // Exponential backoff: 1s, 2s, 4s...
-      return Math.min(1000 * 2 ** attemptIndex, 10000);
-    },
+       Math.min(1000 * 2 ** attemptIndex, 10000)
+    ,
   });
 }
 

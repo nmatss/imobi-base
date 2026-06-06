@@ -112,9 +112,9 @@ const MetricCardComponent = ({
 };
 
 // Memoized MetricCard with intelligent prop comparison
-export const MetricCard = memo(MetricCardComponent, (prevProps, nextProps) => {
+export const MetricCard = memo(MetricCardComponent, (prevProps, nextProps) => 
   // Only re-render if critical props change
-  return (
+   (
     prevProps.label === nextProps.label &&
     prevProps.value === nextProps.value &&
     prevProps.icon === nextProps.icon &&
@@ -123,5 +123,5 @@ export const MetricCard = memo(MetricCardComponent, (prevProps, nextProps) => {
     prevProps.trend?.direction === nextProps.trend?.direction &&
     prevProps.trend?.label === nextProps.trend?.label
     // onClick is a stable reference, no need to compare
-  );
-});
+  )
+);

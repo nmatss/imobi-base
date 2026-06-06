@@ -386,7 +386,7 @@ describe('CSRF Protection Integration Tests', () => {
       const csrfToken = tokenRes.body.csrfToken;
 
       // Tamper with token
-      const tamperedToken = csrfToken.slice(0, -5) + 'XXXXX';
+      const tamperedToken = `${csrfToken.slice(0, -5)  }XXXXX`;
 
       const res = await agent
         .post('/api/protected-resource')

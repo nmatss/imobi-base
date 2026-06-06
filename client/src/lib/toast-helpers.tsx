@@ -67,13 +67,11 @@ export const TOAST_POSITION = "top-right" as const;
  * toast.success("Dados salvos com sucesso!");
  * toast.success("Lead criado", "O lead foi adicionado ao sistema.");
  */
-export const success = (message: string, description?: string) => {
-  return sonnerToast.success(message, {
+export const success = (message: string, description?: string) => sonnerToast.success(message, {
     description,
     icon: <CheckCircle2 className="w-5 h-5" />,
     duration: TOAST_DURATIONS.SUCCESS,
   });
-};
 
 /**
  * Error toast with red X icon
@@ -83,13 +81,11 @@ export const success = (message: string, description?: string) => {
  * toast.error("Erro ao salvar");
  * toast.error("Falha na operação", "Por favor, tente novamente.");
  */
-export const error = (message: string, description?: string) => {
-  return sonnerToast.error(message, {
+export const error = (message: string, description?: string) => sonnerToast.error(message, {
     description,
     icon: <XCircle className="w-5 h-5" />,
     duration: TOAST_DURATIONS.ERROR,
   });
-};
 
 /**
  * Warning toast with yellow alert triangle icon
@@ -99,13 +95,11 @@ export const error = (message: string, description?: string) => {
  * toast.warning("Alterações não salvas");
  * toast.warning("Atenção", "Alguns campos estão vazios.");
  */
-export const warning = (message: string, description?: string) => {
-  return sonnerToast.warning(message, {
+export const warning = (message: string, description?: string) => sonnerToast.warning(message, {
     description,
     icon: <AlertTriangle className="w-5 h-5" />,
     duration: TOAST_DURATIONS.WARNING,
   });
-};
 
 /**
  * Info toast with blue info icon
@@ -115,13 +109,11 @@ export const warning = (message: string, description?: string) => {
  * toast.info("Nova funcionalidade disponível");
  * toast.info("Dica", "Use Ctrl+K para busca rápida.");
  */
-export const info = (message: string, description?: string) => {
-  return sonnerToast.info(message, {
+export const info = (message: string, description?: string) => sonnerToast.info(message, {
     description,
     icon: <Info className="w-5 h-5" />,
     duration: TOAST_DURATIONS.INFO,
   });
-};
 
 /**
  * Loading toast that doesn't auto-dismiss
@@ -131,13 +123,11 @@ export const info = (message: string, description?: string) => {
  * const toastId = toast.loading("Salvando...");
  * // Later: toast.dismiss(toastId);
  */
-export const loading = (message: string, description?: string) => {
-  return sonnerToast.loading(message, {
+export const loading = (message: string, description?: string) => sonnerToast.loading(message, {
     description,
     icon: <Loader2 className="w-5 h-5 animate-spin" />,
     duration: TOAST_DURATIONS.LOADING,
   });
-};
 
 /**
  * Dismiss a specific toast or all toasts
@@ -183,13 +173,11 @@ export const promise = <T,>(
     success: string | ((data: T) => string);
     error: string | ((error: any) => string);
   }
-) => {
-  return sonnerToast.promise(promiseToRun, {
+) => sonnerToast.promise(promiseToRun, {
     loading: messages.loading,
     success: messages.success,
     error: messages.error,
   });
-};
 
 // ==================== CRUD OPERATION HELPERS ====================
 
@@ -478,8 +466,7 @@ export const withAction = (
   actionLabel: string,
   onAction: () => void,
   description?: string
-) => {
-  return sonnerToast(message, {
+) => sonnerToast(message, {
     description,
     duration: TOAST_DURATIONS.ACTION,
     action: {
@@ -487,7 +474,6 @@ export const withAction = (
       onClick: onAction,
     },
   });
-};
 
 /**
  * Confirmation toast with confirm and cancel buttons
@@ -504,8 +490,7 @@ export const confirm = (
   onConfirm: () => void,
   onCancel?: () => void,
   description?: string
-) => {
-  return sonnerToast(message, {
+) => sonnerToast(message, {
     description,
     duration: TOAST_DURATIONS.ACTION,
     action: {
@@ -517,7 +502,6 @@ export const confirm = (
       onClick: () => onCancel?.(),
     },
   });
-};
 
 /**
  * Custom toast with full control
@@ -537,14 +521,12 @@ export const custom = (options: {
   icon?: React.ReactNode;
   duration?: number;
   action?: { label: string; onClick: () => void };
-}) => {
-  return sonnerToast(options.message, {
+}) => sonnerToast(options.message, {
     description: options.description,
     icon: options.icon,
     duration: options.duration || TOAST_DURATIONS.INFO,
     action: options.action,
   });
-};
 
 // ==================== MAIN EXPORT ====================
 

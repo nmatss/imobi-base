@@ -138,7 +138,7 @@ export default function PublicProperties() {
 
   // Filter and sort properties
   const filteredAndSortedProperties = useMemo(() => {
-    let filtered = properties.filter(property => {
+    const filtered = properties.filter(property => {
       // Category filter
       if (categoryFilter !== "all" && property.category !== categoryFilter) return false;
 

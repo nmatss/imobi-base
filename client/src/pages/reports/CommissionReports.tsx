@@ -181,11 +181,12 @@ export default function CommissionReports() {
         start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
         break;
-      case "quarter":
+      case "quarter": {
         const quarterStart = Math.floor(now.getMonth() / 3) * 3;
         start = new Date(now.getFullYear(), quarterStart, 1);
         end = new Date(now.getFullYear(), quarterStart + 3, 0, 23, 59, 59);
         break;
+      }
       case "year":
         start = new Date(now.getFullYear(), 0, 1);
         end = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
@@ -206,8 +207,7 @@ export default function CommissionReports() {
   };
 
   // Filtered commissions
-  const filteredCommissions = useMemo(() => {
-    return commissions.filter((c) => {
+  const filteredCommissions = useMemo(() => commissions.filter((c) => {
       // Status filter
       if (statusFilter !== "all" && c.status !== statusFilter) return false;
 
@@ -234,8 +234,7 @@ export default function CommissionReports() {
       if (maxValue && commValue > parseFloat(maxValue)) return false;
 
       return true;
-    });
-  }, [commissions, statusFilter, typeFilter, brokerFilter, searchQuery, minValue, maxValue]);
+    }), [commissions, statusFilter, typeFilter, brokerFilter, searchQuery, minValue, maxValue]);
 
   // Statistics
   const stats = useMemo(() => calculateCommissionStats(filteredCommissions), [filteredCommissions]);
@@ -252,7 +251,7 @@ export default function CommissionReports() {
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-6)
       .map(([month, value]) => ({
-        month: new Date(month + "-01").toLocaleDateString("pt-BR", {
+        month: new Date(`${month  }-01`).toLocaleDateString("pt-BR", {
           month: "short",
           year: "2-digit",
         }),
@@ -275,8 +274,7 @@ export default function CommissionReports() {
   }, [filteredCommissions]);
 
   // Chart data - sales vs rentals
-  const typeComparisonData = useMemo(() => {
-    return [
+  const typeComparisonData = useMemo(() => [
       {
         name: "Vendas",
         value: stats.byType.sales,
@@ -285,8 +283,7 @@ export default function CommissionReports() {
         name: "Locações",
         value: stats.byType.rentals,
       },
-    ].filter((d) => d.value > 0);
-  }, [stats]);
+    ].filter((d) => d.value > 0), [stats]);
 
   // Handlers
   const handleViewReceipt = (commission: Commission) => {

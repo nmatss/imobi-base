@@ -149,12 +149,10 @@ test.describe('Touch Target Sizes', () => {
     const buttonCount = await buttons.count();
 
     if (buttonCount > 0) {
-      const sizes = await buttons.evaluateAll((btns) => {
-        return btns.slice(0, 10).map(btn => {
+      const sizes = await buttons.evaluateAll((btns) => btns.slice(0, 10).map(btn => {
           const rect = btn.getBoundingClientRect();
           return { width: rect.width, height: rect.height };
-        });
-      });
+        }));
 
       // Check at least some buttons meet minimum size
       const validButtons = sizes.filter(s => s.width >= 40 && s.height >= 40);
@@ -188,12 +186,10 @@ test.describe('Touch Target Sizes', () => {
     const inputCount = await inputs.count();
 
     if (inputCount >= 2) {
-      const positions = await inputs.evaluateAll((elems) => {
-        return elems.slice(0, 5).map(el => {
+      const positions = await inputs.evaluateAll((elems) => elems.slice(0, 5).map(el => {
           const rect = el.getBoundingClientRect();
           return { top: rect.top, bottom: rect.bottom };
-        });
-      });
+        }));
 
       // Check spacing between inputs
       for (let i = 0; i < positions.length - 1; i++) {
@@ -335,8 +331,7 @@ test.describe('Touch Performance', () => {
     await page.waitForLoadState('networkidle');
 
     // Measure scroll performance
-    const scrollMetrics = await page.evaluate(() => {
-      return new Promise((resolve) => {
+    const scrollMetrics = await page.evaluate(() => new Promise((resolve) => {
         const start = performance.now();
         let scrollCount = 0;
 
@@ -356,8 +351,7 @@ test.describe('Touch Performance', () => {
           const end = performance.now();
           resolve({ duration: end - start, scrollCount });
         }, 1000);
-      });
-    });
+      }));
 
     // Should complete in reasonable time
     expect((scrollMetrics as any).duration).toBeLessThan(1500);
@@ -379,9 +373,7 @@ test.describe('Accessibility - Touch', () => {
       await element.tap();
 
       // Element should be focused or have focus-visible state
-      const isFocused = await element.evaluate((el) => {
-        return el === document.activeElement;
-      });
+      const isFocused = await element.evaluate((el) => el === document.activeElement);
 
       expect(isFocused).toBeTruthy();
     }

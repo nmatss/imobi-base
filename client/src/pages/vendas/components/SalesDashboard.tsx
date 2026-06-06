@@ -50,19 +50,15 @@ interface SalesDashboardProps {
 }
 
 // Format currency
-const formatCurrency = (value: number): string => {
-  return new Intl.NumberFormat("pt-BR", {
+const formatCurrency = (value: number): string => new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);
-};
 
 // Format number
-const formatNumber = (value: number): string => {
-  return new Intl.NumberFormat("pt-BR").format(value);
-};
+const formatNumber = (value: number): string => new Intl.NumberFormat("pt-BR").format(value);
 
 // Metric Card Component
 function MetricCard({

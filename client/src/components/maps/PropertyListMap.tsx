@@ -219,8 +219,7 @@ export function PropertyListMap({
     );
   }
 
-  const renderMarkers = () => {
-    return properties.map((property) => {
+  const renderMarkers = () => properties.map((property) => {
       const icon = createCustomIcon(TYPE_COLORS[property.type] || TYPE_COLORS.default);
       const image = getFirstImage(property.images);
       const isSelected = property.id === selectedPropertyId;
@@ -284,7 +283,6 @@ export function PropertyListMap({
         </Marker>
       );
     });
-  };
 
   return (
     <div className={`rounded-lg overflow-hidden border ${className}`} style={{ height }}>

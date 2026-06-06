@@ -11,21 +11,17 @@ type Props = {
 };
 
 export default function BrokerCommissionSummary({ brokers, isLoading }: Props) {
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
+  const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
     }).format(value);
-  };
 
-  const getInitials = (name: string) => {
-    return name
+  const getInitials = (name: string) => name
       .split(' ')
       .map(n => n[0])
       .slice(0, 2)
       .join('')
       .toUpperCase();
-  };
 
   // Sort brokers by total commission
   const sortedBrokers = [...brokers].sort((a, b) => b.totalCommission - a.totalCommission);

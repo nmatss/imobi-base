@@ -50,14 +50,12 @@ export function RentalContractCard({
   const [showTimeline, setShowTimeline] = useState(false);
 
   // Get initials for avatar
-  const getInitials = (name: string) => {
-    return name
+  const getInitials = (name: string) => name
       .split(" ")
       .slice(0, 2)
       .map((n) => n[0])
       .join("")
       .toUpperCase();
-  };
 
   // Calculate contract duration
   const getDuration = () => {

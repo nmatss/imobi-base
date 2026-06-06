@@ -35,7 +35,7 @@ export const useWhatsApp = () => {
 
     // Add country code if not present
     if (!cleaned.startsWith('55')) {
-      cleaned = '55' + cleaned;
+      cleaned = `55${  cleaned}`;
     }
 
     return cleaned;

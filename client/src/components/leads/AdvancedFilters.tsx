@@ -134,8 +134,7 @@ export function AdvancedLeadFilters({
     onFiltersChange(DEFAULT_FILTERS);
   };
 
-  const hasActiveFilters = () => {
-    return (
+  const hasActiveFilters = () => (
       filters.search !== "" ||
       filters.source.length > 0 ||
       filters.status.length > 0 ||
@@ -147,7 +146,6 @@ export function AdvancedLeadFilters({
       filters.hasFollowUp !== null ||
       filters.daysWithoutContact !== null
     );
-  };
 
   const activeFilterCount = () => {
     let count = 0;
@@ -168,9 +166,7 @@ export function AdvancedLeadFilters({
     return `R$ ${value}`;
   };
 
-  const toggleArrayValue = <T,>(array: T[], value: T): T[] => {
-    return array.includes(value) ? array.filter((v) => v !== value) : [...array, value];
-  };
+  const toggleArrayValue = <T,>(array: T[], value: T): T[] => array.includes(value) ? array.filter((v) => v !== value) : [...array, value];
 
   return (
     <div className="space-y-4">

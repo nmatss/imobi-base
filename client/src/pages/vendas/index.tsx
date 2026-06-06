@@ -698,7 +698,7 @@ export default function VendasPage() {
         saleValue: saleForm.saleValue,
         saleDate: new Date(saleForm.saleDate).toISOString(),
         commissionRate: saleForm.commissionRate,
-        commissionValue: commissionValue,
+        commissionValue,
         notes: saleForm.notes || null,
         status: "completed",
       };
@@ -888,9 +888,7 @@ export default function VendasPage() {
   }, [saleForm.saleValue, saleForm.commissionRate, saleForm.brokerCommissionRate, saleForm.discount]);
 
   // Get status config
-  const getStatusConfig = (status: string) => {
-    return PROPOSAL_STATUS[status as keyof typeof PROPOSAL_STATUS] || PROPOSAL_STATUS.pending;
-  };
+  const getStatusConfig = (status: string) => PROPOSAL_STATUS[status as keyof typeof PROPOSAL_STATUS] || PROPOSAL_STATUS.pending;
 
   // Parse probability from notes
   const getProbability = (notes: string | null) => {

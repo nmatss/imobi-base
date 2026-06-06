@@ -6,11 +6,16 @@
  */
 
 import { db } from "../../db";
-import { whatsappMessages, whatsappConversations, leads } from "@shared/schema";
+import { whatsappMessages, whatsappConversations, leads, integrationConfigs } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { conversationManager } from "./conversation-manager";
 import { autoResponder } from "./auto-responder";
 import { log } from "../../index";
+
+interface WhatsappIntegrationConfig {
+  phoneNumberId?: string;
+  [key: string]: unknown;
+}
 
 interface WebhookMessage {
   from: string;
@@ -97,6 +102,48 @@ interface WebhookPayload {
 
 export class WebhookHandler {
   /**
+   * Resolve o tenant interno a partir do phone_number_id que a Meta envia em
+   * value.metadata.phone_number_id.
+   *
+   * O mapeamento vive em integration_configs (integrationName = 'whatsapp'),
+   * com o phone_number_id armazenado em config.phoneNumberId — o mesmo campo
+   * preenchido pela UI de integracoes (IntegrationsTab). Cada tenant que usa
+   * WhatsApp PRECISA ter esse config preenchido; sem ele, o webhook nao tem
+   * como saber a quem o evento pertence e o chamador deve fazer fail-closed.
+   *
+   * Retorna o tenantId ou null se nenhum tenant estiver mapeado para esse
+   * phone_number_id.
+   */
+  async resolveTenantId(phoneNumberId: string): Promise<string | null> {
+    if (!phoneNumberId) {
+      return null;
+    }
+
+    try {
+      const rows = await db
+        .select({
+          tenantId: integrationConfigs.tenantId,
+          config: integrationConfigs.config,
+        })
+        .from(integrationConfigs)
+        .where(eq(integrationConfigs.integrationName, "whatsapp"));
+
+      for (const row of rows) {
+        const config = (row.config ?? {}) as WhatsappIntegrationConfig;
+        if (config.phoneNumberId === phoneNumberId) {
+          return row.tenantId;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      log(`Error resolving tenant for phone_number_id ${phoneNumberId}: ${message}`, "whatsapp");
+      return null;
+    }
+  }
+
+  /**
    * Process incoming webhook from WhatsApp
    */
   async processWebhook(payload: WebhookPayload, tenantId: string): Promise<void> {
@@ -141,6 +188,33 @@ export class WebhookHandler {
     log(`Incoming WhatsApp message from ${message.from}`, "whatsapp");
 
     try {
+      // IDEMPOTENCIA: a Meta reentrega o mesmo evento em retries (ate ~7 dias).
+      // Sem deduplicacao, cada retry cria mensagem duplicada e infla unreadCount
+      // / cria leads repetidos. Fazemos um SELECT best-effort por wabaMessageId
+      // antes de inserir e pulamos se ja existir.
+      //
+      // RECOMENDACAO DE SCHEMA: adicionar um unique constraint composto
+      // (tenant_id, waba_message_id) em whatsapp_messages e migrar para
+      // INSERT ... ON CONFLICT DO NOTHING fecha a janela de corrida entre
+      // retries concorrentes que este SELECT-antes-de-INSERT nao cobre 100%.
+      if (message.id) {
+        const [existing] = await db
+          .select({ id: whatsappMessages.id })
+          .from(whatsappMessages)
+          .where(
+            and(
+              eq(whatsappMessages.tenantId, tenantId),
+              eq(whatsappMessages.wabaMessageId, message.id)
+            )
+          )
+          .limit(1);
+
+        if (existing) {
+          log(`Duplicate WhatsApp message ${message.id} ignored (idempotency)`, "whatsapp");
+          return;
+        }
+      }
+
       // Get or create conversation
       const conversation = await conversationManager.getOrCreateConversation({
         tenantId,

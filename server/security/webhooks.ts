@@ -323,7 +323,7 @@ export class WebhookManager {
     const testPayload: WebhookPayload = {
       type: 'security.event',
       data: {
-        id: 'test-' + Date.now(),
+        id: `test-${  Date.now()}`,
         type: SecurityEventType.API_ERROR,
         severity: SecurityEventSeverity.LOW,
         timestamp: new Date(),

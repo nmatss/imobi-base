@@ -90,22 +90,18 @@ export const createMockSupabaseStorage = () => ({
       };
     }),
 
-    getPublicUrl: vi.fn((path: string) => {
-      return {
+    getPublicUrl: vi.fn((path: string) => ({
         data: {
           publicUrl: `https://storage.example.com/${bucket}/${path}`,
         },
-      };
-    }),
+      })),
 
-    createSignedUrl: vi.fn(async (path: string, expiresIn: number) => {
-      return {
+    createSignedUrl: vi.fn(async (path: string, expiresIn: number) => ({
         data: {
           signedUrl: `https://storage.example.com/${bucket}/${path}?token=signed_${Date.now()}`,
         },
         error: null,
-      };
-    }),
+      })),
   }),
 });
 
@@ -120,24 +116,18 @@ export const hasFile = (path: string) => fileStore.has(path);
 
 // Mock image processing
 export const createMockImageProcessor = () => ({
-  resize: vi.fn(async (buffer: Buffer, width: number, height: number) => {
-    return buffer; // In tests, just return the same buffer
-  }),
+  resize: vi.fn(async (buffer: Buffer, width: number, height: number) => 
+     buffer // In tests, just return the same buffer
+  ),
 
-  optimize: vi.fn(async (buffer: Buffer) => {
-    return buffer;
-  }),
+  optimize: vi.fn(async (buffer: Buffer) => buffer),
 
-  generateThumbnail: vi.fn(async (buffer: Buffer, size: number) => {
-    return buffer;
-  }),
+  generateThumbnail: vi.fn(async (buffer: Buffer, size: number) => buffer),
 
-  getMetadata: vi.fn(async (buffer: Buffer) => {
-    return {
+  getMetadata: vi.fn(async (buffer: Buffer) => ({
       width: 1920,
       height: 1080,
       format: 'jpeg',
       size: buffer.length,
-    };
-  }),
+    })),
 });

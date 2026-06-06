@@ -420,6 +420,7 @@ export const commonSchemas = {
   id: z.string().regex(/^[a-zA-Z0-9_-]+$/).max(50),
 
   filename: z.string().max(255).refine(
+    // eslint-disable-next-line no-control-regex -- bloqueio de caracteres de controle é proposital (validação de filename)
     (name) => !/[<>:"/\\|?*\x00-\x1f]/.test(name),
     'Invalid filename characters'
   ),

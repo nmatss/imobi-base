@@ -136,15 +136,13 @@ export function useConfirmDialog() {
   });
 
   const confirm = React.useCallback(
-    (config: Omit<ConfirmDialogProps, "open" | "onOpenChange" | "onConfirm">) => {
-      return new Promise<boolean>((resolve) => {
+    (config: Omit<ConfirmDialogProps, "open" | "onOpenChange" | "onConfirm">) => new Promise<boolean>((resolve) => {
         setDialogState({
           isOpen: true,
           config,
           resolve,
         });
-      });
-    },
+      }),
     []
   );
 

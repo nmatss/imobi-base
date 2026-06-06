@@ -167,23 +167,17 @@ export function usePermissions() {
   /**
    * Verifica se o usuário é administrador
    */
-  const isAdmin = (): boolean => {
-    return meData?.user?.role === 'admin' || can('settings.manageUsers');
-  };
+  const isAdmin = (): boolean => meData?.user?.role === 'admin' || can('settings.manageUsers');
 
   /**
    * Verifica se possui todas as permissões especificadas
    */
-  const hasAllPermissions = (perms: string[]): boolean => {
-    return perms.every(p => can(p));
-  };
+  const hasAllPermissions = (perms: string[]): boolean => perms.every(p => can(p));
 
   /**
    * Verifica se possui ao menos uma das permissões especificadas
    */
-  const hasAnyPermission = (perms: string[]): boolean => {
-    return perms.some(p => can(p));
-  };
+  const hasAnyPermission = (perms: string[]): boolean => perms.some(p => can(p));
 
   return {
     permissions,

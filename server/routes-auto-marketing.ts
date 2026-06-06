@@ -277,12 +277,12 @@ function generateSocialMediaPost(property: PropertyData, tone: Tone): { post: st
     if (property.bedrooms) specs.push(`${property.bedrooms} ${property.bedrooms === 1 ? 'quarto' : 'quartos'}`);
     if (property.bathrooms) specs.push(`${property.bathrooms} ${property.bathrooms === 1 ? 'banheiro' : 'banheiros'}`);
     if (property.area) specs.push(`${property.area}m²`);
-    post += specs.join(' | ') + '\n\n';
+    post += `${specs.join(' | ')  }\n\n`;
   }
 
   if (features.length > 0) {
     const topFeatures = features.slice(0, 3);
-    post += topFeatures.map(f => `\u2705 ${f}`).join('\n') + '\n\n';
+    post += `${topFeatures.map(f => `\u2705 ${f}`).join('\n')  }\n\n`;
   }
 
   post += `\ud83d\udcf2 Entre em contato e agende sua visita!`;

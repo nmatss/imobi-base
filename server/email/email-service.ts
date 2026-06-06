@@ -66,8 +66,7 @@ export class EmailService {
 
     // Initialize email queue if Redis is configured
     if (this.config.redisUrl || this.config.redisHost) {
-      await this.emailQueue.initialize((data: EmailJobData) => {
-        return this.sendEmailDirect({
+      await this.emailQueue.initialize((data: EmailJobData) => this.sendEmailDirect({
           to: data.to,
           subject: data.subject,
           html: data.html,
@@ -76,8 +75,7 @@ export class EmailService {
           templateData: data.templateData,
           attachments: data.attachments,
           replyTo: data.replyTo,
-        });
-      });
+        }));
     }
 
     this.initialized = true;

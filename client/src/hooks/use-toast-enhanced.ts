@@ -5,37 +5,27 @@ import { toast as sonnerToast } from "sonner";
  * Fornece métodos tipados para success, error, warning e info
  */
 export function useToast() {
-  const success = (message: string, description?: string) => {
-    return sonnerToast.success(message, {
+  const success = (message: string, description?: string) => sonnerToast.success(message, {
       description,
       duration: 4000,
     });
-  };
 
-  const error = (message: string, description?: string) => {
-    return sonnerToast.error(message, {
+  const error = (message: string, description?: string) => sonnerToast.error(message, {
       description,
       duration: 5000,
     });
-  };
 
-  const warning = (message: string, description?: string) => {
-    return sonnerToast.warning(message, {
+  const warning = (message: string, description?: string) => sonnerToast.warning(message, {
       description,
       duration: 4500,
     });
-  };
 
-  const info = (message: string, description?: string) => {
-    return sonnerToast.info(message, {
+  const info = (message: string, description?: string) => sonnerToast.info(message, {
       description,
       duration: 4000,
     });
-  };
 
-  const loading = (message: string) => {
-    return sonnerToast.loading(message);
-  };
+  const loading = (message: string) => sonnerToast.loading(message);
 
   const promise = <T,>(
     promise: Promise<T>,
@@ -48,13 +38,11 @@ export function useToast() {
       success: string | ((data: T) => string);
       error: string | ((error: any) => string);
     }
-  ) => {
-    return sonnerToast.promise(promise, {
+  ) => sonnerToast.promise(promise, {
       loading: loadingMessage,
       success: successMessage,
       error: errorMessage,
     });
-  };
 
   const dismiss = (toastId?: string | number) => {
     sonnerToast.dismiss(toastId);
@@ -109,9 +97,7 @@ export const toast = {
       duration: 4000,
     });
   },
-  loading: (message: string) => {
-    return sonnerToast.loading(message);
-  },
+  loading: (message: string) => sonnerToast.loading(message),
   promise: <T,>(
     promise: Promise<T>,
     {
@@ -123,13 +109,11 @@ export const toast = {
       success: string | ((data: T) => string);
       error: string | ((error: any) => string);
     }
-  ) => {
-    return sonnerToast.promise(promise, {
+  ) => sonnerToast.promise(promise, {
       loading: loadingMessage,
       success: successMessage,
       error: errorMessage,
-    });
-  },
+    }),
   dismiss: (toastId?: string | number) => {
     sonnerToast.dismiss(toastId);
   },

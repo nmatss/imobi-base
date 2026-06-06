@@ -9,8 +9,7 @@ import { cn } from "@/lib/utils"
 export interface InputProps extends React.ComponentProps<"input"> {}
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, ...props }, ref) => {
-    return (
+  ({ className, type, ...props }, ref) => (
       <input
         type={type}
         className={cn(
@@ -21,7 +20,6 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         {...props}
       />
     )
-  }
 )
 Input.displayName = "Input"
 

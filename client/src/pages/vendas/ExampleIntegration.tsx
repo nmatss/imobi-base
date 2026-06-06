@@ -96,8 +96,7 @@ function useSalesPipelineData() {
 function useProposalsData() {
   const { proposals, properties, leads } = useImobi();
 
-  const proposalCards: ProposalCardProps[] = useMemo(() => {
-    return proposals.map((proposal: any) => {
+  const proposalCards: ProposalCardProps[] = useMemo(() => proposals.map((proposal: any) => {
       const property = properties.find((p: any) => p.id === proposal.propertyId);
       const lead = leads.find((l) => l.id === proposal.leadId);
 
@@ -122,8 +121,7 @@ function useProposalsData() {
         financing: undefined,
         deadline: proposal.validityDate ? new Date(proposal.validityDate) : undefined,
       };
-    });
-  }, [proposals, properties, leads]);
+    }), [proposals, properties, leads]);
 
   return proposalCards;
 }

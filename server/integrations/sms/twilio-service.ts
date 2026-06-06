@@ -143,7 +143,7 @@ export class TwilioService {
       // If lookup fails, the number is likely invalid
       return {
         valid: false,
-        phoneNumber: phoneNumber,
+        phoneNumber,
         countryCode: '',
       };
     }
@@ -173,8 +173,8 @@ export class TwilioService {
     try {
       const records = await this.client.usage.records.list({
         category: 'sms',
-        startDate: startDate,
-        endDate: endDate,
+        startDate,
+        endDate,
       });
 
       return records.map(record => ({
@@ -249,7 +249,7 @@ export class TwilioService {
       }
     }
 
-    return '+' + cleaned;
+    return `+${  cleaned}`;
   }
 
   /**

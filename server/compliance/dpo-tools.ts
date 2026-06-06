@@ -129,7 +129,7 @@ export async function generateConsentReport(tenantId: string, startDate?: string
       total,
       active,
       withdrawn,
-      withdrawalRate: total > 0 ? ((withdrawn / total) * 100).toFixed(2) + "%" : "0%",
+      withdrawalRate: total > 0 ? `${((withdrawn / total) * 100).toFixed(2)  }%` : "0%",
     };
 
     report.withdrawalRate[type] = total > 0 ? (withdrawn / total) * 100 : 0;

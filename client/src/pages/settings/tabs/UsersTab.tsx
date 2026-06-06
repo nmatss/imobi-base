@@ -293,14 +293,12 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
     setDeleteDialogOpen(true);
   };
 
-  const getInitials = (name: string) => {
-    return name
+  const getInitials = (name: string) => name
       .split(" ")
       .map((n) => n[0])
       .join("")
       .toUpperCase()
       .slice(0, 2);
-  };
 
   const formatLastLogin = (date?: string) => {
     if (!date) return "Nunca";

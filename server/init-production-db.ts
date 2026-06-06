@@ -58,11 +58,9 @@ async function initProductionDatabase() {
       output: process.stdout,
     });
 
-    const askQuestion = (question: string): Promise<string> => {
-      return new Promise((resolve) => {
+    const askQuestion = (question: string): Promise<string> => new Promise((resolve) => {
         rl.question(question, resolve);
       });
-    };
 
     const companyName = await askQuestion("Company Name: ");
     const companySlug = await askQuestion("Company Slug (URL-friendly): ");

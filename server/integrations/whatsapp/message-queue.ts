@@ -182,15 +182,16 @@ export class MessageQueue {
 
       // Send message based on type
       switch (queueItem.messageType) {
-        case "text":
+        case "text": {
           const textResponse = await whatsappAPI.sendTextMessage({
             to: queueItem.phoneNumber,
             message: queueItem.content || "",
           });
           wabaMessageId = textResponse.messages[0]?.id;
           break;
+        }
 
-        case "template":
+        case "template": {
           if (!queueItem.templateId) {
             throw new Error("Template ID required for template message");
           }
@@ -220,8 +221,9 @@ export class MessageQueue {
           // Increment template usage
           await templateManager.incrementUsageCount(queueItem.templateId);
           break;
+        }
 
-        case "media":
+        case "media": {
           if (!queueItem.mediaUrl) {
             throw new Error("Media URL required for media message");
           }
@@ -237,6 +239,7 @@ export class MessageQueue {
           });
           wabaMessageId = mediaResponse.messages[0]?.id;
           break;
+        }
 
         default:
           throw new Error(`Unknown message type: ${queueItem.messageType}`);

@@ -613,8 +613,6 @@ export function registerWhatsAppRoutes(app: Express) {
    */
   app.post("/api/webhooks/whatsapp", async (req: Request, res: Response) => {
     try {
-      // Validate signature from WhatsApp
-      const signature = req.headers["x-hub-signature-256"] as string;
       const appSecret = process.env.WHATSAPP_APP_SECRET;
 
       if (!appSecret) {
@@ -624,35 +622,74 @@ export function registerWhatsAppRoutes(app: Express) {
         });
       }
 
+      // A Meta assina os BYTES CRUS do corpo (capturados em server/index.ts via
+      // o verify hook do express.json em req.rawBody) usando o APP SECRET.
+      // Validar sobre JSON.stringify(req.body) re-serializa o payload e quebra a
+      // assinatura de webhooks legitimos.
+      const signature = req.headers["x-hub-signature-256"] as string | undefined;
+      const rawBody = req.rawBody;
+
       if (!signature) {
         log('[WHATSAPP] Webhook received without signature', "whatsapp");
         return res.status(401).json({ error: 'Missing signature' });
       }
 
-      // Validate signature using HMAC SHA256
-      const crypto = require('crypto');
-      const payload = JSON.stringify(req.body);
-      const hmac = crypto.createHmac('sha256', appSecret);
-      const expectedSignature = 'sha256=' + hmac.update(payload).digest('hex');
+      if (!Buffer.isBuffer(rawBody)) {
+        log('[WHATSAPP] Raw body unavailable for signature verification', "whatsapp");
+        return res.status(400).json({ error: 'Invalid request body' });
+      }
 
-      // Use timing-safe comparison to prevent timing attacks
-      const isValid = crypto.timingSafeEqual(
-        Buffer.from(signature),
-        Buffer.from(expectedSignature)
-      );
+      // verifyWebhookSignature usa o app secret, guard de length e
+      // timingSafeEqual envolto em try/catch (=> false).
+      const isValid = whatsappAPI.verifyWebhookSignature(signature, rawBody);
 
       if (!isValid) {
         log('[WHATSAPP] Invalid webhook signature', "whatsapp");
         return res.status(401).json({ error: 'Invalid signature' });
       }
 
-      // Process webhook (tenant ID should be determined from webhook payload or configuration)
-      // For now, we'll assume a default tenant or extract from payload
-      const tenantId = req.body.entry?.[0]?.id || "default";
+      // RESOLUCAO DE TENANT (fail-closed):
+      // O entry[].id e o WABA account id da Meta, NAO o tenantId interno.
+      // Derivamos o tenant a partir do value.metadata.phone_number_id de cada
+      // change, mapeando via integration_configs (integrationName='whatsapp',
+      // config.phoneNumberId). Se nao houver mapeamento, IGNORAMOS o evento e
+      // NUNCA gravamos em um tenant 'default' (evita vazar mensagens/leads de um
+      // tenant para outro). Respondemos 200 para a Meta nao reentregar
+      // infinitamente um evento que nunca conseguiremos rotear.
+      const entries = Array.isArray(req.body?.entry) ? req.body.entry : [];
+      let routed = 0;
 
-      await webhookHandler.processWebhook(req.body, tenantId);
+      for (const entry of entries) {
+        const changes = Array.isArray(entry?.changes) ? entry.changes : [];
+        for (const change of changes) {
+          const phoneNumberId: unknown = change?.value?.metadata?.phone_number_id;
 
-      res.json({ success: true });
+          if (typeof phoneNumberId !== "string" || !phoneNumberId) {
+            log('[WHATSAPP] Webhook change sem phone_number_id; ignorado', "whatsapp");
+            continue;
+          }
+
+          const tenantId = await webhookHandler.resolveTenantId(phoneNumberId);
+
+          if (!tenantId) {
+            // FAIL-CLOSED: sem mapeamento, nao gravamos nada.
+            log(
+              `[WHATSAPP] Nenhum tenant mapeado para phone_number_id ${phoneNumberId}; evento ignorado (fail-closed)`,
+              "whatsapp"
+            );
+            continue;
+          }
+
+          // Processa apenas este change, ja resolvido para o tenant correto.
+          await webhookHandler.processWebhook(
+            { object: req.body.object, entry: [{ id: entry.id, changes: [change] }] },
+            tenantId
+          );
+          routed++;
+        }
+      }
+
+      res.json({ success: true, routed });
     } catch (error: any) {
       log(`Webhook error: ${error.message}`, "whatsapp");
       res.status(500).json({ error: error.message });

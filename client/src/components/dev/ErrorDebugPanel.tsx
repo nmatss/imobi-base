@@ -48,6 +48,12 @@ export function ErrorDebugPanel({ position = "bottom-right" }: ErrorDebugPanelPr
     return () => clearInterval(interval);
   }, []);
 
+  const errorCounts = React.useMemo(() => logs.reduce((acc, log) => {
+      const type = log.errorDetails.type;
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {} as Record<ErrorType, number>), [logs]);
+
   // Não renderiza em produção
   if (!import.meta.env.DEV) {
     return null;
@@ -75,14 +81,6 @@ export function ErrorDebugPanel({ position = "bottom-right" }: ErrorDebugPanelPr
     "top-right": "top-4 right-4",
     "top-left": "top-4 left-4",
   };
-
-  const errorCounts = React.useMemo(() => {
-    return logs.reduce((acc, log) => {
-      const type = log.errorDetails.type;
-      acc[type] = (acc[type] || 0) + 1;
-      return acc;
-    }, {} as Record<ErrorType, number>);
-  }, [logs]);
 
   return (
     <>

@@ -133,7 +133,7 @@ export class ConversationManager {
       offset?: number;
     }
   ) {
-    let query = db
+    const query = db
       .select()
       .from(whatsappConversations)
       .where(eq(whatsappConversations.tenantId, tenantId));

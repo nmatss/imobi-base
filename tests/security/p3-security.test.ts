@@ -185,7 +185,7 @@ describe('P3 Security Improvements', () => {
     });
 
     it('should reject URLs that are too long', async () => {
-      const longUrl = '/test?' + 'x'.repeat(200);
+      const longUrl = `/test?${  'x'.repeat(200)}`;
       const response = await request(app).post(longUrl);
       expect(response.status).toBe(414);
       expect(response.body.error).toBe('URL too long');

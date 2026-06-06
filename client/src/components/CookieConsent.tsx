@@ -324,9 +324,7 @@ export function useCookieConsent() {
     }
   }, []);
 
-  const hasConsent = (type: keyof CookiePreferences): boolean => {
-    return preferences?.[type] ?? false;
-  };
+  const hasConsent = (type: keyof CookiePreferences): boolean => preferences?.[type] ?? false;
 
   return { preferences, hasConsent };
 }

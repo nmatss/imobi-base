@@ -454,6 +454,6 @@ export function formatDateForDisplay(date: Date | string | null | undefined): st
 export function parseInputDate(dateString: string): Date | null {
   if (!dateString) return null;
 
-  const date = new Date(dateString + "T00:00:00");
+  const date = new Date(`${dateString  }T00:00:00`);
   return isNaN(date.getTime()) ? null : date;
 }

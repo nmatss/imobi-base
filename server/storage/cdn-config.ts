@@ -166,12 +166,13 @@ export function generateResponsiveSrcSet(
       case CDNProvider.SUPABASE:
         optimizedUrl = getSupabaseOptimizedUrl(baseUrl, { width, quality: 85 });
         break;
-      case CDNProvider.CLOUDFLARE:
+      case CDNProvider.CLOUDFLARE: {
         // Extract image ID from URL
         const imageId = baseUrl.split('/').pop() || '';
         const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || '';
         optimizedUrl = getCloudflareOptimizedUrl(accountId, imageId, { width, quality: 85 });
         break;
+      }
       case CDNProvider.VERCEL:
         optimizedUrl = getVercelOptimizedUrl(baseUrl, { width, quality: 85 });
         break;
@@ -253,14 +254,16 @@ export class CDNConfig {
     switch (this.provider) {
       case CDNProvider.SUPABASE:
         return getSupabaseOptimizedUrl(url, params);
-      case CDNProvider.CLOUDFLARE:
+      case CDNProvider.CLOUDFLARE: {
         const imageId = url.split('/').pop() || '';
         return getCloudflareOptimizedUrl(this.config.accountId, imageId, params);
+      }
       case CDNProvider.VERCEL:
         return getVercelOptimizedUrl(url, params);
-      case CDNProvider.CLOUDINARY:
+      case CDNProvider.CLOUDINARY: {
         const publicId = url.split('/').pop() || '';
         return getCloudinaryOptimizedUrl(this.config.cloudName, publicId, params);
+      }
       default:
         return url;
     }

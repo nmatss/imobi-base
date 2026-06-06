@@ -1153,13 +1153,13 @@ function DetailDialog({
     if (valuation.comparablesData) {
       comparables = JSON.parse(valuation.comparablesData);
     }
-  } catch {}
+  } catch { /* ignore: JSON inválido -> mantém comparables vazio */ }
 
   try {
     if (valuation.adjustments) {
       adjustments = JSON.parse(valuation.adjustments);
     }
-  } catch {}
+  } catch { /* ignore: JSON inválido -> mantém adjustments vazio */ }
 
   const result = {
     estimatedValue: valuation.estimatedValue,

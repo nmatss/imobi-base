@@ -247,8 +247,7 @@ export function useDashboardData() {
   }, [properties]);
 
   // Últimos leads
-  const recentLeads = useMemo(() => {
-    return leads
+  const recentLeads = useMemo(() => leads
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 5)
       .map(lead => {
@@ -268,8 +267,7 @@ export function useDashboardData() {
           nextAction,
           needsAttention: daysSinceUpdate >= 2 && lead.status !== "contract",
         };
-      });
-  }, [leads]);
+      }), [leads]);
 
   // Timeline de visitas de hoje
   const todayTimeline = useMemo(() => {

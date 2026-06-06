@@ -186,7 +186,7 @@ function extractBudget(message: string): { raw: string; value: number } | null {
   for (const pattern of patterns) {
     const match = message.match(pattern);
     if (match) {
-      let numStr = match[1].replace(/\./g, "").replace(",", ".");
+      const numStr = match[1].replace(/\./g, "").replace(",", ".");
       let value = parseFloat(numStr);
       const multiplier = match[2]?.toLowerCase();
       if (multiplier) {
@@ -657,7 +657,7 @@ export async function processIncomingMessage(
       }
       const faqAnswer = findFaqAnswer(message, customFaqs);
       if (faqAnswer) {
-        response = faqAnswer + "\n\n💡 Posso te ajudar com mais alguma coisa? Estou aqui para encontrar o imovel ideal para voce!";
+        response = `${faqAnswer  }\n\n💡 Posso te ajudar com mais alguma coisa? Estou aqui para encontrar o imovel ideal para voce!`;
         await storage.updateIsaConversation(conversation.id, {
           messageCount,
           lastMessageAt: new Date().toISOString(),
@@ -752,7 +752,7 @@ export async function processIncomingMessage(
           const city = extractCity(message);
           const bedrooms = extractBedrooms(message);
           if (propertyType || city || bedrooms) {
-            qualData.need = (qualData.need || "") + ", " + [propertyType, city, bedrooms ? `${bedrooms}q` : null].filter(Boolean).join(", ");
+            qualData.need = `${qualData.need || ""  }, ${  [propertyType, city, bedrooms ? `${bedrooms}q` : null].filter(Boolean).join(", ")}`;
           }
           response = "Anotado! ✅\n\n💰 E qual seria o seu orcamento aproximado?";
           newStage = "qualify_budget";
@@ -844,7 +844,7 @@ export async function processIncomingMessage(
             });
             if (broaderProperties.length > 0) {
               interestedProps = broaderProperties.map(p => p.id);
-              response = "Nao encontrei exatamente o que procura, mas achei opcoes parecidas:\n" + getRecommendResponse(broaderProperties);
+              response = `Nao encontrei exatamente o que procura, mas achei opcoes parecidas:\n${  getRecommendResponse(broaderProperties)}`;
             } else {
               response = getRecommendResponse([]);
             }
@@ -904,7 +904,7 @@ export async function processIncomingMessage(
 
       case "schedule_visit": {
         // Try to extract date from message
-        const hasDate = /(\d{1,2}[\/\-]\d{1,2}|\segunda|ter[cç]a|quarta|quinta|sexta|s[aá]bado|amanh[aã]|hoje|semana)/i.test(message);
+        const hasDate = /(\d{1,2}[/-]\d{1,2}|\segunda|ter[cç]a|quarta|quinta|sexta|s[aá]bado|amanh[aã]|hoje|semana)/i.test(message);
 
         if (hasDate || primaryIntent === "affirmative") {
           // Auto-create lead if doesn't exist

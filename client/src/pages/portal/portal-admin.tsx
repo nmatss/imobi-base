@@ -185,9 +185,7 @@ export default function PortalAdmin() {
     return t.status === ticketStatusFilter;
   });
 
-  const clientTypeLabel = (type: string) => {
-    return type === "owner" ? "Proprietário" : type === "renter" ? "Inquilino" : type;
-  };
+  const clientTypeLabel = (type: string) => type === "owner" ? "Proprietário" : type === "renter" ? "Inquilino" : type;
 
   const statusBadge = (status: string) => {
     const map: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -212,9 +210,7 @@ export default function PortalAdmin() {
     return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.color}`}>{p.label}</span>;
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0);
-  };
+  const formatCurrency = (value: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0);
 
   const clientOptions = newAccessForm.clientType === "owner" ? (owners || []) : (renters || []);
 

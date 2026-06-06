@@ -79,6 +79,123 @@ const fromJson = <T>(str: string | null | undefined): T[] | null => {
 // Helper to get current timestamp
 const now = () => new Date().toISOString();
 
+// ============================================================================
+// FINANCIAL CALCULATION HELPERS (pure functions, unit-tested em
+// tests/unit/financial-calc.test.ts)
+//
+// Regra de negócio: a taxa de administração da imobiliária incide APENAS sobre
+// o componente de ALUGUEL (rentValue). Condomínio (condoFee) e IPTU (iptuValue)
+// são repassados integralmente ao proprietário (pass-through) e NÃO geram taxa.
+// ============================================================================
+
+/** Converte um valor decimal/string do Drizzle para número, com fallback seguro. */
+export function toNumber(value: string | number | null | undefined): number {
+  if (value === null || value === undefined) return 0;
+  const n = typeof value === "number" ? value : parseFloat(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * Calcula a taxa de administração sobre o ALUGUEL apenas.
+ * @param rentValue componente de aluguel do pagamento (R$)
+ * @param adminFeePercent percentual da taxa de administração (ex.: 10 = 10%)
+ */
+export function calcAdminFee(
+  rentValue: string | number | null | undefined,
+  adminFeePercent: string | number | null | undefined
+): number {
+  const rent = toNumber(rentValue);
+  // Default contratual de 10% quando não informado (espelha o default do schema).
+  const percentRaw = adminFeePercent === null || adminFeePercent === undefined || adminFeePercent === ""
+    ? 10
+    : toNumber(adminFeePercent);
+  return rent * (percentRaw / 100);
+}
+
+/**
+ * Componente de aluguel de um pagamento. Quando o pagamento possui rentValue
+ * separado (caso atual do schema, rentValue é NOT NULL), usa-o diretamente.
+ * Caso contrário, deriva subtraindo condomínio e IPTU do valor pago/total
+ * (pass-through), garantindo que a taxa nunca incida sobre esses componentes.
+ */
+export function rentComponentOfPayment(payment: {
+  rentValue?: string | number | null;
+  condoFee?: string | number | null;
+  iptuValue?: string | number | null;
+  totalValue?: string | number | null;
+  paidValue?: string | number | null;
+}): number {
+  const explicitRent = toNumber(payment.rentValue);
+  if (explicitRent > 0) return explicitRent;
+
+  // Fallback: deriva do total pago menos pass-throughs (condo + IPTU).
+  const base = toNumber(payment.paidValue) || toNumber(payment.totalValue);
+  const passThrough = toNumber(payment.condoFee) + toNumber(payment.iptuValue);
+  const derived = base - passThrough;
+  return derived > 0 ? derived : 0;
+}
+
+/**
+ * Calcula o repasse de UM pagamento ao proprietário.
+ * - adminFee incide só sobre o aluguel
+ * - condo/IPTU são pass-through (vão integralmente ao proprietário)
+ * - gross = valor efetivamente recebido (paidValue, com fallback no total)
+ * - net = gross - adminFee
+ */
+export function calcTransferForPayment(payment: {
+  rentValue?: string | number | null;
+  condoFee?: string | number | null;
+  iptuValue?: string | number | null;
+  totalValue?: string | number | null;
+  paidValue?: string | number | null;
+}, adminFeePercent: string | number | null | undefined): { gross: number; adminFee: number; net: number } {
+  const rent = rentComponentOfPayment(payment);
+  const adminFee = calcAdminFee(rent, adminFeePercent);
+  const gross = toNumber(payment.paidValue) || toNumber(payment.totalValue);
+  const net = gross - adminFee;
+  return { gross, adminFee, net };
+}
+
+/**
+ * Receita de administração de aluguel: soma das taxas de cada pagamento,
+ * cada uma incidindo apenas sobre o aluguel e usando o % real do contrato.
+ */
+export function calcRentalAdminRevenue(
+  payments: Array<{
+    rentValue?: string | number | null;
+    condoFee?: string | number | null;
+    iptuValue?: string | number | null;
+    totalValue?: string | number | null;
+    paidValue?: string | number | null;
+    rentalContractId?: string | null;
+  }>,
+  adminFeePercentByContract: Map<string, string | number | null | undefined>
+): number {
+  return payments.reduce((sum, p) => {
+    const percent = p.rentalContractId
+      ? adminFeePercentByContract.get(p.rentalContractId)
+      : undefined;
+    const rent = rentComponentOfPayment(p);
+    return sum + calcAdminFee(rent, percent);
+  }, 0);
+}
+
+/**
+ * Lucro do relatório financeiro (DRE).
+ * profit = receita de comissões (vendas) + receita de adm de aluguel
+ *          - despesas operacionais - comissões pagas a corretor
+ * Repasses ao proprietário NÃO entram aqui porque a receita de aluguel já é
+ * apenas a taxa de administração (não inclui o montante repassado).
+ */
+export function calcFinancialProfit(params: {
+  salesRevenue: number;
+  rentalRevenue: number;
+  totalExpenses: number;
+  brokerCommissions: number;
+}): number {
+  return params.salesRevenue + params.rentalRevenue - params.totalExpenses - params.brokerCommissions;
+}
+
 export interface IStorage {
   getTenant(id: string): Promise<Tenant | undefined>;
   getTenantBySlug(slug: string): Promise<Tenant | undefined>;
@@ -1284,7 +1401,14 @@ export class DbStorage implements IStorage {
     const propertiesMap = new Map(properties.map(p => [p.id, p]));
 
     const nowDate = new Date();
-    const overduePayments = payments.filter(p => new Date(p.dueDate) < nowDate);
+    // Somente pagamentos PENDENTES e com vencimento no passado contam como
+    // vencidos. O filtro de status é redundante com a query acima
+    // (getRentalPaymentsByTenant com status 'pending'), mas é mantido explícito
+    // para que pagamentos já quitados nunca apareçam como inadimplentes mesmo
+    // que a origem dos dados mude.
+    const overduePayments = payments.filter(
+      p => p.status === 'pending' && new Date(p.dueDate) < nowDate
+    );
 
     const enrichedPayments = overduePayments.map(payment => {
       const contract = contractsMap.get(payment.rentalContractId);
@@ -1428,19 +1552,23 @@ export class DbStorage implements IStorage {
 
       if (ownerPayments.length === 0) continue;
 
-      // Calculate totals
-      const grossAmount = ownerPayments.reduce((sum, p) => sum + Number(p.paidValue || 0), 0);
+      // Calculate totals.
+      // grossAmount = tudo que foi efetivamente recebido (aluguel + condo + IPTU + extras).
+      const grossAmount = ownerPayments.reduce((sum, p) => sum + toNumber(p.paidValue), 0);
 
-      // Calculate admin fee based on contracts' administration fee percentage
+      // Taxa de administração: incide APENAS sobre o componente de aluguel
+      // (rentValue). Condomínio e IPTU são pass-through ao proprietário e NÃO
+      // geram taxa. Usa o % real do contrato (default 10% via calcAdminFee).
       let adminFeeTotal = 0;
       for (const payment of ownerPayments) {
         const contract = ownerContracts.find(c => c.id === payment.rentalContractId);
-        if (contract) {
-          const adminFeePercentage = Number(contract.administrationFee || 10) / 100;
-          adminFeeTotal += Number(payment.paidValue || 0) * adminFeePercentage;
-        }
+        const { adminFee } = calcTransferForPayment(payment, contract?.administrationFee);
+        adminFeeTotal += adminFee;
       }
 
+      // Repasse líquido ao proprietário = bruto recebido - taxa de adm.
+      // Como a taxa incide só sobre o aluguel, o condo/IPTU recebido é repassado
+      // integralmente (pass-through) dentro do netAmount.
       const netAmount = grossAmount - adminFeeTotal;
 
       // Check if transfer already exists for this owner and month
@@ -1496,9 +1624,7 @@ export class DbStorage implements IStorage {
     const vacantProperties = properties.filter(p => !rentedPropertyIds.has(p.id) && p.status === 'available');
 
     // Monthly recurring revenue
-    const monthlyRecurringRevenue = activeContracts.reduce((sum, c) => {
-      return sum + Number(c.rentValue || 0) + Number(c.condoFee || 0) + Number(c.iptuValue || 0);
-    }, 0);
+    const monthlyRecurringRevenue = activeContracts.reduce((sum, c) => sum + Number(c.rentValue || 0) + Number(c.condoFee || 0) + Number(c.iptuValue || 0), 0);
 
     // Delinquency - overdue pending payments
     const overduePayments = payments.filter(p => p.status === 'pending' && new Date(p.dueDate) < nowDate);
@@ -1778,78 +1904,55 @@ export class DbStorage implements IStorage {
     cashBalance: number;
     periodVariation: number;
   }> {
-    // Get all financial entries for the period
-    const entries = await this.getFinanceEntriesByTenant(tenantId, { startDate, endDate });
-    const previousEntries = previousPeriodStart && previousPeriodEnd
-      ? await this.getFinanceEntriesByTenant(tenantId, { startDate: previousPeriodStart, endDate: previousPeriodEnd })
-      : [];
+    // Carrega todas as fontes uma única vez e filtra por janela em memória,
+    // para que período atual e período anterior usem EXATAMENTE a mesma fórmula.
+    const allEntries = await this.getFinanceEntriesByTenant(tenantId);
+    const allRentalPayments = await this.getRentalPaymentsByTenant(tenantId);
+    const allSales = await this.getPropertySalesByTenant(tenantId);
+    const allTransfers = await this.getRentalTransfersByTenant(tenantId);
 
-    // Get rental payments
-    const rentalPayments = await this.getRentalPaymentsByTenant(tenantId);
-    const filteredRentalPayments = rentalPayments.filter(p => {
-      const paidDate = p.paidDate ? new Date(p.paidDate) : null;
-      if (!paidDate || p.status !== 'paid') return false;
-      if (startDate && paidDate < startDate) return false;
-      if (endDate && paidDate > endDate) return false;
+    const inWindow = (date: Date | string | null | undefined, from?: Date, to?: Date): boolean => {
+      if (!date) return false;
+      const d = date instanceof Date ? date : new Date(date);
+      if (from && d < from) return false;
+      if (to && d > to) return false;
       return true;
-    });
+    };
 
-    // Get property sales
-    const sales = await this.getPropertySalesByTenant(tenantId);
-    const filteredSales = sales.filter(s => {
-      const saleDate = new Date(s.saleDate);
-      if (startDate && saleDate < startDate) return false;
-      if (endDate && saleDate > endDate) return false;
-      return true;
-    });
+    // Calcula o conjunto de métricas para uma janela [from, to].
+    const metricsForWindow = (from?: Date, to?: Date) => {
+      const filteredSales = allSales.filter(s => inWindow(s.saleDate, from, to));
+      const filteredRentalPayments = allRentalPayments.filter(
+        p => p.status === 'paid' && inWindow(p.paidDate, from, to)
+      );
+      const filteredTransfers = allTransfers.filter(
+        t => t.status === 'paid' && inWindow(t.paidDate, from, to)
+      );
 
-    // Get transfers
-    const transfers = await this.getRentalTransfersByTenant(tenantId);
-    const filteredTransfers = transfers.filter(t => {
-      const paidDate = t.paidDate ? new Date(t.paidDate) : null;
-      if (!paidDate || t.status !== 'paid') return false;
-      if (startDate && paidDate < startDate) return false;
-      if (endDate && paidDate > endDate) return false;
-      return true;
-    });
+      const commissionsReceived = filteredSales.reduce((sum, s) => sum + toNumber(s.commissionValue), 0);
+      const ownerTransfers = filteredTransfers.reduce((sum, t) => sum + toNumber(t.netAmount), 0);
+      const rentalRevenue = filteredRentalPayments.reduce((sum, p) => sum + toNumber(p.paidValue), 0);
+      const salesRevenue = filteredSales.reduce((sum, s) => sum + toNumber(s.saleValue), 0);
+      const operationalExpenses = allEntries
+        .filter(e => e.flow === 'out' && e.status === 'completed' && inWindow(e.entryDate, from, to))
+        .reduce((sum, e) => sum + toNumber(e.amount), 0);
 
-    // Calculate metrics
-    const commissionsReceived = filteredSales.reduce((sum, s) =>
-      sum + Number(s.commissionValue || 0), 0
-    );
+      const totalRevenue = commissionsReceived + (rentalRevenue - ownerTransfers);
+      const cashBalance = totalRevenue - operationalExpenses;
 
-    const ownerTransfers = filteredTransfers.reduce((sum, t) =>
-      sum + Number(t.netAmount || 0), 0
-    );
+      return { commissionsReceived, ownerTransfers, rentalRevenue, salesRevenue, operationalExpenses, cashBalance };
+    };
 
-    const rentalRevenue = filteredRentalPayments.reduce((sum, p) =>
-      sum + Number(p.paidValue || 0), 0
-    );
+    const current = metricsForWindow(startDate, endDate);
+    const { commissionsReceived, ownerTransfers, rentalRevenue, salesRevenue, operationalExpenses, cashBalance } = current;
 
-    const salesRevenue = filteredSales.reduce((sum, s) =>
-      sum + Number(s.saleValue || 0), 0
-    );
-
-    const operationalExpenses = entries
-      .filter(e => e.flow === 'out' && e.status === 'completed')
-      .reduce((sum, e) => sum + Number(e.amount || 0), 0);
-
-    const totalRevenue = commissionsReceived + (rentalRevenue - ownerTransfers);
-    const cashBalance = totalRevenue - operationalExpenses;
-
-    // Calculate period variation
+    // Variação de período: usa a MESMA fórmula (cashBalance) para os dois períodos.
     let periodVariation = 0;
-    if (previousEntries.length > 0) {
-      const previousRevenue = previousEntries
-        .filter(e => e.flow === 'in' && e.status === 'completed')
-        .reduce((sum, e) => sum + Number(e.amount || 0), 0);
-      const previousExpenses = previousEntries
-        .filter(e => e.flow === 'out' && e.status === 'completed')
-        .reduce((sum, e) => sum + Number(e.amount || 0), 0);
-      const previousBalance = previousRevenue - previousExpenses;
-
-      if (previousBalance > 0) {
-        periodVariation = ((cashBalance - previousBalance) / previousBalance) * 100;
+    if (previousPeriodStart && previousPeriodEnd) {
+      const previous = metricsForWindow(previousPeriodStart, previousPeriodEnd);
+      const previousBalance = previous.cashBalance;
+      if (previousBalance !== 0) {
+        periodVariation = ((cashBalance - previousBalance) / Math.abs(previousBalance)) * 100;
       }
     }
 
@@ -2827,12 +2930,14 @@ export class DbStorage implements IStorage {
     const payments = await db.select().from(schema.rentalPayments)
       .where(and(...paymentsConditions, eq(schema.rentalPayments.status, 'paid')));
 
-    // Calculate administration fee from payments
-    const rentalRevenue = payments.reduce((sum: any, p: any) => {
-      const total = parseFloat(p.totalValue || '0');
-      // Assuming 10% administration fee
-      return sum + (total * 0.10);
-    }, 0);
+    // Receita de administração de aluguel: usa a taxa REAL de cada contrato
+    // (não 10% fixo) e incide apenas sobre o componente de aluguel (rentValue),
+    // tratando condomínio/IPTU como pass-through ao proprietário.
+    const rentalContracts: RentalContract[] = await this.getRentalContractsByTenant(tenantId);
+    const adminFeeByContract = new Map<string, string | number | null | undefined>(
+      rentalContracts.map(c => [c.id, c.administrationFee])
+    );
+    const rentalRevenue = calcRentalAdminRevenue(payments, adminFeeByContract);
 
     const commissions = salesRevenue;
 
@@ -2848,7 +2953,28 @@ export class DbStorage implements IStorage {
       .where(and(...transfersConditions, eq(schema.rentalTransfers.status, 'paid')));
     const totalTransfers = transfers.reduce((sum: any, t: any) => sum + parseFloat(t.netAmount || '0'), 0);
 
-    const profit = salesRevenue + rentalRevenue - totalExpenses;
+    // Comissões pagas a corretor são um CUSTO e devem ser deduzidas do lucro.
+    // Considera apenas as comissões efetivamente pagas (status 'paid') no período.
+    const commissionConditions = [
+      eq(schema.commissions.tenantId, tenantId),
+      eq(schema.commissions.status, 'paid'),
+    ];
+    if (filters?.startDate) {
+      commissionConditions.push(sql`${schema.commissions.paidAt} >= ${filters.startDate.toISOString()}`);
+    }
+    if (filters?.endDate) {
+      commissionConditions.push(sql`${schema.commissions.paidAt} <= ${filters.endDate.toISOString()}`);
+    }
+    const paidCommissions = await db.select().from(schema.commissions).where(and(...commissionConditions));
+    const brokerCommissions = paidCommissions.reduce(
+      (sum: number, c: any) => sum + toNumber(c.brokerCommission),
+      0
+    );
+
+    // Lucro: receita de comissões (vendas) + receita de adm de aluguel
+    //        - despesas operacionais - comissões pagas a corretor.
+    // Repasses ao proprietário NÃO entram pois rentalRevenue já é só a taxa de adm.
+    const profit = calcFinancialProfit({ salesRevenue, rentalRevenue, totalExpenses, brokerCommissions });
 
     // Margin by channel (sales vs rentals)
     const marginByChannel = [

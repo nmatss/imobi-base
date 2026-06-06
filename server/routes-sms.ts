@@ -1,5 +1,9 @@
-// @ts-nocheck
-import { Router, type Request, Response } from 'express';
+// @ts-nocheck -- A tabela `smsLogs` ainda não existe no schema dual (shared/schema.ts
+// e shared/schema-sqlite.ts). Enquanto a migration não for criada (fora do escopo
+// deste track), a persistência fica atrás do helper `persistSmsLog`, que é no-op
+// quando a tabela está ausente. Mantemos o pragma apenas por causa dessa dependência
+// de schema externa; toda a lógica nova abaixo é tipada corretamente.
+import { Router, type Request, type Response, type NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
 import { getTwilioService } from './integrations/sms/twilio-service';
 import { getSMSQueue } from './integrations/sms/sms-queue';
@@ -9,12 +13,151 @@ import { getSMSOptOutManager } from './integrations/sms/optout';
 import { getSMSAnalytics } from './integrations/sms/analytics';
 import { renderSMSTemplate, getAvailableTemplates, getTemplateInfo } from './integrations/sms/templates';
 import { db } from './db';
-import { smsLogs } from '../shared/schema';
+import * as schema from '../shared/schema';
 import { eq } from 'drizzle-orm';
 import twilio from 'twilio';
+import { requireAuth, requireAdmin } from './middleware/auth';
 import { generateRateLimitKey, generateUserRateLimitKey } from './middleware/rate-limit-key-generator';
 
 const router = Router();
+
+// `smsLogs` e `integrationConfigs` podem não existir no schema atual; resolvemos
+// dinamicamente para não quebrar o import quando a migration ainda não rodou.
+const smsLogs: typeof schema.integrationConfigs | undefined =
+  (schema as Record<string, unknown>).smsLogs as never;
+const integrationConfigs = schema.integrationConfigs;
+
+// ==================== SEGURANÇA: WEBHOOK TWILIO ====================
+
+/**
+ * Reconstrói a URL pública EXATA que a Twilio usou para assinar a requisição.
+ *
+ * A assinatura X-Twilio-Signature é calculada sobre a URL configurada no console
+ * da Twilio. Atrás de proxies/Vercel, req.protocol/req.get('host') podem divergir
+ * da URL pública real, por isso aceitamos um override explícito via
+ * TWILIO_WEBHOOK_BASE_URL (ex.: https://app.imobibase.com). Quando ausente,
+ * caímos para a reconstrução a partir dos cabeçalhos de proxy.
+ */
+function getPublicWebhookUrl(req: Request): string {
+  const base = process.env.TWILIO_WEBHOOK_BASE_URL;
+  if (base) {
+    return `${base.replace(/\/+$/, '')}${req.originalUrl}`;
+  }
+  const forwardedProto = req.get('x-forwarded-proto');
+  const protocol = (forwardedProto ? forwardedProto.split(',')[0] : req.protocol).trim();
+  const host = req.get('x-forwarded-host') || req.get('host') || '';
+  return `${protocol}://${host}${req.originalUrl}`;
+}
+
+/**
+ * Middleware que valida o cabeçalho X-Twilio-Signature usando o TWILIO_AUTH_TOKEN.
+ * Rejeita com 403 quando a assinatura é inválida (padrão do webhook Stripe:
+ * falha de assinatura = 403, sem vazar detalhe). Sem auth token configurado,
+ * negamos por segurança (fail-closed) em vez de aceitar requisições não verificadas.
+ */
+function validateTwilioSignature(req: Request, res: Response, next: NextFunction): void {
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  if (!authToken) {
+    console.error('[twilio-webhook] TWILIO_AUTH_TOKEN ausente; rejeitando webhook (fail-closed)');
+    res.status(403).type('text/plain').send('Forbidden');
+    return;
+  }
+
+  const signature = req.get('x-twilio-signature');
+  if (!signature) {
+    console.warn('[twilio-webhook] requisição sem X-Twilio-Signature');
+    res.status(403).type('text/plain').send('Forbidden');
+    return;
+  }
+
+  const url = getPublicWebhookUrl(req);
+  // Twilio assina os parâmetros do corpo (application/x-www-form-urlencoded).
+  const params: Record<string, unknown> = (req.body && typeof req.body === 'object') ? req.body : {};
+
+  const isValid = twilio.validateRequest(authToken, signature, url, params as Record<string, string>);
+  if (!isValid) {
+    console.warn('[twilio-webhook] assinatura inválida', { url });
+    res.status(403).type('text/plain').send('Forbidden');
+    return;
+  }
+
+  next();
+}
+
+/**
+ * Resolve o tenantId a partir do número Twilio de destino do SMS inbound.
+ * Procura uma integração SMS cujo config.phoneNumber bata com o número que
+ * recebeu a mensagem (campo `To` do webhook incoming). Retorna null quando
+ * não há correspondência (mensagem é registrada sem tenant atribuído).
+ */
+async function resolveTenantIdByTwilioNumber(twilioNumber: string | undefined): Promise<string | null> {
+  if (!twilioNumber || !integrationConfigs) {
+    return null;
+  }
+  try {
+    const rows = await db
+      .select()
+      .from(integrationConfigs)
+      .where(eq(integrationConfigs.integrationName, 'sms'));
+
+    for (const row of rows as Array<{ tenantId: string; config: unknown }>) {
+      const cfg = typeof row.config === 'string' ? safeJsonParse(row.config) : row.config;
+      const configuredNumber =
+        (cfg as { phoneNumber?: string; twilioPhoneNumber?: string } | null)?.phoneNumber ??
+        (cfg as { phoneNumber?: string; twilioPhoneNumber?: string } | null)?.twilioPhoneNumber;
+      if (configuredNumber && normalizePhone(configuredNumber) === normalizePhone(twilioNumber)) {
+        return row.tenantId;
+      }
+    }
+  } catch (err) {
+    console.error('[twilio-webhook] erro ao resolver tenantId pelo número Twilio:', err);
+  }
+  return null;
+}
+
+function safeJsonParse(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function normalizePhone(value: string): string {
+  return value.replace(/[^\d+]/g, '');
+}
+
+/**
+ * Persiste um registro em smsLogs apenas quando a tabela existe no schema atual.
+ * No-op seguro enquanto a migration de smsLogs não for criada.
+ */
+async function persistSmsLog(values: Record<string, unknown>): Promise<void> {
+  if (!smsLogs) {
+    return;
+  }
+  try {
+    await db.insert(smsLogs).values(values);
+  } catch (err) {
+    console.error('[sms] falha ao persistir smsLog:', err);
+  }
+}
+
+/**
+ * Atualiza um registro em smsLogs por twilioSid apenas quando a tabela existe.
+ */
+async function updateSmsLogByTwilioSid(
+  twilioSid: string,
+  values: Record<string, unknown>,
+): Promise<void> {
+  if (!smsLogs) {
+    return;
+  }
+  try {
+    await db.update(smsLogs).set(values).where(eq((smsLogs as never).twilioSid, twilioSid));
+  } catch (err) {
+    console.error('[sms] falha ao atualizar smsLog:', err);
+  }
+}
 
 // ==================== RATE LIMITERS ====================
 
@@ -85,25 +228,9 @@ const bulkSMSLimiter = rateLimit({
   },
 });
 
-// Middleware to check if user is authenticated (customize based on your auth system)
-function requireAuth(req: Request, res: Response, next: Function) {
-  // TODO: Implement your authentication check
-  // For now, we'll just pass through
-  // if (!req.user) {
-  //   return res.status(401).json({ error: 'Unauthorized' });
-  // }
-  next();
-}
-
-// Middleware to check admin role
-function requireAdmin(req: Request, res: Response, next: Function) {
-  // TODO: Implement your role check
-  // For now, we'll just pass through
-  // if (!req.user?.role === 'admin') {
-  //   return res.status(403).json({ error: 'Forbidden' });
-  // }
-  next();
-}
+// As checagens de autenticação/autorização usam o middleware real importado de
+// ./middleware/auth (requireAuth garante req.user + tenantId; requireAdmin garante
+// papel admin/super_admin). Os stubs no-op anteriores foram removidos.
 
 /**
  * POST /api/sms/send
@@ -163,7 +290,8 @@ router.post('/send', smsLimiter, requireAuth, async (req: Request, res: Response
       priority: priority || 'normal',
       maxRetries: 3,
       metadata: {
-        userId: (req as any).user?.id,
+        tenantId: req.user?.tenantId,
+        userId: req.user?.id,
         ip: req.ip,
       },
     });
@@ -218,6 +346,9 @@ router.post('/send-bulk', bulkSMSLimiter, requireAuth, async (req: Request, res:
       context: templateContext || {},
       scheduledFor: scheduledFor ? new Date(scheduledFor) : undefined,
       priority: priority || 'normal',
+      // NOTE: enqueueBulk (BulkSMSJob em sms-queue.ts, fora deste escopo) ainda não
+      // propaga metadata por job. Quando esse suporte for adicionado, incluir aqui:
+      //   metadata: { tenantId: req.user?.tenantId, userId: req.user?.id }
     });
 
     res.json({
@@ -237,7 +368,7 @@ router.post('/send-bulk', bulkSMSLimiter, requireAuth, async (req: Request, res:
  * POST /api/webhooks/twilio/status
  * Twilio status callback webhook
  */
-router.post('/webhooks/twilio/status', async (req: Request, res: Response) => {
+router.post('/webhooks/twilio/status', validateTwilioSignature, async (req: Request, res: Response) => {
   try {
     const {
       MessageSid,
@@ -250,17 +381,14 @@ router.post('/webhooks/twilio/status', async (req: Request, res: Response) => {
 
     console.log(`Twilio webhook: ${MessageSid} status: ${MessageStatus}`);
 
-    // Update the SMS log
-    await db
-      .update(smsLogs)
-      .set({
-        status: MessageStatus.toLowerCase(),
-        errorCode: ErrorCode || null,
-        errorMessage: ErrorMessage || null,
-        deliveredAt: MessageStatus === 'delivered' ? new Date() : null,
-        updatedAt: new Date(),
-      })
-      .where(eq(smsLogs.twilioSid, MessageSid));
+    // Update the SMS log (no-op enquanto a tabela smsLogs não existir no schema)
+    await updateSmsLogByTwilioSid(MessageSid, {
+      status: String(MessageStatus).toLowerCase(),
+      errorCode: ErrorCode || null,
+      errorMessage: ErrorMessage || null,
+      deliveredAt: MessageStatus === 'delivered' ? new Date() : null,
+      updatedAt: new Date(),
+    });
 
     // Handle opt-out if message failed due to opt-out
     if (ErrorCode === '21610') {
@@ -285,15 +413,21 @@ router.post('/webhooks/twilio/status', async (req: Request, res: Response) => {
  * POST /api/webhooks/twilio/incoming
  * Handle incoming SMS messages (for STOP/START keywords)
  */
-router.post('/webhooks/twilio/incoming', async (req: Request, res: Response) => {
+router.post('/webhooks/twilio/incoming', validateTwilioSignature, async (req: Request, res: Response) => {
   try {
-    const { From, Body, MessageSid } = req.body;
+    const { From, To, Body, MessageSid } = req.body;
 
     console.log(`Incoming SMS from ${From}: ${Body}`);
 
-    // Log the incoming message
-    await db.insert(smsLogs).values({
-      to: process.env.TWILIO_PHONE_NUMBER || '',
+    // O número Twilio de destino vem no campo `To` do webhook incoming; usamos ele
+    // para resolver a qual tenant (imobiliária) a mensagem pertence.
+    const destinationNumber = To || process.env.TWILIO_PHONE_NUMBER || '';
+    const tenantId = await resolveTenantIdByTwilioNumber(destinationNumber);
+
+    // Log the incoming message (no-op enquanto a tabela smsLogs não existir no schema)
+    await persistSmsLog({
+      tenantId,
+      to: destinationNumber,
       from: From,
       body: Body,
       status: 'received',
@@ -541,7 +675,7 @@ router.post('/opt-out', requireAuth, requireAdmin, async (req: Request, res: Res
       source: 'admin_panel',
       optedOutAt: new Date(),
       metadata: {
-        adminUserId: (req as any).user?.id,
+        adminUserId: req.user?.id,
       },
     });
 
@@ -569,7 +703,7 @@ router.post('/opt-in', requireAuth, requireAdmin, async (req: Request, res: Resp
       phoneNumber,
       source: 'admin_panel',
       metadata: {
-        adminUserId: (req as any).user?.id,
+        adminUserId: req.user?.id,
       },
     });
 

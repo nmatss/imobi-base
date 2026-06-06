@@ -594,13 +594,9 @@ export default function ContractsPage() {
   };
 
   // Get status config
-  const getProposalStatusConfig = (status: string) => {
-    return PROPOSAL_STATUS[status as keyof typeof PROPOSAL_STATUS] || PROPOSAL_STATUS.draft;
-  };
+  const getProposalStatusConfig = (status: string) => PROPOSAL_STATUS[status as keyof typeof PROPOSAL_STATUS] || PROPOSAL_STATUS.draft;
 
-  const getContractStatusConfig = (status: string) => {
-    return CONTRACT_STATUS[status as keyof typeof CONTRACT_STATUS] || CONTRACT_STATUS.active;
-  };
+  const getContractStatusConfig = (status: string) => CONTRACT_STATUS[status as keyof typeof CONTRACT_STATUS] || CONTRACT_STATUS.active;
 
   return (
     <div className="space-y-3 sm:space-y-4 md:space-y-6 pb-20 sm:pb-6">

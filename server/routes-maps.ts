@@ -190,7 +190,7 @@ router.get("/nearby/:propertyId", validateParams(propertyIdParamSchema), validat
       latitude: coords.latitude,
       longitude: coords.longitude,
       type: type as any,
-      radius: radius,
+      radius,
     });
 
     res.json(places);

@@ -162,9 +162,7 @@ export default function AutoMarketingPage() {
     }
   }, [selectedContent]);
 
-  const getContentForProperty = (propertyId: string) => {
-    return contents.find((c) => c.propertyId === propertyId);
-  };
+  const getContentForProperty = (propertyId: string) => contents.find((c) => c.propertyId === propertyId);
 
   const handleSelectProperty = (property: Property) => {
     setSelectedProperty(property);
@@ -584,7 +582,7 @@ export default function AutoMarketingPage() {
                             size="sm"
                             onClick={() => {
                               const hashtags = parseHashtags(selectedContent.socialMediaHashtags);
-                              const fullPost = editSocialPost + "\n\n" + hashtags.join(" ");
+                              const fullPost = `${editSocialPost  }\n\n${  hashtags.join(" ")}`;
                               handleCopyToClipboard(fullPost);
                             }}
                             className="gap-1.5"
@@ -681,7 +679,7 @@ export default function AutoMarketingPage() {
                               style={{ maxHeight: "280px" }}
                             >
                               {selectedContent.emailHtml
-                                ? selectedContent.emailHtml.substring(0, 500) + "..."
+                                ? `${selectedContent.emailHtml.substring(0, 500)  }...`
                                 : "Sem conteudo de email"}
                             </div>
                           </div>

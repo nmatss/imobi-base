@@ -2093,13 +2093,13 @@ export async function registerRoutes(
 
   app.patch("/api/rental-contracts/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: 404 em mismatch de tenant (não vaza existência do ID).
       const existing = await storage.getRentalContract(req.params.id);
-      if (!existing)
-        return res
-          .status(404)
-          .json({ error: "Contrato de aluguel não encontrado" });
-      if (existing.tenantId !== req.user!.tenantId)
-        return res.status(403).json({ error: "Acesso negado" });
+      await validateResourceTenant(
+        existing,
+        req.user!.tenantId,
+        "Contrato de aluguel",
+      );
       // Mass-assignment guard: strip immutable fields before update.
       const {
         tenantId: _t,
@@ -2113,12 +2113,9 @@ export async function registerRoutes(
       );
       res.json(contract);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro ao atualizar contrato de aluguel",
-      });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao atualizar contrato de aluguel";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -2555,11 +2552,9 @@ export async function registerRoutes(
 
   app.patch("/api/sale-proposals/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: 404 em mismatch de tenant (não vaza existência do ID).
       const existing = await storage.getSaleProposal(req.params.id);
-      if (!existing)
-        return res.status(404).json({ error: "Proposta não encontrada" });
-      if (existing.tenantId !== req.user!.tenantId)
-        return res.status(403).json({ error: "Acesso negado" });
+      await validateResourceTenant(existing, req.user!.tenantId, "Proposta");
       // Mass-assignment guard: strip immutable fields before update.
       const {
         tenantId: _t,
@@ -2573,24 +2568,23 @@ export async function registerRoutes(
       );
       res.json(proposal);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error ? error.message : "Erro ao atualizar proposta",
-      });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao atualizar proposta";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
   app.delete("/api/sale-proposals/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: 404 em mismatch de tenant (não vaza existência do ID).
       const existing = await storage.getSaleProposal(req.params.id);
-      if (!existing)
-        return res.status(404).json({ error: "Proposta não encontrada" });
-      if (existing.tenantId !== req.user!.tenantId)
-        return res.status(403).json({ error: "Acesso negado" });
+      await validateResourceTenant(existing, req.user!.tenantId, "Proposta");
       await storage.deleteSaleProposal(req.params.id);
       res.json({ success: true });
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao deletar proposta" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao deletar proposta";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -2782,11 +2776,9 @@ export async function registerRoutes(
 
   app.patch("/api/finance-entries/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: 404 em mismatch de tenant (não vaza existência do ID).
       const existing = await storage.getFinanceEntry(req.params.id);
-      if (!existing)
-        return res.status(404).json({ error: "Lançamento não encontrado" });
-      if (existing.tenantId !== req.user!.tenantId)
-        return res.status(403).json({ error: "Acesso negado" });
+      await validateResourceTenant(existing, req.user!.tenantId, "Lançamento");
       // Mass-assignment guard: strip immutable fields before update.
       const {
         tenantId: _t,
@@ -2800,26 +2792,23 @@ export async function registerRoutes(
       );
       res.json(entry);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro ao atualizar lançamento",
-      });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao atualizar lançamento";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
   app.delete("/api/finance-entries/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: 404 em mismatch de tenant (não vaza existência do ID).
       const existing = await storage.getFinanceEntry(req.params.id);
-      if (!existing)
-        return res.status(404).json({ error: "Lançamento não encontrado" });
-      if (existing.tenantId !== req.user!.tenantId)
-        return res.status(403).json({ error: "Acesso negado" });
+      await validateResourceTenant(existing, req.user!.tenantId, "Lançamento");
       await storage.deleteFinanceEntry(req.params.id);
       res.json({ success: true });
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao deletar lançamento" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao deletar lançamento";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -3080,11 +3069,9 @@ export async function registerRoutes(
 
   app.patch("/api/follow-ups/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: 404 em mismatch de tenant (não vaza existência do ID).
       const existing = await storage.getFollowUp(req.params.id);
-      if (!existing)
-        return res.status(404).json({ error: "Follow-up não encontrado" });
-      if (existing.tenantId !== req.user!.tenantId)
-        return res.status(403).json({ error: "Acesso negado" });
+      await validateResourceTenant(existing, req.user!.tenantId, "Follow-up");
       // Mass-assignment guard: strip immutable fields before update.
       const {
         tenantId: _t,
@@ -3098,26 +3085,23 @@ export async function registerRoutes(
       );
       res.json(followUp);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro ao atualizar follow-up",
-      });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao atualizar follow-up";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
   app.delete("/api/follow-ups/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: 404 em mismatch de tenant (não vaza existência do ID).
       const existing = await storage.getFollowUp(req.params.id);
-      if (!existing)
-        return res.status(404).json({ error: "Follow-up não encontrado" });
-      if (existing.tenantId !== req.user!.tenantId)
-        return res.status(403).json({ error: "Acesso negado" });
+      await validateResourceTenant(existing, req.user!.tenantId, "Follow-up");
       await storage.deleteFollowUp(req.params.id);
       res.json({ success: true });
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao deletar follow-up" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao deletar follow-up";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 

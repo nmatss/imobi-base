@@ -468,7 +468,7 @@ describe('SQL Injection Prevention Integration Tests', () => {
     });
 
     it('should sanitize to maximum length', async () => {
-      const longSearch = 'House ' + 'a'.repeat(500);
+      const longSearch = `House ${  'a'.repeat(500)}`;
 
       const res = await request(app)
         .get('/api/properties/search')

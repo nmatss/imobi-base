@@ -212,9 +212,7 @@ export function getContrastRatio(color1: string, color2: string): number {
       .match(/.{2}/g)
       ?.map((x) => parseInt(x, 16) / 255) || [0, 0, 0];
 
-    const [r, g, b] = rgb.map((val) => {
-      return val <= 0.03928 ? val / 12.92 : Math.pow((val + 0.055) / 1.055, 2.4);
-    });
+    const [r, g, b] = rgb.map((val) => val <= 0.03928 ? val / 12.92 : Math.pow((val + 0.055) / 1.055, 2.4));
 
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
   };

@@ -15,7 +15,7 @@ describe('WhatsApp Webhook Signature Validation', () => {
     it('should generate correct signature for valid payload', () => {
       const payload = JSON.stringify({ object: 'whatsapp_business_account' });
       const hmac = crypto.createHmac('sha256', APP_SECRET);
-      const expectedSignature = 'sha256=' + hmac.update(payload).digest('hex');
+      const expectedSignature = `sha256=${  hmac.update(payload).digest('hex')}`;
 
       expect(expectedSignature).toMatch(/^sha256=[a-f0-9]{64}$/);
     });
@@ -23,11 +23,11 @@ describe('WhatsApp Webhook Signature Validation', () => {
     it('should validate matching signatures with timing-safe comparison', () => {
       const payload = JSON.stringify({ object: 'whatsapp_business_account' });
       const hmac = crypto.createHmac('sha256', APP_SECRET);
-      const signature = 'sha256=' + hmac.update(payload).digest('hex');
+      const signature = `sha256=${  hmac.update(payload).digest('hex')}`;
 
       // Recalcular para validação
       const hmac2 = crypto.createHmac('sha256', APP_SECRET);
-      const expectedSignature = 'sha256=' + hmac2.update(payload).digest('hex');
+      const expectedSignature = `sha256=${  hmac2.update(payload).digest('hex')}`;
 
       const isValid = crypto.timingSafeEqual(
         Buffer.from(signature),
@@ -41,10 +41,10 @@ describe('WhatsApp Webhook Signature Validation', () => {
       const payload = JSON.stringify({ object: 'whatsapp_business_account' });
 
       const hmac = crypto.createHmac('sha256', APP_SECRET);
-      const expectedSignature = 'sha256=' + hmac.update(payload).digest('hex');
+      const expectedSignature = `sha256=${  hmac.update(payload).digest('hex')}`;
 
       // Criar signature inválida com o mesmo tamanho
-      const invalidSignature = 'sha256=' + 'a'.repeat(64);
+      const invalidSignature = `sha256=${  'a'.repeat(64)}`;
 
       const isValid = crypto.timingSafeEqual(
         Buffer.from(invalidSignature),
@@ -59,10 +59,10 @@ describe('WhatsApp Webhook Signature Validation', () => {
       const payload2 = JSON.stringify({ object: 'different_payload' });
 
       const hmac1 = crypto.createHmac('sha256', APP_SECRET);
-      const signature1 = 'sha256=' + hmac1.update(payload1).digest('hex');
+      const signature1 = `sha256=${  hmac1.update(payload1).digest('hex')}`;
 
       const hmac2 = crypto.createHmac('sha256', APP_SECRET);
-      const signature2 = 'sha256=' + hmac2.update(payload2).digest('hex');
+      const signature2 = `sha256=${  hmac2.update(payload2).digest('hex')}`;
 
       expect(signature1).not.toBe(signature2);
     });
@@ -111,7 +111,7 @@ describe('WhatsApp Webhook Signature Validation', () => {
       });
 
       const hmac = crypto.createHmac('sha256', APP_SECRET);
-      const signature = 'sha256=' + hmac.update(complexPayload).digest('hex');
+      const signature = `sha256=${  hmac.update(complexPayload).digest('hex')}`;
 
       expect(signature).toMatch(/^sha256=[a-f0-9]{64}$/);
     });
@@ -167,7 +167,7 @@ describe('WhatsApp Webhook Signature Validation', () => {
     it('should handle empty payload', () => {
       const payload = '';
       const hmac = crypto.createHmac('sha256', APP_SECRET);
-      const signature = 'sha256=' + hmac.update(payload).digest('hex');
+      const signature = `sha256=${  hmac.update(payload).digest('hex')}`;
 
       expect(signature).toMatch(/^sha256=[a-f0-9]{64}$/);
     });
@@ -177,7 +177,7 @@ describe('WhatsApp Webhook Signature Validation', () => {
         message: "Hello with special chars: @#$%^&*(){}[]|\\:;\"'<>?,./",
       });
       const hmac = crypto.createHmac('sha256', APP_SECRET);
-      const signature = 'sha256=' + hmac.update(payload).digest('hex');
+      const signature = `sha256=${  hmac.update(payload).digest('hex')}`;
 
       expect(signature).toMatch(/^sha256=[a-f0-9]{64}$/);
     });
@@ -187,7 +187,7 @@ describe('WhatsApp Webhook Signature Validation', () => {
         message: 'Olá! 你好! مرحبا! 🚀',
       });
       const hmac = crypto.createHmac('sha256', APP_SECRET);
-      const signature = 'sha256=' + hmac.update(payload).digest('hex');
+      const signature = `sha256=${  hmac.update(payload).digest('hex')}`;
 
       expect(signature).toMatch(/^sha256=[a-f0-9]{64}$/);
     });
@@ -205,13 +205,13 @@ describe('WhatsApp Webhook Signature Validation', () => {
     it('should prevent timing attacks with constant-time comparison', () => {
       const payload = JSON.stringify({ object: 'test' });
       const hmac = crypto.createHmac('sha256', APP_SECRET);
-      const validSignature = 'sha256=' + hmac.update(payload).digest('hex');
+      const validSignature = `sha256=${  hmac.update(payload).digest('hex')}`;
 
       // Diferentes assinaturas inválidas
       const invalidSignatures = [
-        'sha256=' + 'a'.repeat(64),
-        'sha256=' + 'f'.repeat(64),
-        'sha256=' + '0'.repeat(64),
+        `sha256=${  'a'.repeat(64)}`,
+        `sha256=${  'f'.repeat(64)}`,
+        `sha256=${  '0'.repeat(64)}`,
       ];
 
       // Todas devem ser rejeitadas, independentemente do conteúdo
@@ -259,7 +259,7 @@ describe('WhatsApp Webhook Signature Validation', () => {
 
       const payload = JSON.stringify(messageWebhook);
       const hmac = crypto.createHmac('sha256', APP_SECRET);
-      const signature = 'sha256=' + hmac.update(payload).digest('hex');
+      const signature = `sha256=${  hmac.update(payload).digest('hex')}`;
 
       expect(signature).toMatch(/^sha256=[a-f0-9]{64}$/);
       expect(messageWebhook.entry[0].changes[0].value.messages).toHaveLength(1);
@@ -297,7 +297,7 @@ describe('WhatsApp Webhook Signature Validation', () => {
 
       const payload = JSON.stringify(statusWebhook);
       const hmac = crypto.createHmac('sha256', APP_SECRET);
-      const signature = 'sha256=' + hmac.update(payload).digest('hex');
+      const signature = `sha256=${  hmac.update(payload).digest('hex')}`;
 
       expect(signature).toMatch(/^sha256=[a-f0-9]{64}$/);
       expect(statusWebhook.entry[0].changes[0].value.statuses).toHaveLength(1);
@@ -341,7 +341,7 @@ describe('WhatsApp Webhook Signature Validation', () => {
 
       const payload = JSON.stringify(mediaWebhook);
       const hmac = crypto.createHmac('sha256', APP_SECRET);
-      const signature = 'sha256=' + hmac.update(payload).digest('hex');
+      const signature = `sha256=${  hmac.update(payload).digest('hex')}`;
 
       expect(signature).toMatch(/^sha256=[a-f0-9]{64}$/);
       expect(mediaWebhook.entry[0].changes[0].value.messages[0].type).toBe('image');

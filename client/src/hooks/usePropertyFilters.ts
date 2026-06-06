@@ -46,8 +46,7 @@ export function usePropertyFilters(properties: Property[]) {
     setFilters(DEFAULT_FILTERS);
   }, []);
 
-  const filteredProperties = useMemo(() => {
-    return properties.filter((property) => {
+  const filteredProperties = useMemo(() => properties.filter((property) => {
       // Search filter
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
@@ -114,8 +113,7 @@ export function usePropertyFilters(properties: Property[]) {
       }
 
       return true;
-    });
-  }, [properties, filters]);
+    }), [properties, filters]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;

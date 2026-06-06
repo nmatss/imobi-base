@@ -222,7 +222,7 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
           id: userId,
           tenantId: defaultTenantId,
           name: microsoftUser.displayName,
-          email: email,
+          email,
           password: '', // No password for OAuth users
           role: 'user',
           avatar: null,

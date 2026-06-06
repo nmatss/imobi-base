@@ -185,7 +185,7 @@ export function insertVariable(text: string, cursorPosition: number, variable: s
 export function getPreviewText(text: string, maxLength: number = 100): string {
   const plainText = text.replace(/\{\{(\w+)\}\}/g, '$1');
   if (plainText.length <= maxLength) return text;
-  return text.substring(0, maxLength) + "...";
+  return `${text.substring(0, maxLength)  }...`;
 }
 
 export function renderTemplate(template: string, variables: Record<string, string>): string {

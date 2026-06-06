@@ -57,12 +57,10 @@ export function useToastFeedback() {
     });
   };
 
-  const loading = (message: string, description?: string) => {
-    return sonnerToast.loading(message, {
+  const loading = (message: string, description?: string) => sonnerToast.loading(message, {
       description,
       duration: Infinity, // Não fecha automaticamente
     });
-  };
 
   const promise = <T,>(
     promise: Promise<T>,
@@ -71,13 +69,11 @@ export function useToastFeedback() {
       success: string | ((data: T) => string);
       error: string | ((error: any) => string);
     }
-  ) => {
-    return sonnerToast.promise(promise, {
+  ) => sonnerToast.promise(promise, {
       loading: messages.loading,
       success: messages.success,
       error: messages.error,
     });
-  };
 
   const dismiss = (toastId?: string | number) => {
     sonnerToast.dismiss(toastId);

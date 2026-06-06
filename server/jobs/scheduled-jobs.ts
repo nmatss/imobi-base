@@ -1,168 +1,326 @@
-import {
-  queueDailyReport,
-  queueWeeklyReport,
-  queueMonthlyReport,
-} from "./report-queue";
-import { queueBatchPaymentReminders } from "./payment-queue";
-import {
-  createQueue,
-  QueueName,
-  BackupJobData,
-  CleanupJobData,
-  IntegrationSyncJobData,
-} from "./queue-manager";
 import * as Sentry from "@sentry/node";
+import {
+  sendPaymentReminder,
+  type PaymentReminderContext,
+} from "./processors/payment-reminder-processor";
+import { runReport, type ReportContext } from "./processors/report-processor";
+import { runCleanupTarget } from "./processors/cleanup-processor";
+import { runIntegrationSyncProvider } from "./processors/integration-sync-processor";
+import { runBackup } from "./processors/backup-processor";
 
 // ===================================================================
 // EXPORTED JOB FUNCTIONS
-// These are called by both:
-//   1. Vercel Cron HTTP endpoints (server/routes-cron.ts)
-//   2. node-cron fallback below (for Docker/Railway deployments)
+//
+// These run the work INLINE (no BullMQ enqueue). On Vercel/serverless
+// there is NO persistent BullMQ worker, so anything merely enqueued would
+// pile up in Redis and never execute. These functions are invoked by:
+//   1. Vercel Cron HTTP endpoints (server/routes-cron.ts) -> primary path
+//   2. node-cron fallback below (for Docker/Railway persistent servers)
+//
+// The per-item logic lives in processors/* as directly-callable functions
+// (e.g. sendPaymentReminder, runReport) and is ALSO reused by the BullMQ
+// worker entrypoints (processX) when a persistent worker exists.
 // ===================================================================
 
+const REMINDER_WINDOW_DAYS = 3; // notify this many days before due date
+const FINAL_NOTICE_DAYS = 30; // overdue threshold for "final notice"
+
 /**
- * Run payment reminders
+ * Classify a pending payment into a reminder type relative to today.
+ * Returns null when the payment is neither due-soon nor overdue.
+ */
+function classifyReminder(
+  dueDate: Date,
+  now: Date,
+): { type: PaymentReminderContext["type"]; daysOverdue?: number } | null {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const diffDays = Math.floor(
+    (dueDate.getTime() - now.getTime()) / msPerDay,
+  );
+
+  if (diffDays >= 0 && diffDays <= REMINDER_WINDOW_DAYS) {
+    return { type: "upcoming" };
+  }
+  if (diffDays < 0) {
+    const daysOverdue = Math.abs(diffDays);
+    return {
+      type: daysOverdue >= FINAL_NOTICE_DAYS ? "final-notice" : "overdue",
+      daysOverdue,
+    };
+  }
+  return null;
+}
+
+/**
+ * Run payment reminders for every active tenant.
+ *
+ * Queries REAL pending rental payments whose due date is upcoming or overdue,
+ * joins renter + property for contact/branding, and sends the reminder e-mail
+ * inline.
  */
 export async function runPaymentReminders(): Promise<void> {
-  // In production, fetch contracts with upcoming or overdue payments from database
-  const contractsToRemind = [
-    { contractId: 1, type: "upcoming" as const },
-    { contractId: 2, type: "overdue" as const, daysOverdue: 5 },
-    { contractId: 3, type: "final-notice" as const, daysOverdue: 30 },
-  ];
+  const { db, schema } = await import("../db");
+  const { eq } = await import("drizzle-orm");
 
-  await queueBatchPaymentReminders(contractsToRemind);
+  const now = new Date();
+  let sent = 0;
+  let scanned = 0;
+
+  const rows = await db
+    .select({
+      tenantId: schema.rentalPayments.tenantId,
+      rentalPaymentId: schema.rentalPayments.id,
+      rentalContractId: schema.rentalPayments.rentalContractId,
+      dueDate: schema.rentalPayments.dueDate,
+      totalValue: schema.rentalPayments.totalValue,
+      renterEmail: schema.renters.email,
+      renterName: schema.renters.name,
+      propertyAddress: schema.properties.address,
+      agencyName: schema.tenants.name,
+    })
+    .from(schema.rentalPayments)
+    .innerJoin(
+      schema.rentalContracts,
+      eq(schema.rentalPayments.rentalContractId, schema.rentalContracts.id),
+    )
+    .innerJoin(
+      schema.renters,
+      eq(schema.rentalContracts.renterId, schema.renters.id),
+    )
+    .innerJoin(
+      schema.properties,
+      eq(schema.rentalContracts.propertyId, schema.properties.id),
+    )
+    .innerJoin(
+      schema.tenants,
+      eq(schema.rentalPayments.tenantId, schema.tenants.id),
+    )
+    .where(eq(schema.rentalPayments.status, "pending"));
+
+  for (const row of rows) {
+    scanned++;
+    const classification = classifyReminder(new Date(row.dueDate), now);
+    if (!classification) continue;
+
+    const ctx: PaymentReminderContext = {
+      tenantId: row.tenantId,
+      rentalContractId: row.rentalContractId,
+      rentalPaymentId: row.rentalPaymentId,
+      type: classification.type,
+      daysOverdue: classification.daysOverdue,
+      renterEmail: row.renterEmail ?? "",
+      renterName: row.renterName,
+      propertyAddress: row.propertyAddress,
+      totalValue: row.totalValue,
+      dueDate: new Date(row.dueDate).toISOString(),
+      agencyName: row.agencyName,
+    };
+
+    try {
+      const ok = await sendPaymentReminder(ctx);
+      if (ok) sent++;
+    } catch (err) {
+      Sentry.captureException(err, {
+        tags: { cron: "payment-reminders" },
+        extra: { rentalContractId: row.rentalContractId },
+      });
+    }
+  }
+
   console.log(
-    `[ScheduledJobs] Queued ${contractsToRemind.length} payment reminders`,
+    `[ScheduledJobs] Payment reminders: ${sent} sent / ${scanned} pending payments scanned`,
   );
 }
 
 /**
- * Run daily reports
+ * Fetch the report recipients for every active tenant: the agency e-mail plus
+ * each admin/owner user. Falls back to the tenant e-mail when no admin user
+ * exists.
  */
+async function getReportRecipients(): Promise<
+  Array<{
+    tenantId: string;
+    email: string;
+    name: string;
+    agencyName: string;
+  }>
+> {
+  const { db, schema } = await import("../db");
+  const { inArray } = await import("drizzle-orm");
+
+  const tenants = await db
+    .select({
+      id: schema.tenants.id,
+      name: schema.tenants.name,
+      email: schema.tenants.email,
+    })
+    .from(schema.tenants);
+
+  if (tenants.length === 0) return [];
+
+  const tenantIds = tenants.map((t: { id: string }) => t.id);
+
+  const adminUsers = await db
+    .select({
+      tenantId: schema.users.tenantId,
+      email: schema.users.email,
+      name: schema.users.name,
+      role: schema.users.role,
+    })
+    .from(schema.users)
+    .where(inArray(schema.users.tenantId, tenantIds));
+
+  const recipients: Array<{
+    tenantId: string;
+    email: string;
+    name: string;
+    agencyName: string;
+  }> = [];
+
+  for (const tenant of tenants as Array<{
+    id: string;
+    name: string;
+    email: string | null;
+  }>) {
+    const admins = (
+      adminUsers as Array<{
+        tenantId: string;
+        email: string;
+        name: string;
+        role: string;
+      }>
+    ).filter(
+      (u) =>
+        u.tenantId === tenant.id &&
+        (u.role === "admin" || u.role === "super_admin" || u.role === "owner"),
+    );
+
+    if (admins.length > 0) {
+      for (const admin of admins) {
+        recipients.push({
+          tenantId: tenant.id,
+          email: admin.email,
+          name: admin.name,
+          agencyName: tenant.name,
+        });
+      }
+    } else if (tenant.email) {
+      recipients.push({
+        tenantId: tenant.id,
+        email: tenant.email,
+        name: tenant.name,
+        agencyName: tenant.name,
+      });
+    }
+  }
+
+  return recipients;
+}
+
+async function runReportsForAll(
+  type: ReportContext["type"],
+): Promise<void> {
+  const recipients = await getReportRecipients();
+  let sent = 0;
+
+  for (const recipient of recipients) {
+    try {
+      await runReport({
+        type,
+        tenantId: recipient.tenantId,
+        recipientEmail: recipient.email,
+        recipientName: recipient.name,
+        agencyName: recipient.agencyName,
+      });
+      sent++;
+    } catch (err) {
+      Sentry.captureException(err, {
+        tags: { cron: `${type}-reports` },
+        extra: { tenantId: recipient.tenantId, email: recipient.email },
+      });
+    }
+  }
+
+  console.log(
+    `[ScheduledJobs] ${type} reports: ${sent}/${recipients.length} sent`,
+  );
+}
+
 export async function runDailyReports(): Promise<void> {
-  // In production, fetch users who want daily reports
-  const usersWithDailyReports = [{ userId: 1, email: "admin@imobibase.com" }];
-
-  for (const user of usersWithDailyReports) {
-    await queueDailyReport(user.userId, user.email);
-  }
-
-  console.log(
-    `[ScheduledJobs] Queued ${usersWithDailyReports.length} daily reports`,
-  );
+  await runReportsForAll("daily");
 }
 
-/**
- * Run weekly reports
- */
 export async function runWeeklyReports(): Promise<void> {
-  // In production, fetch users who want weekly reports
-  const usersWithWeeklyReports = [{ userId: 1, email: "admin@imobibase.com" }];
-
-  for (const user of usersWithWeeklyReports) {
-    await queueWeeklyReport(user.userId, user.email);
-  }
-
-  console.log(
-    `[ScheduledJobs] Queued ${usersWithWeeklyReports.length} weekly reports`,
-  );
+  await runReportsForAll("weekly");
 }
 
-/**
- * Run monthly reports
- */
 export async function runMonthlyReports(): Promise<void> {
-  // In production, fetch users who want monthly reports
-  const usersWithMonthlyReports = [{ userId: 1, email: "admin@imobibase.com" }];
-
-  for (const user of usersWithMonthlyReports) {
-    await queueMonthlyReport(user.userId, user.email);
-  }
-
-  console.log(
-    `[ScheduledJobs] Queued ${usersWithMonthlyReports.length} monthly reports`,
-  );
+  await runReportsForAll("monthly");
 }
 
 /**
- * Run session cleanup
+ * Run session cleanup inline.
  */
 export async function runCleanupSessions(): Promise<void> {
-  const cleanupQueue = createQueue<CleanupJobData>(QueueName.CLEANUP);
-
-  await cleanupQueue.add("cleanup-sessions", {
-    target: "sessions",
-    olderThan: 7, // 7 days
-  });
-
-  console.log("[ScheduledJobs] Session cleanup queued");
+  const deleted = await runCleanupTarget("sessions", 7);
+  console.log(`[ScheduledJobs] Session cleanup: ${deleted} removed`);
 }
 
 /**
- * Run log cleanup
+ * Run log cleanup inline.
  */
 export async function runCleanupLogs(): Promise<void> {
-  const cleanupQueue = createQueue<CleanupJobData>(QueueName.CLEANUP);
-
-  await cleanupQueue.add("cleanup-logs", {
-    target: "logs",
-    olderThan: 30, // 30 days
-  });
-
-  console.log("[ScheduledJobs] Log cleanup queued");
+  const deleted = await runCleanupTarget("logs", 30);
+  console.log(`[ScheduledJobs] Log cleanup: ${deleted} removed`);
 }
 
 /**
- * Run temp files cleanup
+ * Run temp files cleanup inline.
  */
 export async function runCleanupTempFiles(): Promise<void> {
-  const cleanupQueue = createQueue<CleanupJobData>(QueueName.CLEANUP);
-
-  await cleanupQueue.add("cleanup-temp-files", {
-    target: "temp-files",
-    olderThan: 7, // 7 days
-  });
-
-  console.log("[ScheduledJobs] Temp files cleanup queued");
+  const deleted = await runCleanupTarget("temp-files", 7);
+  console.log(`[ScheduledJobs] Temp files cleanup: ${deleted} removed`);
 }
 
 /**
- * Run integration sync
+ * Run integration sync inline for the configured providers.
  */
 export async function runIntegrationSync(): Promise<void> {
-  const integrationQueue = createQueue<IntegrationSyncJobData>(
-    QueueName.INTEGRATION_SYNC,
-  );
+  const providers = ["zapier", "salesforce", "hubspot", "real-estate-portal"];
+  let synced = 0;
 
-  // Sync with configured integrations
-  const integrations = ["zapier", "real-estate-portal"];
-
-  for (const provider of integrations) {
-    await integrationQueue.add(`sync-${provider}`, {
-      provider,
-      action: "sync",
-    });
+  for (const provider of providers) {
+    try {
+      const result = await runIntegrationSyncProvider(provider, "sync");
+      if (result.status === "synced") synced++;
+    } catch (err) {
+      Sentry.captureException(err, {
+        tags: { cron: "integration-sync", provider },
+      });
+    }
   }
 
   console.log(
-    `[ScheduledJobs] Queued sync for ${integrations.length} integrations`,
+    `[ScheduledJobs] Integration sync: ${synced}/${providers.length} providers processed`,
   );
 }
 
 /**
- * Run database backup
+ * Run database backup inline.
+ *
+ * NOTE: This will THROW if no durable backup target is configured (see
+ * runBackup). That is intentional - a silent "simulated" success previously
+ * hid the fact that no real backup existed. The official DR strategy in
+ * production is Supabase Point-In-Time Recovery (PITR); set
+ * BACKUP_OPTIONAL=true to treat the missing off-site bucket as a warning.
  */
 export async function runDatabaseBackup(): Promise<void> {
-  const backupQueue = createQueue<BackupJobData>(QueueName.BACKUP);
-
-  await backupQueue.add("database-backup", {
+  const result = await runBackup({
     type: "full",
     includeFiles: false,
     retention: 30,
   });
-
-  console.log("[ScheduledJobs] Database backup queued");
+  console.log(`[ScheduledJobs] Database backup completed: ${result.backupName}`);
 }
 
 /**
@@ -173,9 +331,7 @@ export async function runDatabaseBackup(): Promise<void> {
  */
 export async function runEnforcePlanLimits(): Promise<void> {
   const { storage } = await import("../storage");
-  const { enforceAllPlanLimits } = await import(
-    "../middleware/plan-limits"
-  );
+  const { enforceAllPlanLimits } = await import("../middleware/plan-limits");
 
   console.log("[Cron] Running plan limits enforcement sweep...");
   const tenants = await storage.getAllTenants();
@@ -203,7 +359,7 @@ export async function runEnforcePlanLimits(): Promise<void> {
 }
 
 /**
- * Run cleanup of soft-deleted records older than 90 days
+ * Run cleanup of soft-deleted records older than 90 days.
  */
 export async function runCleanupSoftDeletes(): Promise<void> {
   console.log("[Cron] Cleaning up soft-deleted records older than 90 days...");
@@ -222,11 +378,9 @@ export async function runCleanupSoftDeletes(): Promise<void> {
     schema.financeCategories,
   ];
 
-  let totalDeleted = 0;
   for (const table of tables) {
     if ("deletedAt" in table) {
-      const result = await purgeDeletedRecords(table, 90);
-      // result.rowCount may be available depending on driver
+      await purgeDeletedRecords(table, 90);
       console.log(`[Cron] Purged soft-deleted records from table`);
     }
   }

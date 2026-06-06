@@ -148,12 +148,10 @@ const OptimizedImageComponent = ({
 };
 
 // Memoize component to prevent unnecessary re-renders
-export const OptimizedImage = memo(OptimizedImageComponent, (prevProps, nextProps) => {
-  return (
+export const OptimizedImage = memo(OptimizedImageComponent, (prevProps, nextProps) => (
     prevProps.src === nextProps.src &&
     prevProps.alt === nextProps.alt &&
     prevProps.priority === nextProps.priority &&
     prevProps.aspectRatio === nextProps.aspectRatio &&
     prevProps.objectFit === nextProps.objectFit
-  );
-});
+  ));

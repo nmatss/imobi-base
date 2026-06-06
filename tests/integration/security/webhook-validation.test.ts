@@ -106,10 +106,10 @@ function createTestApp(): Express {
 
     try {
       const rawBody = (req as any).rawBody;
-      const expectedSignature = 'sha256=' + crypto
+      const expectedSignature = `sha256=${  crypto
         .createHmac('sha256', WEBHOOK_SECRETS.whatsapp)
         .update(rawBody)
-        .digest('hex');
+        .digest('hex')}`;
 
       if (!crypto.timingSafeEqual(
         Buffer.from(signature),
@@ -320,10 +320,10 @@ describe('Webhook Signature Validation Integration Tests', () => {
       const payload = { object: 'whatsapp_business_account', entry: [] };
       const payloadString = JSON.stringify(payload);
 
-      const signature = 'sha256=' + crypto
+      const signature = `sha256=${  crypto
         .createHmac('sha256', WEBHOOK_SECRETS.whatsapp)
         .update(payloadString)
-        .digest('hex');
+        .digest('hex')}`;
 
       const res = await request(app)
         .post('/api/webhooks/whatsapp')
@@ -435,13 +435,13 @@ describe('Webhook Signature Validation Integration Tests', () => {
       const payload = { event: 'test' };
       const payloadString = JSON.stringify(payload);
 
-      const validSignature = 'sha256=' + crypto
+      const validSignature = `sha256=${  crypto
         .createHmac('sha256', WEBHOOK_SECRETS.whatsapp)
         .update(payloadString)
-        .digest('hex');
+        .digest('hex')}`;
 
       // Create similar but invalid signature
-      const invalidSignature = validSignature.slice(0, -4) + 'xxxx';
+      const invalidSignature = `${validSignature.slice(0, -4)  }xxxx`;
 
       const start = Date.now();
       await request(app)

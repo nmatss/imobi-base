@@ -59,7 +59,7 @@ export class SignerService {
         phone: signer.phone,
         message: config.customMessage,
         delivery: auths.includes('sms') ? 'sms' : 'email',
-        auths: auths,
+        auths,
         refusable: config.refusable ?? true,
       };
 

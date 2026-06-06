@@ -20,12 +20,10 @@ type Props = {
 };
 
 export default function CommissionCard({ commission, onStatusChange }: Props) {
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
+  const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
     }).format(value);
-  };
 
   const getStatusConfig = (status: 'pending' | 'approved' | 'paid') => {
     switch (status) {
@@ -56,14 +54,12 @@ export default function CommissionCard({ commission, onStatusChange }: Props) {
   const statusConfig = getStatusConfig(commission.status);
   const StatusIcon = statusConfig.icon;
 
-  const getInitials = (name: string) => {
-    return name
+  const getInitials = (name: string) => name
       .split(' ')
       .map(n => n[0])
       .slice(0, 2)
       .join('')
       .toUpperCase();
-  };
 
   return (
     <Card className="transition-shadow duration-200">

@@ -73,7 +73,7 @@ export function sanitizeResponse(response: any, maxLength: number = 1000): strin
 
     // Truncate if too long
     if (jsonStr.length > maxLength) {
-      return jsonStr.substring(0, maxLength) + '... [truncated]';
+      return `${jsonStr.substring(0, maxLength)  }... [truncated]`;
     }
 
     return jsonStr;

@@ -414,16 +414,51 @@ export class WhatsAppBusinessAPI {
   }
 
   /**
-   * Verify webhook signature
+   * Verify webhook signature.
+   *
+   * A Meta assina o payload com o APP SECRET (App Dashboard > Settings > Basic),
+   * NAO com o access token. Usar o token como chave produz assinaturas que nunca
+   * batem com o header x-hub-signature-256.
+   *
+   * IMPORTANTE: o HMAC deve ser calculado sobre os BYTES CRUS do corpo da
+   * requisicao (req.rawBody), nao sobre uma re-serializacao via JSON.stringify,
+   * porque a Meta calcula a assinatura sobre os bytes que enviou e qualquer
+   * diferenca de formatacao (espacos, ordem, escaping unicode) quebra a validacao.
+   *
+   * Comparacao em tempo constante com guard de tamanho para evitar timing
+   * attacks e o throw de timingSafeEqual quando os buffers tem comprimentos
+   * diferentes.
    */
-  verifyWebhookSignature(signature: string, body: string): boolean {
-    const crypto = require("crypto");
-    const expectedSignature = crypto
-      .createHmac("sha256", this.config.apiToken)
-      .update(body)
-      .digest("hex");
+  verifyWebhookSignature(signature: string, rawBody: Buffer): boolean {
+    const crypto = require("crypto") as typeof import("crypto");
 
-    return signature === `sha256=${expectedSignature}`;
+    const appSecret = process.env.WHATSAPP_APP_SECRET;
+    if (!appSecret) {
+      log("[WHATSAPP] WHATSAPP_APP_SECRET not configured", "whatsapp");
+      return false;
+    }
+
+    if (!signature) {
+      return false;
+    }
+
+    const expectedSignature =
+      `sha256=${ 
+      crypto.createHmac("sha256", appSecret).update(rawBody).digest("hex")}`;
+
+    try {
+      const sigBuf = Buffer.from(signature);
+      const expBuf = Buffer.from(expectedSignature);
+
+      // timingSafeEqual lanca se os buffers tiverem tamanhos diferentes.
+      if (sigBuf.length !== expBuf.length) {
+        return false;
+      }
+
+      return crypto.timingSafeEqual(sigBuf, expBuf);
+    } catch {
+      return false;
+    }
   }
 
   /**

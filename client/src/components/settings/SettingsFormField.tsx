@@ -45,14 +45,14 @@ export function SettingsFormField({
   const [touched, setTouched] = useState(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
+  useEffect(() => 
     // Cleanup debounce timer
-    return () => {
+     () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
       }
-    };
-  }, []);
+    }
+  , []);
 
   const performValidation = async (inputValue: string) => {
     if (!validate) {
