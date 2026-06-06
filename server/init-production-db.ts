@@ -23,7 +23,7 @@ async function initProductionDatabase() {
 
   try {
     // Check if any tenants exist
-    const existingTenants = await storage.getTenants();
+    const existingTenants = await storage.getAllTenants();
 
     if (existingTenants.length > 0) {
       console.log("⚠️  Database already contains tenants:");

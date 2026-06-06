@@ -725,7 +725,10 @@ export async function registerRoutes(
         }
 
         // Verifica permissão
-        const permissions = role.permissions as Record<string, unknown>;
+        const permissions = role.permissions as unknown as Record<
+          string,
+          unknown
+        >;
         if (!permissions || typeof permissions !== "object") {
           return res.status(403).json({ error: "Permissões não configuradas" });
         }
@@ -771,7 +774,12 @@ export async function registerRoutes(
       version: process.env.VERCEL_GIT_COMMIT_SHA?.substring(0, 7) || "dev",
       checks: {} as Record<
         string,
-        { status: string; latencyMs?: number; error?: string }
+        {
+          status: string;
+          latencyMs?: number;
+          error?: string;
+          databaseConfigured?: boolean;
+        }
       >,
     };
 
@@ -803,7 +811,7 @@ export async function registerRoutes(
         status: "fail",
         error: showDbDetails ? msg : `connection ${kind}`,
         databaseConfigured: Boolean(process.env.DATABASE_URL),
-      } as Record<string, unknown>;
+      };
       healthCheck.status = "degraded";
     }
 
@@ -921,9 +929,9 @@ export async function registerRoutes(
       const mapped = dbPlans.map((p: Record<string, unknown>) => ({
         id: p.slug || p.id,
         name: p.name,
-        price: Math.round(parseFloat(p.price) * 100), // cents for Stripe compat
-        monthlyPrice: parseFloat(p.price),
-        yearlyPrice: p.yearlyPrice ? parseFloat(p.yearlyPrice) : null,
+        price: Math.round(parseFloat(String(p.price)) * 100), // cents for Stripe compat
+        monthlyPrice: parseFloat(String(p.price)),
+        yearlyPrice: p.yearlyPrice ? parseFloat(String(p.yearlyPrice)) : null,
         interval: "month",
         maxUsers: p.maxUsers,
         maxProperties: p.maxProperties,
@@ -1508,7 +1516,14 @@ export async function registerRoutes(
       const existing = await storage.getProperty(req.params.id);
       await validateResourceTenant(existing, req.user!.tenantId, "Imóvel");
 
-      const property = await storage.updateProperty(req.params.id, req.body);
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...safe
+      } = req.body;
+      const property = await storage.updateProperty(req.params.id, safe);
       if (!property)
         return res.status(404).json({ error: "Imóvel não encontrado" });
       res.json(property);
@@ -1612,7 +1627,14 @@ export async function registerRoutes(
       const existing = await storage.getLead(req.params.id);
       await validateResourceTenant(existing, req.user!.tenantId, "Lead");
 
-      const lead = await storage.updateLead(req.params.id, req.body);
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...safe
+      } = req.body;
+      const lead = await storage.updateLead(req.params.id, safe);
       if (!lead) return res.status(404).json({ error: "Lead não encontrado" });
       res.json(lead);
     } catch (error: unknown) {
@@ -1659,12 +1681,17 @@ export async function registerRoutes(
   // ===== INTERACTION ROUTES =====
   app.get("/api/leads/:leadId/interactions", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: validate the parent lead belongs to the tenant
+      const lead = await storage.getLead(req.params.leadId);
+      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
       const interactions = await storage.getInteractionsByLead(
         req.params.leadId,
       );
       res.json(interactions);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar interações" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar interações";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -1674,13 +1701,18 @@ export async function registerRoutes(
         ...req.body,
         userId: req.user!.id,
       });
+      // IDOR Protection: validate the target lead belongs to the tenant
+      // before attaching an interaction to it.
+      const lead = await storage.getLead(data.leadId);
+      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
       const interaction = await storage.createInteraction(data);
       res.status(201).json(interaction);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error ? error.message : "Erro ao criar interação",
-      });
+      const httpErr = toHttpError(error);
+      // Erros de validacao do Zod / corpo invalido continuam como 400.
+      const status = httpErr.status === 500 ? 400 : httpErr.status;
+      const message = httpErr.message || "Erro ao criar interação";
+      res.status(status).json({ error: message });
     }
   });
 
@@ -1715,7 +1747,14 @@ export async function registerRoutes(
       const existing = await storage.getVisit(req.params.id);
       await validateResourceTenant(existing, req.user!.tenantId, "Visita");
 
-      const visit = await storage.updateVisit(req.params.id, req.body);
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...safe
+      } = req.body;
+      const visit = await storage.updateVisit(req.params.id, safe);
       if (!visit)
         return res.status(404).json({ error: "Visita não encontrada" });
       res.json(visit);
@@ -1788,7 +1827,14 @@ export async function registerRoutes(
       const existing = await storage.getContract(req.params.id);
       await validateResourceTenant(existing, req.user!.tenantId, "Contrato");
 
-      const contract = await storage.updateContract(req.params.id, req.body);
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...safe
+      } = req.body;
+      const contract = await storage.updateContract(req.params.id, safe);
       if (!contract)
         return res.status(404).json({ error: "Contrato não encontrado" });
       res.json(contract);
@@ -1856,11 +1902,13 @@ export async function registerRoutes(
   app.get("/api/owners/:id", requireAuth, async (req, res) => {
     try {
       const owner = await storage.getOwner(req.params.id);
-      if (!owner)
-        return res.status(404).json({ error: "Locador não encontrado" });
+      // IDOR Protection: Validate tenant ownership
+      await validateResourceTenant(owner, req.user!.tenantId, "Locador");
       res.json(owner);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar locador" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar locador";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -1886,7 +1934,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Locador não encontrado" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const owner = await storage.updateOwner(req.params.id, allowedFields);
       res.json(owner);
     } catch (error: unknown) {
@@ -1924,11 +1978,13 @@ export async function registerRoutes(
   app.get("/api/renters/:id", requireAuth, async (req, res) => {
     try {
       const renter = await storage.getRenter(req.params.id);
-      if (!renter)
-        return res.status(404).json({ error: "Inquilino não encontrado" });
+      // IDOR Protection: Validate tenant ownership
+      await validateResourceTenant(renter, req.user!.tenantId, "Inquilino");
       res.json(renter);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar inquilino" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar inquilino";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -1955,7 +2011,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Inquilino não encontrado" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const renter = await storage.updateRenter(req.params.id, allowedFields);
       res.json(renter);
     } catch (error: unknown) {
@@ -1997,13 +2059,17 @@ export async function registerRoutes(
   app.get("/api/rental-contracts/:id", requireAuth, async (req, res) => {
     try {
       const contract = await storage.getRentalContract(req.params.id);
-      if (!contract)
-        return res
-          .status(404)
-          .json({ error: "Contrato de aluguel não encontrado" });
+      // IDOR Protection: Validate tenant ownership
+      await validateResourceTenant(
+        contract,
+        req.user!.tenantId,
+        "Contrato de aluguel",
+      );
       res.json(contract);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar contrato de aluguel" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar contrato de aluguel";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -2034,7 +2100,13 @@ export async function registerRoutes(
           .json({ error: "Contrato de aluguel não encontrado" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const contract = await storage.updateRentalContract(
         req.params.id,
         allowedFields,
@@ -2072,14 +2144,25 @@ export async function registerRoutes(
     requireAuth,
     async (req, res) => {
       try {
+        // IDOR Protection: validate the parent contract belongs to the tenant
+        // before exposing any of its payments.
+        const contract = await storage.getRentalContract(
+          req.params.contractId,
+        );
+        await validateResourceTenant(
+          contract,
+          req.user!.tenantId,
+          "Contrato de aluguel",
+        );
         const payments = await storage.getRentalPaymentsByContract(
           req.params.contractId,
         );
         res.json(payments);
       } catch (error: unknown) {
-        res
-          .status(500)
-          .json({ error: "Erro ao buscar pagamentos do contrato" });
+        const httpErr = toHttpError(error);
+        const message =
+          httpErr.message || "Erro ao buscar pagamentos do contrato";
+        res.status(httpErr.status).json({ error: message });
       }
     },
   );
@@ -2087,11 +2170,13 @@ export async function registerRoutes(
   app.get("/api/rental-payments/:id", requireAuth, async (req, res) => {
     try {
       const payment = await storage.getRentalPayment(req.params.id);
-      if (!payment)
-        return res.status(404).json({ error: "Pagamento não encontrado" });
+      // IDOR Protection: Validate tenant ownership
+      await validateResourceTenant(payment, req.user!.tenantId, "Pagamento");
       res.json(payment);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar pagamento" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar pagamento";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -2118,7 +2203,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Pagamento não encontrado" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const payment = await storage.updateRentalPayment(
         req.params.id,
         allowedFields,
@@ -2297,7 +2388,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Repasse não encontrado" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const transfer = await storage.updateRentalTransfer(
         req.params.id,
         allowedFields,
@@ -2430,11 +2527,13 @@ export async function registerRoutes(
   app.get("/api/sale-proposals/:id", requireAuth, async (req, res) => {
     try {
       const proposal = await storage.getSaleProposal(req.params.id);
-      if (!proposal)
-        return res.status(404).json({ error: "Proposta não encontrada" });
+      // IDOR Protection: Validate tenant ownership
+      await validateResourceTenant(proposal, req.user!.tenantId, "Proposta");
       res.json(proposal);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar proposta" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar proposta";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -2461,7 +2560,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Proposta não encontrada" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const proposal = await storage.updateSaleProposal(
         req.params.id,
         allowedFields,
@@ -2502,10 +2607,13 @@ export async function registerRoutes(
   app.get("/api/property-sales/:id", requireAuth, async (req, res) => {
     try {
       const sale = await storage.getPropertySale(req.params.id);
-      if (!sale) return res.status(404).json({ error: "Venda não encontrada" });
+      // IDOR Protection: Validate tenant ownership
+      await validateResourceTenant(sale, req.user!.tenantId, "Venda");
       res.json(sale);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar venda" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar venda";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -2532,7 +2640,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Venda não encontrada" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const sale = await storage.updatePropertySale(
         req.params.id,
         allowedFields,
@@ -2581,7 +2695,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Categoria não encontrada" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const category = await storage.updateFinanceCategory(
         req.params.id,
         allowedFields,
@@ -2634,11 +2754,13 @@ export async function registerRoutes(
   app.get("/api/finance-entries/:id", requireAuth, async (req, res) => {
     try {
       const entry = await storage.getFinanceEntry(req.params.id);
-      if (!entry)
-        return res.status(404).json({ error: "Lançamento não encontrado" });
+      // IDOR Protection: Validate tenant ownership
+      await validateResourceTenant(entry, req.user!.tenantId, "Lançamento");
       res.json(entry);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar lançamento" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar lançamento";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -2665,7 +2787,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Lançamento não encontrado" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const entry = await storage.updateFinanceEntry(
         req.params.id,
         allowedFields,
@@ -2727,7 +2855,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Tag não encontrada" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const tag = await storage.updateLeadTag(req.params.id, allowedFields);
       res.json(tag);
     } catch (error: unknown) {
@@ -2763,10 +2897,15 @@ export async function registerRoutes(
 
   app.get("/api/leads/:leadId/tags", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: validate the parent lead belongs to the tenant
+      const lead = await storage.getLead(req.params.leadId);
+      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
       const tags = await storage.getTagsByLead(req.params.leadId);
       res.json(tags);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar tags do lead" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar tags do lead";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -2776,12 +2915,19 @@ export async function registerRoutes(
         leadId: req.params.leadId,
         tagId: req.body.tagId,
       });
+      // IDOR Protection: validate both the lead and the tag belong to the
+      // tenant before linking them.
+      const lead = await storage.getLead(req.params.leadId);
+      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
+      const tag = await storage.getLeadTag(data.tagId);
+      await validateResourceTenant(tag, req.user!.tenantId, "Tag");
       const link = await storage.addTagToLead(data);
       res.status(201).json(link);
     } catch (error: unknown) {
-      res.status(400).json({
-        error: error instanceof Error ? error.message : "Erro ao adicionar tag",
-      });
+      const httpErr = toHttpError(error);
+      const status = httpErr.status === 500 ? 400 : httpErr.status;
+      const message = httpErr.message || "Erro ao adicionar tag";
+      res.status(status).json({ error: message });
     }
   });
 
@@ -2790,10 +2936,16 @@ export async function registerRoutes(
     requireAuth,
     async (req, res) => {
       try {
+        // IDOR Protection: validate the parent lead belongs to the tenant
+        // before removing any tag link.
+        const lead = await storage.getLead(req.params.leadId);
+        await validateResourceTenant(lead, req.user!.tenantId, "Lead");
         await storage.removeTagFromLead(req.params.leadId, req.params.tagId);
         res.json({ success: true });
       } catch (error: unknown) {
-        res.status(500).json({ error: "Erro ao remover tag" });
+        const httpErr = toHttpError(error);
+        const message = httpErr.message || "Erro ao remover tag";
+        res.status(httpErr.status).json({ error: message });
       }
     },
   );
@@ -2885,21 +3037,28 @@ export async function registerRoutes(
 
   app.get("/api/leads/:leadId/follow-ups", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: validate the parent lead belongs to the tenant
+      const lead = await storage.getLead(req.params.leadId);
+      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
       const followUps = await storage.getFollowUpsByLead(req.params.leadId);
       res.json(followUps);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar follow-ups do lead" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar follow-ups do lead";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
   app.get("/api/follow-ups/:id", requireAuth, async (req, res) => {
     try {
       const followUp = await storage.getFollowUp(req.params.id);
-      if (!followUp)
-        return res.status(404).json({ error: "Follow-up não encontrado" });
+      // IDOR Protection: Validate tenant ownership
+      await validateResourceTenant(followUp, req.user!.tenantId, "Follow-up");
       res.json(followUp);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar follow-up" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar follow-up";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -2926,7 +3085,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Follow-up não encontrado" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const followUp = await storage.updateFollowUp(
         req.params.id,
         allowedFields,
@@ -3189,7 +3354,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Função não encontrada" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const role = await storage.updateUserRole(req.params.id, allowedFields);
       res.json(role);
     } catch (error: unknown) {
@@ -3554,8 +3725,8 @@ export async function registerRoutes(
         const { action, startDate } = req.query;
         // Sanitize pagination with max limit of 100
         const { page, limit } = sanitizePagination(
-          req.query.page,
-          req.query.limit,
+          req.query.page as string | undefined,
+          req.query.limit as string | undefined,
           100,
         );
 

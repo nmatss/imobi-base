@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Full TypeScript type check before pushing. Kept out of pre-commit to keep
+# commits fast; CI remains the authoritative gate.
+echo "Running TypeScript type check (tsc --noEmit)..."
+npx tsc --noEmit

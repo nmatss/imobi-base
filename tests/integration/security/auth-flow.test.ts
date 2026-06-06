@@ -48,18 +48,24 @@ function createTestApp(): Express {
       sameSite: 'strict',
     },
     store: {
-      get: (sid, callback) => {
+      // express-session espera que o store seja um EventEmitter (chama store.on()).
+      // O mock simples precisa expor on()/once()/removeListener() como no-op.
+      on: () => {},
+      once: () => {},
+      removeListener: () => {},
+      emit: () => false,
+      get: (sid: string, callback: (err: any, session?: any) => void) => {
         callback(null, mockSessions.get(sid) || null);
       },
-      set: (sid, session, callback) => {
+      set: (sid: string, session: any, callback: (err?: any) => void) => {
         mockSessions.set(sid, session);
         callback(null);
       },
-      destroy: (sid, callback) => {
+      destroy: (sid: string, callback: (err?: any) => void) => {
         mockSessions.delete(sid);
         callback(null);
       },
-      touch: (sid, session, callback) => {
+      touch: (sid: string, session: any, callback: (err?: any) => void) => {
         mockSessions.set(sid, session);
         callback(null);
       },
@@ -114,7 +120,7 @@ function createTestApp(): Express {
         email: user.email,
         name: user.name,
         tenantId: user.tenantId,
-      });
+      } as Express.User);
     }
   ));
 
@@ -131,7 +137,7 @@ function createTestApp(): Express {
           email: user.email,
           name: user.name,
           tenantId: user.tenantId,
-        });
+        } as Express.User);
       }
     }
     done(null, false);
@@ -254,7 +260,7 @@ function createTestApp(): Express {
 
 describe('Authentication Flow Integration Tests', () => {
   let app: Express;
-  let agent: request.SuperAgentTest;
+  let agent: ReturnType<typeof request.agent>;
 
   beforeAll(() => {
     app = createTestApp();

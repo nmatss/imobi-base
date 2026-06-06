@@ -9,7 +9,7 @@
  */
 
 import { storage } from "../../storage";
-import type { Property, IsaConversation } from "@shared/schema-sqlite";
+import type { Property } from "@shared/schema-sqlite";
 import { log } from "../../index";
 
 // ==================== TYPES ====================

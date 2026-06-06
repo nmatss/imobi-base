@@ -5,7 +5,7 @@
  */
 
 import compression from 'compression';
-import type { Request, Response } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 
 export interface CompressionOptions {
   /**
@@ -252,7 +252,7 @@ export function selectiveCompression(config: {
   const staticCompression = responseCompression(config.static || compressionPresets.high);
   const defaultCompression = responseCompression(config.default || compressionPresets.production);
 
-  return (req: Request, res: Response, next: Function) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     if (req.path.startsWith('/api/')) {
       return apiCompression(req, res, next);
     }

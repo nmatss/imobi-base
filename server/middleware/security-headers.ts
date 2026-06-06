@@ -143,12 +143,12 @@ export function securityHeaders(options: SecurityHeadersOptions = {}): (req: Req
     // Set appropriate caching based on request type
     if (isApiRequest) {
       // API responses: no caching
-      res.setHeader('Cache-Control', config.cacheControl.api);
+      res.setHeader('Cache-Control', config.cacheControl.api ?? 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
     } else if (req.path.match(/\.(js|css|jpg|jpeg|png|gif|svg|woff|woff2|ttf|eot)$/)) {
       // Static assets: aggressive caching
-      res.setHeader('Cache-Control', config.cacheControl.static);
+      res.setHeader('Cache-Control', config.cacheControl.static ?? 'public, max-age=31536000, immutable');
     } else {
       // HTML pages: moderate caching
       res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
@@ -233,7 +233,8 @@ export function preventMimeSniffing(req: Request, res: Response, next: NextFunct
  */
 export function securityHeadersDebug(req: Request, res: Response): void {
   if (process.env.NODE_ENV === 'production') {
-    return res.status(404).json({ error: 'Not found' });
+    res.status(404).json({ error: 'Not found' });
+    return;
   }
 
   const headers = {

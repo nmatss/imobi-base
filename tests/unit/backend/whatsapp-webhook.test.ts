@@ -130,8 +130,8 @@ describe('WhatsApp Webhook Signature Validation', () => {
     });
 
     it('should reject verification with incorrect token', () => {
-      const mode = 'subscribe';
-      const token = 'wrong-token';
+      const mode: string = 'subscribe';
+      const token: string = 'wrong-token';
       const challenge = 'random-challenge-string-123';
 
       const isValid = mode === 'subscribe' && token === VERIFY_TOKEN;
@@ -141,7 +141,7 @@ describe('WhatsApp Webhook Signature Validation', () => {
     });
 
     it('should reject verification with incorrect mode', () => {
-      const mode = 'invalid-mode';
+      const mode: string = 'invalid-mode';
       const token = VERIFY_TOKEN;
       const challenge = 'random-challenge-string-123';
 
@@ -152,8 +152,8 @@ describe('WhatsApp Webhook Signature Validation', () => {
     });
 
     it('should reject verification with missing parameters', () => {
-      const mode = '';
-      const token = '';
+      const mode: string = '';
+      const token: string = '';
       const challenge = 'random-challenge-string-123';
 
       const isValid = mode === 'subscribe' && token === VERIFY_TOKEN;
@@ -399,8 +399,8 @@ describe('WhatsApp Webhook Error Handling', () => {
   });
 
   it('should return 403 for invalid verify token', () => {
-    const mode = 'subscribe';
-    const token = 'wrong-token';
+    const mode: string = 'subscribe';
+    const token: string = 'wrong-token';
     const expectedToken = 'correct-token';
 
     const isValid = mode === 'subscribe' && token === expectedToken;

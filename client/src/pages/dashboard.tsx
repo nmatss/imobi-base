@@ -28,7 +28,7 @@ import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { Spinner } from "@/components/ui/spinner";
 
 // Lazy load Recharts components to reduce initial bundle size
-const Bar = lazy(() => import("recharts").then(m => ({ default: m.Bar })));
+const Bar = lazy(() => import("recharts").then(m => ({ default: m.Bar as unknown as React.ComponentType<any> })));
 const BarChart = lazy(() => import("recharts").then(m => ({ default: m.BarChart })));
 const ResponsiveContainer = lazy(() => import("recharts").then(m => ({ default: m.ResponsiveContainer })));
 const XAxis = lazy(() => import("recharts").then(m => ({ default: m.XAxis })));
@@ -774,7 +774,7 @@ export default function Dashboard() {
                             boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                             fontSize: '13px'
                           }}
-                          formatter={(value: number, name: string) => {
+                          formatter={(value, name) => {
                             if (name === "sale") return [value, "Venda"];
                             if (name === "rent") return [value, "Aluguel"];
                             return [value, name];

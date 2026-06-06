@@ -6,6 +6,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as Sentry from '@sentry/node';
 
+// stripe-service.ts inicializa a instancia do Stripe no import APENAS se
+// STRIPE_SECRET_KEY estiver presente (caso contrario fica null e todos os
+// metodos quebram com "Cannot read properties of null"). Como imports ES sao
+// hoisted acima de codigo de modulo, usamos vi.hoisted() para setar a env
+// ANTES de qualquer import (incluindo o do servico) ser avaliado.
+vi.hoisted(() => {
+  process.env.STRIPE_SECRET_KEY = 'sk_test_dummy';
+});
+
 // Mock Sentry
 vi.mock('@sentry/node');
 

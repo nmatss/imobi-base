@@ -2,18 +2,11 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-export interface TextareaProps extends React.ComponentProps<"textarea"> {
-  /** ID for linking with label using htmlFor */
-  id?: string;
-  /** ARIA label for accessibility when no visible label */
-  "aria-label"?: string;
-  /** ID of element describing this textarea */
-  "aria-describedby"?: string;
-  /** Indicates invalid state */
-  "aria-invalid"?: boolean;
-  /** Indicates required field */
-  "aria-required"?: boolean;
-}
+// All standard textarea attributes (including id and ARIA attributes such as
+// aria-label, aria-describedby, aria-invalid, aria-required) are already
+// provided by React.ComponentProps<"textarea">. We keep this interface as an
+// extension point without narrowing those built-in types.
+export interface TextareaProps extends React.ComponentProps<"textarea"> {}
 
 const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
   ({ className, ...props }, ref) => {

@@ -24,7 +24,7 @@ export interface ApiMutationOptions<TData, TVariables> {
   /** Nome do recurso (ex: "lead", "propriedade") */
   resourceName: string;
   /** Keys do React Query para invalidar */
-  invalidateKeys?: string[][];
+  invalidateKeys?: readonly (readonly unknown[])[];
   /** Mensagem de sucesso customizada */
   successMessage?: string | ((data: TData) => string);
   /** Mensagem de erro customizada */

@@ -118,6 +118,18 @@ type ImobiContextType = {
 
 const ImobiContext = createContext<ImobiContextType | undefined>(undefined);
 
+// Desempacota respostas de lista do backend.
+// O backend paginado retorna envelope { success, data, meta } enquanto rotas
+// legadas/não paginadas retornam o array cru. Garante SEMPRE um array para os
+// consumidores (.filter/.map/.length) — evita crash quando vem objeto.
+function unwrapList<T = unknown>(json: unknown): T[] {
+  if (Array.isArray(json)) return json as T[];
+  if (json && typeof json === "object" && Array.isArray((json as { data?: unknown }).data)) {
+    return (json as { data: T[] }).data;
+  }
+  return [];
+}
+
 export function ImobiProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
@@ -136,8 +148,8 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
         credentials: "include",
       });
       if (res.ok) {
-        const data = await res.json();
-        setProperties(data);
+        const json = await res.json();
+        setProperties(unwrapList<Property>(json));
       } else if (res.status === 401) {
         // Session expired, redirect to login
         setUser(null);
@@ -155,8 +167,8 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
         credentials: "include",
       });
       if (res.ok) {
-        const data = await res.json();
-        setLeads(data);
+        const json = await res.json();
+        setLeads(unwrapList<Lead>(json));
       } else if (res.status === 401) {
         setUser(null);
         setTenant(null);
@@ -173,8 +185,8 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
         credentials: "include",
       });
       if (res.ok) {
-        const data = await res.json();
-        setVisits(data);
+        const json = await res.json();
+        setVisits(unwrapList<Visit>(json));
       } else if (res.status === 401) {
         setUser(null);
         setTenant(null);
@@ -191,8 +203,8 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
         credentials: "include",
       });
       if (res.ok) {
-        const data = await res.json();
-        setContracts(data);
+        const json = await res.json();
+        setContracts(unwrapList<Contract>(json));
       } else if (res.status === 401) {
         setUser(null);
         setTenant(null);
@@ -240,7 +252,7 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
         if (tenantsRes.ok && mounted) {
           const tenantsData = await tenantsRes.json();
           if (mounted) {
-            setTenants(tenantsData);
+            setTenants(unwrapList<Tenant>(tenantsData));
           }
         }
       } else if (res.status === 401) {
@@ -336,7 +348,7 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
     });
     if (tenantsRes.ok) {
       const tenantsData = await tenantsRes.json();
-      setTenants(tenantsData);
+      setTenants(unwrapList<Tenant>(tenantsData));
     }
 
     setLocation("/dashboard");

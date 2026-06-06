@@ -514,7 +514,7 @@ export const confirm = (
     },
     cancel: {
       label: "Cancelar",
-      onClick: onCancel,
+      onClick: () => onCancel?.(),
     },
   });
 };

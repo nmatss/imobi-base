@@ -27,6 +27,8 @@ export interface LogContext {
     code?: string;
   };
   metadata?: Record<string, any>;
+  /** Marca eventos de segurança no nível superior do log (usado por StructuredLogger.security) */
+  security?: boolean;
 }
 
 export enum LogLevel {

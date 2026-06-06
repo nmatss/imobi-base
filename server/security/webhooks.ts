@@ -5,7 +5,8 @@
  */
 
 import crypto from 'crypto';
-import type { SecurityEvent, SecurityEventType, SecurityEventSeverity } from './security-monitor';
+import type { SecurityEvent } from './security-monitor';
+import { SecurityEventType, SecurityEventSeverity } from './security-monitor';
 
 export interface WebhookConfig {
   /**
@@ -323,12 +324,12 @@ export class WebhookManager {
       type: 'security.event',
       data: {
         id: 'test-' + Date.now(),
-        type: 'test_webhook',
-        severity: 'low',
+        type: SecurityEventType.API_ERROR,
+        severity: SecurityEventSeverity.LOW,
         timestamp: new Date(),
         message: 'Webhook test event',
-        metadata: {},
-      } as SecurityEvent,
+        metadata: { test: true },
+      },
       timestamp: new Date().toISOString(),
       webhookId: id,
       environment: process.env.NODE_ENV || 'development',

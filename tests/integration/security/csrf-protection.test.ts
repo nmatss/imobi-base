@@ -41,16 +41,21 @@ function createTestApp(): Express {
       sameSite: 'strict',
     },
     store: {
-      get: (sid, callback) => callback(null, mockSessions.get(sid) || null),
-      set: (sid, session, callback) => {
+      // express-session espera um EventEmitter (chama store.on()); no-ops bastam no mock.
+      on: () => {},
+      once: () => {},
+      removeListener: () => {},
+      emit: () => false,
+      get: (sid: string, callback: (err: any, session?: any) => void) => callback(null, mockSessions.get(sid) || null),
+      set: (sid: string, session: any, callback: (err?: any) => void) => {
         mockSessions.set(sid, session);
         callback(null);
       },
-      destroy: (sid, callback) => {
+      destroy: (sid: string, callback: (err?: any) => void) => {
         mockSessions.delete(sid);
         callback(null);
       },
-      touch: (sid, session, callback) => {
+      touch: (sid: string, session: any, callback: (err?: any) => void) => {
         mockSessions.set(sid, session);
         callback(null);
       },
@@ -161,7 +166,7 @@ function createTestApp(): Express {
 
 describe('CSRF Protection Integration Tests', () => {
   let app: Express;
-  let agent: request.SuperAgentTest;
+  let agent: ReturnType<typeof request.agent>;
 
   beforeAll(() => {
     app = createTestApp();

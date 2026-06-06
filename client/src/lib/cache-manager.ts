@@ -312,8 +312,8 @@ export const cacheUtils = {
    * Verifica se dados estão stale
    */
   isStale: (queryKey: readonly unknown[]): boolean => {
-    const query = queryClient.getQueryState(queryKey);
-    return query?.isStale ?? true;
+    const query = queryClient.getQueryCache().find({ queryKey });
+    return query?.isStale() ?? true;
   },
 
   /**
@@ -356,7 +356,7 @@ export const cacheUtils = {
     return {
       totalQueries: queries.length,
       totalMutations: mutations.length,
-      staleQueries: queries.filter((q) => q.state.isStale).length,
+      staleQueries: queries.filter((q) => q.isStale()).length,
       fetchingQueries: queries.filter((q) => q.state.fetchStatus === "fetching").length,
       errorQueries: queries.filter((q) => q.state.status === "error").length,
       successQueries: queries.filter((q) => q.state.status === "success").length,
@@ -386,7 +386,7 @@ export const cacheUtils = {
           status: query.state.status,
           fetchStatus: query.state.fetchStatus,
           dataUpdatedAt: new Date(query.state.dataUpdatedAt),
-          isStale: query.state.isStale,
+          isStale: query.isStale(),
         });
       });
     console.groupEnd();

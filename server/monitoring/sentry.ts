@@ -11,10 +11,11 @@ import {
   expressIntegration,
   postgresIntegration,
 } from "@sentry/node";
+import type { Integration } from "@sentry/core";
 import type { Express, Request, Response, NextFunction } from "express";
 
 // Lazy-load profiling (native addon not available in serverless)
-function getProfilingIntegration(): Sentry.Integration | null {
+function getProfilingIntegration(): Integration | null {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { nodeProfilingIntegration } = require("@sentry/profiling-node");

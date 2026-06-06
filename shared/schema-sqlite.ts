@@ -931,6 +931,40 @@ export const insertClientPortalAccessSchema = createInsertSchema(clientPortalAcc
 export type InsertClientPortalAccess = z.infer<typeof insertClientPortalAccessSchema>;
 export type ClientPortalAccess = typeof clientPortalAccess.$inferSelect;
 
+// ==================== MAINTENANCE ====================
+
+/**
+ * MAINTENANCE TICKETS
+ * Maintenance/repair requests raised from the rental/owner portal.
+ * Mirror of maintenanceTickets in schema.ts (kept in parity for dual-DB).
+ */
+export const maintenanceTickets = sqliteTable("maintenance_tickets", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  propertyId: text("property_id").notNull().references(() => properties.id),
+  rentalContractId: text("rental_contract_id"),
+  requestedById: text("requested_by_id"), // portal user / renter / user id
+  requestedByType: text("requested_by_type"), // renter, owner, broker, system
+  title: text("title").notNull(),
+  description: text("description"),
+  category: text("category"), // plumbing, electrical, structural, etc
+  priority: text("priority").notNull().default("medium"), // low, medium, high, urgent
+  status: text("status").notNull().default("open"), // open, in_progress, scheduled, resolved, closed, cancelled
+  assignedTo: text("assigned_to").references(() => users.id),
+  photos: text("photos"), // JSON array of photo URLs
+  cost: real("cost"),
+  scheduledDate: text("scheduled_date"),
+  resolvedAt: text("resolved_at"),
+  completedAt: text("completed_at"),
+  notes: text("notes"), // JSON array of note objects
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertMaintenanceTicketSchema = createInsertSchema(maintenanceTickets).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertMaintenanceTicket = z.infer<typeof insertMaintenanceTicketSchema>;
+export type MaintenanceTicket = typeof maintenanceTickets.$inferSelect;
+
 // ==================== DASHBOARD CUSTOMIZATION ====================
 
 /**

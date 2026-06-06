@@ -19,7 +19,11 @@ type AuthContextType = {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  checkAuth: () => Promise<void>;
+  /**
+   * Verifica a autenticação. Resolve para uma função de cleanup opcional
+   * que cancela atualizações de estado se o componente for desmontado.
+   */
+  checkAuth: () => Promise<(() => void) | undefined>;
 };
 
 // ==================== CONTEXT ====================

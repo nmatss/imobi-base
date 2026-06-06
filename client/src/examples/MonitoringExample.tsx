@@ -116,7 +116,7 @@ function PerformanceMonitoring() {
   };
 
   return (
-    <Profiler id="PerformanceMonitoring" name="Performance Monitoring Component">
+    <Profiler name="Performance Monitoring Component" updateProps={{}}>
       <Card>
         <CardHeader>
           <CardTitle>Performance Monitoring</CardTitle>
@@ -143,7 +143,7 @@ function AnalyticsExample() {
   const {
     trackFeatureUsage,
     trackGoal,
-    trackSearch,
+    trackSearchQuery,
     trackForm,
     trackButtonClick,
   } = useAnalytics();
@@ -167,7 +167,7 @@ function AnalyticsExample() {
 
   const handleSearch = () => {
     const query = "apartamento 2 quartos";
-    trackSearch(query, 15); // 15 results
+    trackSearchQuery(query, 15); // 15 results
   };
 
   const handleFormSubmit = (success: boolean) => {

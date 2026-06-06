@@ -113,20 +113,18 @@ export function AdvancedLeadFiltersExample() {
                   key={lead.id}
                   id={lead.id}
                   name={lead.name}
-                  email={lead.email}
                   phone={lead.phone}
                   source={lead.source as any}
-                  status={lead.status}
-                  budget={lead.budget}
-                  interests={lead.interests}
-                  createdAt={lead.createdAt}
-                  onView={(id) => console.log("View:", id)}
-                  onEdit={(id) => console.log("Edit:", id)}
-                  onDelete={(id) => console.log("Delete:", id)}
-                  onStatusChange={(id, status) => console.log("Status:", id, status)}
-                  onCall={(id) => console.log("Call:", id)}
-                  onWhatsApp={(id) => console.log("WhatsApp:", id)}
-                  onEmail={(id) => console.log("Email:", id)}
+                  budget={lead.budget ?? undefined}
+                  daysInStage={0}
+                  createdAt={typeof lead.createdAt === "string" ? lead.createdAt : lead.createdAt.toISOString()}
+                  updatedAt={typeof lead.updatedAt === "string" ? lead.updatedAt : lead.updatedAt.toISOString()}
+                  onClick={(id: string) => console.log("View:", id)}
+                  onEdit={(id: string) => console.log("Edit:", id)}
+                  onArchive={(id: string) => console.log("Archive:", id)}
+                  onCall={(id: string) => console.log("Call:", id)}
+                  onMessage={(id: string) => console.log("Message:", id)}
+                  onEmail={(id: string) => console.log("Email:", id)}
                 />
               ))}
             </div>

@@ -25,7 +25,7 @@ import {
   Camera, FileCheck, Sparkles, Send, MoreVertical, Copy, CalendarPlus, ChevronDown,
   Bed, Maximize2
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast-helpers";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -139,7 +139,6 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
 
 export default function PropertiesList() {
   const { properties, tenant, visits, leads, refetchProperties, loading } = useImobi();
-  const { toast } = useToast();
   const [, setLocation] = useLocation();
 
   // View & Filter State

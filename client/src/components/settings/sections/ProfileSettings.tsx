@@ -67,8 +67,8 @@ export function ProfileSettings() {
   };
 
 
-  const handleAvatarChange = (url: string) => {
-    setValue("avatar", url, { shouldDirty: true });
+  const handleAvatarChange = (url: string | undefined) => {
+    setValue("avatar", url ?? "", { shouldDirty: true });
   };
 
   return (

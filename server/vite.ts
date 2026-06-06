@@ -17,15 +17,21 @@ export async function setupVite(server: Server, app: Express) {
 
   const rootPath = path.resolve(import.meta.dirname, "..", "client");
 
+  // vite.config exports a config factory (UserConfigFnObject); resolve it for dev.
+  const resolvedConfig = await viteConfig({
+    command: "serve",
+    mode: process.env.NODE_ENV || "development",
+  });
+
   const vite = await createViteServer({
-    ...viteConfig,
+    ...resolvedConfig,
     configFile: false,
     customLogger: viteLogger,
     server: serverOptions,
     appType: "custom",
     root: rootPath,
     resolve: {
-      ...viteConfig.resolve,
+      ...resolvedConfig.resolve,
       alias: {
         "@": path.resolve(rootPath, "src"),
         "@shared": path.resolve(import.meta.dirname, "..", "shared"),

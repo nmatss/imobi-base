@@ -19,6 +19,7 @@ import {
 import { responseCompression } from '../../server/middleware/compression';
 import { errorHandler, AppError, ValidationError } from '../../server/middleware/error-handler';
 import { WebhookManager, verifyWebhookSignature } from '../../server/security/webhooks';
+import { SecurityEventSeverity } from '../../server/security/security-monitor';
 
 describe('P3 Security Improvements', () => {
   describe('Security Headers Middleware', () => {
@@ -406,7 +407,7 @@ describe('P3 Security Improvements', () => {
       webhookManager.addWebhook('high-only', {
         url: 'https://example.com/webhook',
         secret: 'secret',
-        minSeverity: 'high',
+        minSeverity: SecurityEventSeverity.HIGH,
         enabled: true,
       });
 

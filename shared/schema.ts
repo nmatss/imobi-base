@@ -841,18 +841,26 @@ export const userSessions = pgTable("user_sessions", {
 export const userConsents = pgTable("user_consents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id),
-  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  tenantId: varchar("tenant_id").references(() => tenants.id),
   email: text("email"),
-  consentType: text("consent_type").notNull(), // marketing, analytics, necessary
-  status: text("status").notNull(), // given, withdrawn, expired
+  consentType: text("consent_type").notNull(), // privacy, marketing, analytics, cookies, newsletter
+  consentVersion: text("consent_version"), // Track document version
+  status: text("status").notNull().default("active"), // active, given, withdrawn, expired
   purpose: text("purpose"),
   consentMethod: text("consent_method"), // form, email, checkbox
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
+  acceptedAt: timestamp("accepted_at").defaultNow(),
+  withdrawnAt: timestamp("withdrawn_at"),
   expiresAt: timestamp("expires_at"),
+  metadata: json("metadata"), // additional consent metadata
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export const insertUserConsentSchema = createInsertSchema(userConsents).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserConsent = z.infer<typeof insertUserConsentSchema>;
+export type UserConsent = typeof userConsents.$inferSelect;
 
 /**
  * COMPLIANCE: AUDIT LOG
@@ -860,16 +868,30 @@ export const userConsents = pgTable("user_consents", {
  */
 export const complianceAuditLog = pgTable("compliance_audit_log", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  tenantId: varchar("tenant_id").references(() => tenants.id),
   userId: varchar("user_id").references(() => users.id),
+  actorId: varchar("actor_id"), // Who performed the action (user, system, admin)
+  actorType: text("actor_type"), // user, admin, system, api
   action: text("action").notNull(), // view, create, update, delete, export, anonymize
-  resourceType: text("resource_type").notNull(), // user, lead, property, etc.
+  resourceType: text("resource_type"), // user, lead, property, etc.
   resourceId: varchar("resource_id"),
+  entityType: text("entity_type"), // user, lead, property, contract, etc
+  entityId: varchar("entity_id"), // ID of affected entity
   details: json("details"),
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
+  requestPath: text("request_path"), // API endpoint called
+  requestMethod: text("request_method"), // GET, POST, DELETE, etc
+  changedData: json("changed_data"), // before/after values (anonymized)
+  legalBasis: text("legal_basis"), // consent, contract, legal_obligation, etc
+  severity: text("severity").default("info"), // info, warning, critical
   timestamp: timestamp("timestamp").notNull().defaultNow(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+export const insertComplianceAuditLogSchema = createInsertSchema(complianceAuditLog).omit({ id: true, timestamp: true, createdAt: true });
+export type InsertComplianceAuditLog = z.infer<typeof insertComplianceAuditLogSchema>;
+export type ComplianceAuditLog = typeof complianceAuditLog.$inferSelect;
 
 /**
  * AUDIT LOGS
@@ -899,15 +921,29 @@ export const accountDeletionRequests = pgTable("account_deletion_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
-  email: text("email").notNull(),
+  email: text("email"),
+  confirmationToken: text("confirmation_token").unique(), // Email confirmation token
   reason: text("reason"),
-  status: text("status").notNull().default("pending"), // pending, approved, processing, completed, rejected
+  status: text("status").notNull().default("pending"), // pending, confirmed, approved, processing, completed, cancelled, rejected
+  deletionType: text("deletion_type").default("anonymize"), // anonymize, hard_delete
+  dataRetention: json("data_retention"), // what data to keep for legal/audit
+  ipAddress: text("ip_address"),
   requestedAt: timestamp("requested_at").notNull().defaultNow(),
+  confirmedAt: timestamp("confirmed_at"),
   processedAt: timestamp("processed_at"),
   processedBy: varchar("processed_by").references(() => users.id),
+  completedAt: timestamp("completed_at"),
+  cancelledAt: timestamp("cancelled_at"),
   deletionDate: timestamp("deletion_date"),
+  certificateUrl: text("certificate_url"), // URL to deletion certificate
+  certificateNumber: text("certificate_number").unique(), // Unique certificate ID
   notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+export const insertAccountDeletionRequestSchema = createInsertSchema(accountDeletionRequests).omit({ id: true, requestedAt: true, createdAt: true });
+export type InsertAccountDeletionRequest = z.infer<typeof insertAccountDeletionRequestSchema>;
+export type AccountDeletionRequest = typeof accountDeletionRequests.$inferSelect;
 
 /**
  * COMPLIANCE: DATA EXPORT REQUESTS
@@ -917,16 +953,29 @@ export const dataExportRequests = pgTable("data_export_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
-  email: text("email").notNull(),
+  email: text("email"),
+  requestToken: text("request_token").unique(), // Token for export retrieval
   status: text("status").notNull().default("pending"), // pending, processing, completed, failed
   format: text("format").notNull().default("json"), // json, csv, pdf
+  dataScope: json("data_scope"), // which data to export
   exportUrl: text("export_url"),
+  fileUrl: text("file_url"), // storage URL of generated export
+  fileName: text("file_name"),
   expiresAt: timestamp("expires_at"),
   requestedAt: timestamp("requested_at").notNull().defaultNow(),
   completedAt: timestamp("completed_at"),
+  downloadedAt: timestamp("downloaded_at"),
+  downloadCount: integer("download_count").default(0),
   fileSize: integer("file_size"),
+  ipAddress: text("ip_address"),
   error: text("error"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+export const insertDataExportRequestSchema = createInsertSchema(dataExportRequests).omit({ id: true, requestedAt: true, createdAt: true });
+export type InsertDataExportRequest = z.infer<typeof insertDataExportRequestSchema>;
+export type DataExportRequest = typeof dataExportRequests.$inferSelect;
 
 /**
  * COMPLIANCE: DATA BREACH INCIDENTS
@@ -960,15 +1009,23 @@ export const cookiePreferences = pgTable("cookie_preferences", {
   userId: varchar("user_id").references(() => users.id),
   tenantId: varchar("tenant_id").references(() => tenants.id),
   sessionId: text("session_id"),
+  essential: boolean("essential").notNull().default(true), // alias of necessary, always true
   necessary: boolean("necessary").notNull().default(true),
   analytics: boolean("analytics").notNull().default(false),
   marketing: boolean("marketing").notNull().default(false),
   preferences: boolean("preferences").notNull().default(false),
+  personalization: boolean("personalization").notNull().default(false),
+  consentVersion: text("consent_version"), // Version of cookie policy
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
+  acceptedAt: timestamp("accepted_at").defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export const insertCookiePreferenceSchema = createInsertSchema(cookiePreferences).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCookiePreference = z.infer<typeof insertCookiePreferenceSchema>;
+export type CookiePreference = typeof cookiePreferences.$inferSelect;
 
 /**
  * COMPLIANCE: DATA PROCESSING ACTIVITIES
@@ -977,17 +1034,110 @@ export const cookiePreferences = pgTable("cookie_preferences", {
 export const dataProcessingActivities = pgTable("data_processing_activities", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
-  name: text("name").notNull(),
+  name: text("name"),
+  activityName: text("activity_name"), // ROPA activity name
   purpose: text("purpose").notNull(),
   legalBasis: text("legal_basis").notNull(), // consent, contract, legal_obligation, etc.
   dataCategories: text("data_categories").array(),
   dataSubjects: text("data_subjects").array(),
   recipients: text("recipients").array(),
+  dataTransfers: json("data_transfers"), // international transfers
   retentionPeriod: text("retention_period"),
   securityMeasures: text("security_measures"),
+  dpoReviewed: boolean("dpo_reviewed").default(false),
+  dpoReviewedAt: timestamp("dpo_reviewed_at"),
+  dpoReviewedBy: varchar("dpo_reviewed_by").references(() => users.id),
+  isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+export const insertDataProcessingActivitySchema = createInsertSchema(dataProcessingActivities).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDataProcessingActivity = z.infer<typeof insertDataProcessingActivitySchema>;
+export type DataProcessingActivity = typeof dataProcessingActivities.$inferSelect;
+
+// ==================== PROPERTY ENHANCEMENTS ====================
+
+/**
+ * PROPERTY COORDINATES
+ * Geolocation data for map visualization (ported from schema-sqlite for prod parity)
+ */
+export const propertyCoordinates = pgTable("property_coordinates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  propertyId: varchar("property_id").notNull().references(() => properties.id).unique(),
+  latitude: decimal("latitude", { precision: 10, scale: 7 }).notNull(),
+  longitude: decimal("longitude", { precision: 10, scale: 7 }).notNull(),
+  geocodedAddress: text("geocoded_address"),
+  geocodedAt: timestamp("geocoded_at"),
+  manuallySet: boolean("manually_set").default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertPropertyCoordinatesSchema = createInsertSchema(propertyCoordinates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPropertyCoordinates = z.infer<typeof insertPropertyCoordinatesSchema>;
+export type PropertyCoordinates = typeof propertyCoordinates.$inferSelect;
+
+// ==================== CLIENT PORTAL ====================
+
+/**
+ * CLIENT PORTAL ACCESS
+ * Self-service portal access for owners and renters (ported from schema-sqlite for prod parity)
+ */
+export const clientPortalAccess = pgTable("client_portal_access", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  clientType: text("client_type").notNull(), // owner, renter, buyer, lead
+  clientId: varchar("client_id").notNull(), // Reference to owner/renter/lead ID
+  email: text("email").notNull(),
+  passwordHash: text("password_hash"),
+  isActive: boolean("is_active").default(true),
+  lastLogin: timestamp("last_login"),
+  loginCount: integer("login_count").default(0),
+  resetToken: text("reset_token"),
+  resetTokenExpires: timestamp("reset_token_expires"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertClientPortalAccessSchema = createInsertSchema(clientPortalAccess).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertClientPortalAccess = z.infer<typeof insertClientPortalAccessSchema>;
+export type ClientPortalAccess = typeof clientPortalAccess.$inferSelect;
+
+// ==================== MAINTENANCE ====================
+
+/**
+ * MAINTENANCE TICKETS
+ * Maintenance/repair requests raised from the rental/owner portal.
+ * Defined here (and in schema-sqlite) for prod parity — the portal create/list
+ * endpoints in routes-portal.ts depend on this table.
+ */
+export const maintenanceTickets = pgTable("maintenance_tickets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  propertyId: varchar("property_id").notNull().references(() => properties.id),
+  rentalContractId: varchar("rental_contract_id"),
+  requestedById: varchar("requested_by_id"), // portal user / renter / user id
+  requestedByType: text("requested_by_type"), // renter, owner, broker, system
+  title: text("title").notNull(),
+  description: text("description"),
+  category: text("category"), // plumbing, electrical, structural, etc
+  priority: text("priority").notNull().default("medium"), // low, medium, high, urgent
+  status: text("status").notNull().default("open"), // open, in_progress, scheduled, resolved, closed, cancelled
+  assignedTo: varchar("assigned_to").references(() => users.id),
+  photos: text("photos"), // JSON array of photo URLs
+  cost: decimal("cost", { precision: 12, scale: 2 }),
+  scheduledDate: timestamp("scheduled_date"),
+  resolvedAt: timestamp("resolved_at"),
+  completedAt: timestamp("completed_at"),
+  notes: text("notes"), // JSON array of note objects
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertMaintenanceTicketSchema = createInsertSchema(maintenanceTickets).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertMaintenanceTicket = z.infer<typeof insertMaintenanceTicketSchema>;
+export type MaintenanceTicket = typeof maintenanceTickets.$inferSelect;
 
 /**
  * FILES
