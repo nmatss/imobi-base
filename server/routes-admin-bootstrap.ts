@@ -25,6 +25,7 @@ import { eq, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { db, schema } from "./db";
 import { generateRateLimitKey } from "./middleware/rate-limit-key-generator";
+import { ROLES } from "@shared/constants/roles";
 
 const bootstrapLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -92,7 +93,7 @@ export function registerAdminBootstrapRoutes(app: Express): void {
         const [countRow] = await db
           .select({ count: sql<number>`count(*)` })
           .from(usersTable)
-          .where(eq(usersTable.role, "super_admin"));
+          .where(eq(usersTable.role, ROLES.SUPER_ADMIN));
         const existingCount = Number(countRow?.count ?? 0);
         if (existingCount > 0) {
           res.status(409).json({
@@ -130,7 +131,7 @@ export function registerAdminBootstrapRoutes(app: Express): void {
             tenantId: tenant.id,
             email,
             password: hashed,
-            role: "super_admin",
+            role: ROLES.SUPER_ADMIN,
             name,
           })
           .returning();
@@ -165,7 +166,7 @@ export function registerAdminBootstrapRoutes(app: Express): void {
         const [countRow] = await db
           .select({ count: sql<number>`count(*)` })
           .from(usersTable)
-          .where(eq(usersTable.role, "super_admin"));
+          .where(eq(usersTable.role, ROLES.SUPER_ADMIN));
         const count = Number(countRow?.count ?? 0);
         res.json({
           available: count === 0,

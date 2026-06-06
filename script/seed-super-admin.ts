@@ -22,6 +22,7 @@
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 import { db, schema } from "../server/db";
+import { ROLES } from "../shared/constants/roles";
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
@@ -86,7 +87,7 @@ async function main(): Promise<void> {
       .update(usersTable)
       .set({
         password: hashed,
-        role: "super_admin",
+        role: ROLES.SUPER_ADMIN,
         name: ADMIN_NAME,
         tenantId: tenant.id,
       })
@@ -101,7 +102,7 @@ async function main(): Promise<void> {
         tenantId: tenant.id,
         email: ADMIN_EMAIL,
         password: hashed,
-        role: "super_admin",
+        role: ROLES.SUPER_ADMIN,
         name: ADMIN_NAME,
       })
       .returning();

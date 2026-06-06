@@ -45,12 +45,16 @@ const FOLLOW_UP_TYPE_LABELS: Record<string, string> = {
   other: "Outro",
 };
 
+// WCAG AA compliant lead status colors.
+// Single source of truth: tailwind.config.js theme.extend.colors.status (-700 palette).
+// The previous values (blue-500/purple-500/orange-500/yellow-500/green-500) failed the
+// 4.5:1 contrast ratio both as white-on-color avatars and as color-on-tint badges.
 const LEAD_STATUS_COLORS: Record<string, string> = {
-  new: "#3b82f6",
-  qualification: "#8b5cf6",
-  visit: "#f97316",
-  proposal: "#eab308",
-  contract: "#22c55e",
+  new: "#047857", // status.new (green-700)
+  qualification: "#7c3aed", // status.qualification (purple-700)
+  visit: "#c2410c", // status.visit (orange-700)
+  proposal: "#0e7490", // status.proposal (cyan-700)
+  contract: "#047857", // status.contract (green-700)
 };
 
 const LEAD_STATUS_LABELS: Record<string, string> = {

@@ -38,6 +38,7 @@ import {
   insertCommissionSchema,
 } from "@shared/schema-sqlite";
 import type { User } from "@shared/schema-sqlite";
+import { ROLES, isAdminRole, isSuperAdminRole } from "@shared/constants/roles";
 import connectPg from "connect-pg-simple";
 import pkg from "pg";
 import rateLimit from "express-rate-limit";
@@ -47,6 +48,11 @@ import cors from "cors";
 import { apiResponse, apiError, apiPaginated } from "./utils/api-response";
 import { checkFeatureAccess } from "./middleware/plan-limits";
 import { registerSecurityRoutes } from "./routes-security";
+import {
+  checkAccountLock,
+  handleFailedLogin,
+  handleSuccessfulLogin,
+} from "./auth/security";
 import { registerFeatureRoutes } from "./routes-features";
 import { registerPaymentRoutes } from "./routes-payments";
 import { registerAdminBootstrapRoutes } from "./routes-admin-bootstrap";
@@ -111,6 +117,62 @@ async function comparePassword(
   stored: string,
 ): Promise<boolean> {
   return await bcrypt.compare(supplied, stored);
+}
+
+// ===== ACCOUNT LOCKOUT — BEST-EFFORT WRAPPERS =====
+// A persistência de login_history e das colunas de lock pode não existir no
+// Postgres (login_history é SQLite-only no schema dual; users pode não ter as
+// colunas de lock em PG). Por isso estes wrappers nunca quebram o login: o
+// bloqueio funciona onde as colunas existem, mas falha de escrita é só logada.
+async function safeCheckAccountLock(
+  userId: string,
+): Promise<{ locked: boolean }> {
+  try {
+    const result = await checkAccountLock(userId);
+    return { locked: result.locked };
+  } catch (err) {
+    console.warn(
+      "[auth] checkAccountLock indisponível (colunas de lock podem não existir):",
+      err instanceof Error ? err.message : err,
+    );
+    return { locked: false };
+  }
+}
+
+async function safeHandleFailedLogin(
+  userId: string | null,
+  email: string,
+  reason: string,
+  req: Request,
+): Promise<void> {
+  if (!userId) {
+    // Sem userId não há linha de users para incrementar; loginHistory de
+    // usuário inexistente é puramente auditoria e best-effort.
+    return;
+  }
+  try {
+    await handleFailedLogin(userId, email, reason, req);
+  } catch (err) {
+    console.warn(
+      "[auth] handleFailedLogin best-effort falhou (persistência de lockout indisponível):",
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
+async function safeHandleSuccessfulLogin(
+  userId: string,
+  email: string,
+  req: Request,
+): Promise<void> {
+  try {
+    await handleSuccessfulLogin(userId, email, req);
+  } catch (err) {
+    console.warn(
+      "[auth] handleSuccessfulLogin best-effort falhou (persistência de login indisponível):",
+      err instanceof Error ? err.message : err,
+    );
+  }
 }
 
 // ===== TENANT ISOLATION HELPERS (IDOR Prevention) =====
@@ -614,13 +676,42 @@ export async function registerRoutes(
   // Passport configuration
   passport.use(
     new LocalStrategy(
-      { usernameField: "email" },
-      async (email, password, done) => {
+      { usernameField: "email", passReqToCallback: true },
+      async (req, email, password, done) => {
         try {
           const user = await storage.getUserByEmail(email);
-          if (!user || !(await comparePassword(password, user.password))) {
+          if (!user) {
+            // Não revela existência da conta; registra tentativa best-effort.
+            await safeHandleFailedLogin(
+              null,
+              email,
+              "user_not_found",
+              req,
+            );
             return done(null, false, { message: "Email ou senha incorretos" });
           }
+
+          // 1) Antes de validar a senha, checar bloqueio de conta (fail-safe).
+          const lockStatus = await safeCheckAccountLock(user.id);
+          if (lockStatus.locked) {
+            return done(null, false, {
+              message: "Conta bloqueada temporariamente. Tente novamente mais tarde.",
+            });
+          }
+
+          // 2) Validar senha.
+          if (!(await comparePassword(password, user.password))) {
+            await safeHandleFailedLogin(
+              user.id,
+              email,
+              "invalid_password",
+              req,
+            );
+            return done(null, false, { message: "Email ou senha incorretos" });
+          }
+
+          // 3) Sucesso: resetar contadores / registrar login (best-effort).
+          await safeHandleSuccessfulLogin(user.id, email, req);
           return done(null, user);
         } catch (err) {
           return done(err);
@@ -683,7 +774,7 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) {
       return res.status(401).json({ error: "Não autenticado" });
     }
-    if (req.user!.role !== "superadmin") {
+    if (!isSuperAdminRole(req.user!.role)) {
       return res.status(403).json({
         error: "Acesso negado. Apenas superadmins podem acessar esta rota.",
       });
@@ -699,8 +790,8 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Não autenticado" });
       }
 
-      // Admin sempre tem todas as permissões
-      if (req.user.role === "admin") {
+      // Admin e super_admin sempre têm todas as permissões
+      if (isAdminRole(req.user.role)) {
         return next();
       }
 
@@ -711,9 +802,40 @@ export async function registerRoutes(
           return res.status(403).json({ error: "Usuário não encontrado" });
         }
 
-        // Se não tem roleId, usa role padrão (legado)
+        // Caminho legado: usuário sem roleId (sistema antigo de RBAC).
+        // FAIL-SAFE: em vez de liberar tudo (fail-open), deriva permissões
+        // a partir do texto user.role. Apenas admin/super_admin recebem
+        // acesso total; member tem leitura+escrita; viewer só leitura;
+        // qualquer outra role desconhecida é negada (403).
         if (!(user as User & { roleId?: string }).roleId) {
-          return next(); // Compatibilidade com sistema antigo
+          const legacyRole = user.role;
+          console.warn(
+            `[requirePermission] caminho legado (sem roleId) para user=${user.id} role=${legacyRole} module=${module} action=${action}`,
+          );
+
+          if (isAdminRole(legacyRole)) {
+            return next();
+          }
+
+          const isReadAction =
+            action === "read" ||
+            action === "view" ||
+            action === "list" ||
+            action === "get";
+
+          if (legacyRole === ROLES.MEMBER) {
+            // member: conjunto padrão (leitura + escrita básica)
+            return next();
+          }
+
+          if (legacyRole === ROLES.VIEWER && isReadAction) {
+            return next();
+          }
+
+          // default (inclui role "user" legada e desconhecidas): negar
+          return res.status(403).json({
+            error: `Sem permissão para ${action} em ${module}`,
+          });
         }
 
         // Busca as permissões da role
@@ -812,7 +934,9 @@ export async function registerRoutes(
         error: showDbDetails ? msg : `connection ${kind}`,
         databaseConfigured: Boolean(process.env.DATABASE_URL),
       };
-      healthCheck.status = "degraded";
+      // DB é dependência crítica: falha => status "error" (HTTP 503).
+      // Degradações não-críticas (Stripe/Redis) mantêm "degraded" (HTTP 200).
+      healthCheck.status = "error";
     }
 
     // Redis (opcional — so marcar fail se estiver configurado e indisponivel)
@@ -1371,7 +1495,7 @@ export async function registerRoutes(
       if (!tenant)
         return res.status(404).json({ error: "Empresa não encontrada" });
       // Only allow access to own tenant data (unless superadmin)
-      if (tenant.id !== req.user!.tenantId && req.user!.role !== "superadmin") {
+      if (tenant.id !== req.user!.tenantId && !isSuperAdminRole(req.user!.role)) {
         return res.status(403).json({ error: "Acesso negado" });
       }
       res.json(tenant);

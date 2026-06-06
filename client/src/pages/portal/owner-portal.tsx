@@ -55,16 +55,43 @@ export default function OwnerPortal() {
     } catch { return {}; }
   }, []);
 
+  const [brand, setBrand] = useState<any>(tenant);
+
   useEffect(() => {
-    // Check auth via httpOnly cookie
+    // Check auth via httpOnly cookie and refresh white-label branding
     fetch("/api/portal/me", { credentials: "include" })
       .then(res => {
         if (!res.ok) throw new Error("Not authenticated");
+        return res.json();
+      })
+      .then(data => {
+        if (data?.tenant) {
+          setBrand(data.tenant);
+          try {
+            localStorage.setItem("portal_tenant", JSON.stringify(data.tenant));
+          } catch { /* ignore quota errors */ }
+        }
       })
       .catch(() => {
         setLocation("/portal/login");
       });
   }, [setLocation]);
+
+  // Apply dynamic favicon and document title (white-label)
+  useEffect(() => {
+    if (brand?.name) {
+      document.title = `${brand.name} - Portal do Proprietário`;
+    }
+    if (brand?.faviconUrl) {
+      let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = "icon";
+        document.head.appendChild(link);
+      }
+      link.href = brand.faviconUrl;
+    }
+  }, [brand]);
 
   const { data: dashboard } = useQuery({
     queryKey: ["/api/portal/owner/dashboard"],
@@ -155,24 +182,25 @@ export default function OwnerPortal() {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(num || 0);
   };
 
-  const primaryColor = tenant?.primaryColor || "#0066cc";
+  const primaryColor = brand?.primaryColor || "#0066cc";
+  const secondaryColor = brand?.secondaryColor || "#333333";
 
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-50">
+      <header className="bg-white border-b sticky top-0 z-50" style={{ borderTopWidth: 3, borderTopColor: secondaryColor }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              {tenant?.logo ? (
-                <img src={tenant.logo} alt={tenant.name} className="h-8 w-8 rounded-lg object-cover" />
+              {brand?.logo ? (
+                <img src={brand.logo} alt={brand.name} className="h-8 w-8 rounded-lg object-cover" />
               ) : (
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white" style={{ backgroundColor: primaryColor }}>
                   <Building2 className="h-5 w-5" />
                 </div>
               )}
               <div>
-                <p className="font-semibold text-sm">{tenant?.name || "Portal"}</p>
+                <p className="font-semibold text-sm">{brand?.name || "Portal"}</p>
                 <p className="text-xs text-muted-foreground">Portal do Proprietário</p>
               </div>
             </div>
@@ -648,6 +676,15 @@ export default function OwnerPortal() {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* White-label footer */}
+      <footer className="border-t mt-8 py-6" style={{ borderTopColor: secondaryColor }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-muted-foreground">
+          {brand?.footerText
+            ? <p>{brand.footerText}</p>
+            : <p>&copy; {new Date().getFullYear()} {brand?.name || "Portal do Cliente"}. Todos os direitos reservados.</p>}
+        </div>
+      </footer>
 
       {/* Approve Dialog */}
       <Dialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>

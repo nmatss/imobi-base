@@ -20,6 +20,7 @@ import { initializeSentry, addSentryErrorHandler } from "./monitoring/sentry";
 import { initializeRedis } from "./cache/redis-client";
 import { sanitizeResponse, shouldSkipDetailedLogging } from "./utils/log-sanitizer";
 import { secretManager } from "./security/secret-manager";
+import { captureException } from "./monitoring/sentry";
 
 const app = express();
 const httpServer = createServer(app);
@@ -131,8 +132,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// Register all routes
-(async () => {
+// Register all routes. Exposed as a readiness promise so the serverless handler
+// can `await` it before dispatching the first request (avoids a cold-start race
+// where the handler is exported and serves traffic before routes are mounted).
+const appReadyPromise: Promise<void> = (async () => {
   await registerRoutes(httpServer, app);
 
   // Register e-signature routes
@@ -183,34 +186,65 @@ app.use((req, res, next) => {
   // Add Sentry error handler (must be before custom error handlers)
   addSentryErrorHandler(app);
 
-  app.use((err: Error & { status?: number; statusCode?: number }, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: Error & { status?: number; statusCode?: number }, req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
+    const isProduction = process.env.NODE_ENV === "production";
 
+    // Always log full error server-side / to Sentry.
     console.error('Error handled:', err);
+    captureException(err, { path: req.path, method: req.method, status });
+
+    // Never leak internal error details (message/stack) for 5xx in production.
+    // 4xx messages are intentional and safe to surface.
+    if (status >= 500 && isProduction) {
+      res.status(status).json({ message: "Internal Server Error" });
+      return;
+    }
+
+    const message = err.message || "Internal Server Error";
     res.status(status).json({ message });
   });
 })();
 
-// Debug: catch startup errors and expose them
+// Capture a fatal startup error so the handler can fail closed without leaking
+// the stack trace to clients.
 let startupError: Error | null = null;
+appReadyPromise.catch((err) => {
+  startupError = err instanceof Error ? err : new Error(String(err));
+  console.error('Startup failed during route registration:', err);
+});
 
-const handler = (req: Request, res: Response, next: NextFunction) => {
+const handler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Block until routes are registered (cold-start race fix).
+    await appReadyPromise;
+  } catch {
+    // Swallow here; handled via startupError below.
+  }
+
   if (startupError) {
-    res.status(500).json({
-      error: 'Startup failed',
-      message: startupError.message,
-      stack: startupError.stack?.split('\n').slice(0, 5),
-    });
+    captureException(startupError, { phase: 'startup' });
+    const isProduction = process.env.NODE_ENV === "production";
+    res.status(500).json(
+      isProduction
+        ? { message: "Service temporarily unavailable" }
+        : {
+            error: 'Startup failed',
+            message: startupError.message,
+            stack: startupError.stack?.split('\n').slice(0, 5),
+          },
+    );
     return;
   }
+
   app(req, res, next);
 };
 
-// Wrap the async init to capture errors
-process.on('unhandledRejection', (reason: any) => {
+// Capture late startup rejections as well.
+process.on('unhandledRejection', (reason: unknown) => {
   startupError = reason instanceof Error ? reason : new Error(String(reason));
   console.error('Unhandled rejection during startup:', reason);
 });
 
+export { appReadyPromise };
 export default handler;

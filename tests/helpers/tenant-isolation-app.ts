@@ -1,46 +1,44 @@
 /**
- * Helper de integração REAL para o teste de isolamento de tenant.
+ * Helper de integração REAL para testes de isolamento de tenant e compliance.
  *
- * Diferente dos testes que montam um mini-app com banco em memória fake, este
- * helper sobe o MESMO router do projeto (`registerRoutes`) contra o MESMO
- * storage real (`server/storage.ts`), que por sua vez usa o `db` real
- * (`server/db.ts`). Como `server/db.ts` seleciona SQLite quando NÃO há
- * `DATABASE_URL` apontando para Postgres e abre o arquivo fixo
- * `./data/imobibase.db` no momento do import, a estratégia é:
+ * Sobe o MESMO router do projeto (`registerRoutes`) contra o MESMO storage real
+ * (`server/storage.ts`), que usa o `db` real (`server/db.ts`). Em modo SQLite,
+ * `server/db.ts` abre o caminho de `SQLITE_DB_PATH` (ou o default de dev) no
+ * momento do import.
  *
- *  1. Garantir, ANTES de qualquer import de `server/*`, que o ambiente force
- *     SQLite (sem `DATABASE_URL`) e que `SESSION_SECRET` seja válido.
- *  2. Fazer backup do `./data/imobibase.db` de desenvolvimento (se existir) e
- *     substituí-lo por um banco LIMPO criado a partir da migration oficial
- *     `migrations-sqlite/0000_parallel_orphan.sql`. Assim o teste é isolado e
- *     não polui o banco de dev.
- *  3. Importar dinamicamente `server/storage` e `server/routes` só depois do
- *     passo 2, para que o singleton `db` abra o arquivo já recriado.
- *  4. Restaurar o backup ao final.
- *
- * Tudo isso exercita o código REAL de rotas + storage + drizzle, que é o
- * objetivo do track.
+ * ISOLAMENTO E SEGURANÇA (parallel-safe, não-destrutivo):
+ *  1. Antes de qualquer import de `server/*`, força SQLite e define
+ *     `SQLITE_DB_PATH` com um caminho ÚNICO por execução (data/test-<uuid>.db).
+ *     Assim cada arquivo de teste tem seu próprio banco e podem rodar em
+ *     paralelo sem colidir — e o banco de dev (`data/imobibase.db`) NUNCA é
+ *     modificado.
+ *  2. Cria o banco de teste copiando o schema do db de dev (que está em dia com
+ *     `shared/schema-sqlite.ts`) e ESVAZIANDO os dados; fallback para a migration
+ *     oficial quando não há db de dev.
+ *  3. Importa dinamicamente `server/storage` e `server/routes` só após o passo 2.
+ *  4. Remove o banco de teste ao final (sem tocar no db de dev).
  */
 import fs from "fs";
 import path from "path";
+import { randomUUID } from "crypto";
 import express, { type Express } from "express";
 import { createServer, type Server } from "http";
 import Database from "better-sqlite3";
 
 const PROJECT_ROOT = process.cwd();
-const DB_PATH = path.resolve(PROJECT_ROOT, "data/imobibase.db");
-const BACKUP_PATH = path.resolve(
-  PROJECT_ROOT,
-  "data/imobibase.db.tenant-isolation-backup",
-);
+// Banco de dev usado APENAS como fonte de schema (somente leitura/cópia).
+const DEV_DB_PATH = path.resolve(PROJECT_ROOT, "data/imobibase.db");
 const MIGRATION_PATH = path.resolve(
   PROJECT_ROOT,
   "migrations-sqlite/0000_parallel_orphan.sql",
 );
 
+// Caminho único do banco de teste desta execução (definido em prepareTestEnv).
+let workDbPath = "";
+
 /**
- * Garante variáveis de ambiente que fazem `server/db.ts` escolher SQLite e
- * `secret-manager` não reclamar de SESSION_SECRET (>= 32 chars).
+ * Garante variáveis de ambiente que fazem `server/db.ts` escolher SQLite, isola
+ * o banco de teste por execução e satisfaz o secret-manager.
  * Deve ser chamado ANTES de qualquer import dinâmico de `server/*`.
  */
 export function prepareTestEnv(): void {
@@ -48,6 +46,19 @@ export function prepareTestEnv(): void {
   delete process.env.DATABASE_URL;
   process.env.USE_SQLITE = "true";
   process.env.NODE_ENV = "test";
+
+  // Banco de teste ÚNICO por ARQUIVO de teste (parallel-safe; não toca no db de
+  // dev). Idempotente: gera o caminho UMA vez por módulo e reusa nas chamadas
+  // seguintes — assim o caminho fixado no module-load é o MESMO que db.ts abre,
+  // mesmo que prepareTestEnv seja chamado de novo no beforeAll.
+  if (!workDbPath) {
+    workDbPath = path.resolve(
+      PROJECT_ROOT,
+      `data/test-${process.pid}-${randomUUID()}.db`,
+    );
+  }
+  process.env.SQLITE_DB_PATH = workDbPath;
+
   // SESSION_SECRET precisa de >= 32 chars para passar no secret-manager.
   process.env.SESSION_SECRET =
     "tenant-isolation-test-session-secret-0123456789";
@@ -56,52 +67,34 @@ export function prepareTestEnv(): void {
 }
 
 /**
- * Prepara um banco SQLite de TESTE no caminho fixo usado por server/db.ts.
- *
- * A migration `migrations-sqlite/0000_parallel_orphan.sql` está desatualizada
- * em relação a `shared/schema-sqlite.ts` (faltam colunas novas como
- * `email_verified`). A fonte de verdade do schema em runtime é o próprio banco
- * de dev `./data/imobibase.db`, que está em dia. Por isso a estratégia robusta
- * é: fazer backup do db de dev, copiá-lo para o caminho de trabalho e ESVAZIAR
- * todas as tabelas de dados — garantindo schema idêntico ao código E isolamento
- * (nenhum dado de dev contamina as asserções). O backup é restaurado ao final.
- *
- * Fallback: se não houver db de dev, recria a partir da migration (schema
- * possivelmente parcial), apenas para não quebrar em ambientes limpos.
+ * Cria o banco SQLite de TESTE no caminho único (`workDbPath`), com o mesmo
+ * schema do runtime e sem dados. Estratégia: copiar o db de dev (schema em dia)
+ * e esvaziar; fallback para a migration oficial em ambientes sem db de dev.
+ * Nunca modifica o banco de dev.
  */
 export function setupFreshDatabase(): void {
-  const dataDir = path.dirname(DB_PATH);
+  if (!workDbPath) prepareTestEnv();
+
+  const dataDir = path.dirname(workDbPath);
   if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
   }
 
-  const devDbExists = fs.existsSync(DB_PATH);
+  // Limpa qualquer remanescente do caminho de teste (não deveria existir).
+  removeDbFiles(workDbPath);
 
-  // Backup do banco de dev (somente se ainda não houver backup pendente).
-  if (devDbExists && !fs.existsSync(BACKUP_PATH)) {
-    fs.renameSync(DB_PATH, BACKUP_PATH);
-  } else if (devDbExists) {
-    // Backup já existe (execução anterior interrompida): descarta o db atual.
-    fs.rmSync(DB_PATH, { force: true });
-  }
-  // Remover WAL/SHM remanescentes para evitar mistura de estados.
-  for (const suffix of ["-wal", "-shm"]) {
-    const f = DB_PATH + suffix;
-    if (fs.existsSync(f)) fs.rmSync(f, { force: true });
-  }
-
-  if (fs.existsSync(BACKUP_PATH)) {
-    // Caminho preferencial: clona o schema atualizado do db de dev e limpa dados.
-    fs.copyFileSync(BACKUP_PATH, DB_PATH);
-    wipeAllTables();
+  if (fs.existsSync(DEV_DB_PATH)) {
+    // Preferencial: clona o schema atualizado do db de dev e zera os dados.
+    fs.copyFileSync(DEV_DB_PATH, workDbPath);
+    wipeAllTables(workDbPath);
   } else {
-    // Fallback: recria a partir da migration (pode ser schema parcial).
+    // Fallback: recria a partir da migration (schema possivelmente parcial).
     const sql = fs.readFileSync(MIGRATION_PATH, "utf8");
     const statements = sql
       .split("--> statement-breakpoint")
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
-    const client = new Database(DB_PATH);
+    const client = new Database(workDbPath);
     try {
       client.pragma("foreign_keys = OFF");
       for (const stmt of statements) client.exec(stmt);
@@ -112,12 +105,11 @@ export function setupFreshDatabase(): void {
 }
 
 /**
- * Apaga todas as linhas de todas as tabelas de usuário do banco no caminho de
- * trabalho, preservando o schema. Usado para isolar o banco de teste copiado
- * do db de dev.
+ * Apaga todas as linhas de todas as tabelas de usuário do banco informado,
+ * preservando o schema.
  */
-function wipeAllTables(): void {
-  const client = new Database(DB_PATH);
+function wipeAllTables(dbPath: string): void {
+  const client = new Database(dbPath);
   try {
     client.pragma("foreign_keys = OFF");
     const tables = client
@@ -136,12 +128,18 @@ function wipeAllTables(): void {
   }
 }
 
+/** Remove o arquivo de banco e seus companheiros WAL/SHM, se existirem. */
+function removeDbFiles(dbPath: string): void {
+  for (const suffix of ["", "-wal", "-shm"]) {
+    const f = dbPath + suffix;
+    if (fs.existsSync(f)) fs.rmSync(f, { force: true });
+  }
+}
+
 /**
  * Limpa as chaves de rate-limit no Redis (prefixo `rl:`), caso exista um Redis
- * acessível. O `server/routes.ts` usa um RedisStore compartilhado quando há
- * Redis local; sem essa limpeza, contadores acumulados entre execuções podem
- * gerar 429 falso-positivo no login do teste. Best-effort: se Redis não estiver
- * disponível, ignora silenciosamente (a app cai para store em memória).
+ * acessível. Sem isso, contadores acumulados entre execuções podem gerar 429
+ * falso-positivo no login do teste. Best-effort: ignora se Redis indisponível.
  */
 export async function flushRateLimitKeys(): Promise<void> {
   try {
@@ -173,24 +171,16 @@ export async function flushRateLimitKeys(): Promise<void> {
 }
 
 /**
- * Restaura o banco de dev original e limpa o banco de teste.
+ * Remove o banco de teste desta execução. Nunca toca no banco de dev.
  */
 export function restoreDatabase(): void {
-  for (const suffix of ["", "-wal", "-shm"]) {
-    const f = DB_PATH + suffix;
-    if (fs.existsSync(f)) fs.rmSync(f, { force: true });
-  }
-  if (fs.existsSync(BACKUP_PATH)) {
-    fs.renameSync(BACKUP_PATH, DB_PATH);
-  }
+  if (workDbPath) removeDbFiles(workDbPath);
 }
 
 /**
  * Importa e monta o app Express REAL com o router real do projeto.
- * Retorna o app e a função de fechamento do db.
- *
  * Importações são dinâmicas e DEVEM acontecer após setupFreshDatabase(),
- * para que o singleton `db` abra o arquivo já recriado.
+ * para que o singleton `db` abra o arquivo já recriado em `SQLITE_DB_PATH`.
  */
 export async function buildRealApp(): Promise<{
   app: Express;
@@ -201,8 +191,7 @@ export async function buildRealApp(): Promise<{
 }> {
   const app = express();
   // Replica a captura de rawBody feita em server/index.ts (padrão-ouro do
-  // webhook do Stripe) — não é estritamente necessário aqui, mas mantém o
-  // pipeline o mais próximo possível do app real.
+  // webhook do Stripe), mantendo o pipeline o mais próximo possível do app real.
   app.use(
     express.json({
       verify: (req, _res, buf) => {

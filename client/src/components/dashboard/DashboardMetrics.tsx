@@ -67,7 +67,7 @@ const MetricCard = memo(({
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <p className="text-sm font-medium text-muted-foreground">{label}</p>
-            <h3 className="text-3xl font-bold text-foreground mt-1">{value}</h3>
+            <h3 className="text-2xl xs:text-3xl sm:text-4xl font-bold text-foreground mt-1">{value}</h3>
             {trend && (
               <div className={`flex items-center gap-1 mt-2 text-xs ${trendColor}`}>
                 <TrendIcon className="h-3 w-3" />
@@ -108,7 +108,7 @@ export const DashboardMetrics = memo(({ metrics, isLoading }: DashboardMetricsPr
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+    <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
       {/* Imóveis Ativos */}
       <MetricCard
         icon={Building2}

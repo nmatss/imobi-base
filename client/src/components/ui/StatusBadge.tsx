@@ -14,13 +14,15 @@ interface StatusBadgeProps {
   ariaLabel?: string;
 }
 
-// WCAG AA Compliant (4.5:1 contrast ratio) - Solid backgrounds with white text
+// WCAG AA Compliant (4.5:1+ contrast ratio) - Soft tonal backgrounds with -700 text.
+// The *-100 background paired with *-700 foreground is the standard accessible token
+// pairing used across the design system (see badge/MetricCard trend tokens).
 const STATUS_STYLES: Record<Status, string> = {
-  success: 'bg-emerald-700 text-white border-emerald-800',
-  warning: 'bg-amber-700 text-white border-amber-800',
-  error: 'bg-red-700 text-white border-red-800',
-  info: 'bg-blue-700 text-white border-blue-800',
-  neutral: 'bg-slate-700 text-white border-slate-800',
+  success: 'bg-green-100 text-green-700 border-green-200',
+  warning: 'bg-amber-100 text-amber-700 border-amber-200',
+  error: 'bg-red-100 text-red-700 border-red-200',
+  info: 'bg-blue-100 text-blue-700 border-blue-200',
+  neutral: 'bg-gray-100 text-gray-700 border-gray-200',
 };
 
 const STATUS_ICONS: Record<Status, typeof CheckCircle> = {

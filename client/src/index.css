@@ -91,9 +91,12 @@
     /* ==================== DESIGN SYSTEM TOKENS ==================== */
 
     /* Brand Colors */
-    --brand-primary: #0066ff;
-    --brand-primary-light: #3385ff;
-    --brand-primary-dark: #0052cc;
+    /* Source of truth: tailwind.config.js theme.extend.colors.brand.
+       #0066CC is the WCAG AA compliant brand blue (4.5:1 on white); the
+       previous #0066ff failed AA. Keep these in sync with tailwind.config.js. */
+    --brand-primary: #0066CC;
+    --brand-primary-light: #0080FF;
+    --brand-primary-dark: #0052AA;
     --brand-secondary: #00aa44;
     --brand-secondary-light: #00d455;
     --brand-secondary-dark: #008835;

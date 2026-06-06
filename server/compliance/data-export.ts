@@ -64,8 +64,10 @@ export async function requestDataExport(options: DataExportOptions) {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + EXPORT_EXPIRY_DAYS);
 
-  // Create export request
+  // Create export request.
+  // id explícito: a coluna não tem default no schema SQLite (dev/test).
   const [request] = await db.insert(schema.dataExportRequests).values({
+    id: randomUUID(),
     userId,
     tenantId,
     requestToken,

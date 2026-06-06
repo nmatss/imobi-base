@@ -7,6 +7,7 @@
 
 import { db, schema } from "../db";
 import { eq, and } from "drizzle-orm";
+import { randomUUID } from "crypto";
 import { logComplianceAudit, logConsentEvent } from "./audit-logger";
 
 export type ConsentType = "privacy" | "marketing" | "analytics" | "cookies" | "newsletter";
@@ -73,8 +74,10 @@ export async function giveConsent(options: ConsentOptions) {
     };
   }
 
-  // Create new consent
+  // Create new consent.
+  // id explícito: a coluna não tem default no schema SQLite (dev/test).
   const [consent] = await db.insert(schema.userConsents).values({
+    id: randomUUID(),
     userId,
     tenantId,
     email,
@@ -248,6 +251,7 @@ export async function setCookieConsent(
   userAgent?: string
 ) {
   const [cookiePreference] = await db.insert(schema.cookiePreferences).values({
+    id: randomUUID(),
     userId,
     sessionId,
     essential: preferences.essential,

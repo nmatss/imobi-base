@@ -9,6 +9,7 @@ import userEvent from '@testing-library/user-event';
 import Dashboard from '../dashboard';
 import { useImobi } from '@/lib/imobi-context';
 import { useLocation } from 'wouter';
+import { useDashboardData } from '@/hooks/useDashboardData';
 
 // Mock dependencies
 vi.mock('@/lib/imobi-context');
@@ -17,7 +18,7 @@ vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({ toast: vi.fn() }),
 }));
 vi.mock('@/hooks/useDashboardData', () => ({
-  useDashboardData: () => ({
+  useDashboardData: vi.fn(() => ({
     metrics: {
       newLeads: 15,
       inContactLeads: 10,
@@ -104,14 +105,110 @@ vi.mock('@/hooks/useDashboardData', () => ({
     loading: false,
     error: null,
     refetchFollowUps: vi.fn(),
-  }),
+  })),
 }));
+
+// Default dashboard data used by the happy-path tests. Re-applied in beforeEach so
+// that per-test overrides (empty states) do not leak into subsequent tests.
+function makeDefaultDashboardData() {
+  return {
+    metrics: {
+      newLeads: 15,
+      inContactLeads: 10,
+      inVisitLeads: 8,
+      proposalLeads: 7,
+      closedLeads: 5,
+      totalLeads: 45,
+      todayVisits: 3,
+      scheduledVisits: 8,
+      completedVisits: 20,
+      draftContracts: 2,
+      sentContracts: 3,
+      signedContracts: 12,
+      availableProperties: 30,
+      featuredProperties: 5,
+      rentProperties: 15,
+      saleProperties: 15,
+      conversionToVisit: 44,
+      conversionToProposal: 27,
+      conversionToClosed: 11,
+    },
+    pendencies: {
+      leadsWithoutContact: [],
+      todayVisitsList: [],
+      overdueFollowUps: [],
+      todayFollowUps: [],
+      totalUrgent: 0,
+    },
+    propertyInsights: {
+      total: 50,
+      available: 30,
+      withoutImages: 5,
+      withoutDescription: 3,
+      needsAttention: 8,
+      byType: [
+        { name: 'Casa', total: 20, available: 15, rent: 8, sale: 7 },
+        { name: 'Apto', total: 25, available: 12, rent: 6, sale: 6 },
+        { name: 'Comercial', total: 5, available: 3, rent: 1, sale: 2 },
+      ],
+    },
+    recentLeads: [
+      {
+        id: '1',
+        name: 'John Doe',
+        email: 'john@example.com',
+        phone: '(11) 99999-9999',
+        status: 'new',
+        source: 'website',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        daysSinceCreated: 1,
+        daysSinceUpdate: 0,
+        nextAction: 'Fazer primeiro contato',
+        needsAttention: false,
+      },
+      {
+        id: '2',
+        name: 'Jane Smith',
+        email: 'jane@example.com',
+        phone: '(11) 88888-8888',
+        status: 'qualification',
+        source: 'instagram',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        daysSinceCreated: 2,
+        daysSinceUpdate: 0,
+        nextAction: 'Agendar visita',
+        needsAttention: false,
+      },
+    ],
+    todayTimeline: [
+      {
+        id: 'v1',
+        propertyId: 'p1',
+        leadId: '1',
+        scheduledFor: new Date().toISOString(),
+        status: 'scheduled',
+        property: { id: 'p1', title: 'Casa 3 Quartos' },
+        lead: { id: '1', name: 'Alice Johnson' },
+        isPast: false,
+      },
+    ],
+    followUps: [],
+    loading: false,
+    error: null,
+    refetchFollowUps: vi.fn(),
+  };
+}
 
 describe('Dashboard Component', () => {
   let mockSetLocation: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Restore the default dashboard data so per-test overrides do not leak.
+    vi.mocked(useDashboardData).mockReturnValue(makeDefaultDashboardData() as any);
 
     mockSetLocation = vi.fn();
 
@@ -307,7 +404,7 @@ describe('Dashboard Component', () => {
   describe('Empty States', () => {
     it('should show empty state when no leads', () => {
       // Mock useDashboardData to return empty recent leads
-      vi.mocked(require('@/hooks/useDashboardData').useDashboardData).mockReturnValue({
+      vi.mocked(useDashboardData).mockReturnValue({
         metrics: {
           totalLeads: 0,
           newLeads: 0,
@@ -370,7 +467,7 @@ describe('Dashboard Component', () => {
 
     it('should show empty state when no visits', () => {
       // Mock useDashboardData to return empty timeline
-      vi.mocked(require('@/hooks/useDashboardData').useDashboardData).mockReturnValue({
+      vi.mocked(useDashboardData).mockReturnValue({
         metrics: {
           totalLeads: 0,
           newLeads: 0,
@@ -490,7 +587,7 @@ describe('Dashboard Component', () => {
 
       // Charts are lazy loaded, check if the container exists
       // The chart will only render when propertyInsights.byType has data
-      const { propertyInsights } = require('@/hooks/useDashboardData').useDashboardData();
+      const { propertyInsights } = vi.mocked(useDashboardData)();
       expect(propertyInsights.byType.length).toBeGreaterThan(0);
     });
   });
