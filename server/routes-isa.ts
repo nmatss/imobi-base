@@ -12,7 +12,7 @@
 import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
 import { processIncomingMessage, getConversationState } from "./integrations/whatsapp/isa-engine";
-import { log } from "./index";
+import { log } from "./utils/log";
 import { checkFeatureAccess } from "./middleware/plan-limits";
 
 export function registerIsaRoutes(app: Express) {

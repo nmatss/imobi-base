@@ -10,7 +10,7 @@
 
 import { storage } from "../../storage";
 import type { Property } from "@shared/schema-sqlite";
-import { log } from "../../index";
+import { log } from "../../utils/log";
 
 // ==================== TYPES ====================
 

@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
+import { log } from "./utils/log";
 import { registerRoutes } from "./routes";
 import { registerESignatureRoutes } from "./routes-esignature";
 import { registerWhatsAppRoutes } from "./routes-whatsapp";
@@ -52,16 +53,10 @@ app.use(
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
-export function log(message: string, source = "express") {
-  const formattedTime = new Date().toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  });
-
-  console.log(`${formattedTime} [${source}] ${message}`);
-}
+// `log` foi movido para ./utils/log para quebrar o import circular (módulos como
+// routes-whatsapp importavam log daqui e disparavam o bootstrap no import).
+// Re-exportado para compatibilidade com importadores que usavam `from "./index"`.
+export { log };
 
 app.use((req, res, next) => {
   const start = Date.now();

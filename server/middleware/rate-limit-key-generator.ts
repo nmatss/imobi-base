@@ -6,6 +6,16 @@
  */
 
 import type { Request } from 'express';
+import { ipKeyGenerator } from 'express-rate-limit';
+
+/**
+ * Normaliza um IP para chave de rate-limit segura para IPv6.
+ * O helper ipKeyGenerator agrupa endereços IPv6 por sub-rede, impedindo que um
+ * usuário IPv6 contorne o limite rotacionando endereços dentro do seu prefixo.
+ */
+function ipKey(req: Request): string {
+  return ipKeyGenerator(req.ip || req.socket.remoteAddress || 'unknown');
+}
 
 /**
  * Generate a rate limit key that works with both IPv4 and IPv6
@@ -23,8 +33,8 @@ export function generateRateLimitKey(req: Request): string {
     return `tenant:${req.user.tenantId}`;
   }
 
-  // Fallback to IP address for unauthenticated requests
-  return req.ip || req.socket.remoteAddress || 'unknown';
+  // Fallback IPv6-safe para requests não autenticados
+  return ipKey(req);
 }
 
 /**
@@ -61,6 +71,6 @@ export function generateCombinedRateLimitKey(req: Request): string {
     return `tenant:${req.user.tenantId}:combined`;
   }
 
-  // Fallback to IP address for unauthenticated requests
-  return req.ip || req.socket.remoteAddress || 'unknown';
+  // Fallback IPv6-safe para requests não autenticados
+  return ipKey(req);
 }

@@ -5,7 +5,7 @@
  * Includes rate limiting, retry logic, and error handling
  */
 
-import { log } from "../../index";
+import { log } from "../../utils/log";
 import { validateExternalUrl } from "../../security/url-validator";
 
 interface WhatsAppConfig {

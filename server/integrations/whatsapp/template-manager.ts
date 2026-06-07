@@ -9,7 +9,7 @@ import { db } from "../../db";
 import { whatsappTemplates, type InsertWhatsappTemplate } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { whatsappAPI } from "./business-api";
-import { log } from "../../index";
+import { log } from "../../utils/log";
 
 export interface TemplateVariable {
   [key: string]: string;

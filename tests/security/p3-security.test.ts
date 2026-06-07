@@ -141,9 +141,14 @@ describe('P3 Security Improvements', () => {
     });
 
     it('should reject requests with missing Content-Type', async () => {
+      // Envia um corpo bruto (Buffer) SEM Content-Type. O superagent só injeta
+      // um Content-Type default para corpos string; com Buffer + .unset() o
+      // header fica genuinamente ausente, mas o Content-Length declara o corpo,
+      // então o middleware deve exigir o Content-Type.
       const response = await request(app)
         .post('/test')
-        .send({ test: 'data' });
+        .unset('Content-Type')
+        .send(Buffer.from('raw body without content-type'));
 
       expect(response.status).toBe(400);
       expect(response.body.error).toContain('Content-Type');
@@ -528,9 +533,13 @@ describe('Integration: Full Security Stack', () => {
   });
 
   it('should validate and limit requests', async () => {
+    // Corpo bruto (Buffer) SEM Content-Type: deve ser barrado pelo
+    // validateContentType com 400. Usamos Buffer + .unset() porque o superagent
+    // só adiciona um Content-Type default a corpos string.
     const response = await request(app)
       .post('/api/test')
-      .send({ test: 'data' });
+      .unset('Content-Type')
+      .send(Buffer.from('raw body without content-type'));
 
     expect(response.status).toBe(400);
     expect(response.body.error).toContain('Content-Type');

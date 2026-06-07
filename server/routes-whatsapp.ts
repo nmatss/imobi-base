@@ -16,7 +16,7 @@ import { conversationManager } from "./integrations/whatsapp/conversation-manage
 import { autoResponder } from "./integrations/whatsapp/auto-responder";
 import { messageQueue } from "./integrations/whatsapp/message-queue";
 import { webhookHandler } from "./integrations/whatsapp/webhook-handler";
-import { log } from "./index";
+import { log } from "./utils/log";
 import { validateExternalUrl } from "./security/url-validator";
 import { generateRateLimitKey } from "./middleware/rate-limit-key-generator";
 import { checkFeatureAccess } from "./middleware/plan-limits";

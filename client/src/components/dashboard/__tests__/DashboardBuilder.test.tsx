@@ -1,9 +1,15 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { configure } from '@testing-library/dom';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DashboardBuilder } from '../DashboardBuilder';
+
+// waitFor default (1000ms) estoura sob contenção de CPU quando a suíte completa
+// roda em paralelo com os testes de integração pesados. Aumenta o timeout para
+// evitar flakiness por carga (sem alterar nenhuma asserção).
+configure({ asyncUtilTimeout: 5000 });
 
 const createWrapper = () => {
   const queryClient = new QueryClient({

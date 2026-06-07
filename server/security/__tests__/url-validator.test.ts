@@ -151,10 +151,9 @@ describe('URL Validator - SSRF Protection', () => {
     });
 
     it('should block IPv6 localhost', () => {
-      // Note: Basic implementation might not catch all IPv6 variations
+      // Agora o validador bloqueia IPv6 loopback/privado (::1, fc00::/7, fe80::/10).
       const result = validateExternalUrl('http://[::1]/file.pdf');
-      expect(result.valid).toBe(true); // Current implementation doesn't block IPv6
-      // TODO: Enhance validator to block IPv6 private addresses
+      expect(result.valid).toBe(false);
     });
 
     it('should allow legitimate cloud storage URLs', () => {

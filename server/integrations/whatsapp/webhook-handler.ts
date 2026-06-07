@@ -10,7 +10,7 @@ import { whatsappMessages, whatsappConversations, leads, integrationConfigs } fr
 import { eq, and } from "drizzle-orm";
 import { conversationManager } from "./conversation-manager";
 import { autoResponder } from "./auto-responder";
-import { log } from "../../index";
+import { log } from "../../utils/log";
 
 interface WhatsappIntegrationConfig {
   phoneNumberId?: string;

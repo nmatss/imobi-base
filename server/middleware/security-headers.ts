@@ -187,8 +187,23 @@ export function validateContentType(allowedTypes: string[] = ['application/json'
       return next();
     }
 
-    // Skip if no body
-    if (!req.body || Object.keys(req.body).length === 0) {
+    // Decide if the request carries a body. We must NOT rely on `req.body`
+    // because body parsers (e.g. express.json) only populate it for
+    // content-types they recognize — a request with a missing or wrong
+    // Content-Type would leave `req.body` empty and silently bypass this
+    // check. Instead, detect a declared body via transport headers so the
+    // validation runs even when the body was never parsed.
+    const hasParsedBody =
+      typeof req.body === 'object' &&
+      req.body !== null &&
+      Object.keys(req.body).length > 0;
+    const contentLength = parseInt(req.get('Content-Length') ?? '', 10);
+    const declaresBody =
+      (Number.isFinite(contentLength) && contentLength > 0) ||
+      req.get('Transfer-Encoding') !== undefined;
+
+    // Skip if there is genuinely no body to validate.
+    if (!hasParsedBody && !declaresBody) {
       return next();
     }
 

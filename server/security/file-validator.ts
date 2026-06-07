@@ -51,6 +51,25 @@ const MAGIC_BYTES_SIGNATURES: Record<string, { signature: number[][]; mime: stri
 };
 
 /**
+ * Normaliza qualquer entrada binária para um `Uint8Array` "puro" do realm atual.
+ *
+ * A lib `file-type` (fileTypeFromBuffer) valida o argumento com
+ * `input instanceof Uint8Array`. Um `Buffer` do Node normalmente passa nessa
+ * checagem, mas há ambientes (ex.: jsdom no Vitest, múltiplos realms/VM contexts)
+ * em que o `Uint8Array` global difere do usado pela lib, fazendo o `Buffer`
+ * falhar com "Expected the input argument to be of type Uint8Array or
+ * ArrayBuffer, got object". Reembrulhar como `Uint8Array` sobre o mesmo
+ * ArrayBuffer (sem cópia) garante compatibilidade em qualquer realm.
+ */
+function toUint8Array(buffer: Buffer): Uint8Array {
+  return new Uint8Array(
+    buffer.buffer,
+    buffer.byteOffset,
+    buffer.byteLength,
+  );
+}
+
+/**
  * Checks if buffer starts with any of the given signatures
  */
 function matchesMagicBytes(buffer: Buffer, signatures: number[][]): boolean {
@@ -78,8 +97,9 @@ export async function validateFileContent(
       };
     }
 
-    // Detect type using file-type library (primary method)
-    const detectedType = await fileTypeFromBuffer(buffer);
+    // Detect type using file-type library (primary method).
+    // Normaliza para Uint8Array do realm atual (ver toUint8Array).
+    const detectedType = await fileTypeFromBuffer(toUint8Array(buffer));
 
     if (!detectedType) {
       // Fallback to manual magic bytes check

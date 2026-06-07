@@ -8,7 +8,7 @@
 import { db } from "../../db";
 import { whatsappConversations, whatsappMessages, type InsertWhatsappConversation } from "@shared/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
-import { log } from "../../index";
+import { log } from "../../utils/log";
 
 interface CreateConversationParams {
   tenantId: string;

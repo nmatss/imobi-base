@@ -15,7 +15,7 @@ import { eq, and, or, lte, isNull } from "drizzle-orm";
 import { whatsappAPI } from "./business-api";
 import { templateManager } from "./template-manager";
 import { conversationManager } from "./conversation-manager";
-import { log } from "../../index";
+import { log } from "../../utils/log";
 
 interface QueueMessageParams {
   tenantId: string;

@@ -1,481 +1,385 @@
 /**
- * File Upload Security Integration Tests
- * Tests malicious file detection, validation, and sanitization
+ * File Upload Security — Integração REAL
+ *
+ * Substitui a antiga suíte que montava um app Express MOCK self-contained
+ * (`createTestApp`) e por isso dava "falso verde": nunca exercitava o validador
+ * real do projeto nem a rota real de upload.
+ *
+ * Aqui exercitamos CÓDIGO DE PRODUÇÃO em duas frentes:
+ *
+ *  1. ROTA REAL (`POST /api/files/upload` de server/routes-files.ts):
+ *     subimos o app real com `buildRealApp()`, registramos as rotas de arquivo
+ *     (`registerFileRoutes`, que não é montada por `registerRoutes`), fazemos
+ *     login real (passport + sessão + CSRF Double-Submit) e enviamos arquivos
+ *     maliciosos via multipart. A rota usa o validador real (`validateFile` ->
+ *     `comprehensiveFileValidation` -> `validateFileContent`) e rejeita ANTES de
+ *     tocar no Supabase, então os 400 são 100% reais.
+ *
+ *  2. VALIDADOR REAL direto (`comprehensiveFileValidation`, `validateFileContent`
+ *     e helpers): para os casos que (a) o transporte multipart não consegue
+ *     carregar (null byte no filename quebra o header da parte) ou (b) exigiriam
+ *     prosseguir para o Supabase (arquivo VÁLIDO aceito). Usamos magic bytes
+ *     reais de JPEG/PNG/PDF/ZIP e um PHP-com-.jpg que deve ser rejeitado.
+ *
+ * BUG REAL CORRIGIDO (server/security/file-validator.ts):
+ *   `fileTypeFromBuffer(buffer)` recebia um `Buffer`. A lib `file-type` valida o
+ *   argumento com `instanceof Uint8Array`; sob jsdom (ambiente do Vitest) o
+ *   `Uint8Array` global difere do usado pela lib e o `Buffer` falha com
+ *   "Expected the input argument to be of type Uint8Array or ArrayBuffer, got
+ *   object". Normalizamos para um `Uint8Array` do realm atual antes da chamada.
+ *   Sem isso, validateFileContent caía no catch e rejeitava ATÉ imagens válidas.
  */
-
-import { describe, it, expect, beforeAll } from 'vitest';
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+} from 'vitest';
 import request from 'supertest';
-import express, { type Express } from 'express';
-import multer from 'multer';
+import type { Express } from 'express';
+import bcrypt from 'bcryptjs';
 import {
   comprehensiveFileValidation,
+  validateFileContent,
   isExtensionDangerous,
   hasDoubleExtension,
   hasNullByteInjection,
-  sanitizeFilename as sanitizeFilenameSecurity
+  sanitizeFilename,
 } from '../../../server/security/file-validator';
+import {
+  prepareTestEnv,
+  setupFreshDatabase,
+  restoreDatabase,
+  buildRealApp,
+  flushRateLimitKeys,
+} from '../../helpers/tenant-isolation-app';
 
-const upload = multer({ storage: multer.memoryStorage() });
+// Precisa rodar ANTES de qualquer import de server/* (feito dentro de buildRealApp).
+prepareTestEnv();
 
-function createTestApp(): Express {
-  const app = express();
+// ---------------------------------------------------------------------------
+// Buffers reais (magic bytes verdadeiros) usados em vários casos.
+// ---------------------------------------------------------------------------
+const JPEG_HEADER = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46]);
+const PNG_HEADER = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+const PDF_HEADER = Buffer.from('%PDF-1.4\n');
+const ZIP_HEADER = Buffer.from([0x50, 0x4B, 0x03, 0x04]);
 
-  app.use(express.json());
+const realJpeg = (): Buffer => Buffer.concat([JPEG_HEADER, Buffer.alloc(1000)]);
+const realPng = (): Buffer => Buffer.concat([PNG_HEADER, Buffer.alloc(1000)]);
+const realPdf = (): Buffer => Buffer.concat([PDF_HEADER, Buffer.alloc(1000)]);
+const realZip = (): Buffer => Buffer.concat([ZIP_HEADER, Buffer.alloc(100)]);
 
-  // File upload endpoint with security validation
-  app.post('/api/upload', upload.single('file'), async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: 'No file uploaded' });
-      }
-
-      const { originalname, buffer, mimetype } = req.file;
-
-      // 1. Check for dangerous extensions
-      if (isExtensionDangerous(originalname)) {
-        return res.status(400).json({
-          error: 'File type not allowed',
-          code: 'DANGEROUS_EXTENSION',
-        });
-      }
-
-      // 2. Check for double extensions
-      if (hasDoubleExtension(originalname)) {
-        return res.status(400).json({
-          error: 'Double extensions not allowed',
-          code: 'DOUBLE_EXTENSION',
-        });
-      }
-
-      // 3. Check for null byte injection
-      if (hasNullByteInjection(originalname)) {
-        return res.status(400).json({
-          error: 'Invalid filename characters',
-          code: 'NULL_BYTE_INJECTION',
-        });
-      }
-
-      // 4. Comprehensive validation
-      const validation = await comprehensiveFileValidation(
-        buffer,
-        originalname,
-        mimetype
-      );
-
-      if (!validation.valid) {
-        return res.status(400).json({
-          error: 'File validation failed',
-          code: 'VALIDATION_FAILED',
-          errors: validation.errors,
-          warnings: validation.warnings,
-        });
-      }
-
-      // 5. Sanitize filename
-      const sanitizedFilename = sanitizeFilenameSecurity(originalname);
-
-      res.json({
-        success: true,
-        filename: sanitizedFilename,
-        size: buffer.length,
-        detectedType: validation.detectedType,
-        warnings: validation.warnings,
-      });
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      res.status(500).json({
-        error: 'Upload failed',
-        message: error.message,
-      });
-    }
-  });
-
-  // Simple upload endpoint without validation (for testing)
-  app.post('/api/upload-unsafe', upload.single('file'), (req, res) => {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
-    res.json({
-      success: true,
-      filename: req.file.originalname,
-      size: req.file.size,
-    });
-  });
-
-  return app;
-}
-
-describe('File Upload Security Integration Tests', () => {
+// =====================================================================================
+// PARTE 1 — ROTA REAL DE UPLOAD (server/routes-files.ts) autenticada
+// =====================================================================================
+describe('File Upload Security — ROTA REAL (POST /api/files/upload)', () => {
   let app: Express;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let storage: any;
+  let closeDb: () => Promise<void>;
+  let agent: ReturnType<typeof request.agent>;
+  let csrfToken: string;
 
-  beforeAll(() => {
-    app = createTestApp();
+  const PASSWORD = 'SenhaForteDeTeste123!';
+
+  beforeAll(async () => {
+    // tests/setup.ts roda um beforeAll global que pode encurtar SESSION_SECRET.
+    prepareTestEnv();
+    setupFreshDatabase();
+
+    const built = await buildRealApp();
+    app = built.app;
+    storage = built.storage;
+    closeDb = built.closeDb;
+
+    // registerRoutes NÃO monta as rotas de arquivo; registramos no app real.
+    const fileRoutes = await import('../../../server/routes-files');
+    fileRoutes.registerFileRoutes(app);
+
+    const tenant = await storage.createTenant({
+      name: 'Imobiliária Upload',
+      slug: `imob-upload-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+      email: 'contato-upload@example.com',
+      primaryColor: '#0066cc',
+      secondaryColor: '#333333',
+    });
+    const email = `user-upload-${Date.now()}@example.com`;
+    await storage.createUser({
+      tenantId: tenant.id,
+      name: 'Corretor Upload',
+      email,
+      password: await bcrypt.hash(PASSWORD, 10),
+      role: 'admin',
+    });
+
+    await flushRateLimitKeys();
+
+    agent = request.agent(app);
+    const loginRes = await agent
+      .post('/api/auth/login')
+      .send({ email, password: PASSWORD });
+    expect(loginRes.status).toBe(200);
+    csrfToken = loginRes.body.csrfToken;
+    expect(csrfToken).toBeTruthy();
+  }, 30000);
+
+  afterAll(async () => {
+    try {
+      if (closeDb) await closeDb();
+    } finally {
+      restoreDatabase();
+    }
   });
 
-  describe('Malicious File Detection', () => {
-    it('should reject PHP web shell upload', async () => {
-      const phpShell = Buffer.from('<?php system($_GET["cmd"]); ?>');
+  /** Helper de upload autenticado pela rota real. */
+  function upload(
+    filename: string,
+    content: Buffer,
+    fileType: string,
+  ): request.Test {
+    return agent
+      .post('/api/files/upload')
+      .set('x-csrf-token', csrfToken)
+      .field('fileType', fileType)
+      .attach('file', content, filename);
+  }
 
+  describe('Autenticação e CSRF', () => {
+    it('rejeita upload sem autenticação/CSRF', async () => {
       const res = await request(app)
-        .post('/api/upload')
-        .attach('file', phpShell, 'shell.php')
-        .expect(400);
-
-      expect(res.body.error).toContain('File type not allowed');
-      expect(res.body.code).toBe('DANGEROUS_EXTENSION');
-    });
-
-    it('should reject executable file upload', async () => {
-      const exe = Buffer.from('MZ'); // EXE magic bytes
-
-      const res = await request(app)
-        .post('/api/upload')
-        .attach('file', exe, 'malware.exe')
-        .expect(400);
-
-      expect(res.body.error).toContain('File type not allowed');
-      expect(res.body.code).toBe('DANGEROUS_EXTENSION');
-    });
-
-    it('should reject shell script upload', async () => {
-      const script = Buffer.from('#!/bin/bash\nrm -rf /');
-
-      const res = await request(app)
-        .post('/api/upload')
-        .attach('file', script, 'evil.sh')
-        .expect(400);
-
-      expect(res.body.error).toContain('File type not allowed');
-      expect(res.body.code).toBe('DANGEROUS_EXTENSION');
-    });
-
-    it('should reject ASP web shell upload', async () => {
-      const aspShell = Buffer.from('<%@ Page Language="C#" %>');
-
-      const res = await request(app)
-        .post('/api/upload')
-        .attach('file', aspShell, 'shell.aspx')
-        .expect(400);
-
-      expect(res.body.error).toContain('File type not allowed');
-      expect(res.body.code).toBe('DANGEROUS_EXTENSION');
-    });
-
-    it('should reject JSP web shell upload', async () => {
-      const jspShell = Buffer.from('<%@ page import="java.io.*" %>');
-
-      const res = await request(app)
-        .post('/api/upload')
-        .attach('file', jspShell, 'shell.jsp')
-        .expect(400);
-
-      expect(res.body.error).toContain('File type not allowed');
-      expect(res.body.code).toBe('DANGEROUS_EXTENSION');
-    });
-  });
-
-  describe('Double Extension Attack Prevention', () => {
-    it('should reject file with double extension (image.jpg.php)', async () => {
-      const phpContent = Buffer.from('<?php echo "pwned"; ?>');
-
-      const res = await request(app)
-        .post('/api/upload')
-        .attach('file', phpContent, 'image.jpg.php')
-        .expect(400);
-
-      expect(res.body.error).toContain('Double extensions not allowed');
-      expect(res.body.code).toBe('DOUBLE_EXTENSION');
-    });
-
-    it('should reject file with double extension (doc.pdf.exe)', async () => {
-      const exeContent = Buffer.from('MZ');
-
-      const res = await request(app)
-        .post('/api/upload')
-        .attach('file', exeContent, 'document.pdf.exe')
-        .expect(400);
-
-      expect(res.body.code).toBe('DANGEROUS_EXTENSION');
-    });
-
-    it('should reject file with triple extension (file.txt.sh.php)', async () => {
-      const phpContent = Buffer.from('<?php system($_GET["c"]); ?>');
-
-      const res = await request(app)
-        .post('/api/upload')
-        .attach('file', phpContent, 'readme.txt.sh.php')
-        .expect(400);
-
-      expect(res.body.code).toBe('DANGEROUS_EXTENSION');
+        .post('/api/files/upload')
+        .attach('file', realJpeg(), 'a.jpg');
+      // CSRF (403) ou auth (401) — nunca aceita (200).
+      expect([401, 403]).toContain(res.status);
+      expect(res.status).not.toBe(200);
     });
   });
 
-  describe('Null Byte Injection Prevention', () => {
-    it('should reject filename with null byte (image.jpg\\x00.php)', async () => {
-      const content = Buffer.from('fake image');
-
-      const res = await request(app)
-        .post('/api/upload')
-        .attach('file', content, 'image.jpg\x00.php')
-        .expect(400);
-
-      expect(res.body.error).toContain('Invalid filename');
-      expect(res.body.code).toBe('NULL_BYTE_INJECTION');
+  describe('Detecção de arquivos maliciosos pela rota real', () => {
+    it('rejeita web shell PHP (.php) por extensão perigosa', async () => {
+      const res = await upload('shell.php', Buffer.from('<?php system($_GET["cmd"]); ?>'), 'document');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('extension is not allowed');
     });
 
-    it('should reject filename with URL-encoded null byte', async () => {
-      const content = Buffer.from('test');
+    it('rejeita executável (.exe) por extensão perigosa', async () => {
+      const res = await upload('malware.exe', Buffer.from('MZ'), 'document');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('extension is not allowed');
+    });
 
-      const res = await request(app)
-        .post('/api/upload')
-        .attach('file', content, 'image.jpg%00.php')
-        .expect(400);
-
-      expect(res.body.code).toBe('NULL_BYTE_INJECTION');
+    it('rejeita script shell (.sh) por extensão perigosa', async () => {
+      const res = await upload('evil.sh', Buffer.from('#!/bin/bash\nrm -rf /'), 'document');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('extension is not allowed');
     });
   });
 
-  describe('Magic Bytes Validation', () => {
-    it('should reject fake image (PHP with .jpg extension)', async () => {
-      const phpContent = Buffer.from('<?php echo "fake"; ?>');
-
-      const res = await request(app)
-        .post('/api/upload')
-        .field('mimetype', 'image/jpeg')
-        .attach('file', phpContent, 'fake-image.jpg')
-        .expect(400);
-
-      expect(res.body.error).toContain('File validation failed');
-      expect(res.body.code).toBe('VALIDATION_FAILED');
+  describe('Ataque de dupla extensão pela rota real', () => {
+    it('rejeita image.jpg.php (segunda extensão perigosa)', async () => {
+      const res = await upload('image.jpg.php', Buffer.from('<?php echo "pwned"; ?>'), 'document');
+      expect(res.status).toBe(400);
+      // .php é pego como extensão perigosa (a verificação de extensão roda antes).
+      expect(res.body.error).toContain('extension is not allowed');
     });
 
-    it('should accept valid JPEG image', async () => {
-      // JPEG magic bytes: FF D8 FF
-      const jpegHeader = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46]);
-      const jpegContent = Buffer.concat([jpegHeader, Buffer.alloc(1000)]);
-
-      const res = await request(app)
-        .post('/api/upload')
-        .field('mimetype', 'image/jpeg')
-        .attach('file', jpegContent, 'valid-image.jpg')
-        .expect(200);
-
-      expect(res.body.success).toBe(true);
-      expect(res.body.detectedType).toContain('image');
-    });
-
-    it('should accept valid PNG image', async () => {
-      // PNG magic bytes: 89 50 4E 47 0D 0A 1A 0A
-      const pngHeader = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
-      const pngContent = Buffer.concat([pngHeader, Buffer.alloc(1000)]);
-
-      const res = await request(app)
-        .post('/api/upload')
-        .field('mimetype', 'image/png')
-        .attach('file', pngContent, 'valid-image.png')
-        .expect(200);
-
-      expect(res.body.success).toBe(true);
-      expect(res.body.detectedType).toContain('image');
-    });
-
-    it('should accept valid PDF document', async () => {
-      // PDF magic bytes: %PDF
-      const pdfHeader = Buffer.from('%PDF-1.4\n');
-      const pdfContent = Buffer.concat([pdfHeader, Buffer.alloc(1000)]);
-
-      const res = await request(app)
-        .post('/api/upload')
-        .field('mimetype', 'application/pdf')
-        .attach('file', pdfContent, 'document.pdf')
-        .expect(200);
-
-      expect(res.body.success).toBe(true);
-      expect(res.body.detectedType).toContain('pdf');
+    it('rejeita document.pdf.exe', async () => {
+      const res = await upload('document.pdf.exe', Buffer.from('MZ'), 'document');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('extension is not allowed');
     });
   });
 
-  describe('Embedded Script Detection', () => {
-    it('should detect embedded PHP in image file', async () => {
-      // JPEG header + embedded PHP
-      const jpegHeader = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0]);
-      const embeddedPhp = Buffer.from('<?php system("whoami"); ?>');
-      const maliciousImage = Buffer.concat([jpegHeader, embeddedPhp, Buffer.alloc(500)]);
-
-      const res = await request(app)
-        .post('/api/upload')
-        .field('mimetype', 'image/jpeg')
-        .attach('file', maliciousImage, 'image-with-php.jpg')
-        .expect(200); // Accepted but with warnings
-
-      expect(res.body.warnings).toBeDefined();
-      expect(res.body.warnings.length).toBeGreaterThan(0);
-      expect(res.body.warnings.some((w: string) => w.includes('Suspicious content'))).toBe(true);
+  describe('Magic bytes / spoofing de Content-Type pela rota real', () => {
+    it('rejeita PHP disfarçado de .jpg (conteúdo não é imagem)', async () => {
+      const res = await upload('fake-image.jpg', Buffer.from('<?php echo "fake"; ?>'), 'image');
+      expect(res.status).toBe(400);
+      // file-type não detecta -> "Could not detect file type".
+      expect(res.body.error).toBeTruthy();
     });
 
-    it('should detect eval() in image file', async () => {
-      const jpegHeader = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0]);
-      const embeddedScript = Buffer.from('eval(atob("malicious"))');
-      const maliciousImage = Buffer.concat([jpegHeader, embeddedScript, Buffer.alloc(500)]);
+    it('rejeita PDF declarado como .jpg (mismatch de tipo detectado)', async () => {
+      const res = await upload('fake.jpg', realPdf(), 'image');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('mismatch');
+    });
 
-      const res = await request(app)
-        .post('/api/upload')
-        .field('mimetype', 'image/jpeg')
-        .attach('file', maliciousImage, 'image-with-eval.jpg')
-        .expect(200);
-
-      expect(res.body.warnings).toBeDefined();
-      expect(res.body.warnings.some((w: string) => w.includes('Suspicious content'))).toBe(true);
+    it('rejeita HTML disfarçado de .png', async () => {
+      const html = Buffer.from('<!DOCTYPE html><html><body><script>alert(1)</script></body></html>');
+      const res = await upload('malicious.png', html, 'image');
+      expect(res.status).toBe(400);
     });
   });
 
-  describe('File Size Validation', () => {
-    it('should reject empty file', async () => {
-      const emptyBuffer = Buffer.alloc(0);
+  describe('Segurança de SVG pela rota real', () => {
+    it('rejeita SVG com JavaScript embutido (sanitizer real)', async () => {
+      const maliciousSvg = Buffer.from(
+        '<?xml version="1.0" encoding="UTF-8"?>' +
+        '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(\'XSS\')</script></svg>',
+      );
+      // fileType 'logo' é o único que aceita image/svg+xml na config.
+      const res = await upload('malicious.svg', maliciousSvg, 'logo');
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBeTruthy();
+    });
+  });
+});
 
-      const res = await request(app)
-        .post('/api/upload')
-        .attach('file', emptyBuffer, 'empty.txt')
-        .expect(400);
-
-      expect(res.body.errors).toContain('File is empty');
+// =====================================================================================
+// PARTE 2 — VALIDADOR REAL direto (buffers reais; casos não-transportáveis via HTTP
+//           ou que exigiriam prosseguir ao Supabase)
+// =====================================================================================
+describe('File Upload Security — VALIDADOR REAL (file-validator.ts)', () => {
+  describe('Aceitação de arquivos legítimos (magic bytes reais)', () => {
+    it('aceita JPEG válido e detecta image/jpeg', async () => {
+      const r = await comprehensiveFileValidation(realJpeg(), 'valid-image.jpg', 'image/jpeg');
+      expect(r.valid).toBe(true);
+      expect(r.errors).toHaveLength(0);
+      expect(r.detectedType).toContain('image');
     });
 
-    it('should reject file exceeding maximum size (100MB)', async () => {
-      // Note: This test creates a large buffer, might be slow
-      const hugeBuffer = Buffer.alloc(101 * 1024 * 1024); // 101MB
+    it('aceita PNG válido e detecta image/png', async () => {
+      const r = await comprehensiveFileValidation(realPng(), 'valid-image.png', 'image/png');
+      expect(r.valid).toBe(true);
+      expect(r.detectedType).toContain('image');
+    });
 
-      const res = await request(app)
-        .post('/api/upload')
-        .attach('file', hugeBuffer, 'huge.txt')
-        .expect(400);
+    it('aceita PDF válido e detecta application/pdf', async () => {
+      const r = await comprehensiveFileValidation(realPdf(), 'document.pdf', 'application/pdf');
+      expect(r.valid).toBe(true);
+      expect(r.detectedType).toContain('pdf');
+    });
 
-      expect(res.body.errors).toBeDefined();
-      expect(res.body.errors.some((e: string) => e.includes('exceeds'))).toBe(true);
+    it('aceita ZIP válido', async () => {
+      const r = await comprehensiveFileValidation(realZip(), 'archive.zip', 'application/zip');
+      expect(r.valid).toBe(true);
+      expect(r.detectedType).toContain('zip');
     });
   });
 
-  describe('Filename Sanitization', () => {
-    it('should sanitize filename with path traversal attempt', async () => {
-      const content = Buffer.from('test content');
-
-      const res = await request(app)
-        .post('/api/upload-unsafe')
-        .attach('file', content, '../../../etc/passwd')
-        .expect(200);
-
-      // Filename should be sanitized
-      expect(res.body.filename).not.toContain('../');
+  describe('Detecção de mismatch de tipo (validateFileContent real)', () => {
+    it('rejeita PHP disfarçado de .jpg (não detectável)', async () => {
+      const r = await comprehensiveFileValidation(
+        Buffer.from('<?php echo "fake"; ?>'),
+        'fake-image.jpg',
+        'image/jpeg',
+      );
+      expect(r.valid).toBe(false);
+      expect(r.errors.length).toBeGreaterThan(0);
     });
 
-    it('should sanitize filename with special characters', async () => {
-      const jpegHeader = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46]);
-      const jpegContent = Buffer.concat([jpegHeader, Buffer.alloc(100)]);
-
-      const res = await request(app)
-        .post('/api/upload')
-        .field('mimetype', 'image/jpeg')
-        .attach('file', jpegContent, 'test<script>.jpg')
-        .expect(200);
-
-      expect(res.body.success).toBe(true);
-      expect(res.body.filename).not.toContain('<');
-      expect(res.body.filename).not.toContain('>');
+    it('rejeita PDF declarado como image/jpeg (mismatch)', async () => {
+      const r = await comprehensiveFileValidation(realPdf(), 'fake.jpg', 'image/jpeg');
+      expect(r.valid).toBe(false);
+      expect(r.errors.some((e) => e.includes('mismatch'))).toBe(true);
+      expect(r.detectedType).toBe('application/pdf');
     });
 
-    it('should handle very long filenames', async () => {
-      const jpegHeader = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46]);
-      const jpegContent = Buffer.concat([jpegHeader, Buffer.alloc(100)]);
-
-      const longFilename = `${'a'.repeat(300)  }.jpg`;
-
-      const res = await request(app)
-        .post('/api/upload')
-        .field('mimetype', 'image/jpeg')
-        .attach('file', jpegContent, longFilename)
-        .expect(200);
-
-      expect(res.body.success).toBe(true);
-      expect(res.body.filename.length).toBeLessThanOrEqual(255);
+    it('validateFileContent confirma o tipo correto quando bate', async () => {
+      const r = await validateFileContent(realPng(), 'image/png', '.png');
+      expect(r.valid).toBe(true);
+      expect(r.detectedType).toBe('image/png');
     });
   });
 
-  describe('MIME Type Validation', () => {
-    it('should reject MIME type mismatch', async () => {
-      // PDF content declared as image
-      const pdfContent = Buffer.from(`%PDF-1.4\n${  'a'.repeat(100)}`);
+  describe('Detecção de script embutido em imagem (warnings reais)', () => {
+    it('emite warning para PHP embutido em JPEG', async () => {
+      const malicious = Buffer.concat([
+        Buffer.from([0xFF, 0xD8, 0xFF, 0xE0]),
+        Buffer.from('<?php system("whoami"); ?>'),
+        Buffer.alloc(500),
+      ]);
+      const r = await comprehensiveFileValidation(malicious, 'image-with-php.jpg', 'image/jpeg');
+      // file-type ainda detecta como jpeg (magic bytes válidos), então valida,
+      // mas o scanner de conteúdo precisa marcar o conteúdo suspeito.
+      expect(r.valid).toBe(true);
+      expect(r.warnings.some((w) => w.includes('Suspicious content'))).toBe(true);
+    });
 
-      const res = await request(app)
-        .post('/api/upload')
-        .field('mimetype', 'image/jpeg')
-        .attach('file', pdfContent, 'fake.jpg')
-        .expect(400);
-
-      expect(res.body.code).toBe('VALIDATION_FAILED');
-      expect(res.body.errors.some((e: string) => e.includes('mismatch'))).toBe(true);
+    it('emite warning para eval() embutido em JPEG', async () => {
+      const malicious = Buffer.concat([
+        Buffer.from([0xFF, 0xD8, 0xFF, 0xE0]),
+        Buffer.from('eval(atob("malicious"))'),
+        Buffer.alloc(500),
+      ]);
+      const r = await comprehensiveFileValidation(malicious, 'image-with-eval.jpg', 'image/jpeg');
+      expect(r.warnings.some((w) => w.includes('Suspicious content'))).toBe(true);
     });
   });
 
-  describe('Content-Type Spoofing Prevention', () => {
-    it('should validate actual file content, not just Content-Type header', async () => {
-      // PHP file with fake Content-Type
-      const phpContent = Buffer.from('<?php phpinfo(); ?>');
-
-      const res = await request(app)
-        .post('/api/upload')
-        .field('mimetype', 'image/jpeg') // Fake MIME type
-        .attach('file', phpContent, 'shell.jpg')
-        .expect(400);
-
-      expect(res.body.code).toBe('VALIDATION_FAILED');
+  describe('Validação de tamanho', () => {
+    it('rejeita arquivo vazio', async () => {
+      const r = await comprehensiveFileValidation(Buffer.alloc(0), 'empty.txt', 'text/plain');
+      expect(r.valid).toBe(false);
+      expect(r.errors).toContain('File is empty');
     });
 
-    it('should reject HTML file disguised as image', async () => {
-      const htmlContent = Buffer.from('<!DOCTYPE html><html><body><script>alert(1)</script></body></html>');
-
-      const res = await request(app)
-        .post('/api/upload')
-        .field('mimetype', 'image/png')
-        .attach('file', htmlContent, 'malicious.png')
-        .expect(400);
-
-      expect(res.body.code).toBe('VALIDATION_FAILED');
+    it('rejeita arquivo acima do máximo absoluto (100MB)', async () => {
+      const huge = Buffer.alloc(101 * 1024 * 1024);
+      const r = await comprehensiveFileValidation(huge, 'huge.txt', 'text/plain');
+      expect(r.valid).toBe(false);
+      expect(r.errors.some((e) => e.includes('exceeds'))).toBe(true);
     });
   });
 
-  describe('SVG Upload Security', () => {
-    it('should reject SVG with embedded JavaScript', async () => {
-      const maliciousSvg = Buffer.from(`
-        <?xml version="1.0" encoding="UTF-8"?>
-        <svg xmlns="http://www.w3.org/2000/svg">
-          <script>alert('XSS')</script>
-        </svg>
-      `);
+  describe('Helpers de extensão/nome (lógica pura)', () => {
+    it('isExtensionDangerous detecta extensões perigosas', () => {
+      expect(isExtensionDangerous('shell.php')).toBe(true);
+      expect(isExtensionDangerous('malware.exe')).toBe(true);
+      expect(isExtensionDangerous('evil.sh')).toBe(true);
+      expect(isExtensionDangerous('shell.aspx')).toBe(true);
+      expect(isExtensionDangerous('shell.jsp')).toBe(true);
+      expect(isExtensionDangerous('photo.jpg')).toBe(false);
+    });
 
-      const res = await request(app)
-        .post('/api/upload')
-        .field('mimetype', 'image/svg+xml')
-        .attach('file', maliciousSvg, 'malicious.svg')
-        .expect(400);
+    it('hasDoubleExtension detecta extensão dupla perigosa', () => {
+      expect(hasDoubleExtension('image.jpg.php')).toBe(true);
+      expect(hasDoubleExtension('readme.txt.sh.php')).toBe(true);
+      expect(hasDoubleExtension('document.pdf.exe')).toBe(true);
+      expect(hasDoubleExtension('photo.jpg')).toBe(false);
+      expect(hasDoubleExtension('archive.tar.gz')).toBe(false);
+    });
 
-      expect(res.body.code).toBe('VALIDATION_FAILED');
+    it('hasNullByteInjection detecta null byte literal e URL-encoded', () => {
+      // Estes casos NÃO são transportáveis via multipart (o header da parte
+      // quebra com "Malformed part header"), por isso são testados na função.
+      expect(hasNullByteInjection('image.jpg\x00.php')).toBe(true);
+      expect(hasNullByteInjection('image.jpg%00.php')).toBe(true);
+      expect(hasNullByteInjection('photo.jpg')).toBe(false);
+    });
+
+    it('comprehensiveFileValidation acumula erro de null byte no nome', async () => {
+      const r = await comprehensiveFileValidation(realJpeg(), 'image.jpg\x00.php', 'image/jpeg');
+      expect(r.valid).toBe(false);
+      expect(r.errors.some((e) => e.includes('null bytes'))).toBe(true);
     });
   });
 
-  describe('Archive File Validation', () => {
-    it('should accept valid ZIP file', async () => {
-      // ZIP magic bytes: PK
-      const zipHeader = Buffer.from([0x50, 0x4B, 0x03, 0x04]);
-      const zipContent = Buffer.concat([zipHeader, Buffer.alloc(100)]);
+  describe('Sanitização de filename (sanitizeFilename real)', () => {
+    it('remove tentativa de path traversal', () => {
+      const out = sanitizeFilename('../../../etc/passwd');
+      expect(out).not.toContain('../');
+      expect(out).not.toContain('/');
+    });
 
-      const res = await request(app)
-        .post('/api/upload')
-        .field('mimetype', 'application/zip')
-        .attach('file', zipContent, 'archive.zip')
-        .expect(200);
+    it('remove caracteres perigosos (< >)', () => {
+      const out = sanitizeFilename('test<script>.jpg');
+      expect(out).not.toContain('<');
+      expect(out).not.toContain('>');
+    });
 
-      expect(res.body.success).toBe(true);
+    it('remove null bytes do nome', () => {
+      const out = sanitizeFilename('image.jpg\x00.php');
+      expect(out).not.toContain('\x00');
+      expect(out).not.toContain('%00');
+    });
+
+    it('limita o comprimento a 255 caracteres', () => {
+      const longName = `${'a'.repeat(300)}.jpg`;
+      const out = sanitizeFilename(longName);
+      expect(out.length).toBeLessThanOrEqual(255);
     });
   });
 });

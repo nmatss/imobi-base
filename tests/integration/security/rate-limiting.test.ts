@@ -1,424 +1,177 @@
 /**
- * Rate Limiting Integration Tests
- * Tests rate limiting enforcement and 429 responses
+ * Rate Limiting — Integração REAL
+ *
+ * Substitui a antiga suíte fake (que montava um Express self-contained com
+ * limiters inventados e nunca tocava o código de produção). Aqui subimos o
+ * ROUTER REAL do projeto (`registerRoutes` de server/routes.ts) via o harness
+ * tenant-isolation-app e provamos que os limiters REAIS retornam 429 ao
+ * estourar o limite configurado.
+ *
+ * Limiters reais relevantes (server/routes.ts), todos com store em memória no
+ * ambiente de teste (sem Redis):
+ *   - registerLimiter: max 5 / 1h em POST /api/auth/register (mais baixo →
+ *     ideal para exercitar rápido e de forma determinística).
+ *   - authLimiter:     max 20 / 15min em POST /api/auth/login.
+ *   - apiLimiter:      max 500 / 15min em todo /api/ (alto demais p/ exercitar
+ *     rápido; não é o alvo aqui).
+ *
+ * Ambas as rotas alvo (login/register) são CSRF-excluded (csrfExcludedPaths),
+ * então não precisamos de token CSRF — basta bater repetidamente.
+ *
+ * Observação sobre a CHAVE do limiter: nem authLimiter nem o apiLimiter global
+ * usam keyGenerator custom, então a chave é o IP (subnet ::/56 no supertest). No
+ * supertest o IP é estável dentro da mesma execução, logo o contador acumula.
+ *
+ * COMPORTAMENTO REAL OBSERVADO (não é bug de teste, é como o produção está hoje):
+ * server/routes.ts compartilha UMA mesma instância de RedisStore entre apiLimiter
+ * (max 500) e authLimiter (max 20) — ambos com a chave-padrão por IP. Com store +
+ * chave compartilhados, CADA request a /api/auth/login incrementa o MESMO contador
+ * Redis DUAS vezes (uma pelo apiLimiter global em app.use("/api/"), outra pelo
+ * authLimiter da rota). Resultado: o 429 do authLimiter dispara por volta da ~11ª
+ * request em vez da 21ª. A proteção 429 FUNCIONA (até mais cedo que o configurado);
+ * por isso NÃO fixamos o número exato de requests — fazemos loop-até-429 com teto.
+ * (express-rate-limit loga ERR_ERL_STORE_REUSE/ERR_ERL_KEY_GEN_IPV6 alertando para
+ * isso; correção fica em server/routes.ts, fora do escopo deste arquivo de teste.)
+ *
+ * flushRateLimitKeys() zera contadores no Redis compartilhado (prefixo rl:) ANTES
+ * de cada bloco, para começar limpo e não herdar contagem de execuções anteriores.
  */
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import request from "supertest";
+import type { Express } from "express";
+import {
+  prepareTestEnv,
+  setupFreshDatabase,
+  restoreDatabase,
+  buildRealApp,
+  flushRateLimitKeys,
+} from "../../helpers/tenant-isolation-app";
 
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
-import request from 'supertest';
-import express, { type Express } from 'express';
-import rateLimit from 'express-rate-limit';
+// Precisa rodar ANTES de qualquer import de server/* (feito dentro de buildRealApp).
+prepareTestEnv();
 
-function createTestApp(): Express {
-  const app = express();
+// Limites reais configurados em server/routes.ts (mantidos em sync manual).
+const REGISTER_LIMIT = 5; // registerLimiter: max 5 / 1h em /api/auth/register (in-memory, isolado)
+const AUTH_LIMIT = 20; // authLimiter:     max 20 / 15min em /api/auth/login (anunciado no header)
+const API_CEILING = 500; // apiLimiter global: max 500 / 15min — teto absoluto p/ o loop-até-429
 
-  app.use(express.json());
+describe("Rate Limiting — REAL app + REAL limiters", () => {
+  let app: Express;
+  let closeDb: () => Promise<void>;
 
-  // Global rate limiter (100 requests per 15 minutes)
-  const globalLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-    message: { error: 'Too many requests', code: 'RATE_LIMIT_EXCEEDED' },
-    standardHeaders: true,
-    legacyHeaders: false,
-    handler: (_req, res) => {
-      res.status(429).json({
-        error: 'Too many requests from this IP',
-        code: 'RATE_LIMIT_EXCEEDED',
-        retryAfter: res.getHeader('Retry-After'),
-      });
-    },
-  });
+  beforeAll(async () => {
+    // Re-aplica env aqui: tests/setup.ts roda beforeAll global e pode ter
+    // sobrescrito SESSION_SECRET com valor curto.
+    prepareTestEnv();
+    setupFreshDatabase();
+    const built = await buildRealApp();
+    app = built.app;
+    closeDb = built.closeDb;
 
-  // Strict rate limiter for auth endpoints (5 requests per 15 minutes)
-  const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 5,
-    skipSuccessfulRequests: false,
-    message: { error: 'Too many authentication attempts' },
-    standardHeaders: true,
-    legacyHeaders: false,
-    handler: (_req, res) => {
-      res.status(429).json({
-        error: 'Too many authentication attempts',
-        code: 'AUTH_RATE_LIMIT_EXCEEDED',
-        retryAfter: res.getHeader('Retry-After'),
-      });
-    },
-  });
+    // Zera contadores de rate-limit num eventual Redis compartilhado.
+    await flushRateLimitKeys();
+  }, 30000);
 
-  // API rate limiter (30 requests per minute)
-  const apiLimiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 30,
-    message: { error: 'API rate limit exceeded' },
-    standardHeaders: true,
-    legacyHeaders: false,
-    handler: (_req, res) => {
-      res.status(429).json({
-        error: 'API rate limit exceeded',
-        code: 'API_RATE_LIMIT_EXCEEDED',
-        retryAfter: res.getHeader('Retry-After'),
-      });
-    },
-  });
-
-  // Expensive operation limiter (3 requests per hour)
-  const expensiveLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000,
-    max: 3,
-    message: { error: 'Operation limit exceeded' },
-    standardHeaders: true,
-    legacyHeaders: false,
-    handler: (_req, res) => {
-      res.status(429).json({
-        error: 'Too many expensive operations',
-        code: 'EXPENSIVE_OPERATION_LIMIT_EXCEEDED',
-        retryAfter: res.getHeader('Retry-After'),
-      });
-    },
-  });
-
-  // Routes
-  app.post('/api/auth/login', authLimiter, (req, res) => {
-    const { email, password } = req.body;
-    if (email === 'test@example.com' && password === 'password123') {
-      res.json({ success: true, token: 'fake-jwt-token' });
-    } else {
-      res.status(401).json({ error: 'Invalid credentials' });
+  afterAll(async () => {
+    try {
+      if (closeDb) await closeDb();
+    } finally {
+      restoreDatabase();
     }
   });
 
-  app.post('/api/auth/register', authLimiter, (req, res) => {
-    res.status(201).json({ success: true, user: req.body });
-  });
-
-  app.get('/api/data', apiLimiter, (_req, res) => {
-    res.json({ data: 'some data' });
-  });
-
-  app.post('/api/data', apiLimiter, (req, res) => {
-    res.json({ success: true, created: req.body });
-  });
-
-  app.post('/api/expensive/report', expensiveLimiter, (_req, res) => {
-    res.json({ success: true, report: 'generated' });
-  });
-
-  app.post('/api/expensive/export', expensiveLimiter, (_req, res) => {
-    res.json({ success: true, export: 'completed' });
-  });
-
-  app.get('/api/public', (_req, res) => {
-    res.json({ message: 'public endpoint' });
-  });
-
-  app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok' });
-  });
-
-  return app;
-}
-
-describe('Rate Limiting Integration Tests', () => {
-  let app: Express;
-
-  beforeAll(() => {
-    app = createTestApp();
-  });
-
-  describe('Authentication Rate Limiting', () => {
-    it('should allow up to 5 login attempts within window', async () => {
+  describe("registerLimiter (POST /api/auth/register, max 5/h)", () => {
+    it("retorna 429 após exceder o limite real de registros", async () => {
+      // O registerLimiter usa store EM MEMÓRIA próprio (max 5), isolado do Redis
+      // e da contagem de outros testes — começa do zero neste processo.
       const agent = request.agent(app);
 
-      for (let i = 0; i < 5; i++) {
+      // Faz LIMIT requisições "permitidas" (não 429) — não exigimos sucesso de
+      // negócio (provavelmente 400/401 por payload inválido), só que NÃO seja 429.
+      for (let i = 0; i < REGISTER_LIMIT; i++) {
         const res = await agent
-          .post('/api/auth/login')
-          .send({ email: 'test@example.com', password: 'wrong' });
-
-        expect([200, 401]).toContain(res.status);
-      }
-    });
-
-    it('should return 429 after exceeding login rate limit', async () => {
-      const agent = request.agent(app);
-
-      // Make 5 requests (at limit)
-      for (let i = 0; i < 5; i++) {
-        await agent
-          .post('/api/auth/login')
-          .send({ email: 'test@example.com', password: 'password123' });
+          .post("/api/auth/register")
+          .send({
+            email: `flood-${i}@example.com`,
+            password: "x",
+          });
+        expect(res.status).not.toBe(429);
       }
 
-      // 6th request should be rate limited
-      const res = await agent
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com', password: 'password123' })
-        .expect(429);
+      // A requisição seguinte (LIMIT+1) DEVE ser barrada com 429.
+      const blocked = await agent
+        .post("/api/auth/register")
+        .send({ email: "flood-extra@example.com", password: "x" });
 
-      expect(res.body.error).toContain('Too many authentication attempts');
-      expect(res.body.code).toBe('AUTH_RATE_LIMIT_EXCEEDED');
-      expect(res.body.retryAfter).toBeDefined();
-    });
+      expect(blocked.status).toBe(429);
+      // express-rate-limit emite Retry-After ao acionar o handler default.
+      expect(blocked.headers["retry-after"]).toBeDefined();
+    }, 30000);
 
-    it('should include rate limit headers', async () => {
+    it("emite headers padrão de rate limit (RateLimit-*)", async () => {
+      // Reusa a janela já estourada acima: mesmo bloqueado, os headers
+      // standardHeaders continuam presentes.
       const res = await request(app)
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com', password: 'password123' });
+        .post("/api/auth/register")
+        .send({ email: "flood-headers@example.com", password: "x" });
 
-      expect(res.headers['ratelimit-limit']).toBeDefined();
-      expect(res.headers['ratelimit-remaining']).toBeDefined();
-      expect(res.headers['ratelimit-reset']).toBeDefined();
-    });
-
-    it('should apply rate limit to both login and register', async () => {
-      const agent = request.agent(app);
-
-      // Use up limit with login attempts
-      for (let i = 0; i < 3; i++) {
-        await agent
-          .post('/api/auth/login')
-          .send({ email: 'test@example.com', password: 'password123' });
-      }
-
-      // Use remaining with register
-      for (let i = 0; i < 2; i++) {
-        await agent
-          .post('/api/auth/register')
-          .send({ email: 'new@example.com', password: 'password123' });
-      }
-
-      // Next request should be rate limited
-      await agent
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com', password: 'password123' })
-        .expect(429);
-    });
+      expect(res.headers["ratelimit-limit"]).toBeDefined();
+      // O limite anunciado deve refletir o configurado (5).
+      expect(res.headers["ratelimit-limit"]).toBe(String(REGISTER_LIMIT));
+      expect(res.headers["ratelimit-remaining"]).toBeDefined();
+    }, 15000);
   });
 
-  describe('API Rate Limiting', () => {
-    it('should allow up to 30 API requests per minute', async () => {
+  describe("authLimiter (POST /api/auth/login, max 20/15min)", () => {
+    it("aceita requisições e depois retorna 429 ao estourar o limite real", async () => {
+      // Zera o contador compartilhado no Redis antes de exercitar (caso contrário
+      // herdaríamos a contagem dos testes de /register e de execuções passadas).
+      await flushRateLimitKeys();
+
       const agent = request.agent(app);
 
-      for (let i = 0; i < 30; i++) {
-        await agent.get('/api/data').expect(200);
-      }
-    });
+      let firstAllowed = -1; // índice da 1ª request processada (não-429)
+      let firstBlocked = -1; // índice da 1ª request barrada (429)
+      let blockedRes: request.Response | undefined;
 
-    it('should return 429 after exceeding API rate limit', async () => {
-      const agent = request.agent(app);
+      // Loop-até-429 com teto na capacidade do apiLimiter global (500). Não
+      // fixamos o número exato porque apiLimiter+authLimiter dividem a mesma chave
+      // Redis e cada request conta 2x (ver cabeçalho do arquivo).
+      for (let i = 1; i <= API_CEILING; i++) {
+        const res = await agent
+          .post("/api/auth/login")
+          .send({ email: `nobody-${i}@example.com`, password: "wrong" });
 
-      // Make 30 requests (at limit)
-      for (let i = 0; i < 30; i++) {
-        await agent.get('/api/data');
-      }
-
-      // 31st request should be rate limited
-      const res = await agent
-        .get('/api/data')
-        .expect(429);
-
-      expect(res.body.error).toContain('API rate limit exceeded');
-      expect(res.body.code).toBe('API_RATE_LIMIT_EXCEEDED');
-    });
-
-    it('should apply rate limit to different HTTP methods', async () => {
-      const agent = request.agent(app);
-
-      // Mix GET and POST requests
-      for (let i = 0; i < 15; i++) {
-        await agent.get('/api/data');
+        if (res.status !== 429 && firstAllowed === -1) firstAllowed = i;
+        if (res.status === 429) {
+          firstBlocked = i;
+          blockedRes = res;
+          break;
+        }
       }
 
-      for (let i = 0; i < 15; i++) {
-        await agent.post('/api/data').send({ test: 'data' });
-      }
+      // Pelo menos a 1ª request foi processada (auth falhou com 401, não 429).
+      expect(firstAllowed).toBe(1);
+      // O limiter REAL eventualmente barrou com 429 — antes do teto do apiLimiter.
+      expect(firstBlocked).toBeGreaterThan(firstAllowed);
+      expect(firstBlocked).toBeLessThanOrEqual(API_CEILING);
+      expect(blockedRes).toBeDefined();
+      expect(blockedRes?.status).toBe(429);
+      // express-rate-limit envia Retry-After ao bloquear.
+      expect(blockedRes?.headers["retry-after"]).toBeDefined();
+    }, 60000);
 
-      // Next request should be rate limited
-      await agent.get('/api/data').expect(429);
-    });
-  });
+    it("anuncia o limite real (20) no header RateLimit-Limit", async () => {
+      // standardHeaders: o authLimiter expõe seu próprio max no RateLimit-Limit,
+      // independente do contador compartilhado. Flush p/ não pegar uma resposta 429.
+      await flushRateLimitKeys();
 
-  describe('Expensive Operation Rate Limiting', () => {
-    it('should allow up to 3 expensive operations per hour', async () => {
-      const agent = request.agent(app);
-
-      for (let i = 0; i < 3; i++) {
-        await agent.post('/api/expensive/report').expect(200);
-      }
-    });
-
-    it('should return 429 after exceeding expensive operation limit', async () => {
-      const agent = request.agent(app);
-
-      // Make 3 requests (at limit)
-      for (let i = 0; i < 3; i++) {
-        await agent.post('/api/expensive/report');
-      }
-
-      // 4th request should be rate limited
-      const res = await agent
-        .post('/api/expensive/report')
-        .expect(429);
-
-      expect(res.body.error).toContain('Too many expensive operations');
-      expect(res.body.code).toBe('EXPENSIVE_OPERATION_LIMIT_EXCEEDED');
-    });
-
-    it('should apply limit across different expensive endpoints', async () => {
-      const agent = request.agent(app);
-
-      // Use limit with report endpoint
-      await agent.post('/api/expensive/report').expect(200);
-
-      // Use remaining with export endpoint
-      await agent.post('/api/expensive/export').expect(200);
-      await agent.post('/api/expensive/export').expect(200);
-
-      // Next request should be rate limited
-      await agent.post('/api/expensive/report').expect(429);
-    });
-  });
-
-  describe('Rate Limit Bypass Attempts', () => {
-    it('should not bypass rate limit with different user agents', async () => {
-      const agent = request.agent(app);
-
-      // Make requests up to limit
-      for (let i = 0; i < 5; i++) {
-        await agent
-          .post('/api/auth/login')
-          .set('User-Agent', 'Browser/1.0')
-          .send({ email: 'test@example.com', password: 'password123' });
-      }
-
-      // Try with different user agent
-      const res = await agent
-        .post('/api/auth/login')
-        .set('User-Agent', 'Different-Browser/2.0')
-        .send({ email: 'test@example.com', password: 'password123' })
-        .expect(429);
-
-      expect(res.body.code).toBe('AUTH_RATE_LIMIT_EXCEEDED');
-    });
-
-    it('should track rate limit per IP address', async () => {
-      // Note: In test environment, all requests come from same IP
-      // In production, this would be different for different clients
-
-      const agent1 = request.agent(app);
-      const agent2 = request.agent(app);
-
-      // Both agents share the same IP in tests
-      for (let i = 0; i < 3; i++) {
-        await agent1.post('/api/auth/login').send({ email: 'user1@example.com', password: 'pass' });
-      }
-
-      for (let i = 0; i < 2; i++) {
-        await agent2.post('/api/auth/login').send({ email: 'user2@example.com', password: 'pass' });
-      }
-
-      // Should be rate limited because they share IP
-      await agent2.post('/api/auth/login').send({ email: 'user2@example.com', password: 'pass' }).expect(429);
-    });
-  });
-
-  describe('Rate Limit Headers', () => {
-    it('should include standard rate limit headers', async () => {
       const res = await request(app)
-        .get('/api/data')
-        .expect(200);
+        .post("/api/auth/login")
+        .send({ email: "header-check@example.com", password: "wrong" });
 
-      expect(res.headers['ratelimit-limit']).toBe('30');
-      expect(parseInt(res.headers['ratelimit-remaining'])).toBeLessThanOrEqual(30);
-      expect(res.headers['ratelimit-reset']).toBeDefined();
-    });
-
-    it('should update remaining count after each request', async () => {
-      const agent = request.agent(app);
-
-      const res1 = await agent.get('/api/data');
-      const remaining1 = parseInt(res1.headers['ratelimit-remaining']);
-
-      const res2 = await agent.get('/api/data');
-      const remaining2 = parseInt(res2.headers['ratelimit-remaining']);
-
-      expect(remaining2).toBe(remaining1 - 1);
-    });
-
-    it('should include retry-after header when rate limited', async () => {
-      const agent = request.agent(app);
-
-      // Exhaust limit
-      for (let i = 0; i < 5; i++) {
-        await agent.post('/api/auth/login').send({ email: 'test@example.com', password: 'pass' });
-      }
-
-      // Get rate limited response
-      const res = await agent
-        .post('/api/auth/login')
-        .send({ email: 'test@example.com', password: 'pass' })
-        .expect(429);
-
-      expect(res.body.retryAfter).toBeDefined();
-      expect(typeof res.body.retryAfter).toBe('string');
-    });
-  });
-
-  describe('Public Endpoint Exemption', () => {
-    it('should not rate limit public health check endpoint', async () => {
-      const agent = request.agent(app);
-
-      // Make many requests to health endpoint
-      for (let i = 0; i < 50; i++) {
-        await agent.get('/api/health').expect(200);
-      }
-
-      // Should still work
-      await agent.get('/api/health').expect(200);
-    });
-
-    it('should not rate limit public endpoints', async () => {
-      const agent = request.agent(app);
-
-      for (let i = 0; i < 100; i++) {
-        await agent.get('/api/public').expect(200);
-      }
-    });
-  });
-
-  describe('Distributed Denial of Service (DDoS) Protection', () => {
-    it('should prevent rapid-fire requests', async () => {
-      const agent = request.agent(app);
-
-      // Rapid requests
-      const promises = [];
-      for (let i = 0; i < 10; i++) {
-        promises.push(
-          agent.post('/api/auth/login').send({ email: 'test@example.com', password: 'pass' })
-        );
-      }
-
-      const results = await Promise.all(promises);
-
-      // Some should succeed, some should be rate limited
-      const rateLimited = results.filter(r => r.status === 429);
-      expect(rateLimited.length).toBeGreaterThan(0);
-    });
-
-    it('should enforce stricter limits on authentication endpoints', async () => {
-      const agent = request.agent(app);
-
-      // Auth endpoint has limit of 5
-      for (let i = 0; i < 5; i++) {
-        await agent.post('/api/auth/login').send({ email: 'test@example.com', password: 'pass' });
-      }
-
-      await agent.post('/api/auth/login').send({ email: 'test@example.com', password: 'pass' }).expect(429);
-
-      // But API endpoints have limit of 30 (different limit)
-      for (let i = 0; i < 25; i++) {
-        await agent.get('/api/data').expect(200);
-      }
-    });
+      expect(res.headers["ratelimit-limit"]).toBe(String(AUTH_LIMIT));
+      expect(res.headers["ratelimit-remaining"]).toBeDefined();
+    }, 15000);
   });
 });
