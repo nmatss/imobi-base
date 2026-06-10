@@ -19,7 +19,13 @@ import {
   ArrowUpRight,
   Clock,
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -36,6 +42,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { FeatureUpgradeState } from "@/components/FeatureUpgradeState";
+import { fetchPlanGatedJson, isPlanBlockedError } from "@/lib/plan-blocked";
 
 // ==================== TYPES ====================
 
@@ -98,15 +106,25 @@ interface FaqItem {
   answer: string;
 }
 
+const ISA_UPGRADE_BENEFITS = [
+  {
+    title: "Atendimento virtual",
+    description: "Respostas automatizadas para leads via WhatsApp.",
+  },
+  {
+    title: "Qualificacao BANT",
+    description: "Priorizacao por temperatura e dados de interesse.",
+  },
+  {
+    title: "Transferencia assistida",
+    description: "Encaminhamento para o time comercial no momento certo.",
+  },
+];
+
 // ==================== API HELPERS ====================
 
 async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, { credentials: "include", ...options });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: "Erro desconhecido" }));
-    throw new Error(err.error || `HTTP ${res.status}`);
-  }
-  return res.json();
+  return fetchPlanGatedJson<T>(url, options);
 }
 
 // ==================== COMPONENTS ====================
@@ -114,44 +132,82 @@ async function fetchApi<T>(url: string, options?: RequestInit): Promise<T> {
 function TemperatureBadge({ temperature }: { temperature: string | null }) {
   switch (temperature) {
     case "hot":
-      return <Badge variant="destructive" className="gap-1"><Flame className="h-3 w-3" /> Quente</Badge>;
+      return (
+        <Badge variant="destructive" className="gap-1">
+          <Flame className="h-3 w-3" /> Quente
+        </Badge>
+      );
     case "warm":
-      return <Badge variant="default" className="gap-1 bg-orange-500"><Thermometer className="h-3 w-3" /> Morno</Badge>;
+      return (
+        <Badge variant="default" className="gap-1 bg-orange-500">
+          <Thermometer className="h-3 w-3" /> Morno
+        </Badge>
+      );
     case "cold":
-      return <Badge variant="secondary" className="gap-1"><Snowflake className="h-3 w-3" /> Frio</Badge>;
+      return (
+        <Badge variant="secondary" className="gap-1">
+          <Snowflake className="h-3 w-3" /> Frio
+        </Badge>
+      );
     default:
-      return <Badge variant="outline" className="gap-1">Desconhecido</Badge>;
+      return (
+        <Badge variant="outline" className="gap-1">
+          Desconhecido
+        </Badge>
+      );
   }
 }
 
 function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, { label: string; className: string }> = {
-    active: { label: "Ativo", className: "bg-green-100 text-green-700 border-green-200" },
-    qualified: { label: "Qualificado", className: "bg-blue-100 text-blue-700 border-blue-200" },
-    transferred: { label: "Transferido", className: "bg-purple-100 text-purple-700 border-purple-200" },
-    closed: { label: "Fechado", className: "bg-gray-100 text-gray-700 border-gray-200" },
+    active: {
+      label: "Ativo",
+      className: "bg-green-100 text-green-700 border-green-200",
+    },
+    qualified: {
+      label: "Qualificado",
+      className: "bg-blue-100 text-blue-700 border-blue-200",
+    },
+    transferred: {
+      label: "Transferido",
+      className: "bg-purple-100 text-purple-700 border-purple-200",
+    },
+    closed: {
+      label: "Fechado",
+      className: "bg-gray-100 text-gray-700 border-gray-200",
+    },
   };
   const v = variants[status] || { label: status, className: "" };
-  return <Badge variant="outline" className={v.className}>{v.label}</Badge>;
+  return (
+    <Badge variant="outline" className={v.className}>
+      {v.label}
+    </Badge>
+  );
 }
 
 // ==================== DASHBOARD TAB ====================
 
-function DashboardTab() {
+function DashboardTab({ onPlanBlocked }: { onPlanBlocked: () => void }) {
   const [stats, setStats] = useState<IsaStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchApi<IsaStats>("/api/isa/stats")
       .then(setStats)
-      .catch(() => toast.error("Erro ao carregar estatisticas"))
+      .catch((error) => {
+        if (isPlanBlockedError(error)) {
+          onPlanBlocked();
+          return;
+        }
+        toast.error("Erro ao carregar estatisticas");
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [onPlanBlocked]);
 
   if (loading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[1, 2, 3, 4].map(i => (
+        {[1, 2, 3, 4].map((i) => (
           <Card key={i} className="animate-pulse">
             <CardContent className="pt-6">
               <div className="h-8 bg-muted rounded w-16 mb-2" />
@@ -166,10 +222,30 @@ function DashboardTab() {
   if (!stats) return null;
 
   const cards = [
-    { label: "Total de Conversas", value: stats.total, icon: MessageSquare, color: "text-blue-600" },
-    { label: "Leads Qualificados", value: stats.qualified + stats.transferred, icon: Users, color: "text-green-600" },
-    { label: "Visitas Agendadas", value: stats.visitsScheduled, icon: Calendar, color: "text-purple-600" },
-    { label: "Taxa de Conversao", value: `${stats.conversionRate}%`, icon: ArrowUpRight, color: "text-orange-600" },
+    {
+      label: "Total de Conversas",
+      value: stats.total,
+      icon: MessageSquare,
+      color: "text-blue-600",
+    },
+    {
+      label: "Leads Qualificados",
+      value: stats.qualified + stats.transferred,
+      icon: Users,
+      color: "text-green-600",
+    },
+    {
+      label: "Visitas Agendadas",
+      value: stats.visitsScheduled,
+      icon: Calendar,
+      color: "text-purple-600",
+    },
+    {
+      label: "Taxa de Conversao",
+      value: `${stats.conversionRate}%`,
+      icon: ArrowUpRight,
+      color: "text-orange-600",
+    },
   ];
 
   return (
@@ -193,7 +269,9 @@ function DashboardTab() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Leads Quentes</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Leads Quentes
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
@@ -204,7 +282,9 @@ function DashboardTab() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Leads Mornos</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Leads Mornos
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
@@ -215,7 +295,9 @@ function DashboardTab() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Leads Frios</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Leads Frios
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
@@ -233,15 +315,21 @@ function DashboardTab() {
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-4 rounded-lg bg-green-50 border border-green-100">
-              <p className="text-2xl font-bold text-green-700">{stats.active}</p>
+              <p className="text-2xl font-bold text-green-700">
+                {stats.active}
+              </p>
               <p className="text-sm text-green-600">Ativas</p>
             </div>
             <div className="text-center p-4 rounded-lg bg-blue-50 border border-blue-100">
-              <p className="text-2xl font-bold text-blue-700">{stats.qualified}</p>
+              <p className="text-2xl font-bold text-blue-700">
+                {stats.qualified}
+              </p>
               <p className="text-sm text-blue-600">Qualificadas</p>
             </div>
             <div className="text-center p-4 rounded-lg bg-purple-50 border border-purple-100">
-              <p className="text-2xl font-bold text-purple-700">{stats.transferred}</p>
+              <p className="text-2xl font-bold text-purple-700">
+                {stats.transferred}
+              </p>
               <p className="text-sm text-purple-600">Transferidas</p>
             </div>
             <div className="text-center p-4 rounded-lg bg-gray-50 border border-gray-100">
@@ -257,9 +345,10 @@ function DashboardTab() {
 
 // ==================== CONVERSATIONS TAB ====================
 
-function ConversationsTab() {
+function ConversationsTab({ onPlanBlocked }: { onPlanBlocked: () => void }) {
   const [conversations, setConversations] = useState<IsaConversation[]>([]);
-  const [selectedConversation, setSelectedConversation] = useState<IsaConversation | null>(null);
+  const [selectedConversation, setSelectedConversation] =
+    useState<IsaConversation | null>(null);
   const [messages, setMessages] = useState<IsaMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
@@ -270,23 +359,38 @@ function ConversationsTab() {
     const params = filter !== "all" ? `?status=${filter}` : "";
     fetchApi<IsaConversation[]>(`/api/isa/conversations${params}`)
       .then(setConversations)
-      .catch(() => toast.error("Erro ao carregar conversas"))
+      .catch((error) => {
+        if (isPlanBlockedError(error)) {
+          onPlanBlocked();
+          return;
+        }
+        toast.error("Erro ao carregar conversas");
+      })
       .finally(() => setLoading(false));
-  }, [filter]);
+  }, [filter, onPlanBlocked]);
 
   useEffect(() => {
     loadConversations();
   }, [loadConversations]);
 
-  const loadMessages = useCallback(async (conv: IsaConversation) => {
-    setSelectedConversation(conv);
-    try {
-      const state = await fetchApi<{ messages: IsaMessage[] }>(`/api/isa/conversations/${conv.id}`);
-      setMessages(state.messages || []);
-    } catch {
-      toast.error("Erro ao carregar mensagens");
-    }
-  }, []);
+  const loadMessages = useCallback(
+    async (conv: IsaConversation) => {
+      setSelectedConversation(conv);
+      try {
+        const state = await fetchApi<{ messages: IsaMessage[] }>(
+          `/api/isa/conversations/${conv.id}`,
+        );
+        setMessages(state.messages || []);
+      } catch (error) {
+        if (isPlanBlockedError(error)) {
+          onPlanBlocked();
+          return;
+        }
+        toast.error("Erro ao carregar mensagens");
+      }
+    },
+    [onPlanBlocked],
+  );
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -294,22 +398,38 @@ function ConversationsTab() {
 
   const handleTransfer = async (id: string) => {
     try {
-      await fetchApi(`/api/isa/conversations/${id}/transfer`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      await fetchApi(`/api/isa/conversations/${id}/transfer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
       toast.success("Conversa transferida com sucesso");
       loadConversations();
       setSelectedConversation(null);
-    } catch {
+    } catch (error) {
+      if (isPlanBlockedError(error)) {
+        onPlanBlocked();
+        return;
+      }
       toast.error("Erro ao transferir conversa");
     }
   };
 
   const handleClose = async (id: string) => {
     try {
-      await fetchApi(`/api/isa/conversations/${id}/close`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      await fetchApi(`/api/isa/conversations/${id}/close`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
       toast.success("Conversa fechada com sucesso");
       loadConversations();
       setSelectedConversation(null);
-    } catch {
+    } catch (error) {
+      if (isPlanBlockedError(error)) {
+        onPlanBlocked();
+        return;
+      }
       toast.error("Erro ao fechar conversa");
     }
   };
@@ -341,11 +461,15 @@ function ConversationsTab() {
         <CardContent className="flex-1 overflow-hidden p-0">
           <ScrollArea className="h-full">
             {loading ? (
-              <div className="p-4 text-center text-muted-foreground text-sm">Carregando...</div>
+              <div className="p-4 text-center text-muted-foreground text-sm">
+                Carregando...
+              </div>
             ) : conversations.length === 0 ? (
-              <div className="p-4 text-center text-muted-foreground text-sm">Nenhuma conversa encontrada</div>
+              <div className="p-4 text-center text-muted-foreground text-sm">
+                Nenhuma conversa encontrada
+              </div>
             ) : (
-              conversations.map(conv => (
+              conversations.map((conv) => (
                 <button
                   key={conv.id}
                   onClick={() => loadMessages(conv)}
@@ -369,7 +493,12 @@ function ConversationsTab() {
                   {conv.lastMessageAt && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                       <Clock className="h-3 w-3" />
-                      {new Date(conv.lastMessageAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                      {new Date(conv.lastMessageAt).toLocaleString("pt-BR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </div>
                   )}
                 </button>
@@ -387,12 +516,15 @@ function ConversationsTab() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-base">
-                    {selectedConversation.leadName || selectedConversation.phoneNumber}
+                    {selectedConversation.leadName ||
+                      selectedConversation.phoneNumber}
                   </CardTitle>
                   <CardDescription className="flex items-center gap-2 mt-1">
-                    <Phone className="h-3 w-3" /> {selectedConversation.phoneNumber}
+                    <Phone className="h-3 w-3" />{" "}
+                    {selectedConversation.phoneNumber}
                     <span className="mx-1">|</span>
-                    Etapa: {selectedConversation.conversationStage || "greeting"}
+                    Etapa:{" "}
+                    {selectedConversation.conversationStage || "greeting"}
                     {selectedConversation.messageCount && (
                       <>
                         <span className="mx-1">|</span>
@@ -404,10 +536,18 @@ function ConversationsTab() {
                 <div className="flex gap-2">
                   {selectedConversation.status === "active" && (
                     <>
-                      <Button size="sm" variant="outline" onClick={() => handleTransfer(selectedConversation.id)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleTransfer(selectedConversation.id)}
+                      >
                         <ArrowRight className="h-4 w-4 mr-1" /> Transferir
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleClose(selectedConversation.id)}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleClose(selectedConversation.id)}
+                      >
                         <X className="h-4 w-4 mr-1" /> Fechar
                       </Button>
                     </>
@@ -415,20 +555,31 @@ function ConversationsTab() {
                 </div>
               </div>
               <div className="flex gap-2 mt-2">
-                <TemperatureBadge temperature={selectedConversation.temperature} />
+                <TemperatureBadge
+                  temperature={selectedConversation.temperature}
+                />
                 <StatusBadge status={selectedConversation.status} />
-                {selectedConversation.qualificationData && (() => {
-                  try {
-                    const qd = JSON.parse(selectedConversation.qualificationData);
-                    return <Badge variant="outline">Score: {qd.score || 0}/100</Badge>;
-                  } catch { return null; }
-                })()}
+                {selectedConversation.qualificationData &&
+                  (() => {
+                    try {
+                      const qd = JSON.parse(
+                        selectedConversation.qualificationData,
+                      );
+                      return (
+                        <Badge variant="outline">
+                          Score: {qd.score || 0}/100
+                        </Badge>
+                      );
+                    } catch {
+                      return null;
+                    }
+                  })()}
               </div>
             </CardHeader>
             <CardContent className="flex-1 overflow-hidden p-0">
               <ScrollArea className="h-full p-4">
                 <div className="space-y-3">
-                  {messages.map(msg => (
+                  {messages.map((msg) => (
                     <div
                       key={msg.id}
                       className={`flex ${msg.direction === "outbound" ? "justify-start" : "justify-end"}`}
@@ -450,7 +601,10 @@ function ConversationsTab() {
                             {msg.direction === "outbound" ? "ISA" : "Lead"}
                           </span>
                           <span className="text-[10px] opacity-50 ml-auto">
-                            {new Date(msg.sentAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                            {new Date(msg.sentAt).toLocaleTimeString("pt-BR", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
                           </span>
                         </div>
                         {msg.content}
@@ -477,29 +631,49 @@ function ConversationsTab() {
 
 // ==================== SETTINGS TAB ====================
 
-function SettingsTab() {
+function SettingsTab({ onPlanBlocked }: { onPlanBlocked: () => void }) {
   const [settings, setSettings] = useState<IsaSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [faqs, setFaqs] = useState<FaqItem[]>([]);
-  const [workingHours, setWorkingHours] = useState({ start: "08:00", end: "20:00", days: [1, 2, 3, 4, 5] });
+  const [workingHours, setWorkingHours] = useState({
+    start: "08:00",
+    end: "20:00",
+    days: [1, 2, 3, 4, 5],
+  });
 
   useEffect(() => {
     fetchApi<IsaSettings>("/api/isa/settings")
-      .then(s => {
+      .then((s) => {
         setSettings(s);
         try {
-          const wh = typeof s.workingHours === "string" ? JSON.parse(s.workingHours) : s.workingHours;
+          const wh =
+            typeof s.workingHours === "string"
+              ? JSON.parse(s.workingHours)
+              : s.workingHours;
           if (wh) setWorkingHours(wh);
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
         try {
-          const fq = typeof s.faqResponses === "string" ? JSON.parse(s.faqResponses) : s.faqResponses;
+          const fq =
+            typeof s.faqResponses === "string"
+              ? JSON.parse(s.faqResponses)
+              : s.faqResponses;
           if (Array.isArray(fq)) setFaqs(fq);
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       })
-      .catch(() => toast.error("Erro ao carregar configuracoes"))
+      .catch((error) => {
+        if (isPlanBlockedError(error)) {
+          onPlanBlocked();
+          return;
+        }
+        toast.error("Erro ao carregar configuracoes");
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [onPlanBlocked]);
 
   const handleSave = async () => {
     if (!settings) return;
@@ -516,7 +690,11 @@ function SettingsTab() {
       });
       setSettings(updated);
       toast.success("Configuracoes salvas com sucesso!");
-    } catch {
+    } catch (error) {
+      if (isPlanBlockedError(error)) {
+        onPlanBlocked();
+        return;
+      }
       toast.error("Erro ao salvar configuracoes");
     } finally {
       setSaving(false);
@@ -531,22 +709,31 @@ function SettingsTab() {
     setFaqs(faqs.filter((_, i) => i !== index));
   };
 
-  const updateFaq = (index: number, field: "question" | "answer", value: string) => {
+  const updateFaq = (
+    index: number,
+    field: "question" | "answer",
+    value: string,
+  ) => {
     const updated = [...faqs];
     updated[index][field] = value;
     setFaqs(updated);
   };
 
   const toggleDay = (day: number) => {
-    setWorkingHours(prev => ({
+    setWorkingHours((prev) => ({
       ...prev,
       days: prev.days.includes(day)
-        ? prev.days.filter(d => d !== day)
+        ? prev.days.filter((d) => d !== day)
         : [...prev.days, day].sort(),
     }));
   };
 
-  if (loading) return <div className="text-center text-muted-foreground py-8">Carregando...</div>;
+  if (loading)
+    return (
+      <div className="text-center text-muted-foreground py-8">
+        Carregando...
+      </div>
+    );
   if (!settings) return null;
 
   const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
@@ -560,7 +747,9 @@ function SettingsTab() {
             <Bot className="h-5 w-5" />
             ISA Virtual
           </CardTitle>
-          <CardDescription>Ative ou desative a assistente virtual</CardDescription>
+          <CardDescription>
+            Ative ou desative a assistente virtual
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between">
@@ -568,7 +757,9 @@ function SettingsTab() {
             <Switch
               id="isa-enabled"
               checked={settings.enabled}
-              onCheckedChange={(checked) => setSettings({ ...settings, enabled: checked })}
+              onCheckedChange={(checked) =>
+                setSettings({ ...settings, enabled: checked })
+              }
             />
           </div>
         </CardContent>
@@ -578,12 +769,17 @@ function SettingsTab() {
       <Card>
         <CardHeader>
           <CardTitle>Mensagem de Boas-Vindas</CardTitle>
-          <CardDescription>Personalize a saudacao inicial. Use {"{companyName}"} para inserir o nome da empresa.</CardDescription>
+          <CardDescription>
+            Personalize a saudacao inicial. Use {"{companyName}"} para inserir o
+            nome da empresa.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Textarea
             value={settings.greeting}
-            onChange={(e) => setSettings({ ...settings, greeting: e.target.value })}
+            onChange={(e) =>
+              setSettings({ ...settings, greeting: e.target.value })
+            }
             rows={3}
             placeholder="Ola! Sou a assistente virtual..."
           />
@@ -591,7 +787,9 @@ function SettingsTab() {
             <Label>Personalidade</Label>
             <Select
               value={settings.personality}
-              onValueChange={(value) => setSettings({ ...settings, personality: value })}
+              onValueChange={(value) =>
+                setSettings({ ...settings, personality: value })
+              }
             >
               <SelectTrigger className="mt-1">
                 <SelectValue />
@@ -619,7 +817,9 @@ function SettingsTab() {
               <Input
                 type="time"
                 value={workingHours.start}
-                onChange={(e) => setWorkingHours({ ...workingHours, start: e.target.value })}
+                onChange={(e) =>
+                  setWorkingHours({ ...workingHours, start: e.target.value })
+                }
                 className="mt-1"
               />
             </div>
@@ -628,7 +828,9 @@ function SettingsTab() {
               <Input
                 type="time"
                 value={workingHours.end}
-                onChange={(e) => setWorkingHours({ ...workingHours, end: e.target.value })}
+                onChange={(e) =>
+                  setWorkingHours({ ...workingHours, end: e.target.value })
+                }
                 className="mt-1"
               />
             </div>
@@ -639,7 +841,9 @@ function SettingsTab() {
               {dayNames.map((name, i) => (
                 <Button
                   key={i}
-                  variant={workingHours.days.includes(i) ? "default" : "outline"}
+                  variant={
+                    workingHours.days.includes(i) ? "default" : "outline"
+                  }
                   size="sm"
                   onClick={() => toggleDay(i)}
                   className="w-10 h-10 p-0"
@@ -656,40 +860,57 @@ function SettingsTab() {
       <Card>
         <CardHeader>
           <CardTitle>Qualificacao</CardTitle>
-          <CardDescription>Configure o comportamento de qualificacao de leads</CardDescription>
+          <CardDescription>
+            Configure o comportamento de qualificacao de leads
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <Label>Qualificacao automatica (BANT)</Label>
-              <p className="text-xs text-muted-foreground">Qualifica automaticamente usando Budget, Authority, Need, Timeline</p>
+              <p className="text-xs text-muted-foreground">
+                Qualifica automaticamente usando Budget, Authority, Need,
+                Timeline
+              </p>
             </div>
             <Switch
               checked={settings.autoQualify}
-              onCheckedChange={(checked) => setSettings({ ...settings, autoQualify: checked })}
+              onCheckedChange={(checked) =>
+                setSettings({ ...settings, autoQualify: checked })
+              }
             />
           </div>
           <div className="flex items-center justify-between">
             <div>
               <Label>Agendar visitas automaticamente</Label>
-              <p className="text-xs text-muted-foreground">Agenda visitas para leads quentes automaticamente</p>
+              <p className="text-xs text-muted-foreground">
+                Agenda visitas para leads quentes automaticamente
+              </p>
             </div>
             <Switch
               checked={settings.autoScheduleVisits}
-              onCheckedChange={(checked) => setSettings({ ...settings, autoScheduleVisits: checked })}
+              onCheckedChange={(checked) =>
+                setSettings({ ...settings, autoScheduleVisits: checked })
+              }
             />
           </div>
           <div>
             <Label>Limite de mensagens para transferir</Label>
             <p className="text-xs text-muted-foreground mb-1">
-              Apos esse numero de mensagens, a conversa e transferida para um humano
+              Apos esse numero de mensagens, a conversa e transferida para um
+              humano
             </p>
             <Input
               type="number"
               min={5}
               max={50}
               value={settings.transferToHumanThreshold}
-              onChange={(e) => setSettings({ ...settings, transferToHumanThreshold: parseInt(e.target.value) || 10 })}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  transferToHumanThreshold: parseInt(e.target.value) || 10,
+                })
+              }
               className="w-24"
             />
           </div>
@@ -702,7 +923,9 @@ function SettingsTab() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Perguntas Frequentes</CardTitle>
-              <CardDescription>Adicione respostas personalizadas para perguntas comuns</CardDescription>
+              <CardDescription>
+                Adicione respostas personalizadas para perguntas comuns
+              </CardDescription>
             </div>
             <Button size="sm" variant="outline" onClick={addFaq}>
               <Plus className="h-4 w-4 mr-1" /> Adicionar
@@ -719,7 +942,12 @@ function SettingsTab() {
               <div key={i} className="border rounded-lg p-3 space-y-2">
                 <div className="flex items-start justify-between">
                   <Label className="text-xs">Pergunta {i + 1}</Label>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeFaq(i)}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => removeFaq(i)}
+                  >
                     <Trash2 className="h-3 w-3 text-destructive" />
                   </Button>
                 </div>
@@ -752,9 +980,11 @@ function SettingsTab() {
 
 // ==================== TEST TAB ====================
 
-function TestTab() {
+function TestTab({ onPlanBlocked }: { onPlanBlocked: () => void }) {
   const [testPhone, setTestPhone] = useState(`test_${Date.now()}`);
-  const [messages, setMessages] = useState<Array<{ direction: string; content: string; time: string }>>([]);
+  const [messages, setMessages] = useState<
+    Array<{ direction: string; content: string; time: string }>
+  >([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [conversationInfo, setConversationInfo] = useState<any>(null);
@@ -769,22 +999,45 @@ function TestTab() {
 
     const userMessage = input.trim();
     setInput("");
-    setMessages(prev => [...prev, { direction: "inbound", content: userMessage, time: new Date().toLocaleTimeString("pt-BR") }]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        direction: "inbound",
+        content: userMessage,
+        time: new Date().toLocaleTimeString("pt-BR"),
+      },
+    ]);
 
     setSending(true);
     try {
-      const result = await fetchApi<{ response: string; conversationState: any }>("/api/isa/test", {
+      const result = await fetchApi<{
+        response: string;
+        conversationState: any;
+      }>("/api/isa/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phoneNumber: testPhone, message: userMessage }),
       });
 
       // Simulate typing delay
-      await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
+      await new Promise((resolve) =>
+        setTimeout(resolve, 500 + Math.random() * 1000),
+      );
 
-      setMessages(prev => [...prev, { direction: "outbound", content: result.response, time: new Date().toLocaleTimeString("pt-BR") }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          direction: "outbound",
+          content: result.response,
+          time: new Date().toLocaleTimeString("pt-BR"),
+        },
+      ]);
       setConversationInfo(result.conversationState);
-    } catch {
+    } catch (error) {
+      if (isPlanBlockedError(error)) {
+        onPlanBlocked();
+        return;
+      }
       toast.error("Erro ao enviar mensagem de teste");
     } finally {
       setSending(false);
@@ -816,7 +1069,9 @@ function TestTab() {
                 <TestTube className="h-4 w-4" />
                 Simulador de Chat
               </CardTitle>
-              <CardDescription>Teste as respostas da ISA em tempo real</CardDescription>
+              <CardDescription>
+                Teste as respostas da ISA em tempo real
+              </CardDescription>
             </div>
             <Button size="sm" variant="outline" onClick={handleReset}>
               <RefreshCw className="h-4 w-4 mr-1" /> Nova Conversa
@@ -829,8 +1084,12 @@ function TestTab() {
               {messages.length === 0 && (
                 <div className="text-center text-muted-foreground py-12">
                   <Bot className="h-12 w-12 mx-auto mb-3 opacity-30" />
-                  <p className="text-sm">Envie uma mensagem para testar a ISA</p>
-                  <p className="text-xs mt-1">Tente: "Ola", "Quero comprar um apartamento", etc.</p>
+                  <p className="text-sm">
+                    Envie uma mensagem para testar a ISA
+                  </p>
+                  <p className="text-xs mt-1">
+                    Tente: "Ola", "Quero comprar um apartamento", etc.
+                  </p>
                 </div>
               )}
               {messages.map((msg, i) => (
@@ -851,7 +1110,9 @@ function TestTab() {
                       ) : (
                         <span className="text-[10px]">Voce</span>
                       )}
-                      <span className="text-[10px] opacity-50 ml-auto">{msg.time}</span>
+                      <span className="text-[10px] opacity-50 ml-auto">
+                        {msg.time}
+                      </span>
                     </div>
                     {msg.content}
                   </div>
@@ -865,9 +1126,18 @@ function TestTab() {
                       <span className="text-[10px]">ISA digitando...</span>
                     </div>
                     <div className="flex gap-1 mt-1">
-                      <span className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <span className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <span className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                      <span
+                        className="w-2 h-2 bg-green-400 rounded-full animate-bounce"
+                        style={{ animationDelay: "0ms" }}
+                      />
+                      <span
+                        className="w-2 h-2 bg-green-400 rounded-full animate-bounce"
+                        style={{ animationDelay: "150ms" }}
+                      />
+                      <span
+                        className="w-2 h-2 bg-green-400 rounded-full animate-bounce"
+                        style={{ animationDelay: "300ms" }}
+                      />
                     </div>
                   </div>
                 </div>
@@ -885,7 +1155,11 @@ function TestTab() {
               disabled={sending}
               className="flex-1"
             />
-            <Button onClick={handleSend} disabled={sending || !input.trim()} size="icon">
+            <Button
+              onClick={handleSend}
+              disabled={sending || !input.trim()}
+              size="icon"
+            >
               <Send className="h-4 w-4" />
             </Button>
           </div>
@@ -895,78 +1169,117 @@ function TestTab() {
       {/* Conversation State */}
       <Card className="flex flex-col">
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Estado da Conversa</CardTitle>
+          <CardTitle className="text-sm font-medium">
+            Estado da Conversa
+          </CardTitle>
         </CardHeader>
         <CardContent className="flex-1 overflow-auto">
           {conversationInfo ? (
             <div className="space-y-3 text-sm">
               <div>
                 <Label className="text-xs text-muted-foreground">Etapa</Label>
-                <p className="font-medium">{conversationInfo.stage || "greeting"}</p>
+                <p className="font-medium">
+                  {conversationInfo.stage || "greeting"}
+                </p>
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Temperatura</Label>
+                <Label className="text-xs text-muted-foreground">
+                  Temperatura
+                </Label>
                 <div className="mt-1">
-                  <TemperatureBadge temperature={conversationInfo.temperature} />
+                  <TemperatureBadge
+                    temperature={conversationInfo.temperature}
+                  />
                 </div>
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Score BANT</Label>
+                <Label className="text-xs text-muted-foreground">
+                  Score BANT
+                </Label>
                 <div className="flex items-center gap-2 mt-1">
                   <div className="flex-1 h-2 bg-muted rounded-full">
                     <div
                       className={`h-full rounded-full transition-all ${
                         (conversationInfo.qualificationData?.score || 0) >= 70
                           ? "bg-red-500"
-                          : (conversationInfo.qualificationData?.score || 0) >= 40
-                          ? "bg-orange-500"
-                          : "bg-blue-400"
+                          : (conversationInfo.qualificationData?.score || 0) >=
+                              40
+                            ? "bg-orange-500"
+                            : "bg-blue-400"
                       }`}
-                      style={{ width: `${conversationInfo.qualificationData?.score || 0}%` }}
+                      style={{
+                        width: `${conversationInfo.qualificationData?.score || 0}%`,
+                      }}
                     />
                   </div>
-                  <span className="font-mono text-xs">{conversationInfo.qualificationData?.score || 0}/100</span>
+                  <span className="font-mono text-xs">
+                    {conversationInfo.qualificationData?.score || 0}/100
+                  </span>
                 </div>
               </div>
               {conversationInfo.qualificationData?.budget && (
                 <div>
-                  <Label className="text-xs text-muted-foreground">Orcamento (B)</Label>
-                  <p className="font-medium">{conversationInfo.qualificationData.budget}</p>
+                  <Label className="text-xs text-muted-foreground">
+                    Orcamento (B)
+                  </Label>
+                  <p className="font-medium">
+                    {conversationInfo.qualificationData.budget}
+                  </p>
                 </div>
               )}
               {conversationInfo.qualificationData?.authority && (
                 <div>
-                  <Label className="text-xs text-muted-foreground">Autoridade (A)</Label>
-                  <p className="font-medium">{conversationInfo.qualificationData.authority}</p>
+                  <Label className="text-xs text-muted-foreground">
+                    Autoridade (A)
+                  </Label>
+                  <p className="font-medium">
+                    {conversationInfo.qualificationData.authority}
+                  </p>
                 </div>
               )}
               {conversationInfo.qualificationData?.need && (
                 <div>
-                  <Label className="text-xs text-muted-foreground">Necessidade (N)</Label>
-                  <p className="font-medium">{conversationInfo.qualificationData.need}</p>
+                  <Label className="text-xs text-muted-foreground">
+                    Necessidade (N)
+                  </Label>
+                  <p className="font-medium">
+                    {conversationInfo.qualificationData.need}
+                  </p>
                 </div>
               )}
               {conversationInfo.qualificationData?.timeline && (
                 <div>
-                  <Label className="text-xs text-muted-foreground">Prazo (T)</Label>
-                  <p className="font-medium">{conversationInfo.qualificationData.timeline}</p>
+                  <Label className="text-xs text-muted-foreground">
+                    Prazo (T)
+                  </Label>
+                  <p className="font-medium">
+                    {conversationInfo.qualificationData.timeline}
+                  </p>
                 </div>
               )}
               <div>
                 <Label className="text-xs text-muted-foreground">Status</Label>
                 <div className="mt-1">
-                  <StatusBadge status={conversationInfo.conversation?.status || "active"} />
+                  <StatusBadge
+                    status={conversationInfo.conversation?.status || "active"}
+                  />
                 </div>
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Mensagens</Label>
-                <p className="font-medium">{conversationInfo.conversation?.messageCount || 0}</p>
+                <Label className="text-xs text-muted-foreground">
+                  Mensagens
+                </Label>
+                <p className="font-medium">
+                  {conversationInfo.conversation?.messageCount || 0}
+                </p>
               </div>
             </div>
           ) : (
             <div className="text-center text-muted-foreground py-8">
               <Settings className="h-8 w-8 mx-auto mb-2 opacity-30" />
-              <p className="text-xs">Envie uma mensagem para ver o estado da conversa</p>
+              <p className="text-xs">
+                Envie uma mensagem para ver o estado da conversa
+              </p>
             </div>
           )}
         </CardContent>
@@ -978,6 +1291,14 @@ function TestTab() {
 // ==================== MAIN PAGE ====================
 
 export default function IsaPage() {
+  const [featureBlocked, setFeatureBlocked] = useState(false);
+  const handlePlanBlocked = useCallback(() => {
+    setFeatureBlocked(true);
+  }, []);
+  const refreshAccess = useCallback(() => {
+    setFeatureBlocked(false);
+  }, []);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -992,42 +1313,51 @@ export default function IsaPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="dashboard" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
-          <TabsTrigger value="dashboard" className="gap-1">
-            <BarChart className="h-4 w-4 hidden sm:inline" />
-            Dashboard
-          </TabsTrigger>
-          <TabsTrigger value="conversations" className="gap-1">
-            <MessageSquare className="h-4 w-4 hidden sm:inline" />
-            Conversas
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="gap-1">
-            <Settings className="h-4 w-4 hidden sm:inline" />
-            Config
-          </TabsTrigger>
-          <TabsTrigger value="test" className="gap-1">
-            <TestTube className="h-4 w-4 hidden sm:inline" />
-            Testar
-          </TabsTrigger>
-        </TabsList>
+      {featureBlocked ? (
+        <FeatureUpgradeState
+          title="ISA Virtual disponivel no plano Profissional"
+          description="Ative a assistente virtual para responder leads, qualificar oportunidades e apoiar o atendimento comercial."
+          benefits={ISA_UPGRADE_BENEFITS}
+          onRefresh={refreshAccess}
+        />
+      ) : (
+        <Tabs defaultValue="dashboard" className="w-full">
+          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+            <TabsTrigger value="dashboard" className="gap-1">
+              <BarChart className="h-4 w-4 hidden sm:inline" />
+              Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="conversations" className="gap-1">
+              <MessageSquare className="h-4 w-4 hidden sm:inline" />
+              Conversas
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="gap-1">
+              <Settings className="h-4 w-4 hidden sm:inline" />
+              Config
+            </TabsTrigger>
+            <TabsTrigger value="test" className="gap-1">
+              <TestTube className="h-4 w-4 hidden sm:inline" />
+              Testar
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="dashboard" className="mt-6">
-          <DashboardTab />
-        </TabsContent>
+          <TabsContent value="dashboard" className="mt-6">
+            <DashboardTab onPlanBlocked={handlePlanBlocked} />
+          </TabsContent>
 
-        <TabsContent value="conversations" className="mt-6">
-          <ConversationsTab />
-        </TabsContent>
+          <TabsContent value="conversations" className="mt-6">
+            <ConversationsTab onPlanBlocked={handlePlanBlocked} />
+          </TabsContent>
 
-        <TabsContent value="settings" className="mt-6">
-          <SettingsTab />
-        </TabsContent>
+          <TabsContent value="settings" className="mt-6">
+            <SettingsTab onPlanBlocked={handlePlanBlocked} />
+          </TabsContent>
 
-        <TabsContent value="test" className="mt-6">
-          <TestTab />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="test" className="mt-6">
+            <TestTab onPlanBlocked={handlePlanBlocked} />
+          </TabsContent>
+        </Tabs>
+      )}
     </div>
   );
 }
@@ -1035,7 +1365,16 @@ export default function IsaPage() {
 // Missing import - using inline
 function BarChart({ className }: { className?: string }) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
       <line x1="12" x2="12" y1="20" y2="10" />
       <line x1="18" x2="18" y1="20" y2="4" />
       <line x1="6" x2="6" y1="20" y2="16" />

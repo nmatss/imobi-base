@@ -156,6 +156,7 @@ export class ErrorBoundary extends Component<Props, State> {
       };
 
       const message = errorMessages[errorType] || errorMessages[ErrorType.UNKNOWN];
+      const showDebugInfo = import.meta.env.VITE_SHOW_ERROR_DEBUG === "true";
 
       return (
         <div className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
@@ -173,7 +174,7 @@ export class ErrorBoundary extends Component<Props, State> {
               )}
             </CardHeader>
             <CardContent className="space-y-4">
-              {import.meta.env.DEV && this.state.error && (
+              {showDebugInfo && this.state.error && (
                 <div className="bg-muted p-4 rounded-lg space-y-2">
                   <div className="flex items-center gap-2 text-destructive font-semibold text-sm">
                     <Bug className="w-4 h-4" />

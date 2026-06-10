@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import InterestForm from "@/components/public/InterestForm";
+import { unwrapList } from "@/lib/api-envelope";
 import {
   MapPin,
   BedDouble,
@@ -158,7 +159,7 @@ export default function PropertyDetails() {
         );
         if (similarRes.ok) {
           const similarData = await similarRes.json();
-          setSimilarProperties(similarData.slice(0, 3));
+          setSimilarProperties(unwrapList<Property>(similarData).slice(0, 3));
         }
       } catch (err) {
         setError("Erro ao carregar dados");

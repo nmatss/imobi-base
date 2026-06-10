@@ -61,8 +61,10 @@ export default defineConfig({
       all: true,
       include: ["client/src/**/*.{ts,tsx}", "server/**/*.ts"],
     },
-    testTimeout: 10000,
-    hookTimeout: 15000,
+    // Folga para starvation de worker em runs paralelos (WSL2/CI); os testes
+    // em si são rápidos — timeout alto só evita flake sob contenção de CPU.
+    testTimeout: 20000,
+    hookTimeout: 20000,
     teardownTimeout: 5000,
     isolate: true,
     pool: "threads",

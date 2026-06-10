@@ -237,18 +237,18 @@ function LoginPage() {
 }
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { user, logout } = useImobi();
+  const { user, loading, logout } = useImobi();
   const [, setLocation] = useLocation();
 
   // Redirect to login if not authenticated (useEffect to avoid setState during render)
   useEffect(() => {
-    if (!user) {
+    if (!loading && !user) {
       setLocation("/login");
     }
-  }, [user, setLocation]);
+  }, [loading, user, setLocation]);
 
   // Show loader while checking auth or redirecting
-  if (!user) {
+  if (loading || !user) {
     return <PageLoader />;
   }
 
@@ -274,20 +274,23 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 }
 
 function SuperAdminRoute({ component: Component }: { component: React.ComponentType }) {
-  const { user } = useImobi();
+  const { user, loading } = useImobi();
   const [, setLocation] = useLocation();
 
   // Redirect to login if not authenticated (useEffect to avoid setState during render)
   useEffect(() => {
+    if (loading) {
+      return;
+    }
     if (!user) {
       setLocation("/login");
     } else if (user.role !== "superadmin") {
       setLocation("/dashboard");
     }
-  }, [user, setLocation]);
+  }, [loading, user, setLocation]);
 
   // Show loader while checking auth or redirecting
-  if (!user || user.role !== "superadmin") {
+  if (loading || !user || user.role !== "superadmin") {
     return <PageLoader />;
   }
 

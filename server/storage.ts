@@ -3726,72 +3726,109 @@ export class DbStorage implements IStorage {
   }
 
   // ==================== INSPECTIONS ====================
+  // GAP CONHECIDO: as tabelas property_inspections/inspection_rooms/
+  // inspection_items ainda não existem em shared/schema*.ts. Leitura de lista
+  // degrada para [] (a página carrega vazia); operações de escrita falham com
+  // mensagem acionável em vez de TypeError opaco. Ver docs/GO_LIVE_CHECKLIST.md.
+  private requireInspectionsTable(
+    name: "propertyInspections" | "inspectionRooms" | "inspectionItems",
+  ) {
+    const table = (schema as any)[name];
+    if (!table) {
+      throw new Error(
+        `Inspections indisponível: tabela "${name}" não existe no schema atual (pendente de port para shared/schema)`,
+      );
+    }
+    return table;
+  }
   async getPropertyInspection(id: string): Promise<PropertyInspection | undefined> {
-    const [i] = await db.select().from((schema as any).propertyInspections).where(eq((schema as any).propertyInspections.id, id));
+    const propertyInspections = this.requireInspectionsTable("propertyInspections");
+    const [i] = await db.select().from(propertyInspections).where(eq(propertyInspections.id, id));
     return i;
   }
   async getPropertyInspectionsByTenant(tenantId: string, filters?: { propertyId?: string; type?: string; status?: string }): Promise<PropertyInspection[]> {
-    const conditions = [eq((schema as any).propertyInspections.tenantId, tenantId)];
-    if (filters?.propertyId) conditions.push(eq((schema as any).propertyInspections.propertyId, filters.propertyId));
-    if (filters?.type) conditions.push(eq((schema as any).propertyInspections.type, filters.type));
-    if (filters?.status) conditions.push(eq((schema as any).propertyInspections.status, filters.status));
-    return db.select().from((schema as any).propertyInspections).where(and(...conditions)).orderBy(desc((schema as any).propertyInspections.createdAt));
+    const propertyInspections = (schema as any).propertyInspections;
+    if (!tenantId || !propertyInspections) {
+      return [];
+    }
+
+    const conditions = [eq(propertyInspections.tenantId, tenantId)];
+    if (filters?.propertyId) conditions.push(eq(propertyInspections.propertyId, filters.propertyId));
+    if (filters?.type) conditions.push(eq(propertyInspections.type, filters.type));
+    if (filters?.status) conditions.push(eq(propertyInspections.status, filters.status));
+    return db.select().from(propertyInspections).where(and(...conditions)).orderBy(desc(propertyInspections.createdAt));
   }
   async createPropertyInspection(inspection: InsertPropertyInspection): Promise<PropertyInspection> {
+    const propertyInspections = this.requireInspectionsTable("propertyInspections");
     const id = generateId();
-    const [created] = await db.insert((schema as any).propertyInspections).values({ ...inspection, id, createdAt: now(), updatedAt: now() }).returning();
+    const [created] = await db.insert(propertyInspections).values({ ...inspection, id, createdAt: now(), updatedAt: now() }).returning();
     return created;
   }
   async updatePropertyInspection(id: string, inspection: Partial<InsertPropertyInspection>): Promise<PropertyInspection | undefined> {
-    const [updated] = await db.update((schema as any).propertyInspections).set({ ...inspection, updatedAt: now() }).where(eq((schema as any).propertyInspections.id, id)).returning();
+    const propertyInspections = this.requireInspectionsTable("propertyInspections");
+    const [updated] = await db.update(propertyInspections).set({ ...inspection, updatedAt: now() }).where(eq(propertyInspections.id, id)).returning();
     return updated;
   }
   async deletePropertyInspection(id: string): Promise<boolean> {
+    const propertyInspections = this.requireInspectionsTable("propertyInspections");
+    const inspectionRooms = this.requireInspectionsTable("inspectionRooms");
+    const inspectionItems = this.requireInspectionsTable("inspectionItems");
     const rooms = await this.getInspectionRoomsByInspection(id);
-    for (const room of rooms) { await db.delete((schema as any).inspectionItems).where(eq((schema as any).inspectionItems.roomId, room.id)); }
-    await db.delete((schema as any).inspectionRooms).where(eq((schema as any).inspectionRooms.inspectionId, id));
-    await db.delete((schema as any).propertyInspections).where(eq((schema as any).propertyInspections.id, id));
+    for (const room of rooms) { await db.delete(inspectionItems).where(eq(inspectionItems.roomId, room.id)); }
+    await db.delete(inspectionRooms).where(eq(inspectionRooms.inspectionId, id));
+    await db.delete(propertyInspections).where(eq(propertyInspections.id, id));
     return true;
   }
   async getInspectionRoomsByInspection(inspectionId: string): Promise<InspectionRoom[]> {
-    return db.select().from((schema as any).inspectionRooms).where(eq((schema as any).inspectionRooms.inspectionId, inspectionId)).orderBy((schema as any).inspectionRooms.order);
+    const inspectionRooms = this.requireInspectionsTable("inspectionRooms");
+    return db.select().from(inspectionRooms).where(eq(inspectionRooms.inspectionId, inspectionId)).orderBy(inspectionRooms.order);
   }
   async getInspectionRoom(id: string): Promise<InspectionRoom | undefined> {
-    const [r] = await db.select().from((schema as any).inspectionRooms).where(eq((schema as any).inspectionRooms.id, id));
+    const inspectionRooms = this.requireInspectionsTable("inspectionRooms");
+    const [r] = await db.select().from(inspectionRooms).where(eq(inspectionRooms.id, id));
     return r;
   }
   async createInspectionRoom(room: InsertInspectionRoom): Promise<InspectionRoom> {
+    const inspectionRooms = this.requireInspectionsTable("inspectionRooms");
     const id = generateId();
-    const [created] = await db.insert((schema as any).inspectionRooms).values({ ...room, id }).returning();
+    const [created] = await db.insert(inspectionRooms).values({ ...room, id }).returning();
     return created;
   }
   async updateInspectionRoom(id: string, room: Partial<InsertInspectionRoom>): Promise<InspectionRoom | undefined> {
-    const [updated] = await db.update((schema as any).inspectionRooms).set(room).where(eq((schema as any).inspectionRooms.id, id)).returning();
+    const inspectionRooms = this.requireInspectionsTable("inspectionRooms");
+    const [updated] = await db.update(inspectionRooms).set(room).where(eq(inspectionRooms.id, id)).returning();
     return updated;
   }
   async deleteInspectionRoom(id: string): Promise<boolean> {
-    await db.delete((schema as any).inspectionItems).where(eq((schema as any).inspectionItems.roomId, id));
-    await db.delete((schema as any).inspectionRooms).where(eq((schema as any).inspectionRooms.id, id));
+    const inspectionRooms = this.requireInspectionsTable("inspectionRooms");
+    const inspectionItems = this.requireInspectionsTable("inspectionItems");
+    await db.delete(inspectionItems).where(eq(inspectionItems.roomId, id));
+    await db.delete(inspectionRooms).where(eq(inspectionRooms.id, id));
     return true;
   }
   async getInspectionItemsByRoom(roomId: string): Promise<InspectionItem[]> {
-    return db.select().from((schema as any).inspectionItems).where(eq((schema as any).inspectionItems.roomId, roomId)).orderBy((schema as any).inspectionItems.order);
+    const inspectionItems = this.requireInspectionsTable("inspectionItems");
+    return db.select().from(inspectionItems).where(eq(inspectionItems.roomId, roomId)).orderBy(inspectionItems.order);
   }
   async getInspectionItem(id: string): Promise<InspectionItem | undefined> {
-    const [i] = await db.select().from((schema as any).inspectionItems).where(eq((schema as any).inspectionItems.id, id));
+    const inspectionItems = this.requireInspectionsTable("inspectionItems");
+    const [i] = await db.select().from(inspectionItems).where(eq(inspectionItems.id, id));
     return i;
   }
   async createInspectionItem(item: InsertInspectionItem): Promise<InspectionItem> {
+    const inspectionItems = this.requireInspectionsTable("inspectionItems");
     const id = generateId();
-    const [created] = await db.insert((schema as any).inspectionItems).values({ ...item, id }).returning();
+    const [created] = await db.insert(inspectionItems).values({ ...item, id }).returning();
     return created;
   }
   async updateInspectionItem(id: string, item: Partial<InsertInspectionItem>): Promise<InspectionItem | undefined> {
-    const [updated] = await db.update((schema as any).inspectionItems).set(item).where(eq((schema as any).inspectionItems.id, id)).returning();
+    const inspectionItems = this.requireInspectionsTable("inspectionItems");
+    const [updated] = await db.update(inspectionItems).set(item).where(eq(inspectionItems.id, id)).returning();
     return updated;
   }
   async deleteInspectionItem(id: string): Promise<boolean> {
-    await db.delete((schema as any).inspectionItems).where(eq((schema as any).inspectionItems.id, id));
+    const inspectionItems = this.requireInspectionsTable("inspectionItems");
+    await db.delete(inspectionItems).where(eq(inspectionItems.id, id));
     return true;
   }
 

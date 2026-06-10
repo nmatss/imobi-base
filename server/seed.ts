@@ -272,6 +272,9 @@ async function seed() {
     console.log("\nLogin credentials:");
     console.log("Tenant 1 (Sol): admin@sol.com / password");
     console.log("Tenant 2 (Nova Casa): admin@novacasa.com / password");
+    console.log("\nPublic sites:");
+    console.log("Tenant 1 (Sol): http://localhost:5000/e/sol");
+    console.log("Tenant 2 (Nova Casa): http://localhost:5000/e/nova-casa");
     
   } catch (error) {
     console.error("❌ Error seeding database:", error);

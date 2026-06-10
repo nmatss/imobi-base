@@ -480,19 +480,21 @@ export async function registerRoutes(
     next();
   });
 
-  // Redis store for rate limiting in production (falls back to in-memory)
-  let rateLimitStore: RedisStore | undefined;
+  // Redis store for rate limiting in production (falls back to in-memory).
+  // express-rate-limit v8 requires a distinct Store instance per limiter.
+  let createRateLimitStore: ((prefix: string) => RedisStore) | undefined;
   try {
     const { getRedisClient } = await import("./cache/redis-client");
     const client = getRedisClient();
     if (client) {
-      rateLimitStore = new RedisStore({
-        sendCommand: (...args: string[]) =>
-          client.call(args[0], ...args.slice(1)) as Promise<
-            boolean | number | string | (boolean | number | string)[]
-          >,
-        prefix: "rl:",
-      });
+      createRateLimitStore = (prefix: string) =>
+        new RedisStore({
+          sendCommand: (...args: string[]) =>
+            client.call(args[0], ...args.slice(1)) as Promise<
+              boolean | number | string | (boolean | number | string)[]
+            >,
+          prefix,
+        });
       console.log("[RateLimit] Using Redis store");
     }
   } catch {
@@ -506,7 +508,7 @@ export async function registerRoutes(
     message: { error: "Muitas requisições. Tente novamente mais tarde." },
     standardHeaders: true,
     legacyHeaders: false,
-    store: rateLimitStore,
+    store: createRateLimitStore?.("rl:api:"),
   });
 
   // Stricter rate limiting for auth routes
@@ -518,7 +520,7 @@ export async function registerRoutes(
     },
     standardHeaders: true,
     legacyHeaders: false,
-    store: rateLimitStore,
+    store: createRateLimitStore?.("rl:auth:"),
   });
 
   // Stricter rate limiting for public routes (lead creation, newsletter)
@@ -528,7 +530,7 @@ export async function registerRoutes(
     message: { error: "Muitas requisições. Tente novamente mais tarde." },
     standardHeaders: true,
     legacyHeaders: false,
-    store: rateLimitStore,
+    store: createRateLimitStore?.("rl:public:"),
   });
 
   // Rate limiter para endpoints administrativos
@@ -539,7 +541,7 @@ export async function registerRoutes(
     keyGenerator: generateRateLimitKey,
     standardHeaders: true,
     legacyHeaders: false,
-    store: rateLimitStore,
+    store: createRateLimitStore?.("rl:admin:"),
   });
 
   // Apply general rate limiting to all API routes
@@ -909,9 +911,13 @@ export async function registerRoutes(
     const showDbDetails = req.query.debug === process.env.HEALTH_DEBUG_TOKEN;
     try {
       const t0 = Date.now();
-      const { db } = await import("./db");
+      const { db, isSqlite } = await import("./db");
       const { sql } = await import("drizzle-orm");
-      await db.execute(sql`SELECT 1`);
+      if (isSqlite) {
+        await db.run(sql`SELECT 1`);
+      } else {
+        await db.execute(sql`SELECT 1`);
+      }
       healthCheck.checks.database = {
         status: "ok",
         latencyMs: Date.now() - t0,

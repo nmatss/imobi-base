@@ -34,21 +34,19 @@ npm run db:seed
 ```
 
 ### 3. Usuários de Teste
-Os testes esperam os seguintes usuários (definidos em `tests/e2e/fixtures/auth.fixture.ts`):
+O smoke E2E atual usa os usuários criados por `npm run db:seed`:
 
 ```typescript
 {
-  user: {
-    email: 'user@test.com',
-    password: 'Test123!'
+  sol: {
+    email: 'admin@sol.com',
+    password: 'password',
+    publicSite: '/e/sol'
   },
-  admin: {
-    email: 'admin@test.com',
-    password: 'Admin123!'
-  },
-  viewer: {
-    email: 'viewer@test.com',
-    password: 'Viewer123!'
+  novaCasa: {
+    email: 'admin@novacasa.com',
+    password: 'password',
+    publicSite: '/e/nova-casa'
   }
 }
 ```

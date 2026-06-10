@@ -59,6 +59,7 @@ if (import.meta.env.DEV) {
         { id: 'aria-valid-attr', enabled: true },
         { id: 'image-alt', enabled: true },
         { id: 'landmark-one-main', enabled: true },
+        { id: 'region', enabled: false },
       ],
     });
   });

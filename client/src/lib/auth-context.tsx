@@ -2,6 +2,7 @@ import React from "react";
 // @ts-nocheck
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { useLocation } from "wouter";
+import { unwrapData } from "@/lib/api-envelope";
 
 // ==================== TYPES ====================
 
@@ -51,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mounted) return;
 
       if (res.ok) {
-        const data = await res.json();
+        const data = unwrapData<{ user: User }>(await res.json());
         if (mounted) {
           setUser(data.user);
         }

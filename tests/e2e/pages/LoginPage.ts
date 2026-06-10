@@ -12,9 +12,9 @@ export class LoginPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.emailInput = page.locator('[data-testid="email-input"]');
-    this.passwordInput = page.locator('[data-testid="password-input"]');
-    this.loginButton = page.locator('[data-testid="login-button"]');
+    this.emailInput = page.locator('[data-testid="input-email"]');
+    this.passwordInput = page.locator('[data-testid="input-password"]');
+    this.loginButton = page.locator('[data-testid="button-login"]');
     this.forgotPasswordLink = page.locator('[data-testid="forgot-password-link"]');
     this.errorMessage = page.locator('[data-testid="error-message"]');
     this.googleLoginButton = page.locator('[data-testid="google-login-button"]');

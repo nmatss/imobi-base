@@ -43,12 +43,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -57,6 +52,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { FeatureUpgradeState } from "@/components/FeatureUpgradeState";
+import { fetchPlanGatedJson, isPlanBlockedError } from "@/lib/plan-blocked";
 import {
   BarChart,
   Bar,
@@ -73,7 +70,9 @@ import {
 
 // Brazilian currency formatter
 const formatBRL = (value: number) =>
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+    value,
+  );
 
 const formatNumber = (value: number) =>
   new Intl.NumberFormat("pt-BR").format(value);
@@ -117,14 +116,69 @@ const FEATURES_LIST = [
 ];
 
 const STATES = [
-  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO",
-  "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI",
-  "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
+  "AC",
+  "AL",
+  "AP",
+  "AM",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
+  "MA",
+  "MT",
+  "MS",
+  "MG",
+  "PA",
+  "PB",
+  "PR",
+  "PE",
+  "PI",
+  "RJ",
+  "RN",
+  "RS",
+  "RO",
+  "RR",
+  "SC",
+  "SP",
+  "SE",
+  "TO",
 ];
 
 const CHART_COLORS = [
-  "#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
-  "#ec4899", "#06b6d4", "#f97316", "#14b8a6", "#6366f1",
+  "#3b82f6",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#ec4899",
+  "#06b6d4",
+  "#f97316",
+  "#14b8a6",
+  "#6366f1",
+];
+
+async function fetchAvmJson<T>(
+  url: string,
+  message: string,
+  options?: RequestInit,
+): Promise<T> {
+  return fetchPlanGatedJson<T>(url, options, message);
+}
+
+const AVM_UPGRADE_BENEFITS = [
+  {
+    title: "Avaliacao automatica",
+    description: "Estimativas de valor por caracteristicas e localizacao.",
+  },
+  {
+    title: "Historico completo",
+    description: "Registro das avaliacoes realizadas pela equipe.",
+  },
+  {
+    title: "Dados de mercado",
+    description: "Indicadores e comparativos por regiao.",
+  },
 ];
 
 interface ValuationForm {
@@ -165,44 +219,61 @@ export default function AVMPage() {
   const [form, setForm] = useState<ValuationForm>(defaultForm);
   const [result, setResult] = useState<any>(null);
   const [detailDialog, setDetailDialog] = useState<any>(null);
+  const [featureBlocked, setFeatureBlocked] = useState(false);
 
   // Fetch valuation history
-  const { data: history = [], isLoading: historyLoading } = useQuery({
+  const {
+    data: history = [],
+    isLoading: historyLoading,
+    error: historyError,
+  } = useQuery({
     queryKey: ["/api/avm/history"],
     queryFn: async () => {
-      const res = await fetch("/api/avm/history", { credentials: "include" });
-      if (!res.ok) throw new Error("Erro ao buscar historico");
-      return res.json();
+      return fetchAvmJson<any[]>(
+        "/api/avm/history",
+        "Erro ao buscar historico",
+      );
     },
+    retry: (failureCount, error) =>
+      !isPlanBlockedError(error) && failureCount < 2,
   });
 
   // Fetch market indices
-  const { data: indices = [], isLoading: indicesLoading } = useQuery({
+  const {
+    data: indices = [],
+    isLoading: indicesLoading,
+    error: indicesError,
+  } = useQuery({
     queryKey: ["/api/avm/market-indices"],
     queryFn: async () => {
-      const res = await fetch("/api/avm/market-indices", { credentials: "include" });
-      if (!res.ok) throw new Error("Erro ao buscar indices");
-      return res.json();
+      return fetchAvmJson<any[]>(
+        "/api/avm/market-indices",
+        "Erro ao buscar indices",
+      );
     },
+    retry: (failureCount, error) =>
+      !isPlanBlockedError(error) && failureCount < 2,
   });
 
   // Fetch price map data
-  const { data: priceMap = [] } = useQuery({
+  const { data: priceMap = [], error: priceMapError } = useQuery({
     queryKey: ["/api/avm/price-map"],
     queryFn: async () => {
-      const res = await fetch("/api/avm/price-map", { credentials: "include" });
-      if (!res.ok) throw new Error("Erro ao buscar mapa de precos");
-      return res.json();
+      return fetchAvmJson<any[]>(
+        "/api/avm/price-map",
+        "Erro ao buscar mapa de precos",
+      );
     },
+    retry: (failureCount, error) =>
+      !isPlanBlockedError(error) && failureCount < 2,
   });
 
   // Evaluate mutation
   const evaluateMutation = useMutation({
     mutationFn: async (data: ValuationForm) => {
-      const res = await fetch("/api/avm/evaluate", {
+      return fetchAvmJson<any>("/api/avm/evaluate", "Erro ao avaliar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({
           propertyType: data.propertyType,
           category: data.category,
@@ -213,24 +284,26 @@ export default function AVMPage() {
           area: parseFloat(data.area),
           bedrooms: data.bedrooms ? parseInt(data.bedrooms) : undefined,
           bathrooms: data.bathrooms ? parseInt(data.bathrooms) : undefined,
-          parkingSpaces: data.parkingSpaces ? parseInt(data.parkingSpaces) : undefined,
+          parkingSpaces: data.parkingSpaces
+            ? parseInt(data.parkingSpaces)
+            : undefined,
           features: data.features.length > 0 ? data.features : undefined,
           condition: data.condition || undefined,
           yearBuilt: data.yearBuilt ? parseInt(data.yearBuilt) : undefined,
         }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Erro ao avaliar");
-      }
-      return res.json();
     },
     onSuccess: (data) => {
       setResult(data);
+      setFeatureBlocked(false);
       queryClient.invalidateQueries({ queryKey: ["/api/avm/history"] });
       toast.success("Avaliacao realizada com sucesso!");
     },
     onError: (error: any) => {
+      if (isPlanBlockedError(error)) {
+        setFeatureBlocked(true);
+        return;
+      }
       toast.error(error.message || "Erro ao realizar avaliacao");
     },
   });
@@ -238,18 +311,24 @@ export default function AVMPage() {
   // Recalculate indices
   const recalculateMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/avm/recalculate-indices", {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Erro ao recalcular");
-      return res.json();
+      return fetchAvmJson<{ message?: string }>(
+        "/api/avm/recalculate-indices",
+        "Erro ao recalcular",
+        {
+          method: "POST",
+        },
+      );
     },
     onSuccess: (data) => {
+      setFeatureBlocked(false);
       queryClient.invalidateQueries({ queryKey: ["/api/avm/market-indices"] });
-      toast.success(data.message);
+      toast.success(data.message || "Indices recalculados");
     },
-    onError: () => {
+    onError: (error) => {
+      if (isPlanBlockedError(error)) {
+        setFeatureBlocked(true);
+        return;
+      }
       toast.error("Erro ao recalcular indices");
     },
   });
@@ -257,16 +336,16 @@ export default function AVMPage() {
   // Delete valuation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/avm/history/${id}`, {
+      return fetchAvmJson(`/api/avm/history/${id}`, "Erro ao excluir", {
         method: "DELETE",
-        credentials: "include",
       });
-      if (!res.ok) throw new Error("Erro ao excluir");
-      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/avm/history"] });
       toast.success("Avaliacao excluida");
+    },
+    onError: (error) => {
+      if (isPlanBlockedError(error)) setFeatureBlocked(true);
     },
   });
 
@@ -307,8 +386,10 @@ export default function AVMPage() {
   };
 
   const getTrendIcon = (trend: string) => {
-    if (trend === "up") return <TrendingUp className="h-4 w-4 text-green-600" />;
-    if (trend === "down") return <TrendingDown className="h-4 w-4 text-red-600" />;
+    if (trend === "up")
+      return <TrendingUp className="h-4 w-4 text-green-600" />;
+    if (trend === "down")
+      return <TrendingDown className="h-4 w-4 text-red-600" />;
     return <Minus className="h-4 w-4 text-gray-500" />;
   };
 
@@ -343,13 +424,29 @@ export default function AVMPage() {
   }, []);
 
   // Group indices by type for summary cards
-  const latestIndices = indices.reduce((acc: any, idx: any) => {
-    const key = `${idx.propertyType}-${idx.category}`;
-    if (!acc[key] || idx.period > acc[key].period) {
-      acc[key] = idx;
-    }
-    return acc;
-  }, {} as Record<string, any>);
+  const latestIndices = indices.reduce(
+    (acc: any, idx: any) => {
+      const key = `${idx.propertyType}-${idx.category}`;
+      if (!acc[key] || idx.period > acc[key].period) {
+        acc[key] = idx;
+      }
+      return acc;
+    },
+    {} as Record<string, any>,
+  );
+
+  const isUpgradeBlocked =
+    featureBlocked ||
+    isPlanBlockedError(historyError) ||
+    isPlanBlockedError(indicesError) ||
+    isPlanBlockedError(priceMapError);
+
+  const refreshAccess = () => {
+    setFeatureBlocked(false);
+    queryClient.invalidateQueries({ queryKey: ["/api/avm/history"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/avm/market-indices"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/avm/price-map"] });
+  };
 
   return (
     <div className="space-y-6">
@@ -361,558 +458,699 @@ export default function AVMPage() {
             Avaliacoes de Imoveis (AVM)
           </h1>
           <p className="text-muted-foreground mt-1">
-            Modelo automatizado de avaliacao de imoveis com base em dados de mercado
+            Modelo automatizado de avaliacao de imoveis com base em dados de
+            mercado
           </p>
         </div>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="avaliar" className="gap-2">
-            <Calculator className="h-4 w-4" />
-            <span className="hidden sm:inline">Avaliar</span>
-          </TabsTrigger>
-          <TabsTrigger value="historico" className="gap-2">
-            <History className="h-4 w-4" />
-            <span className="hidden sm:inline">Historico</span>
-          </TabsTrigger>
-          <TabsTrigger value="mercado" className="gap-2">
-            <BarChart3 className="h-4 w-4" />
-            <span className="hidden sm:inline">Mercado</span>
-          </TabsTrigger>
-        </TabsList>
+      {isUpgradeBlocked ? (
+        <FeatureUpgradeState
+          title="AVM disponivel no plano Profissional"
+          description="Acesse avaliacoes automaticas, historico e indicadores de mercado ao fazer upgrade do plano."
+          benefits={AVM_UPGRADE_BENEFITS}
+          onRefresh={refreshAccess}
+        />
+      ) : (
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="avaliar" className="gap-2">
+              <Calculator className="h-4 w-4" />
+              <span className="hidden sm:inline">Avaliar</span>
+            </TabsTrigger>
+            <TabsTrigger value="historico" className="gap-2">
+              <History className="h-4 w-4" />
+              <span className="hidden sm:inline">Historico</span>
+            </TabsTrigger>
+            <TabsTrigger value="mercado" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Mercado</span>
+            </TabsTrigger>
+          </TabsList>
 
-        {/* ==================== AVALIAR TAB ==================== */}
-        <TabsContent value="avaliar" className="space-y-6 mt-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Valuation Form */}
+          {/* ==================== AVALIAR TAB ==================== */}
+          <TabsContent value="avaliar" className="space-y-6 mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Valuation Form */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calculator className="h-5 w-5" />
+                    Nova Avaliacao
+                  </CardTitle>
+                  <CardDescription>
+                    Preencha os dados do imovel para obter uma estimativa de
+                    valor
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* Type & Category */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Tipo do Imovel *</Label>
+                        <Select
+                          value={form.propertyType}
+                          onValueChange={(v) =>
+                            setForm({ ...form, propertyType: v })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PROPERTY_TYPES.map((t) => (
+                              <SelectItem key={t.value} value={t.value}>
+                                {t.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Categoria *</Label>
+                        <Select
+                          value={form.category}
+                          onValueChange={(v) =>
+                            setForm({ ...form, category: v })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CATEGORIES.map((c) => (
+                              <SelectItem key={c.value} value={c.value}>
+                                {c.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Location */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Cidade *</Label>
+                        <Input
+                          value={form.city}
+                          onChange={(e) =>
+                            setForm({ ...form, city: e.target.value })
+                          }
+                          placeholder="Ex: Sao Paulo"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Estado *</Label>
+                        <Select
+                          value={form.state}
+                          onValueChange={(v) => setForm({ ...form, state: v })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {STATES.map((s) => (
+                              <SelectItem key={s} value={s}>
+                                {s}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Bairro</Label>
+                        <Input
+                          value={form.neighborhood}
+                          onChange={(e) =>
+                            setForm({ ...form, neighborhood: e.target.value })
+                          }
+                          placeholder="Ex: Jardins"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Endereco</Label>
+                        <Input
+                          value={form.address}
+                          onChange={(e) =>
+                            setForm({ ...form, address: e.target.value })
+                          }
+                          placeholder="Rua, numero"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Characteristics */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <div className="space-y-2">
+                        <Label>Area (m2) *</Label>
+                        <Input
+                          type="number"
+                          value={form.area}
+                          onChange={(e) =>
+                            setForm({ ...form, area: e.target.value })
+                          }
+                          placeholder="80"
+                          required
+                          min="1"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Quartos</Label>
+                        <Input
+                          type="number"
+                          value={form.bedrooms}
+                          onChange={(e) =>
+                            setForm({ ...form, bedrooms: e.target.value })
+                          }
+                          placeholder="2"
+                          min="0"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Banheiros</Label>
+                        <Input
+                          type="number"
+                          value={form.bathrooms}
+                          onChange={(e) =>
+                            setForm({ ...form, bathrooms: e.target.value })
+                          }
+                          placeholder="1"
+                          min="0"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Vagas</Label>
+                        <Input
+                          type="number"
+                          value={form.parkingSpaces}
+                          onChange={(e) =>
+                            setForm({ ...form, parkingSpaces: e.target.value })
+                          }
+                          placeholder="1"
+                          min="0"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Condition & Year */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Estado de Conservacao</Label>
+                        <Select
+                          value={form.condition}
+                          onValueChange={(v) =>
+                            setForm({ ...form, condition: v })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CONDITIONS.map((c) => (
+                              <SelectItem key={c.value} value={c.value}>
+                                {c.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Ano de Construcao</Label>
+                        <Input
+                          type="number"
+                          value={form.yearBuilt}
+                          onChange={(e) =>
+                            setForm({ ...form, yearBuilt: e.target.value })
+                          }
+                          placeholder="2010"
+                          min="1900"
+                          max={new Date().getFullYear()}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Features */}
+                    <div className="space-y-2">
+                      <Label>Diferenciais</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {FEATURES_LIST.map((feature) => (
+                          <Badge
+                            key={feature}
+                            variant={
+                              form.features.includes(feature)
+                                ? "default"
+                                : "outline"
+                            }
+                            className="cursor-pointer select-none transition-colors"
+                            onClick={() => toggleFeature(feature)}
+                          >
+                            {feature}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full h-12 text-base font-semibold"
+                      disabled={evaluateMutation.isPending}
+                    >
+                      {evaluateMutation.isPending ? (
+                        <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Calculator className="h-4 w-4 mr-2" />
+                      )}
+                      {evaluateMutation.isPending
+                        ? "Calculando..."
+                        : "Calcular Avaliacao"}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+
+              {/* Results Panel */}
+              <div className="space-y-6">
+                {result?.result ? (
+                  <ResultsPanel result={result.result} />
+                ) : (
+                  <Card className="flex items-center justify-center min-h-[400px]">
+                    <div className="text-center text-muted-foreground space-y-3 p-8">
+                      <Calculator className="h-16 w-16 mx-auto opacity-20" />
+                      <p className="text-lg font-medium">
+                        Nenhuma avaliacao realizada
+                      </p>
+                      <p className="text-sm">
+                        Preencha o formulario ao lado e clique em "Calcular
+                        Avaliacao" para obter uma estimativa de valor do imovel.
+                      </p>
+                    </div>
+                  </Card>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* ==================== HISTORICO TAB ==================== */}
+          <TabsContent value="historico" className="space-y-6 mt-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Calculator className="h-5 w-5" />
-                  Nova Avaliacao
+                  <History className="h-5 w-5" />
+                  Historico de Avaliacoes
                 </CardTitle>
                 <CardDescription>
-                  Preencha os dados do imovel para obter uma estimativa de valor
+                  {history.length} avaliacao(oes) realizadas
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  {/* Type & Category */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Tipo do Imovel *</Label>
-                      <Select
-                        value={form.propertyType}
-                        onValueChange={(v) => setForm({ ...form, propertyType: v })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PROPERTY_TYPES.map((t) => (
-                            <SelectItem key={t.value} value={t.value}>
-                              {t.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Categoria *</Label>
-                      <Select
-                        value={form.category}
-                        onValueChange={(v) => setForm({ ...form, category: v })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CATEGORIES.map((c) => (
-                            <SelectItem key={c.value} value={c.value}>
-                              {c.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                {historyLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
-
-                  {/* Location */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Cidade *</Label>
-                      <Input
-                        value={form.city}
-                        onChange={(e) => setForm({ ...form, city: e.target.value })}
-                        placeholder="Ex: Sao Paulo"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Estado *</Label>
-                      <Select
-                        value={form.state}
-                        onValueChange={(v) => setForm({ ...form, state: v })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATES.map((s) => (
-                            <SelectItem key={s} value={s}>
-                              {s}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                ) : history.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <History className="h-12 w-12 mx-auto opacity-20 mb-3" />
+                    <p>Nenhuma avaliacao realizada ainda</p>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Bairro</Label>
-                      <Input
-                        value={form.neighborhood}
-                        onChange={(e) => setForm({ ...form, neighborhood: e.target.value })}
-                        placeholder="Ex: Jardins"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Endereco</Label>
-                      <Input
-                        value={form.address}
-                        onChange={(e) => setForm({ ...form, address: e.target.value })}
-                        placeholder="Rua, numero"
-                      />
-                    </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Data</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Localizacao</TableHead>
+                          <TableHead>Area</TableHead>
+                          <TableHead className="text-right">
+                            Valor Estimado
+                          </TableHead>
+                          <TableHead className="text-right">
+                            Confianca
+                          </TableHead>
+                          <TableHead>Tendencia</TableHead>
+                          <TableHead className="text-right">Acoes</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {history.map((item: any) => (
+                          <TableRow
+                            key={item.id}
+                            className="cursor-pointer hover:bg-muted/50"
+                          >
+                            <TableCell className="text-sm">
+                              {new Date(item.createdAt).toLocaleDateString(
+                                "pt-BR",
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {PROPERTY_TYPES.find(
+                                  (t) => t.value === item.propertyType,
+                                )?.label || item.propertyType}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3 text-muted-foreground" />
+                              {item.city}/{item.state}
+                            </TableCell>
+                            <TableCell>{item.area}m2</TableCell>
+                            <TableCell className="text-right font-semibold">
+                              {item.estimatedValue
+                                ? formatBRL(item.estimatedValue)
+                                : "-"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span
+                                className={getConfidenceColor(
+                                  item.confidenceScore || 0,
+                                )}
+                              >
+                                {item.confidenceScore?.toFixed(1) || 0}%
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                {getTrendIcon(item.marketTrend)}
+                                <span className="text-xs">
+                                  {getTrendLabel(item.marketTrend)}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => setDetailDialog(item)}
+                                >
+                                  <Info className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive"
+                                  onClick={() => {
+                                    if (confirm("Excluir esta avaliacao?")) {
+                                      deleteMutation.mutate(item.id);
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
-
-                  {/* Characteristics */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                    <div className="space-y-2">
-                      <Label>Area (m2) *</Label>
-                      <Input
-                        type="number"
-                        value={form.area}
-                        onChange={(e) => setForm({ ...form, area: e.target.value })}
-                        placeholder="80"
-                        required
-                        min="1"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Quartos</Label>
-                      <Input
-                        type="number"
-                        value={form.bedrooms}
-                        onChange={(e) => setForm({ ...form, bedrooms: e.target.value })}
-                        placeholder="2"
-                        min="0"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Banheiros</Label>
-                      <Input
-                        type="number"
-                        value={form.bathrooms}
-                        onChange={(e) => setForm({ ...form, bathrooms: e.target.value })}
-                        placeholder="1"
-                        min="0"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Vagas</Label>
-                      <Input
-                        type="number"
-                        value={form.parkingSpaces}
-                        onChange={(e) => setForm({ ...form, parkingSpaces: e.target.value })}
-                        placeholder="1"
-                        min="0"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Condition & Year */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Estado de Conservacao</Label>
-                      <Select
-                        value={form.condition}
-                        onValueChange={(v) => setForm({ ...form, condition: v })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CONDITIONS.map((c) => (
-                            <SelectItem key={c.value} value={c.value}>
-                              {c.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Ano de Construcao</Label>
-                      <Input
-                        type="number"
-                        value={form.yearBuilt}
-                        onChange={(e) => setForm({ ...form, yearBuilt: e.target.value })}
-                        placeholder="2010"
-                        min="1900"
-                        max={new Date().getFullYear()}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Features */}
-                  <div className="space-y-2">
-                    <Label>Diferenciais</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {FEATURES_LIST.map((feature) => (
-                        <Badge
-                          key={feature}
-                          variant={form.features.includes(feature) ? "default" : "outline"}
-                          className="cursor-pointer select-none transition-colors"
-                          onClick={() => toggleFeature(feature)}
-                        >
-                          {feature}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full h-12 text-base font-semibold"
-                    disabled={evaluateMutation.isPending}
-                  >
-                    {evaluateMutation.isPending ? (
-                      <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <Calculator className="h-4 w-4 mr-2" />
-                    )}
-                    {evaluateMutation.isPending ? "Calculando..." : "Calcular Avaliacao"}
-                  </Button>
-                </form>
+                )}
               </CardContent>
             </Card>
+          </TabsContent>
 
-            {/* Results Panel */}
-            <div className="space-y-6">
-              {result?.result ? (
-                <ResultsPanel result={result.result} />
-              ) : (
-                <Card className="flex items-center justify-center min-h-[400px]">
-                  <div className="text-center text-muted-foreground space-y-3 p-8">
-                    <Calculator className="h-16 w-16 mx-auto opacity-20" />
-                    <p className="text-lg font-medium">Nenhuma avaliacao realizada</p>
-                    <p className="text-sm">
-                      Preencha o formulario ao lado e clique em "Calcular Avaliacao" para obter
-                      uma estimativa de valor do imovel.
+          {/* ==================== MERCADO TAB ==================== */}
+          <TabsContent value="mercado" className="space-y-6 mt-6">
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {Object.values(latestIndices)
+                .slice(0, 4)
+                .map((idx: any, i: number) => (
+                  <Card key={i}>
+                    <CardContent className="pt-6">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wider">
+                            {PROPERTY_TYPES.find(
+                              (t) => t.value === idx.propertyType,
+                            )?.label || idx.propertyType}
+                            {" - "}
+                            {idx.category === "sale" ? "Venda" : "Aluguel"}
+                          </p>
+                          <p className="text-2xl font-bold mt-1">
+                            R${" "}
+                            {formatNumber(Math.round(idx.avgPricePerSqm || 0))}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            /m2 medio
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {getTrendIcon(idx.trend)}
+                          <span
+                            className={`text-xs font-medium ${
+                              idx.trend === "up"
+                                ? "text-green-600"
+                                : idx.trend === "down"
+                                  ? "text-red-600"
+                                  : "text-gray-500"
+                            }`}
+                          >
+                            {idx.trendPercentage
+                              ? `${idx.trendPercentage > 0 ? "+" : ""}${idx.trendPercentage.toFixed(1)}%`
+                              : "0%"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <MapPin className="h-3 w-3 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">
+                          {idx.city} ({idx.sampleSize} imoveis)
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+
+              {Object.keys(latestIndices).length === 0 && (
+                <Card className="col-span-full">
+                  <CardContent className="py-12 text-center text-muted-foreground">
+                    <BarChart3 className="h-12 w-12 mx-auto opacity-20 mb-3" />
+                    <p>Nenhum indice de mercado disponivel</p>
+                    <p className="text-sm mt-1">
+                      Clique em "Recalcular Indices" para gerar dados a partir
+                      dos imoveis cadastrados
                     </p>
-                  </div>
+                  </CardContent>
                 </Card>
               )}
             </div>
-          </div>
-        </TabsContent>
 
-        {/* ==================== HISTORICO TAB ==================== */}
-        <TabsContent value="historico" className="space-y-6 mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <History className="h-5 w-5" />
-                Historico de Avaliacoes
-              </CardTitle>
-              <CardDescription>
-                {history.length} avaliacao(oes) realizadas
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {historyLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : history.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <History className="h-12 w-12 mx-auto opacity-20 mb-3" />
-                  <p>Nenhuma avaliacao realizada ainda</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Data</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Localizacao</TableHead>
-                        <TableHead>Area</TableHead>
-                        <TableHead className="text-right">Valor Estimado</TableHead>
-                        <TableHead className="text-right">Confianca</TableHead>
-                        <TableHead>Tendencia</TableHead>
-                        <TableHead className="text-right">Acoes</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {history.map((item: any) => (
-                        <TableRow key={item.id} className="cursor-pointer hover:bg-muted/50">
-                          <TableCell className="text-sm">
-                            {new Date(item.createdAt).toLocaleDateString("pt-BR")}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">
-                              {PROPERTY_TYPES.find((t) => t.value === item.propertyType)?.label || item.propertyType}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3 text-muted-foreground" />
-                            {item.city}/{item.state}
-                          </TableCell>
-                          <TableCell>{item.area}m2</TableCell>
-                          <TableCell className="text-right font-semibold">
-                            {item.estimatedValue ? formatBRL(item.estimatedValue) : "-"}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <span className={getConfidenceColor(item.confidenceScore || 0)}>
-                              {item.confidenceScore?.toFixed(1) || 0}%
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              {getTrendIcon(item.marketTrend)}
-                              <span className="text-xs">{getTrendLabel(item.marketTrend)}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => setDetailDialog(item)}
-                              >
-                                <Info className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive"
-                                onClick={() => {
-                                  if (confirm("Excluir esta avaliacao?")) {
-                                    deleteMutation.mutate(item.id);
-                                  }
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+            {/* Recalculate Button */}
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                onClick={() => recalculateMutation.mutate()}
+                disabled={recalculateMutation.isPending}
+              >
+                {recalculateMutation.isPending ? (
+                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                Recalcular Indices
+              </Button>
+            </div>
 
-        {/* ==================== MERCADO TAB ==================== */}
-        <TabsContent value="mercado" className="space-y-6 mt-6">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {Object.values(latestIndices).slice(0, 4).map((idx: any, i: number) => (
-              <Card key={i}>
-                <CardContent className="pt-6">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wider">
-                        {PROPERTY_TYPES.find((t) => t.value === idx.propertyType)?.label || idx.propertyType}
-                        {" - "}
-                        {idx.category === "sale" ? "Venda" : "Aluguel"}
+            {/* Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Price per sqm by neighborhood */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    Preco por m2 por Regiao
+                  </CardTitle>
+                  <CardDescription>
+                    Comparativo de precos por localizacao
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {priceMapChartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={350}>
+                      <BarChart
+                        data={priceMapChartData}
+                        layout="vertical"
+                        margin={{ left: 10, right: 30 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis
+                          type="number"
+                          tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`}
+                        />
+                        <YAxis
+                          type="category"
+                          dataKey="name"
+                          width={120}
+                          tick={{ fontSize: 11 }}
+                        />
+                        <Tooltip
+                          formatter={(value: any) => [
+                            formatBRL(value),
+                            "Preco/m2",
+                          ]}
+                          labelFormatter={(label) => `Regiao: ${label}`}
+                        />
+                        <Bar dataKey="preco" radius={[0, 4, 4, 0]}>
+                          {priceMapChartData.map((_: any, i: number) => (
+                            <Cell
+                              key={i}
+                              fill={CHART_COLORS[i % CHART_COLORS.length]}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-[350px] text-muted-foreground">
+                      <p className="text-sm">
+                        Sem dados suficientes para exibir grafico
                       </p>
-                      <p className="text-2xl font-bold mt-1">
-                        R$ {formatNumber(Math.round(idx.avgPricePerSqm || 0))}
-                      </p>
-                      <p className="text-xs text-muted-foreground">/m2 medio</p>
                     </div>
-                    <div className="flex items-center gap-1">
-                      {getTrendIcon(idx.trend)}
-                      <span className={`text-xs font-medium ${
-                        idx.trend === "up" ? "text-green-600" :
-                        idx.trend === "down" ? "text-red-600" : "text-gray-500"
-                      }`}>
-                        {idx.trendPercentage ? `${idx.trendPercentage > 0 ? "+" : ""}${idx.trendPercentage.toFixed(1)}%` : "0%"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="mt-2 flex items-center gap-2">
-                    <MapPin className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">{idx.city} ({idx.sampleSize} imoveis)</span>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
-            ))}
 
-            {Object.keys(latestIndices).length === 0 && (
-              <Card className="col-span-full">
-                <CardContent className="py-12 text-center text-muted-foreground">
-                  <BarChart3 className="h-12 w-12 mx-auto opacity-20 mb-3" />
-                  <p>Nenhum indice de mercado disponivel</p>
-                  <p className="text-sm mt-1">Clique em "Recalcular Indices" para gerar dados a partir dos imoveis cadastrados</p>
+              {/* Market trend over time */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    Tendencia de Mercado
+                  </CardTitle>
+                  <CardDescription>
+                    Evolucao do preco por m2 ao longo do tempo
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {indicesTimeSeries.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={350}>
+                      <LineChart
+                        data={indicesTimeSeries}
+                        margin={{ left: 10, right: 30 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="period" />
+                        <YAxis
+                          tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`}
+                        />
+                        <Tooltip
+                          formatter={(value: any) => [
+                            formatBRL(value),
+                            "Preco/m2",
+                          ]}
+                        />
+                        <Legend />
+                        {Object.keys(indicesTimeSeries[0] || {})
+                          .filter((k) => k !== "period")
+                          .map((key, i) => (
+                            <Line
+                              key={key}
+                              type="monotone"
+                              dataKey={key}
+                              name={
+                                PROPERTY_TYPES.find((t) => t.value === key)
+                                  ?.label || key
+                              }
+                              stroke={CHART_COLORS[i % CHART_COLORS.length]}
+                              strokeWidth={2}
+                              dot={{ r: 4 }}
+                            />
+                          ))}
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-[350px] text-muted-foreground">
+                      <p className="text-sm">
+                        Sem dados suficientes para exibir grafico
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Market Indices Table */}
+            {indices.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    Indices de Mercado Detalhados
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Periodo</TableHead>
+                          <TableHead>Cidade</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Categoria</TableHead>
+                          <TableHead className="text-right">
+                            Preco Medio/m2
+                          </TableHead>
+                          <TableHead className="text-right">
+                            Preco Mediano
+                          </TableHead>
+                          <TableHead className="text-center">Amostra</TableHead>
+                          <TableHead>Tendencia</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {indices.slice(0, 20).map((idx: any) => (
+                          <TableRow key={idx.id}>
+                            <TableCell>{idx.period}</TableCell>
+                            <TableCell>
+                              {idx.city}/{idx.state}
+                            </TableCell>
+                            <TableCell>
+                              {PROPERTY_TYPES.find(
+                                (t) => t.value === idx.propertyType,
+                              )?.label || idx.propertyType}
+                            </TableCell>
+                            <TableCell>
+                              {idx.category === "sale" ? "Venda" : "Aluguel"}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {idx.avgPricePerSqm
+                                ? formatBRL(idx.avgPricePerSqm)
+                                : "-"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {idx.medianPrice
+                                ? formatBRL(idx.medianPrice)
+                                : "-"}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {idx.sampleSize || 0}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                {getTrendIcon(idx.trend)}
+                                <span className="text-xs">
+                                  {idx.trendPercentage
+                                    ? `${idx.trendPercentage > 0 ? "+" : ""}${idx.trendPercentage.toFixed(1)}%`
+                                    : ""}
+                                </span>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               </Card>
             )}
-          </div>
-
-          {/* Recalculate Button */}
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              onClick={() => recalculateMutation.mutate()}
-              disabled={recalculateMutation.isPending}
-            >
-              {recalculateMutation.isPending ? (
-                <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-2" />
-              )}
-              Recalcular Indices
-            </Button>
-          </div>
-
-          {/* Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Price per sqm by neighborhood */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Preco por m2 por Regiao</CardTitle>
-                <CardDescription>Comparativo de precos por localizacao</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {priceMapChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={350}>
-                    <BarChart data={priceMapChartData} layout="vertical" margin={{ left: 10, right: 30 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                      <YAxis type="category" dataKey="name" width={120} tick={{ fontSize: 11 }} />
-                      <Tooltip
-                        formatter={(value: any) => [formatBRL(value), "Preco/m2"]}
-                        labelFormatter={(label) => `Regiao: ${label}`}
-                      />
-                      <Bar dataKey="preco" radius={[0, 4, 4, 0]}>
-                        {priceMapChartData.map((_: any, i: number) => (
-                          <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-[350px] text-muted-foreground">
-                    <p className="text-sm">Sem dados suficientes para exibir grafico</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Market trend over time */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Tendencia de Mercado</CardTitle>
-                <CardDescription>Evolucao do preco por m2 ao longo do tempo</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {indicesTimeSeries.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={350}>
-                    <LineChart data={indicesTimeSeries} margin={{ left: 10, right: 30 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="period" />
-                      <YAxis tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} />
-                      <Tooltip formatter={(value: any) => [formatBRL(value), "Preco/m2"]} />
-                      <Legend />
-                      {Object.keys(indicesTimeSeries[0] || {})
-                        .filter((k) => k !== "period")
-                        .map((key, i) => (
-                          <Line
-                            key={key}
-                            type="monotone"
-                            dataKey={key}
-                            name={PROPERTY_TYPES.find((t) => t.value === key)?.label || key}
-                            stroke={CHART_COLORS[i % CHART_COLORS.length]}
-                            strokeWidth={2}
-                            dot={{ r: 4 }}
-                          />
-                        ))}
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-[350px] text-muted-foreground">
-                    <p className="text-sm">Sem dados suficientes para exibir grafico</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Market Indices Table */}
-          {indices.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Indices de Mercado Detalhados</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Periodo</TableHead>
-                        <TableHead>Cidade</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Categoria</TableHead>
-                        <TableHead className="text-right">Preco Medio/m2</TableHead>
-                        <TableHead className="text-right">Preco Mediano</TableHead>
-                        <TableHead className="text-center">Amostra</TableHead>
-                        <TableHead>Tendencia</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {indices.slice(0, 20).map((idx: any) => (
-                        <TableRow key={idx.id}>
-                          <TableCell>{idx.period}</TableCell>
-                          <TableCell>{idx.city}/{idx.state}</TableCell>
-                          <TableCell>
-                            {PROPERTY_TYPES.find((t) => t.value === idx.propertyType)?.label || idx.propertyType}
-                          </TableCell>
-                          <TableCell>{idx.category === "sale" ? "Venda" : "Aluguel"}</TableCell>
-                          <TableCell className="text-right font-medium">
-                            {idx.avgPricePerSqm ? formatBRL(idx.avgPricePerSqm) : "-"}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {idx.medianPrice ? formatBRL(idx.medianPrice) : "-"}
-                          </TableCell>
-                          <TableCell className="text-center">{idx.sampleSize || 0}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              {getTrendIcon(idx.trend)}
-                              <span className="text-xs">
-                                {idx.trendPercentage ? `${idx.trendPercentage > 0 ? "+" : ""}${idx.trendPercentage.toFixed(1)}%` : ""}
-                              </span>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
+          </TabsContent>
+        </Tabs>
+      )}
 
       {/* Detail Dialog */}
       {detailDialog && (
@@ -928,12 +1166,24 @@ export default function AVMPage() {
 // ====================== RESULTS PANEL ======================
 
 function ResultsPanel({ result }: { result: any }) {
-  const confidenceColor = result.confidenceScore >= 70 ? "text-green-600" :
-    result.confidenceScore >= 40 ? "text-yellow-600" : "text-red-600";
-  const confidenceBg = result.confidenceScore >= 70 ? "bg-green-500" :
-    result.confidenceScore >= 40 ? "bg-yellow-500" : "bg-red-500";
-  const confidenceLabel = result.confidenceScore >= 70 ? "Alta" :
-    result.confidenceScore >= 40 ? "Moderada" : "Baixa";
+  const confidenceColor =
+    result.confidenceScore >= 70
+      ? "text-green-600"
+      : result.confidenceScore >= 40
+        ? "text-yellow-600"
+        : "text-red-600";
+  const confidenceBg =
+    result.confidenceScore >= 70
+      ? "bg-green-500"
+      : result.confidenceScore >= 40
+        ? "bg-yellow-500"
+        : "bg-red-500";
+  const confidenceLabel =
+    result.confidenceScore >= 70
+      ? "Alta"
+      : result.confidenceScore >= 40
+        ? "Moderada"
+        : "Baixa";
 
   const adjustmentEntries = Object.entries(result.adjustments || {});
   const adjustmentLabels: Record<string, string> = {
@@ -980,7 +1230,11 @@ function ResultsPanel({ result }: { result: any }) {
               )}
               <span>
                 Mercado{" "}
-                {result.marketTrend === "up" ? "em alta" : result.marketTrend === "down" ? "em baixa" : "estavel"}
+                {result.marketTrend === "up"
+                  ? "em alta"
+                  : result.marketTrend === "down"
+                    ? "em baixa"
+                    : "estavel"}
               </span>
             </div>
           </div>
@@ -997,7 +1251,13 @@ function ResultsPanel({ result }: { result: any }) {
                 {result.confidenceScore.toFixed(1)}%
               </span>
               <Badge
-                variant={result.confidenceScore >= 70 ? "default" : result.confidenceScore >= 40 ? "secondary" : "destructive"}
+                variant={
+                  result.confidenceScore >= 70
+                    ? "default"
+                    : result.confidenceScore >= 40
+                      ? "secondary"
+                      : "destructive"
+                }
               >
                 {confidenceLabel}
               </Badge>
@@ -1026,8 +1286,10 @@ function ResultsPanel({ result }: { result: any }) {
             <div className="mt-3 flex items-start gap-2 text-sm text-yellow-700 bg-yellow-50 p-3 rounded-lg">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               <p>
-                Poucos dados comparaveis disponveis ({result.comparables?.length || 0} imoveis).
-                A estimativa pode variar significativamente. Recomenda-se uma avaliacao presencial.
+                Poucos dados comparaveis disponveis (
+                {result.comparables?.length || 0} imoveis). A estimativa pode
+                variar significativamente. Recomenda-se uma avaliacao
+                presencial.
               </p>
             </div>
           )}
@@ -1043,11 +1305,20 @@ function ResultsPanel({ result }: { result: any }) {
           <CardContent>
             <div className="space-y-2">
               {adjustmentEntries.map(([key, value]) => (
-                <div key={key} className="flex items-center justify-between py-1">
-                  <span className="text-sm">{adjustmentLabels[key] || key}</span>
+                <div
+                  key={key}
+                  className="flex items-center justify-between py-1"
+                >
+                  <span className="text-sm">
+                    {adjustmentLabels[key] || key}
+                  </span>
                   <span
                     className={`text-sm font-medium ${
-                      (value as number) > 0 ? "text-green-600" : (value as number) < 0 ? "text-red-600" : ""
+                      (value as number) > 0
+                        ? "text-green-600"
+                        : (value as number) < 0
+                          ? "text-red-600"
+                          : ""
                     }`}
                   >
                     {(value as number) > 0 ? "+" : ""}
@@ -1059,13 +1330,27 @@ function ResultsPanel({ result }: { result: any }) {
                 <span className="text-sm font-medium">Total</span>
                 <span
                   className={`text-sm font-bold ${
-                    Object.values(result.adjustments).reduce((s: number, v: any) => s + v, 0) > 0
+                    Object.values(result.adjustments).reduce(
+                      (s: number, v: any) => s + v,
+                      0,
+                    ) > 0
                       ? "text-green-600"
                       : "text-red-600"
                   }`}
                 >
-                  {Object.values(result.adjustments).reduce((s: number, v: any) => s + v, 0) > 0 ? "+" : ""}
-                  {(Object.values(result.adjustments).reduce((s: number, v: any) => s + v, 0) as number).toFixed(1)}%
+                  {Object.values(result.adjustments).reduce(
+                    (s: number, v: any) => s + v,
+                    0,
+                  ) > 0
+                    ? "+"
+                    : ""}
+                  {(
+                    Object.values(result.adjustments).reduce(
+                      (s: number, v: any) => s + v,
+                      0,
+                    ) as number
+                  ).toFixed(1)}
+                  %
                 </span>
               </div>
             </div>
@@ -1095,16 +1380,26 @@ function ResultsPanel({ result }: { result: any }) {
                     </p>
                     <div className="flex items-center gap-3 mt-1">
                       <span className="text-xs">{comp.area}m2</span>
-                      {comp.bedrooms != null && <span className="text-xs">{comp.bedrooms} quartos</span>}
+                      {comp.bedrooms != null && (
+                        <span className="text-xs">{comp.bedrooms} quartos</span>
+                      )}
                       <span className="text-xs font-medium">
                         R$ {formatNumber(Math.round(comp.pricePerSqm))}/m2
                       </span>
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-semibold">{formatBRL(comp.price)}</p>
+                    <p className="text-sm font-semibold">
+                      {formatBRL(comp.price)}
+                    </p>
                     <Badge
-                      variant={comp.similarityScore >= 70 ? "default" : comp.similarityScore >= 50 ? "secondary" : "outline"}
+                      variant={
+                        comp.similarityScore >= 70
+                          ? "default"
+                          : comp.similarityScore >= 50
+                            ? "secondary"
+                            : "outline"
+                      }
                       className="text-xs"
                     >
                       {comp.similarityScore}% similar
@@ -1153,13 +1448,17 @@ function DetailDialog({
     if (valuation.comparablesData) {
       comparables = JSON.parse(valuation.comparablesData);
     }
-  } catch { /* ignore: JSON inválido -> mantém comparables vazio */ }
+  } catch {
+    /* ignore: JSON inválido -> mantém comparables vazio */
+  }
 
   try {
     if (valuation.adjustments) {
       adjustments = JSON.parse(valuation.adjustments);
     }
-  } catch { /* ignore: JSON inválido -> mantém adjustments vazio */ }
+  } catch {
+    /* ignore: JSON inválido -> mantém adjustments vazio */
+  }
 
   const result = {
     estimatedValue: valuation.estimatedValue,
@@ -1177,11 +1476,10 @@ function DetailDialog({
     <Dialog open onOpenChange={() => onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            Detalhes da Avaliacao
-          </DialogTitle>
+          <DialogTitle>Detalhes da Avaliacao</DialogTitle>
           <DialogDescription>
-            {PROPERTY_TYPES.find((t) => t.value === valuation.propertyType)?.label || valuation.propertyType}
+            {PROPERTY_TYPES.find((t) => t.value === valuation.propertyType)
+              ?.label || valuation.propertyType}
             {" em "}
             {valuation.city}/{valuation.state}
             {" - "}

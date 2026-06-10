@@ -4,6 +4,10 @@
 
 Este documento é o guia operacional para operar ImobiBase em produção. Leitura obrigatória antes de qualquer mudança em `imobibase.com.br`.
 
+> Para o lançamento inicial, use o gate de decisão em
+> [GO_LIVE_CHECKLIST.md](./GO_LIVE_CHECKLIST.md) — todos os itens
+> "Bloqueante" precisam estar marcados antes de apontar tráfego real.
+
 ---
 
 ## 1. Stack e topologia

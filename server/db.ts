@@ -7,8 +7,17 @@ const { Pool } = pkg;
 import * as schemaPg from "@shared/schema";
 import * as schemaSqlite from "@shared/schema-sqlite";
 
-// Determine which database to use
-const useSqlite = !process.env.DATABASE_URL || process.env.USE_SQLITE === "true";
+// Determine which database to use. Development can fall back to SQLite when
+// DATABASE_URL is absent; production/serverless must configure Postgres unless
+// SQLite is explicitly requested for a controlled environment.
+const isProductionRuntime = process.env.NODE_ENV === "production" || Boolean(process.env.VERCEL);
+const useSqlite =
+  process.env.USE_SQLITE === "true" ||
+  (!process.env.DATABASE_URL && !isProductionRuntime);
+
+if (!useSqlite && !process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL is required outside explicit SQLite mode");
+}
 
 // SQLite setup
 let sqliteDb: ReturnType<typeof drizzleSqlite> | null = null;

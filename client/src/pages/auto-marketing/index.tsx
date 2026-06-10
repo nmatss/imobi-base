@@ -25,7 +25,6 @@ import {
   Globe,
   Copy,
   Send,
-  RefreshCw,
   Eye,
   Loader2,
   Check,
@@ -37,6 +36,8 @@ import {
   Search,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { FeatureUpgradeState } from "@/components/FeatureUpgradeState";
+import { isPlanBlockedResponse, readJsonSafely } from "@/lib/plan-blocked";
 
 type Property = {
   id: string;
@@ -80,9 +81,81 @@ type Template = {
   icon: string;
 };
 
-function formatPrice(price: string): string {
-  const num = parseFloat(price);
-  if (isNaN(num)) return price;
+type BlockedFeatureState = {
+  title: string;
+  description: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function extractArray<T>(payload: unknown, keys: string[] = []): T[] {
+  if (Array.isArray(payload)) return payload as T[];
+  if (!isRecord(payload)) return [];
+
+  const candidateKeys = [...keys, "data", "items", "results", "properties", "contents", "templates"];
+  for (const key of candidateKeys) {
+    const value = payload[key];
+    if (Array.isArray(value)) return value as T[];
+    if (isRecord(value)) {
+      const nested = extractArray<T>(value, keys);
+      if (nested.length > 0) return nested;
+    }
+  }
+
+  return [];
+}
+
+function unwrapPayload<T>(payload: unknown): T | null {
+  if (isRecord(payload) && isRecord(payload.data)) return payload.data as T;
+  if (isRecord(payload)) return payload as T;
+  return null;
+}
+
+function isProperty(value: unknown): value is Property {
+  return isRecord(value) && typeof value.id === "string";
+}
+
+function isMarketingContent(value: unknown): value is MarketingContent {
+  return isRecord(value) && typeof value.id === "string" && typeof value.propertyId === "string";
+}
+
+function isTemplate(value: unknown): value is Template {
+  return isRecord(value) && typeof value.id === "string" && typeof value.name === "string";
+}
+
+function safeText(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function getBlockedFeatureState(): BlockedFeatureState {
+  return {
+    title: "Marketing IA disponivel no plano Profissional",
+    description:
+      "Gere descricoes, posts, emails e conteudos de microsite com IA ao fazer upgrade do plano.",
+  };
+}
+
+const MARKETING_UPGRADE_BENEFITS = [
+  {
+    title: "Descricoes",
+    description: "Textos comerciais por tom de voz.",
+  },
+  {
+    title: "Redes sociais",
+    description: "Posts e hashtags prontos para publicar.",
+  },
+  {
+    title: "Email marketing",
+    description: "Campanhas para nutrir leads.",
+  },
+];
+
+function formatPrice(price: unknown): string {
+  const priceText = safeText(price);
+  const num = parseFloat(priceText);
+  if (isNaN(num)) return priceText;
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(num);
 }
 
@@ -114,6 +187,8 @@ export default function AutoMarketingPage() {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailSentResult, setEmailSentResult] = useState<{ message: string; recipientCount: number } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [blockedFeature, setBlockedFeature] = useState<BlockedFeatureState | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Editable fields
   const [editDescription, setEditDescription] = useState("");
@@ -123,26 +198,55 @@ export default function AutoMarketingPage() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError(null);
+      setBlockedFeature(null);
       const [propsRes, contentsRes, templatesRes] = await Promise.all([
         fetch("/api/properties", { credentials: "include" }),
         fetch("/api/auto-marketing/all", { credentials: "include" }),
         fetch("/api/auto-marketing/templates", { credentials: "include" }),
       ]);
 
+      const [propsData, contentsData, templatesData] = await Promise.all([
+        readJsonSafely(propsRes),
+        readJsonSafely(contentsRes),
+        readJsonSafely(templatesRes),
+      ]);
+
       if (propsRes.ok) {
-        const propsData = await propsRes.json();
-        setProperties(propsData);
+        setProperties(extractArray<unknown>(propsData, ["properties"]).filter(isProperty));
+      } else {
+        setProperties([]);
       }
+
+      const isContentsBlocked = isPlanBlockedResponse(contentsRes, contentsData);
+      const isTemplatesBlocked = isPlanBlockedResponse(templatesRes, templatesData);
+      if (isContentsBlocked || isTemplatesBlocked) {
+        setContents([]);
+        setTemplates([]);
+        setBlockedFeature(getBlockedFeatureState());
+        return;
+      }
+
       if (contentsRes.ok) {
-        const contentsData = await contentsRes.json();
-        setContents(contentsData);
+        setContents(extractArray<unknown>(contentsData, ["contents", "marketingContents"]).filter(isMarketingContent));
+      } else {
+        setContents([]);
       }
+
       if (templatesRes.ok) {
-        const templatesData = await templatesRes.json();
-        setTemplates(templatesData);
+        setTemplates(extractArray<unknown>(templatesData, ["templates"]).filter(isTemplate));
+      } else {
+        setTemplates([]);
       }
-    } catch (error) {
-      console.error("Error fetching data:", error);
+
+      if (!propsRes.ok || !contentsRes.ok || !templatesRes.ok) {
+        setLoadError("Nao foi possivel carregar todos os dados de Marketing IA. Tente novamente.");
+      }
+    } catch {
+      setProperties([]);
+      setContents([]);
+      setTemplates([]);
+      setLoadError("Nao foi possivel carregar os dados de Marketing IA. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -183,8 +287,15 @@ export default function AutoMarketingPage() {
         body: JSON.stringify({ tone: selectedTone }),
       });
 
+      const data = await readJsonSafely(res);
+      if (isPlanBlockedResponse(res, data)) {
+        setBlockedFeature(getBlockedFeatureState());
+        return;
+      }
+
       if (res.ok) {
-        const newContent = await res.json();
+        const newContent = unwrapPayload<MarketingContent>(data);
+        if (!isMarketingContent(newContent)) return;
         setSelectedContent(newContent);
         // Update contents list
         setContents((prev) => {
@@ -220,8 +331,15 @@ export default function AutoMarketingPage() {
         }),
       });
 
+      const data = await readJsonSafely(res);
+      if (isPlanBlockedResponse(res, data)) {
+        setBlockedFeature(getBlockedFeatureState());
+        return;
+      }
+
       if (res.ok) {
-        const updated = await res.json();
+        const updated = unwrapPayload<MarketingContent>(data);
+        if (!isMarketingContent(updated)) return;
         setSelectedContent(updated);
         setContents((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
       }
@@ -241,8 +359,15 @@ export default function AutoMarketingPage() {
         credentials: "include",
       });
 
+      const data = await readJsonSafely(res);
+      if (isPlanBlockedResponse(res, data)) {
+        setBlockedFeature(getBlockedFeatureState());
+        return;
+      }
+
       if (res.ok) {
-        const updated = await res.json();
+        const updated = unwrapPayload<MarketingContent>(data);
+        if (!isMarketingContent(updated)) return;
         setSelectedContent(updated);
         setContents((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
       }
@@ -259,6 +384,12 @@ export default function AutoMarketingPage() {
         method: "DELETE",
         credentials: "include",
       });
+
+      const data = await readJsonSafely(res);
+      if (isPlanBlockedResponse(res, data)) {
+        setBlockedFeature(getBlockedFeatureState());
+        return;
+      }
 
       if (res.ok) {
         setContents((prev) => prev.filter((c) => c.id !== selectedContent.id));
@@ -291,9 +422,15 @@ export default function AutoMarketingPage() {
         body: JSON.stringify({}),
       });
 
+      const data = await readJsonSafely(res);
+      if (isPlanBlockedResponse(res, data)) {
+        setBlockedFeature(getBlockedFeatureState());
+        return;
+      }
+
       if (res.ok) {
-        const result = await res.json();
-        setEmailSentResult(result);
+        const result = unwrapPayload<{ message: string; recipientCount: number }>(data);
+        if (result) setEmailSentResult(result);
       }
     } catch (error) {
       console.error("Error sending email:", error);
@@ -305,7 +442,8 @@ export default function AutoMarketingPage() {
   const parseHashtags = (hashtagsStr: string | null): string[] => {
     if (!hashtagsStr) return [];
     try {
-      return JSON.parse(hashtagsStr);
+      const parsed = JSON.parse(hashtagsStr);
+      return Array.isArray(parsed) ? parsed.filter((tag): tag is string => typeof tag === "string") : [];
     } catch {
       return [];
     }
@@ -315,9 +453,9 @@ export default function AutoMarketingPage() {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
-      p.title.toLowerCase().includes(q) ||
-      p.city.toLowerCase().includes(q) ||
-      p.address.toLowerCase().includes(q)
+      safeText(p.title).toLowerCase().includes(q) ||
+      safeText(p.city).toLowerCase().includes(q) ||
+      safeText(p.address).toLowerCase().includes(q)
     );
   });
 
@@ -331,6 +469,29 @@ export default function AutoMarketingPage() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
+      </div>
+    );
+  }
+
+  if (blockedFeature) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-heading font-bold flex items-center gap-2">
+            <Sparkles className="h-6 w-6 text-primary" />
+            Marketing IA
+          </h1>
+          <p className="text-muted-foreground">
+            Recursos inteligentes para criar materiais de divulgacao de imoveis
+          </p>
+        </div>
+
+        <FeatureUpgradeState
+          title={blockedFeature.title}
+          description={blockedFeature.description}
+          benefits={MARKETING_UPGRADE_BENEFITS}
+          onRefresh={fetchData}
+        />
       </div>
     );
   }
@@ -357,6 +518,12 @@ export default function AutoMarketingPage() {
           </Badge>
         </div>
       </div>
+
+      {loadError && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {loadError}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Properties List */}

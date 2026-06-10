@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import { useLocation } from "wouter";
 import { setCSRFToken, clearCSRFToken } from "@/lib/queryClient";
+import { unwrapList, unwrapData } from "@/lib/api-envelope";
 
 // --- Types ---
 export type User = {
@@ -118,16 +119,18 @@ type ImobiContextType = {
 
 const ImobiContext = createContext<ImobiContextType | undefined>(undefined);
 
-// Desempacota respostas de lista do backend.
-// O backend paginado retorna envelope { success, data, meta } enquanto rotas
-// legadas/não paginadas retornam o array cru. Garante SEMPRE um array para os
-// consumidores (.filter/.map/.length) — evita crash quando vem objeto.
-function unwrapList<T = unknown>(json: unknown): T[] {
-  if (Array.isArray(json)) return json as T[];
-  if (json && typeof json === "object" && Array.isArray((json as { data?: unknown }).data)) {
-    return (json as { data: T[] }).data;
-  }
-  return [];
+function isPublicAuthOptionalPath(path: string): boolean {
+  return (
+    path === "/" ||
+    path === "/login" ||
+    path === "/pricing" ||
+    path === "/signup" ||
+    path === "/termos" ||
+    path === "/privacidade" ||
+    path.startsWith("/e/") ||
+    path.startsWith("/portal/login") ||
+    path.startsWith("/portal/reset-password")
+  );
 }
 
 export function ImobiProvider({ children }: { children: ReactNode }) {
@@ -139,7 +142,7 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
   const [visits, setVisits] = useState<Visit[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
 
   // Memoized refetch functions para evitar re-criação em cada render
   const refetchProperties = useCallback(async () => {
@@ -228,67 +231,56 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
     }
   }, [refetchProperties, refetchLeads, refetchVisits, refetchContracts]);
 
+  // A sessão é verificada UMA vez por carga do app, adiada até a primeira rota
+  // protegida (páginas públicas não disparam /api/auth/me). Enquanto não há
+  // resposta definitiva, `loading` fica true para o ProtectedRoute aguardar em
+  // vez de redirecionar para /login com a checagem ainda em voo.
+  const hasCheckedAuthRef = useRef(false);
+
   const checkAuth = useCallback(async () => {
-    let mounted = true; // Controle de componente montado para evitar race conditions
+    if (isPublicAuthOptionalPath(location)) return;
+    if (hasCheckedAuthRef.current) return;
+    hasCheckedAuthRef.current = true;
 
     try {
       const res = await fetch("/api/auth/me", {
         credentials: "include",
       });
 
-      if (!mounted) return; // Verifica se o componente ainda está montado antes de setState
-
       if (res.ok) {
-        const data = await res.json();
-        if (mounted) {
-          setUser(data.user);
-          setTenant(data.tenant);
-        }
+        const data = unwrapData<{ user: User; tenant: Tenant }>(await res.json());
+        setUser(data.user);
+        setTenant(data.tenant);
 
         // Fetch all tenants
         const tenantsRes = await fetch("/api/tenants", {
           credentials: "include",
         });
-        if (tenantsRes.ok && mounted) {
+        if (tenantsRes.ok) {
           const tenantsData = await tenantsRes.json();
-          if (mounted) {
-            setTenants(unwrapList<Tenant>(tenantsData));
-          }
+          setTenants(unwrapList<Tenant>(tenantsData));
         }
       } else if (res.status === 401) {
         // Session expired, clear state
-        if (mounted) {
-          setUser(null);
-          setTenant(null);
-          setTenants([]);
-          setProperties([]);
-          setLeads([]);
-          setVisits([]);
-          setContracts([]);
-        }
+        setUser(null);
+        setTenant(null);
+        setTenants([]);
+        setProperties([]);
+        setLeads([]);
+        setVisits([]);
+        setContracts([]);
       }
     } catch (error) {
       console.error("Auth check failed:", error);
       // On network error, try to maintain state but mark as potentially stale
     } finally {
-      if (mounted) {
-        setLoading(false);
-      }
+      setLoading(false);
     }
+  }, [location]);
 
-    return () => {
-      mounted = false; // Cleanup function para marcar componente como desmontado
-    };
-  }, []);
-
-  // Check auth on mount
+  // Re-executa a cada navegação, mas só faz trabalho na primeira rota protegida.
   useEffect(() => {
-    const cleanup = checkAuth();
-    return () => {
-      if (cleanup instanceof Promise) {
-        cleanup.then((fn) => fn && fn());
-      }
-    };
+    checkAuth();
   }, [checkAuth]);
 
   // Periodic session refresh to prevent idle timeout (every 20 minutes)
@@ -336,6 +328,9 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
     const data = await res.json();
     setUser(data.user);
     setTenant(data.tenant);
+    // Login responde o estado da sessão — não precisa do /api/auth/me adiado.
+    hasCheckedAuthRef.current = true;
+    setLoading(false);
 
     // Store CSRF token from login response
     if (data.csrfToken) {
