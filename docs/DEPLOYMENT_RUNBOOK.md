@@ -1,6 +1,8 @@
 # Deployment Runbook — ImobiBase
 
-Última atualização: 2026-04-21 (pós-sessão de hardening + Stripe checkout)
+Última atualização: 2026-06-10 (pós-hardening completo: ondas 0-4 + auditoria
+1000% + migrations 20260610 aplicadas + deploy `d136db5` — ver
+`reports/EXECUCAO_TIMES_2026-06-10.md`)
 
 Este documento é o guia operacional para operar ImobiBase em produção. Leitura obrigatória antes de qualquer mudança em `imobibase.com.br`.
 
@@ -160,6 +162,21 @@ DATABASE_URL='postgres://prod...' npx drizzle-kit push
 ```
 
 Supabase faz backup automático diário no free tier (7 dias retention).
+
+> **⚠️ NUNCA rode `npm run db:migrate` cego contra produção.** O runner
+> (`script/migrate.ts`) executa TODAS as `migrations/*.sql` em ordem
+> alfabética — incluindo `RLS_enable.sql` (RLS não deve ser ativada sem o app
+> preparado) e os pares duplicados `001_*`/`20241225_001_*`. Migrations novas
+> devem ser aplicadas individualmente, cada uma em transação. Atenção ao
+> pooler transaction-mode: ele não define `search_path` — use
+> `SET LOCAL search_path TO public` antes de DDL sem qualificação.
+> Procedimento de referência (aplicado em 2026-06-10, 47→70 tabelas, zero
+> downtime): `docs/reports/EXECUCAO_TIMES_2026-06-10.md`, seção Pós-execução.
+>
+> **Credencial**: a `DATABASE_URL` do `.env` está desatualizada (senha
+> rotacionada); a válida está em `.env.production.local`. `pg_dump` local v16
+> não fala com o servidor v17 — use backup lógico via SQL ou
+> `postgresql-client-17`.
 
 ### 4.3 Criar super_admin adicional
 

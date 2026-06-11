@@ -47,8 +47,9 @@ com aviso no log. Marcar cada uma como "ativa" ou "aceito lançar sem":
 
 ## 3. Banco de dados (Bloqueante)
 
-- [ ] Migrations aplicadas em prod (`npm run db:push` com backup antes —
-      seção 4.2 do runbook).
+- [x] Migrations aplicadas em prod — ✅ 2026-06-10, `20260610_000/001/002`
+      individualmente em transação (47→70 tabelas, zero downtime; ver alerta
+      na seção 4.2 do runbook sobre NÃO usar `db:migrate` cego).
 - [ ] **Não rodar `npm run db:seed` em produção** (cria tenants demo
       `sol`/`nova-casa` com senha `password`).
 - [ ] Catálogo de planos hidratado (`server/seed-plans.ts` via fluxo do
@@ -59,23 +60,22 @@ com aviso no log. Marcar cada uma como "ativa" ou "aceito lançar sem":
 
 Rodar na branch/commit exato que vai ao ar:
 
-- [ ] `npm run check` — typecheck limpo.
-- [ ] `npm test` — suíte Vitest completa verde (1291+ testes).
-- [ ] `npm run build` — **zero warnings de `import.meta`**; avisos de chunk
-      >500 kB só são aceitáveis para chunks lazy (charts/pdf).
-- [ ] `npx playwright test tests/e2e/smoke.spec.ts --project=chromium` —
-      8/8 (landing, site público `/e/sol`, login, reload, health, módulos).
-- [ ] Lint verde (`npm run lint`).
+- [x] `npm run check` — typecheck limpo. ✅ 2026-06-10
+- [x] `npm test` — suíte Vitest completa verde (1290+ testes; flakes de contenção documentados). ✅ 2026-06-10
+- [x] `npm run build` — **zero warnings**. ✅ 2026-06-10
+- [x] `npx playwright test tests/e2e/smoke.spec.ts --project=chromium` —
+      8/8 ✅ 2026-06-10 (local e no CI do GitHub).
+- [x] Lint verde (`npm run lint`). ✅ 2026-06-10
 
 ## 5. Smoke pós-deploy (Bloqueante)
 
 Imediatamente após o deploy de produção:
 
-- [ ] `GET https://imobibase.com.br/api/health` → 200 com
-      `database/redis/stripe: ok` (503 indica dependência fora).
-- [ ] Landing `/` carrega sem erro de console e sem painel de debug
-      (debug só aparece com `VITE_SHOW_ERROR_DEBUG=true`).
-- [ ] Site público de um tenant real `/e/<slug>` renderiza imóveis.
+- [x] `GET https://imobibase.com.br/api/health` → 200 com
+      `database/redis/stripe: ok`. ✅ 2026-06-10 pós-deploy `d136db5`
+- [x] Landing `/` carrega sem erro de console. ✅ 2026-06-10 (zero pageerrors)
+- [x] Site público `/e/imobibase` renderiza (0 imóveis = tenant prod sem
+      cadastro ainda). ✅ 2026-06-10
 - [ ] Login + reload do dashboard mantém sessão.
 - [ ] Checkout Stripe em modo live com cartão de teste do radar desativado
       (ou transação real de R$1 estornada).

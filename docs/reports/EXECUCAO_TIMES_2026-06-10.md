@@ -109,11 +109,42 @@ gate de decisão em `../GO_LIVE_CHECKLIST.md`.
 
 ---
 
+## Pós-execução (mesma data, 2026-06-10)
+
+### Migrations aplicadas no Supabase de produção
+- `20260610_000/001/002` aplicadas individualmente, cada uma em transação com
+  `SET LOCAL search_path TO public` (o pooler transaction-mode não define
+  search_path). **Não** foi usado `npm run db:migrate` — ele executaria TODAS
+  as `migrations/*.sql`, incluindo `RLS_enable.sql` (RLS não deve ser ativada
+  ainda) e os pares duplicados `001_*`/`20241225_001_*`.
+- Backup lógico pré-migration: `~/backups/imobibase-prod-20260610-pre-migration.json`
+  (contagens de todas as tabelas + dump JSON das tabelas de negócio).
+- Resultado: **47 → 70 tabelas**, `users` 9 → 23 colunas, `audit_logs`
+  completa, dados pré-existentes intactos (2 users, 2 tenants, 5 plans),
+  health ok durante e após (zero downtime).
+- Nota operacional: `pg_dump` local é v16 vs servidor v17 — backup binário
+  requer `postgresql-client-17`.
+
+### Merge + deploy de produção
+- **CI verde pela primeira vez desde março** no PR #1: Run Tests, E2E Smoke,
+  Lint & TypeScript, Build, CodeQL. Únicas falhas: `Dependency Review` (exige
+  GitHub Advanced Security) e `Deploy Preview`/`Deploy to Production` do
+  Actions (secret `VERCEL_TOKEN` não configurado) — jobs redundantes; o
+  deploy real é a integração git do Vercel.
+- Merge: PR #1 → `main` (`d136db5`). Deploy automático do Vercel em ~4 min
+  (`version` no health: `c785e54` → `d136db5`).
+- Smoke pós-deploy em produção: health `database/redis/stripe: ok`; landing
+  renderiza; **recuperação de senha viva** (`/auth/forgot-password` no ar);
+  site público `/e/imobibase` renderiza; zero pageerrors/4xx/5xx.
+
 ## Pendências que só o dono pode executar
 
-1. **Aplicar migrations no Supabase** (`npm run db:migrate` com backup antes;
-   ou `db:push`) — sem isso prod continua sem as tabelas/colunas novas.
-2. **Branch protection em `main`** exigindo os jobs do CI.
-3. Decisões de billing live: rodar `script/seed-stripe-prices.ts` com o
-   catálogo live; conferir webhooks no dashboard Stripe.
-4. Itens do `GO_LIVE_CHECKLIST.md` (secrets, integrações opcionais).
+1. **Branch protection em `main`** exigindo os jobs do CI (comando no
+   comentário do PR #1).
+2. **`VERCEL_TOKEN` nos secrets do Actions** — ou remover os jobs de deploy
+   do Actions (a integração git do Vercel é quem deploya; hoje esses jobs só
+   geram ❌ cosmético).
+3. **Catálogo Stripe live**: `script/seed-stripe-prices.ts` com price IDs de
+   produção (os planos em prod estão com IDs de teste).
+4. Itens restantes do `GO_LIVE_CHECKLIST.md` (secrets live, integrações
+   opcionais, checkout real de R$1).
