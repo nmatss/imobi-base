@@ -88,12 +88,13 @@ Imediatamente após o deploy de produção:
 
 Registrados para a primeira sprint pós-launch (ver memória/backlog):
 
-- **Tabelas novas precisam ser aplicadas no Postgres de prod antes do go-live**:
-  as tabelas de Vistorias/AVM/ISA/Marketing + features (e as colunas de
-  auth/auditoria) foram portadas para `shared/schema.ts` com migrations
-  idempotentes (`migrations/20260610_*.sql`). Rodar `npm run db:migrate` (ou
-  `db:push` com backup antes) contra o Supabase é **bloqueante** — sem isso,
-  reset de senha/OAuth/2FA e os módulos de feature 500am em prod.
+- ✅ **Migrations `20260610_000/001/002` APLICADAS no Supabase em 2026-06-10**
+  (47 → 70 tabelas; `users` 9 → 23 colunas; dados pré-existentes intactos;
+  health pós-aplicação ok). Backup lógico pré-migration em
+  `~/backups/imobibase-prod-20260610-pre-migration.json`. Atenção: NÃO usar
+  `npm run db:migrate` cego — ele roda TODAS as `migrations/*.sql` incluindo
+  `RLS_enable.sql` (RLS ainda não deve ser ativada) e pares duplicados
+  001/20241225_001; aplicar migrations novas individualmente.
 
 - Bundle: chunk principal ~110 kB gz (inclui posthog); charts (134 kB gz) e
   maps (45 kB gz) já são lazy por rota.
