@@ -15,6 +15,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { FeatureUpgradeState } from "@/components/FeatureUpgradeState";
+import { isPlanBlockedResponse, readJsonSafely } from "@/lib/plan-blocked";
 import {
   ClipboardCheck,
   Plus,
@@ -65,6 +67,21 @@ const typeLabels: Record<string, string> = {
   periodic: "Periodica",
 };
 
+const INSPECTIONS_UPGRADE_BENEFITS = [
+  {
+    title: "Vistorias digitais",
+    description: "Checklist por comodo com fotos e condicoes de cada item.",
+  },
+  {
+    title: "Comparativo entrada/saida",
+    description: "Danos e custos de reparo calculados automaticamente.",
+  },
+  {
+    title: "Laudo assinado",
+    description: "Relatorio em HTML com assinaturas de vistoriador e inquilino.",
+  },
+];
+
 const conditionConfig: Record<string, { label: string; color: string }> = {
   excellent: { label: "Excelente", color: "bg-green-100 text-green-800" },
   good: { label: "Bom", color: "bg-blue-100 text-blue-800" },
@@ -77,6 +94,7 @@ export default function InspectionsPage() {
   const [, setLocation] = useLocation();
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [featureBlocked, setFeatureBlocked] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [creating, setCreating] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -107,6 +125,14 @@ export default function InspectionsPage() {
       });
       if (res.ok) {
         setInspections(await res.json());
+        setFeatureBlocked(false);
+      } else {
+        // Gate de plano (digital_inspections e feature Business): 403 com
+        // upgradeRequired vira estado de upgrade em vez de erro silencioso.
+        const payload = await readJsonSafely(res);
+        if (isPlanBlockedResponse(res, payload)) {
+          setFeatureBlocked(true);
+        }
       }
     } catch (e) {
       console.error("Failed to fetch inspections", e);
@@ -205,6 +231,30 @@ export default function InspectionsPage() {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Estado bloqueado por plano: mantem o header (h1 "Vistorias") visivel e
+  // mostra o upgrade state padrao do projeto (mesmo padrao do /marketing).
+  if (featureBlocked) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Vistorias</h1>
+          <p className="text-muted-foreground mt-1">
+            Gestao de vistorias digitais de imoveis
+          </p>
+        </div>
+        <FeatureUpgradeState
+          title="Vistorias digitais disponiveis no plano Business"
+          description="Faca upgrade do plano para criar vistorias de entrada e saida com fotos, comparativos e laudos assinados."
+          benefits={INSPECTIONS_UPGRADE_BENEFITS}
+          onRefresh={() => {
+            setLoading(true);
+            fetchInspections();
+          }}
+        />
       </div>
     );
   }

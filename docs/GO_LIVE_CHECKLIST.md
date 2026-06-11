@@ -88,17 +88,20 @@ Imediatamente após o deploy de produção:
 
 Registrados para a primeira sprint pós-launch (ver memória/backlog):
 
-- **Vistorias (módulo /vistorias) não persiste dados**: as tabelas
-  `property_inspections`/`inspection_rooms`/`inspection_items` ainda não
-  existem em `shared/schema*.ts`. A listagem degrada para vazio e operações de
-  escrita retornam erro descritivo (`server/storage.ts`,
-  `requireInspectionsTable`). Decidir antes do go-live: portar as tabelas ou
-  ocultar o módulo do menu.
+- **Tabelas novas precisam ser aplicadas no Postgres de prod antes do go-live**:
+  as tabelas de Vistorias/AVM/ISA/Marketing + features (e as colunas de
+  auth/auditoria) foram portadas para `shared/schema.ts` com migrations
+  idempotentes (`migrations/20260610_*.sql`). Rodar `npm run db:migrate` (ou
+  `db:push` com backup antes) contra o Supabase é **bloqueante** — sem isso,
+  reset de senha/OAuth/2FA e os módulos de feature 500am em prod.
 
 - Bundle: chunk principal ~110 kB gz (inclui posthog); charts (134 kB gz) e
   maps (45 kB gz) já são lazy por rota.
 - `npm audit` com vulnerabilidades em dev-deps (sem caminho de exploração em
   runtime de produção).
 - 2FA, handlers de refund e dashboard MRR ficam para pós-launch.
+- Sem cron de `database-backup` na Vercel (o runtime não tem `pg_dump` — o
+  cron falharia diariamente); o DR real do banco é o backup/PITR gerenciado do
+  Supabase.
 - Flake raro de timeout no Vitest sob paralelismo alto — mitigado com
   `testTimeout: 20000`; se reaparecer, rodar o arquivo isolado para confirmar.

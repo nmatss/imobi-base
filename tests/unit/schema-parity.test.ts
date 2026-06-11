@@ -65,35 +65,19 @@ function collectSqliteTables(): Map<string, TableInfo> {
  * reconciliation, so this is empty. Anything added here must explain why.)
  */
 const KNOWN_TABLE_DIVERGENCES: Record<string, string> = {
-  // --- Postgres-only tables (billing/whatsapp) — not yet mirrored to SQLite dev.
-  // Out of scope for the Onda 1 portal/maps/compliance reconciliation; tracked
-  // for a future port. Listed here so this test does not regress on them.
-  plans: "PG-only billing table",
-  tenant_subscriptions: "PG-only billing table",
-  usage_logs: "PG-only billing table",
+  // --- Postgres-only tables (whatsapp) — not yet mirrored to SQLite dev.
+  // The whatsapp module só roda contra a Business API em prod (PG); dev usa
+  // mocks e nunca toca nessas tabelas. Tracked for a future port.
   whatsapp_auto_responses: "PG-only whatsapp table",
   whatsapp_conversations: "PG-only whatsapp table",
   whatsapp_message_queue: "PG-only whatsapp table",
   whatsapp_messages: "PG-only whatsapp table",
   whatsapp_templates: "PG-only whatsapp table",
-  // --- SQLite-only tables — feature tables not yet ported to the Postgres
-  // (production) schema. These features 500 in prod until ported + db:push'd.
-  // Out of scope for THIS track (Onda 1 targeted coordinates/portal/maintenance
-  // + compliance only); documented so the test catches NEW drift, not these.
-  analytics_events: "SQLite-only, pending PG port",
-  campaign_enrollments: "SQLite-only, pending PG port",
-  campaign_steps: "SQLite-only, pending PG port",
-  contract_documents: "SQLite-only, pending PG port",
-  dashboard_layouts: "SQLite-only, pending PG port",
-  digital_signatures: "SQLite-only, pending PG port",
-  drip_campaigns: "SQLite-only, pending PG port",
-  lead_scores: "SQLite-only, pending PG port",
-  legal_documents: "SQLite-only, pending PG port",
-  login_history: "SQLite-only, pending PG port",
-  property_comparisons: "SQLite-only, pending PG port",
-  two_factor_auth: "SQLite-only, pending PG port",
-  virtual_tours: "SQLite-only, pending PG port",
-  widget_types: "SQLite-only, pending PG port",
+  // --- SQLite-only tables ---
+  // legal_documents: nenhum código de servidor consulta esta tabela hoje
+  // (documentos legais são servidos estaticamente); port para PG quando o
+  // CMS de documentos legais sair do backlog.
+  legal_documents: "SQLite-only, sem consumidor em prod, pending PG port",
 };
 
 /**
@@ -188,6 +172,44 @@ describe("schema parity: schema.ts (Postgres) vs schema-sqlite.ts (SQLite)", () 
       "data_export_requests",
       "cookie_preferences",
       "data_processing_activities",
+      // Reconciliadas na paridade auth/auditoria/sessão (2026-06-10):
+      "users",
+      "tenants",
+      "properties",
+      "leads",
+      "contracts",
+      "rental_contracts",
+      "audit_logs",
+      "user_sessions",
+      "login_history",
+      "two_factor_auth",
+      "integration_configs",
+      // Reconciliadas na paridade billing/features/módulos (2026-06-10):
+      "plans",
+      "tenant_subscriptions",
+      "usage_logs",
+      "analytics_events",
+      "lead_scores",
+      "drip_campaigns",
+      "campaign_steps",
+      "campaign_enrollments",
+      "virtual_tours",
+      "property_comparisons",
+      "digital_signatures",
+      "contract_documents",
+      "dashboard_layouts",
+      "widget_types",
+      // Novas tabelas de módulos (AVM/ISA/Marketing/Vistorias), criadas já em
+      // paridade nos dois schemas (2026-06-10):
+      "property_inspections",
+      "inspection_rooms",
+      "inspection_items",
+      "property_valuations",
+      "market_indices",
+      "isa_conversations",
+      "isa_messages",
+      "isa_settings",
+      "auto_marketing_content",
     ];
 
     const divergences: string[] = [];

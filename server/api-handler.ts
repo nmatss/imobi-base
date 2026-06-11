@@ -31,12 +31,17 @@ secretManager.initialize(process.env);
 // Initialize Sentry (before any other middleware)
 initializeSentry(app);
 
-// Initialize Redis with graceful degradation for serverless
-try {
-  initializeRedis();
-} catch (err) {
-  console.warn("Redis initialization failed (expected in serverless):", err);
-}
+// Initialize Redis with graceful degradation for serverless.
+// IMPORTANTE: initializeRedis é ASYNC — um try/catch síncrono NÃO captura a
+// rejeição do `await ping()` interno; ela viraria unhandledRejection e
+// envenenaria a instância via startupError. Tratamos a promise explicitamente:
+// sem Redis o app segue normalmente (cache/rate-limit degradam para memória).
+initializeRedis().catch((err) => {
+  console.warn(
+    "Redis indisponível — seguindo sem Redis (degradação graciosa):",
+    err instanceof Error ? err.message : err,
+  );
+});
 
 declare module "http" {
   interface IncomingMessage {
@@ -209,10 +214,17 @@ const appReadyPromise: Promise<void> = (async () => {
 // Capture a fatal startup error so the handler can fail closed without leaking
 // the stack trace to clients.
 let startupError: Error | null = null;
-appReadyPromise.catch((err) => {
-  startupError = err instanceof Error ? err : new Error(String(err));
-  console.error('Startup failed during route registration:', err);
-});
+// Flag de prontidão: depois que o app fica pronto, rejeições tardias NÃO podem
+// mais envenenar a instância warm (ver handler de unhandledRejection abaixo).
+let appReady = false;
+appReadyPromise
+  .then(() => {
+    appReady = true;
+  })
+  .catch((err) => {
+    startupError = err instanceof Error ? err : new Error(String(err));
+    console.error('Startup failed during route registration:', err);
+  });
 
 const handler = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -240,10 +252,19 @@ const handler = async (req: Request, res: Response, next: NextFunction) => {
   app(req, res, next);
 };
 
-// Capture late startup rejections as well.
+// Captura rejeições tardias de STARTUP apenas. Depois que o app está pronto,
+// uma rejeição avulsa (ex.: ping de Redis, job em background) NÃO pode setar
+// startupError — isso envenenaria permanentemente a instância warm, fazendo o
+// handler responder 500 a TODAS as requests seguintes. Pós-ready: só log+Sentry.
 process.on('unhandledRejection', (reason: unknown) => {
-  startupError = reason instanceof Error ? reason : new Error(String(reason));
-  console.error('Unhandled rejection during startup:', reason);
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  if (!appReady) {
+    startupError = err;
+    console.error('Unhandled rejection during startup:', reason);
+    return;
+  }
+  console.error('Unhandled rejection (instância warm, não fatal):', reason);
+  captureException(err, { phase: 'runtime-unhandled-rejection' });
 });
 
 export { appReadyPromise };

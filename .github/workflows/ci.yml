@@ -29,15 +29,8 @@ jobs:
       - name: TypeScript type check
         run: npm run check
 
-      - name: Report status
-        if: always()
-        run: |
-          if [ ${{ job.status }} == 'success' ]; then
-            echo "✅ TypeScript check passed!"
-          else
-            echo "❌ TypeScript check failed!"
-            exit 1
-          fi
+      - name: ESLint (errors fail, warnings allowed)
+        run: npm run lint
 
   build:
     name: Build Application
@@ -98,54 +91,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run unit tests
-        run: npm run test:unit
+      # better-sqlite3 não cria o diretório do banco (SQLITE_CANTOPEN em
+      # checkout limpo) e os testes de integração clonam o schema do db de dev
+      # (data/imobibase.db) — o push cria esse db com o schema atual.
+      - name: Prepare SQLite database
+        run: |
+          mkdir -p data
+          npm run db:push:sqlite
 
-      - name: Run integration tests
-        run: npm run test:integration
-
-      - name: Run all tests with verbose output
-        run: npm test -- --reporter=verbose
-        env:
-          CI: true
-
+      # Roda TODOS os testes (unit + integration) uma única vez, com coverage.
+      # Os thresholds (ratchet) são aplicados pelo próprio vitest (vitest.config.ts).
       - name: Run all tests with coverage
         run: npm run test:coverage
         env:
           CI: true
 
-      - name: Check coverage thresholds
-        run: |
-          echo "📊 Checking test coverage thresholds..."
-
-          # Parse coverage summary
-          if [ -f "coverage/coverage-summary.json" ]; then
-            STATEMENTS=$(jq '.total.statements.pct' coverage/coverage-summary.json)
-            BRANCHES=$(jq '.total.branches.pct' coverage/coverage-summary.json)
-            FUNCTIONS=$(jq '.total.functions.pct' coverage/coverage-summary.json)
-            LINES=$(jq '.total.lines.pct' coverage/coverage-summary.json)
-
-            echo "Coverage Results:"
-            echo "- Statements: $STATEMENTS%"
-            echo "- Branches: $BRANCHES%"
-            echo "- Functions: $FUNCTIONS%"
-            echo "- Lines: $LINES%"
-
-            # Target: 70%+ coverage
-            if (( $(echo "$STATEMENTS < 70" | bc -l) )); then
-              echo "❌ Statements coverage ($STATEMENTS%) is below 70% threshold"
-              exit 1
-            fi
-
-            if (( $(echo "$LINES < 70" | bc -l) )); then
-              echo "❌ Lines coverage ($LINES%) is below 70% threshold"
-              exit 1
-            fi
-
-            echo "✅ Coverage thresholds met!"
-          else
-            echo "⚠️  Coverage summary not found, skipping threshold check"
-          fi
       - name: Generate coverage report
         if: always()
         run: |
@@ -183,10 +143,10 @@ jobs:
           retention-days: 7
 
   e2e:
-    name: E2E Tests (Playwright)
+    name: E2E Smoke Tests (Playwright)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: build
+    needs: lint-and-typecheck
 
     steps:
       - name: Checkout code
@@ -201,17 +161,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # O dev server (subido pelo webServer do playwright.config.ts) usa SQLite
+      # quando não há DATABASE_URL; o smoke depende do seed (Imobiliária Sol).
+      - name: Prepare SQLite database (schema + seed)
+        run: |
+          mkdir -p data
+          npm run db:push:sqlite
+          npm run db:seed
+
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-artifacts
-          path: dist/
-
-      - name: Run Playwright tests
-        run: npx playwright test --project=chromium
+      # Roda APENAS o smoke: as demais suítes e2e estão quarentenadas
+      # (ver tests/e2e/QUARANTINE.md) até serem reescritas contra a UI real.
+      - name: Run smoke E2E tests
+        run: npx playwright test tests/e2e/smoke.spec.ts --project=chromium
         env:
           CI: true
 
@@ -299,11 +263,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Validate database schema
+      # O teste de paridade valida os dois schemas (Postgres ↔ SQLite) usando o
+      # tsconfig/aliases do projeto — tsc com arquivos avulsos ignora o tsconfig.
+      - name: Validate database schema parity
         run: |
-          # Check if schema files are valid TypeScript
-          npx tsc --noEmit shared/schema.ts shared/schema-sqlite.ts
-          echo "✅ Database schema files are valid!"
+          mkdir -p data
+          npx vitest run tests/unit/schema-parity.test.ts
 
   summary:
     name: CI Summary

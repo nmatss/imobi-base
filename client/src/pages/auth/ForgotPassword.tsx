@@ -1,14 +1,14 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Mail, ArrowLeft } from "lucide-react";
+import { Mail, ArrowLeft } from "lucide-react";
 
 export default function ForgotPassword() {
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -87,7 +87,7 @@ export default function ForgotPassword() {
           <div className="mt-6">
             <Button
               type="button"
-              onClick={() => navigate("/auth/login")}
+              onClick={() => setLocation("/login")}
               className="w-full"
               variant="outline"
             >
@@ -136,7 +136,7 @@ export default function ForgotPassword() {
 
           <div className="text-center">
             <Link
-              to="/auth/login"
+              href="/login"
               className="text-sm font-medium text-blue-600 hover:text-blue-500"
             >
               <ArrowLeft className="mr-1 inline h-4 w-4" />

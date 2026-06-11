@@ -133,6 +133,13 @@ export default function Dashboard() {
       if (res.ok) {
         toast({ title: "Lembrete concluído", description: "O lembrete foi marcado como concluído." });
         refetchFollowUps();
+      } else {
+        const payload = await res.json().catch(() => null);
+        toast({
+          title: "Erro",
+          description: payload?.error || payload?.message || "Não foi possível concluir o lembrete.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       toast({ title: "Erro", description: "Não foi possível concluir o lembrete.", variant: "destructive" });
@@ -192,6 +199,13 @@ export default function Dashboard() {
         setNewLeadForm({ name: "", email: "", phone: "", source: "website" });
         await refetchLeads();
         toast({ title: "Lead criado", description: "O lead foi cadastrado com sucesso." });
+      } else {
+        const payload = await res.json().catch(() => null);
+        toast({
+          title: "Erro ao criar lead",
+          description: payload?.error || payload?.message || "Não foi possível criar o lead.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Failed to create lead:", error);

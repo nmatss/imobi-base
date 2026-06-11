@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, decimal, json } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, decimal, json, real } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -29,6 +29,21 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   role: text("role").notNull().default("user"),
   avatar: text("avatar"),
+  // --- Auth/segurança (paridade com schema-sqlite; consumidores: server/auth/*) ---
+  emailVerified: boolean("email_verified").default(false),
+  verificationToken: text("verification_token"),
+  verificationTokenExpires: timestamp("verification_token_expires"),
+  passwordResetToken: text("password_reset_token"),
+  passwordResetExpires: timestamp("password_reset_expires"),
+  oauthProvider: text("oauth_provider"), // google, microsoft, null
+  oauthId: text("oauth_id"),
+  oauthAccessToken: text("oauth_access_token"),
+  oauthRefreshToken: text("oauth_refresh_token"),
+  lastLogin: timestamp("last_login"),
+  lastLoginIp: text("last_login_ip"),
+  failedLoginAttempts: integer("failed_login_attempts").default(0),
+  lockedUntil: timestamp("locked_until"),
+  passwordHistory: text("password_history"), // JSON array de hashes de senhas anteriores
   createdAt: timestamp("created_at").notNull().defaultNow(),
   deletedAt: timestamp("deleted_at"),
 });
@@ -539,13 +554,16 @@ export interface RolePermissions {
 export const integrationConfigs = pgTable("integration_configs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  integrationType: text("integration_type"), // portal, whatsapp, email, signature, bi (deprecated, use integrationName)
   integrationName: text("integration_name").notNull(),
   status: text("status").notNull().default("disconnected"),
   config: json("config").default('{}'),
+  lastSync: timestamp("last_sync"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const insertIntegrationConfigSchema = createInsertSchema(integrationConfigs).omit({ id: true, updatedAt: true });
+export const insertIntegrationConfigSchema = createInsertSchema(integrationConfigs).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertIntegrationConfig = z.infer<typeof insertIntegrationConfigSchema>;
 export type IntegrationConfig = typeof integrationConfigs.$inferSelect;
 
@@ -826,10 +844,18 @@ export type WhatsappAutoResponse = typeof whatsappAutoResponses.$inferSelect;
 export const userSessions = pgTable("user_sessions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
-  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  // Nullable: o fluxo de criação de sessão (server/auth/session-manager.ts) não
+  // fornece tenantId; NOT NULL aqui quebrava o insert em produção.
+  tenantId: varchar("tenant_id").references(() => tenants.id),
   sessionToken: text("session_token").notNull(),
+  deviceName: text("device_name"),
+  deviceType: text("device_type"), // desktop, mobile, tablet
+  browser: text("browser"),
+  os: text("os"),
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
+  location: text("location"), // Cidade, País a partir do IP
+  lastActivity: timestamp("last_activity").notNull().defaultNow(),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -900,11 +926,15 @@ export type ComplianceAuditLog = typeof complianceAuditLog.$inferSelect;
 export const auditLogs = pgTable("audit_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  userId: varchar("user_id").references(() => users.id),
   entityType: text("entity_type").notNull(),
   entityId: varchar("entity_id"),
   action: text("action").notNull(),
+  oldValues: text("old_values"), // JSON dos valores anteriores
+  newValues: text("new_values"), // JSON dos novos valores
   metadata: json("metadata"),
   ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
   occurredAt: timestamp("occurred_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
@@ -912,6 +942,47 @@ export const auditLogs = pgTable("audit_logs", {
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
+
+/**
+ * TWO FACTOR AUTHENTICATION
+ * 2FA via TOTP (paridade com schema-sqlite; consumidor: server/routes-security.ts)
+ */
+export const twoFactorAuth = pgTable("two_factor_auth", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  secret: text("secret").notNull(), // Segredo TOTP criptografado
+  backupCodes: text("backup_codes"), // JSON array de backup codes hasheados
+  isEnabled: boolean("is_enabled").default(false),
+  verifiedAt: timestamp("verified_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertTwoFactorAuthSchema = createInsertSchema(twoFactorAuth).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTwoFactorAuth = z.infer<typeof insertTwoFactorAuthSchema>;
+export type TwoFactorAuth = typeof twoFactorAuth.$inferSelect;
+
+/**
+ * LOGIN HISTORY
+ * Histórico de tentativas de login (paridade com schema-sqlite;
+ * consumidores: server/auth/oauth-*.ts, password-reset.ts)
+ */
+export const loginHistory = pgTable("login_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  email: text("email").notNull(),
+  success: boolean("success").notNull(),
+  failureReason: text("failure_reason"), // invalid_password, account_locked, 2fa_failed, etc.
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  location: text("location"),
+  suspicious: boolean("suspicious").default(false), // sinalizado por atividade incomum
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertLoginHistorySchema = createInsertSchema(loginHistory).omit({ id: true, createdAt: true });
+export type InsertLoginHistory = z.infer<typeof insertLoginHistorySchema>;
+export type LoginHistory = typeof loginHistory.$inferSelect;
 
 /**
  * COMPLIANCE: ACCOUNT DELETION REQUESTS
@@ -1166,3 +1237,517 @@ export type InsertFile = z.infer<typeof insertFileSchema>;
 export type File = typeof files.$inferSelect;
 
 export type UsageLog = typeof usageLogs.$inferSelect;
+
+// ==================== ANALYTICS ====================
+
+/**
+ * ANALYTICS EVENTS
+ * Pageviews, web vitals and error tracking (ported from schema-sqlite for
+ * prod parity — consumer: server/routes-analytics.ts + storage ANALYTICS)
+ */
+export const analyticsEvents = pgTable("analytics_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  userId: varchar("user_id"),
+  eventType: text("event_type").notNull(), // pageview, event, vital, error
+  eventName: text("event_name"), // for custom events
+  path: text("path"),
+  // Web Vitals
+  metricName: text("metric_name"), // CLS, FCP, LCP, TTFB, INP, FID
+  metricValue: real("metric_value"),
+  metricRating: text("metric_rating"), // good, needs-improvement, poor
+  // Error tracking
+  errorMessage: text("error_message"),
+  errorStack: text("error_stack"),
+  // Metadata
+  properties: text("properties"), // JSON
+  userAgent: text("user_agent"),
+  sessionId: text("session_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertAnalyticsEventSchema = createInsertSchema(analyticsEvents).omit({ id: true, createdAt: true });
+export type InsertAnalyticsEvent = z.infer<typeof insertAnalyticsEventSchema>;
+export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
+
+// ==================== LEAD INTELLIGENCE ====================
+
+/**
+ * LEAD SCORES
+ * Automated lead scoring (ported from schema-sqlite for prod parity —
+ * consumer: server/routes-features.ts)
+ */
+export const leadScores = pgTable("lead_scores", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  leadId: varchar("lead_id").notNull().references(() => leads.id).unique(),
+  totalScore: integer("total_score").notNull().default(0), // 0-100
+  budgetScore: integer("budget_score").default(0),
+  engagementScore: integer("engagement_score").default(0),
+  profileScore: integer("profile_score").default(0),
+  urgencyScore: integer("urgency_score").default(0),
+  behaviorScore: integer("behavior_score").default(0),
+  temperature: text("temperature").default("cold"), // cold, warm, hot
+  lastCalculated: timestamp("last_calculated").notNull().defaultNow(),
+  scoreHistory: text("score_history"), // JSON array of score changes over time
+  predictedConversion: real("predicted_conversion"), // 0.0 to 1.0 probability
+  nextBestAction: text("next_best_action"), // Recommended action
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertLeadScoreSchema = createInsertSchema(leadScores).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertLeadScore = z.infer<typeof insertLeadScoreSchema>;
+export type LeadScore = typeof leadScores.$inferSelect;
+
+/**
+ * DRIP CAMPAIGNS
+ * Automated email/message sequences for lead nurturing (ported from schema-sqlite)
+ */
+export const dripCampaigns = pgTable("drip_campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  triggerType: text("trigger_type").notNull(), // lead_created, status_change, tag_added, manual
+  triggerConditions: text("trigger_conditions"), // JSON conditions
+  isActive: boolean("is_active").default(true),
+  totalEnrolled: integer("total_enrolled").default(0),
+  totalCompleted: integer("total_completed").default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertDripCampaignSchema = createInsertSchema(dripCampaigns).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDripCampaign = z.infer<typeof insertDripCampaignSchema>;
+export type DripCampaign = typeof dripCampaigns.$inferSelect;
+
+/**
+ * CAMPAIGN STEPS
+ * Individual steps within a drip campaign (ported from schema-sqlite)
+ */
+export const campaignSteps = pgTable("campaign_steps", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").notNull().references(() => dripCampaigns.id),
+  stepOrder: integer("step_order").notNull(),
+  delayDays: integer("delay_days").notNull().default(0),
+  delayHours: integer("delay_hours").notNull().default(0),
+  channel: text("channel").notNull(), // email, whatsapp, sms
+  subject: text("subject"),
+  content: text("content").notNull(),
+  templateVariables: text("template_variables"), // JSON
+  conditions: text("conditions"), // JSON - skip conditions
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertCampaignStepSchema = createInsertSchema(campaignSteps).omit({ id: true, createdAt: true });
+export type InsertCampaignStep = z.infer<typeof insertCampaignStepSchema>;
+export type CampaignStep = typeof campaignSteps.$inferSelect;
+
+/**
+ * CAMPAIGN ENROLLMENTS
+ * Tracks leads enrolled in campaigns (ported from schema-sqlite)
+ */
+export const campaignEnrollments = pgTable("campaign_enrollments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").notNull().references(() => dripCampaigns.id),
+  leadId: varchar("lead_id").notNull().references(() => leads.id),
+  currentStep: integer("current_step").default(0),
+  status: text("status").notNull().default("active"), // active, completed, paused, exited
+  enrolledAt: timestamp("enrolled_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+  lastStepAt: timestamp("last_step_at"),
+  nextStepAt: timestamp("next_step_at"),
+});
+
+export const insertCampaignEnrollmentSchema = createInsertSchema(campaignEnrollments).omit({ id: true });
+export type InsertCampaignEnrollment = z.infer<typeof insertCampaignEnrollmentSchema>;
+export type CampaignEnrollment = typeof campaignEnrollments.$inferSelect;
+
+// ==================== PROPERTY FEATURE TABLES ====================
+
+/**
+ * VIRTUAL TOURS
+ * 360° virtual tour links and configurations (ported from schema-sqlite)
+ */
+export const virtualTours = pgTable("virtual_tours", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  propertyId: varchar("property_id").notNull().references(() => properties.id),
+  tourType: text("tour_type").notNull(), // matterport, 360_photos, video, iframe
+  tourUrl: text("tour_url").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  title: text("title"),
+  description: text("description"),
+  sortOrder: integer("sort_order").default(0),
+  isActive: boolean("is_active").default(true),
+  viewCount: integer("view_count").default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertVirtualTourSchema = createInsertSchema(virtualTours).omit({ id: true, createdAt: true });
+export type InsertVirtualTour = z.infer<typeof insertVirtualTourSchema>;
+export type VirtualTour = typeof virtualTours.$inferSelect;
+
+/**
+ * PROPERTY COMPARISONS
+ * Saved property comparisons by users/leads (ported from schema-sqlite)
+ */
+export const propertyComparisons = pgTable("property_comparisons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  userId: varchar("user_id").references(() => users.id),
+  leadId: varchar("lead_id").references(() => leads.id),
+  sessionId: text("session_id"), // For anonymous users
+  propertyIds: text("property_ids").notNull(), // JSON array of property IDs
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertPropertyComparisonSchema = createInsertSchema(propertyComparisons).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPropertyComparison = z.infer<typeof insertPropertyComparisonSchema>;
+export type PropertyComparison = typeof propertyComparisons.$inferSelect;
+
+// ==================== DIGITAL SIGNATURES ====================
+
+/**
+ * DIGITAL SIGNATURES
+ * E-signature workflow for contracts (ported from schema-sqlite)
+ */
+export const digitalSignatures = pgTable("digital_signatures", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contractId: varchar("contract_id").notNull().references(() => contracts.id),
+  signerType: text("signer_type").notNull(), // client, owner, broker, witness
+  signerName: text("signer_name").notNull(),
+  signerEmail: text("signer_email").notNull(),
+  signerDocument: text("signer_document"), // CPF/CNPJ
+  signatureData: text("signature_data"), // Base64 signature image or hash
+  signatureHash: text("signature_hash"), // SHA-256 hash for verification
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  geoLocation: text("geo_location"), // JSON with lat/lng
+  status: text("status").notNull().default("pending"), // pending, sent, viewed, signed, declined, expired
+  sentAt: timestamp("sent_at"),
+  viewedAt: timestamp("viewed_at"),
+  signedAt: timestamp("signed_at"),
+  expiresAt: timestamp("expires_at"),
+  token: text("token").unique(), // Unique token for signing link
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertDigitalSignatureSchema = createInsertSchema(digitalSignatures).omit({ id: true, createdAt: true });
+export type InsertDigitalSignature = z.infer<typeof insertDigitalSignatureSchema>;
+export type DigitalSignature = typeof digitalSignatures.$inferSelect;
+
+/**
+ * CONTRACT DOCUMENTS
+ * Generated PDF documents for contracts (ported from schema-sqlite)
+ */
+export const contractDocuments = pgTable("contract_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contractId: varchar("contract_id").notNull().references(() => contracts.id),
+  documentType: text("document_type").notNull(), // contract, addendum, receipt, notice
+  version: integer("version").notNull().default(1),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url"),
+  fileHash: text("file_hash"), // SHA-256 hash for integrity
+  generatedBy: varchar("generated_by").references(() => users.id),
+  isFinalized: boolean("is_finalized").default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertContractDocumentSchema = createInsertSchema(contractDocuments).omit({ id: true, createdAt: true });
+export type InsertContractDocument = z.infer<typeof insertContractDocumentSchema>;
+export type ContractDocument = typeof contractDocuments.$inferSelect;
+
+// ==================== DASHBOARD CUSTOMIZATION ====================
+
+/**
+ * DASHBOARD LAYOUTS
+ * Custom dashboard configurations per user (ported from schema-sqlite)
+ */
+export const dashboardLayouts = pgTable("dashboard_layouts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  name: text("name").notNull().default("Principal"),
+  isDefault: boolean("is_default").default(false),
+  layout: text("layout").notNull(), // JSON grid layout config
+  widgets: text("widgets").notNull(), // JSON array of widget configs
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertDashboardLayoutSchema = createInsertSchema(dashboardLayouts).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDashboardLayout = z.infer<typeof insertDashboardLayoutSchema>;
+export type DashboardLayout = typeof dashboardLayouts.$inferSelect;
+
+/**
+ * WIDGET TYPES
+ * Available widget definitions (ported from schema-sqlite; global, no tenant)
+ */
+export const widgetTypes = pgTable("widget_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  category: text("category").notNull(), // metrics, charts, lists, calendar, map
+  component: text("component").notNull(), // React component name
+  defaultConfig: text("default_config"), // JSON default settings
+  minWidth: integer("min_width").default(1),
+  minHeight: integer("min_height").default(1),
+  maxWidth: integer("max_width"),
+  maxHeight: integer("max_height"),
+  requiredPermissions: text("required_permissions"), // JSON array
+  isActive: boolean("is_active").default(true),
+});
+
+export const insertWidgetTypeSchema = createInsertSchema(widgetTypes).omit({ id: true });
+export type InsertWidgetType = z.infer<typeof insertWidgetTypeSchema>;
+export type WidgetType = typeof widgetTypes.$inferSelect;
+
+// ==================== INSPECTIONS (VISTORIAS) ====================
+
+/**
+ * PROPERTY INSPECTIONS
+ * Vistorias de entrada/saída/periódicas — consumidores: server/storage.ts
+ * (seção INSPECTIONS), server/routes-inspections.ts, services/inspection-service.ts.
+ * Campos numéricos usam real (não decimal) porque o código faz aritmética JS
+ * direta sobre eles (totalDamages, estimatedRepairCost).
+ */
+export const propertyInspections = pgTable("property_inspections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  propertyId: varchar("property_id").notNull().references(() => properties.id),
+  rentalContractId: varchar("rental_contract_id"),
+  type: text("type").notNull(), // entry, exit, periodic
+  status: text("status").notNull().default("in_progress"), // in_progress, completed, signed
+  inspectorName: text("inspector_name").notNull(),
+  inspectorId: varchar("inspector_id").references(() => users.id),
+  renterName: text("renter_name"),
+  renterId: varchar("renter_id"),
+  scheduledDate: timestamp("scheduled_date"),
+  completedDate: timestamp("completed_date"),
+  signedAt: timestamp("signed_at"),
+  overallCondition: text("overall_condition"), // excellent, good, fair, poor
+  generalNotes: text("general_notes"),
+  totalDamages: real("total_damages"),
+  previousInspectionId: varchar("previous_inspection_id"),
+  inspectorSignature: text("inspector_signature"), // base64
+  renterSignature: text("renter_signature"), // base64
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertPropertyInspectionSchema = createInsertSchema(propertyInspections).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPropertyInspection = z.infer<typeof insertPropertyInspectionSchema>;
+export type PropertyInspection = typeof propertyInspections.$inferSelect;
+
+/**
+ * INSPECTION ROOMS
+ * Cômodos de uma vistoria
+ */
+export const inspectionRooms = pgTable("inspection_rooms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  inspectionId: varchar("inspection_id").notNull().references(() => propertyInspections.id),
+  roomType: text("room_type").notNull(), // living_room, kitchen, bedroom_1...
+  roomLabel: text("room_label").notNull(),
+  overallCondition: text("overall_condition"),
+  notes: text("notes"),
+  photos: text("photos"), // JSON array of URLs
+  order: integer("order").notNull().default(0),
+});
+
+export const insertInspectionRoomSchema = createInsertSchema(inspectionRooms).omit({ id: true });
+export type InsertInspectionRoom = z.infer<typeof insertInspectionRoomSchema>;
+export type InspectionRoom = typeof inspectionRooms.$inferSelect;
+
+/**
+ * INSPECTION ITEMS
+ * Itens avaliados em cada cômodo
+ */
+export const inspectionItems = pgTable("inspection_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  roomId: varchar("room_id").notNull().references(() => inspectionRooms.id),
+  itemName: text("item_name").notNull(),
+  condition: text("condition").notNull().default("good"), // excellent, good, fair, poor, not_applicable
+  description: text("description"),
+  hasDamage: boolean("has_damage").default(false),
+  damageDescription: text("damage_description"),
+  estimatedRepairCost: real("estimated_repair_cost"),
+  photos: text("photos"), // JSON array of URLs
+  previousCondition: text("previous_condition"), // condição na vistoria de entrada
+  order: integer("order").notNull().default(0),
+});
+
+export const insertInspectionItemSchema = createInsertSchema(inspectionItems).omit({ id: true });
+export type InsertInspectionItem = z.infer<typeof insertInspectionItemSchema>;
+export type InspectionItem = typeof inspectionItems.$inferSelect;
+
+// ==================== AVM (AUTOMATED VALUATION MODEL) ====================
+
+/**
+ * PROPERTY VALUATIONS
+ * Histórico de avaliações do AVM — consumidores: server/routes-avm.ts,
+ * server/services/avm-engine.ts, server/storage.ts (seção AVM).
+ * Valores em real (não decimal) porque o engine faz aritmética JS direta.
+ */
+export const propertyValuations = pgTable("property_valuations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  propertyId: varchar("property_id").references(() => properties.id),
+  propertyType: text("property_type").notNull(),
+  category: text("category").notNull(), // sale, rent
+  city: text("city").notNull(),
+  state: text("state").notNull(),
+  neighborhood: text("neighborhood"),
+  address: text("address"),
+  area: real("area").notNull(),
+  bedrooms: integer("bedrooms"),
+  bathrooms: integer("bathrooms"),
+  parkingSpaces: integer("parking_spaces"),
+  features: text("features"), // JSON array
+  condition: text("condition"),
+  yearBuilt: integer("year_built"),
+  estimatedValue: real("estimated_value"),
+  minValue: real("min_value"),
+  maxValue: real("max_value"),
+  pricePerSqm: real("price_per_sqm"),
+  confidenceScore: real("confidence_score"), // 0-100
+  comparablesCount: integer("comparables_count"),
+  comparablesData: text("comparables_data"), // JSON array
+  marketTrend: text("market_trend"), // up, down, stable
+  adjustments: text("adjustments"), // JSON object
+  methodology: text("methodology"),
+  reportUrl: text("report_url"),
+  requestedBy: varchar("requested_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPropertyValuationSchema = createInsertSchema(propertyValuations).omit({ id: true, createdAt: true });
+export type InsertPropertyValuation = z.infer<typeof insertPropertyValuationSchema>;
+export type PropertyValuation = typeof propertyValuations.$inferSelect;
+
+/**
+ * MARKET INDICES
+ * Índices de mercado agregados por cidade/tipo/categoria/período
+ */
+export const marketIndices = pgTable("market_indices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  city: text("city").notNull(),
+  state: text("state"),
+  propertyType: text("property_type").notNull(),
+  category: text("category").notNull(), // sale, rent
+  avgPricePerSqm: real("avg_price_per_sqm"),
+  medianPrice: real("median_price"),
+  sampleSize: integer("sample_size"),
+  trend: text("trend").default("stable"), // up, down, stable
+  trendPercentage: real("trend_percentage"),
+  period: text("period").notNull(), // YYYY-MM
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertMarketIndexSchema = createInsertSchema(marketIndices).omit({ id: true, createdAt: true });
+export type InsertMarketIndex = z.infer<typeof insertMarketIndexSchema>;
+export type MarketIndex = typeof marketIndices.$inferSelect;
+
+// ==================== ISA (INSIDE SALES AGENT) ====================
+
+/**
+ * ISA CONVERSATIONS
+ * Conversas do agente virtual via WhatsApp — consumidores: server/routes-isa.ts,
+ * server/integrations/whatsapp/isa-engine.ts, server/storage.ts (seção ISA)
+ */
+export const isaConversations = pgTable("isa_conversations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  leadId: varchar("lead_id").references(() => leads.id),
+  phoneNumber: text("phone_number").notNull(),
+  leadName: text("lead_name"),
+  status: text("status").notNull().default("active"), // active, qualified, transferred, closed
+  conversationStage: text("conversation_stage").default("greeting"),
+  qualificationData: text("qualification_data"), // JSON (BANT + score)
+  interestedPropertyIds: text("interested_property_ids"), // JSON array
+  temperature: text("temperature").default("unknown"), // hot, warm, cold, unknown
+  messageCount: integer("message_count").default(0),
+  assignedAgentId: varchar("assigned_agent_id").references(() => users.id),
+  transferredAt: timestamp("transferred_at"),
+  visitScheduledId: varchar("visit_scheduled_id"),
+  lastMessageAt: timestamp("last_message_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertIsaConversationSchema = createInsertSchema(isaConversations).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertIsaConversation = z.infer<typeof insertIsaConversationSchema>;
+export type IsaConversation = typeof isaConversations.$inferSelect;
+
+/**
+ * ISA MESSAGES
+ * Mensagens trocadas em cada conversa ISA
+ */
+export const isaMessages = pgTable("isa_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id").notNull().references(() => isaConversations.id),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  direction: text("direction").notNull(), // inbound, outbound
+  content: text("content").notNull(),
+  messageType: text("message_type").notNull().default("text"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertIsaMessageSchema = createInsertSchema(isaMessages).omit({ id: true, createdAt: true });
+export type InsertIsaMessage = z.infer<typeof insertIsaMessageSchema>;
+export type IsaMessage = typeof isaMessages.$inferSelect;
+
+/**
+ * ISA SETTINGS
+ * Configurações do agente ISA por tenant
+ */
+export const isaSettings = pgTable("isa_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id).unique(),
+  enabled: boolean("enabled").default(false),
+  greeting: text("greeting"),
+  personality: text("personality").default("professional"),
+  workingHours: text("working_hours"), // JSON: { start, end, days }
+  autoQualify: boolean("auto_qualify").default(true),
+  autoScheduleVisits: boolean("auto_schedule_visits").default(false),
+  transferToHumanThreshold: integer("transfer_to_human_threshold").default(10),
+  faqResponses: text("faq_responses"), // JSON array
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertIsaSettingsSchema = createInsertSchema(isaSettings).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertIsaSettings = z.infer<typeof insertIsaSettingsSchema>;
+export type IsaSettings = typeof isaSettings.$inferSelect;
+
+// ==================== AUTO-MARKETING ====================
+
+/**
+ * AUTO MARKETING CONTENT
+ * Conteúdo de marketing gerado por imóvel — consumidores:
+ * server/routes-auto-marketing.ts, server/storage.ts (seção AUTO-MARKETING)
+ */
+export const autoMarketingContent = pgTable("auto_marketing_content", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  propertyId: varchar("property_id").notNull().references(() => properties.id),
+  description: text("description"),
+  descriptionTone: text("description_tone"), // professional, casual, luxury...
+  socialMediaPost: text("social_media_post"),
+  socialMediaHashtags: text("social_media_hashtags"), // JSON array
+  emailSubject: text("email_subject"),
+  emailHtml: text("email_html"),
+  micrositeContent: text("microsite_content"), // JSON/HTML
+  status: text("status").notNull().default("draft"), // draft, published
+  generatedAt: timestamp("generated_at"),
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at"),
+});
+
+export const insertAutoMarketingContentSchema = createInsertSchema(autoMarketingContent).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAutoMarketingContent = z.infer<typeof insertAutoMarketingContentSchema>;
+export type AutoMarketingContent = typeof autoMarketingContent.$inferSelect;

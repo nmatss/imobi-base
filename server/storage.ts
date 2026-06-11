@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Drizzle ORM dual-DB (SQLite + PG) requires `as any` casts for type bridging */
 // Drizzle ORM with dual database support (SQLite + PostgreSQL)
-import { eq, and, desc, sql, like, or, inArray } from "drizzle-orm";
+import { eq, and, desc, gte, sql, like, or, inArray } from "drizzle-orm";
 import { db, schema, isSqlite } from "./db";
 import { activeRowsFilter } from "./utils/soft-delete";
 import { nanoid } from "nanoid";
@@ -3398,16 +3398,18 @@ export class DbStorage implements IStorage {
   async getTenantLeadCountThisMonth(tenantId: string): Promise<number> {
     const now = new Date();
     const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    // count(*) sem cast ::int (Postgres-only) e gte() em vez de SQL cru para
+    // a data — compatibilidade dual-DB (SQLite em dev/teste, PG em prod).
     const result = await db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({ count: sql<number>`count(*)` })
       .from(schema.leads)
       .where(
         and(
           eq(schema.leads.tenantId, tenantId),
-          sql`${schema.leads.createdAt} >= ${firstOfMonth.toISOString()}`
+          gte(schema.leads.createdAt, firstOfMonth)
         )
       );
-    return result[0]?.count || 0;
+    return Number(result[0]?.count) || 0;
   }
 
   async getUsageLogs(page: number, limit: number, filters?: { action?: string; startDate?: Date }): Promise<{
@@ -3484,12 +3486,28 @@ export class DbStorage implements IStorage {
   }
 
   /**
-   * Update tenant subscription
+   * Update tenant subscription.
+   *
+   * IMPORTANTE: `metadata` (JSONB) e MERGE, nao replace. A ordem dos webhooks
+   * do Stripe nao e garantida — checkout.session.completed pode chegar depois
+   * de customer.subscription.created e, se substituisse o JSONB inteiro,
+   * apagaria o stripeSubscriptionId ja gravado (cancel/reactivate passariam a
+   * retornar 404 e o guard de checkout duplicado deixaria criar uma segunda
+   * assinatura = double-billing). Para remover uma chave do metadata,
+   * passe-a explicitamente com valor null/undefined.
    */
   async updateTenantSubscription(tenantId: string, data: any) {
+    const updateData: Record<string, any> = { ...data };
+    if (updateData.metadata) {
+      const existing = await this.getTenantSubscription(tenantId);
+      updateData.metadata = {
+        ...((existing?.metadata as Record<string, unknown>) || {}),
+        ...updateData.metadata,
+      };
+    }
     const [updated] = await db
       .update((schema as any).tenantSubscriptions)
-      .set({ ...data, updatedAt: new Date() })
+      .set({ ...updateData, updatedAt: new Date() })
       .where(eq((schema as any).tenantSubscriptions.tenantId, tenantId))
       .returning();
     return updated;
@@ -3532,12 +3550,15 @@ export class DbStorage implements IStorage {
   /**
    * Get tenant user count
    */
+  // NOTA (contadores de plano): count(*) sem o cast ::int, que é sintaxe
+  // exclusiva do Postgres e quebrava em SQLite (dev/teste). O Number() cobre
+  // o driver PG, que devolve bigint como string.
   async getTenantUserCount(tenantId: string): Promise<number> {
     const result = await db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({ count: sql<number>`count(*)` })
       .from(schema.users)
       .where(eq(schema.users.tenantId, tenantId));
-    return result[0]?.count || 0;
+    return Number(result[0]?.count) || 0;
   }
 
   /**
@@ -3545,10 +3566,10 @@ export class DbStorage implements IStorage {
    */
   async getTenantPropertyCount(tenantId: string): Promise<number> {
     const result = await db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({ count: sql<number>`count(*)` })
       .from(schema.properties)
       .where(eq(schema.properties.tenantId, tenantId));
-    return result[0]?.count || 0;
+    return Number(result[0]?.count) || 0;
   }
 
   /**
@@ -3556,7 +3577,7 @@ export class DbStorage implements IStorage {
    */
   async getTenantIntegrationCount(tenantId: string): Promise<number> {
     const result = await db
-      .select({ count: sql<number>`count(*)::int` })
+      .select({ count: sql<number>`count(*)` })
       .from(schema.integrationConfigs)
       .where(
         and(
@@ -3564,7 +3585,7 @@ export class DbStorage implements IStorage {
           eq(schema.integrationConfigs.status, 'connected')
         )
       );
-    return result[0]?.count || 0;
+    return Number(result[0]?.count) || 0;
   }
 
   /**

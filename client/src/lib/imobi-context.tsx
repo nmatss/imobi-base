@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import { useLocation } from "wouter";
 import { setCSRFToken, clearCSRFToken } from "@/lib/queryClient";
-import { unwrapList, unwrapData } from "@/lib/api-envelope";
+import { unwrapList, unwrapData, getPaginationTotal } from "@/lib/api-envelope";
 
 // --- Types ---
 export type User = {
@@ -129,8 +129,45 @@ function isPublicAuthOptionalPath(path: string): boolean {
     path === "/privacidade" ||
     path.startsWith("/e/") ||
     path.startsWith("/portal/login") ||
-    path.startsWith("/portal/reset-password")
+    path.startsWith("/portal/reset-password") ||
+    path.startsWith("/auth/forgot-password") ||
+    path.startsWith("/auth/reset-password") ||
+    path.startsWith("/auth/verify-email")
   );
+}
+
+// As rotas autenticadas /api/properties e /api/leads são paginadas no servidor
+// (default 50 registros); sem percorrer todas as páginas, tenants com >50
+// registros viam listas truncadas no kanban, dashboard e busca global.
+// Mesmo padrão de fetchAllPublicProperties (pages/public/properties.tsx),
+// com hard-stop de 20 páginas (20 × 100 = 2000 registros).
+async function fetchAllPages<T>(
+  baseUrl: string
+): Promise<{ ok: boolean; status: number; items: T[] }> {
+  const limit = 100;
+  const items: T[] = [];
+
+  for (let page = 1; page <= 20; page++) {
+    const res = await fetch(`${baseUrl}?page=${page}&limit=${limit}`, {
+      credentials: "include",
+    });
+    if (!res.ok) {
+      // Falha na primeira página invalida tudo (ex.: 401);
+      // em páginas seguintes mantém o parcial já carregado.
+      if (page === 1) return { ok: false, status: res.status, items: [] };
+      break;
+    }
+
+    const json = await res.json();
+    const batch = unwrapList<T>(json);
+    items.push(...batch);
+
+    // Envelope dessas rotas é { success, data, meta } — getPaginationTotal cobre meta.total.
+    const total = getPaginationTotal(json);
+    if (batch.length < limit || (total !== undefined && items.length >= total)) break;
+  }
+
+  return { ok: true, status: 200, items };
 }
 
 export function ImobiProvider({ children }: { children: ReactNode }) {
@@ -147,13 +184,10 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
   // Memoized refetch functions para evitar re-criação em cada render
   const refetchProperties = useCallback(async () => {
     try {
-      const res = await fetch("/api/properties", {
-        credentials: "include",
-      });
-      if (res.ok) {
-        const json = await res.json();
-        setProperties(unwrapList<Property>(json));
-      } else if (res.status === 401) {
+      const result = await fetchAllPages<Property>("/api/properties");
+      if (result.ok) {
+        setProperties(result.items);
+      } else if (result.status === 401) {
         // Session expired, redirect to login
         setUser(null);
         setTenant(null);
@@ -166,13 +200,10 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
 
   const refetchLeads = useCallback(async () => {
     try {
-      const res = await fetch("/api/leads", {
-        credentials: "include",
-      });
-      if (res.ok) {
-        const json = await res.json();
-        setLeads(unwrapList<Lead>(json));
-      } else if (res.status === 401) {
+      const result = await fetchAllPages<Lead>("/api/leads");
+      if (result.ok) {
+        setLeads(result.items);
+      } else if (result.status === 401) {
         setUser(null);
         setTenant(null);
         setLocation("/login");

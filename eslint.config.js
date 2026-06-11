@@ -30,10 +30,12 @@ export default [
       "public/**",
       "migrations/**",
       "migrations-sqlite/**",
+      // Bundle serverless gerado pelo build (script/build.ts) — não é fonte
+      "api/_handler.mjs",
     ],
   },
   {
-    files: ["**/*.{ts,tsx,js,jsx}"],
+    files: ["**/*.{ts,tsx,js,jsx,mjs,cjs}"],
     languageOptions: {
       parser: tsParser,
       parserOptions: {

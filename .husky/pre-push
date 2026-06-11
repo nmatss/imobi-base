@@ -3,5 +3,6 @@
 
 # Full TypeScript type check before pushing. Kept out of pre-commit to keep
 # commits fast; CI remains the authoritative gate.
-echo "Running TypeScript type check (tsc --noEmit)..."
-npx tsc --noEmit
+# Mesmo comando do gate de CI (npm run check = tsc), para manter alinhamento.
+echo "Running TypeScript type check (npm run check)..."
+npm run check

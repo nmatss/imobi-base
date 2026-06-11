@@ -16,9 +16,10 @@ export const tenants = sqliteTable("tenants", {
   email: text("email"),
   address: text("address"),
   createdAt: text("created_at").notNull().default(now()),
+  deletedAt: text("deleted_at"), // soft delete (paridade com schema.ts/PG)
 });
 
-export const insertTenantSchema = createInsertSchema(tenants).omit({ id: true, createdAt: true });
+export const insertTenantSchema = createInsertSchema(tenants).omit({ id: true, createdAt: true, deletedAt: true });
 export type InsertTenant = z.infer<typeof insertTenantSchema>;
 export type Tenant = typeof tenants.$inferSelect;
 
@@ -45,9 +46,10 @@ export const users = sqliteTable("users", {
   lockedUntil: text("locked_until"),
   passwordHistory: text("password_history"), // JSON array of hashed passwords
   createdAt: text("created_at").notNull().default(now()),
+  deletedAt: text("deleted_at"), // soft delete (paridade com schema.ts/PG)
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, deletedAt: true });
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
@@ -72,9 +74,10 @@ export const properties = sqliteTable("properties", {
   featured: integer("featured", { mode: "boolean" }).notNull().default(false),
   createdAt: text("created_at").notNull().default(now()),
   updatedAt: text("updated_at").notNull().default(now()),
+  deletedAt: text("deleted_at"), // soft delete (paridade com schema.ts/PG)
 });
 
-export const insertPropertySchema = createInsertSchema(properties).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertPropertySchema = createInsertSchema(properties).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertProperty = z.infer<typeof insertPropertySchema>;
 export type Property = typeof properties.$inferSelect;
 
@@ -98,9 +101,10 @@ export const leads = sqliteTable("leads", {
   maxBedrooms: integer("max_bedrooms"),
   createdAt: text("created_at").notNull().default(now()),
   updatedAt: text("updated_at").notNull().default(now()),
+  deletedAt: text("deleted_at"), // soft delete (paridade com schema.ts/PG)
 });
 
-export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertLeadSchema = createInsertSchema(leads).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertLead = z.infer<typeof insertLeadSchema>;
 export type Lead = typeof leads.$inferSelect;
 
@@ -146,9 +150,10 @@ export const contracts = sqliteTable("contracts", {
   signedAt: text("signed_at"),
   createdAt: text("created_at").notNull().default(now()),
   updatedAt: text("updated_at").notNull().default(now()),
+  deletedAt: text("deleted_at"), // soft delete (paridade com schema.ts/PG)
 });
 
-export const insertContractSchema = createInsertSchema(contracts).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertContractSchema = createInsertSchema(contracts).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertContract = z.infer<typeof insertContractSchema>;
 export type Contract = typeof contracts.$inferSelect;
 
@@ -224,9 +229,10 @@ export const rentalContracts = sqliteTable("rental_contracts", {
   notes: text("notes"),
   createdAt: text("created_at").notNull().default(now()),
   updatedAt: text("updated_at").notNull().default(now()),
+  deletedAt: text("deleted_at"), // soft delete (paridade com schema.ts/PG)
 });
 
-export const insertRentalContractSchema = createInsertSchema(rentalContracts).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertRentalContractSchema = createInsertSchema(rentalContracts).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertRentalContract = z.infer<typeof insertRentalContractSchema>;
 export type RentalContract = typeof rentalContracts.$inferSelect;
 
@@ -659,12 +665,14 @@ export type AuditLog = typeof auditLogs.$inferSelect;
 export const userSessions = sqliteTable("user_sessions", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull().references(() => users.id),
+  tenantId: text("tenant_id").references(() => tenants.id), // nullable (paridade com schema.ts/PG)
   sessionToken: text("session_token").notNull().unique(),
   deviceName: text("device_name"),
   deviceType: text("device_type"), // desktop, mobile, tablet
   browser: text("browser"),
   os: text("os"),
   ipAddress: text("ip_address"),
+  userAgent: text("user_agent"), // paridade com schema.ts/PG
   location: text("location"), // City, Country from IP
   lastActivity: text("last_activity").notNull().default(now()),
   expiresAt: text("expires_at").notNull(),
@@ -1290,3 +1298,319 @@ export const analyticsEvents = sqliteTable("analytics_events", {
 export const insertAnalyticsEventSchema = createInsertSchema(analyticsEvents).omit({ id: true, createdAt: true });
 export type InsertAnalyticsEvent = z.infer<typeof insertAnalyticsEventSchema>;
 export type AnalyticsEvent = typeof analyticsEvents.$inferSelect;
+
+// ============== ADMIN GLOBAL SYSTEM (paridade com schema.ts/PG) ==============
+
+/**
+ * PLANS
+ * Subscription plans for tenants (espelho de schema.ts; valores decimais
+ * armazenados como text no SQLite, como as demais colunas monetárias)
+ */
+export const plans = sqliteTable("plans", {
+  id: text("id").primaryKey(),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  price: text("price").notNull(),
+  yearlyPrice: text("yearly_price"),
+  maxUsers: integer("max_users").notNull().default(5),
+  maxProperties: integer("max_properties").notNull().default(100),
+  maxLeads: integer("max_leads").notNull().default(-1),
+  maxIntegrations: integer("max_integrations").notNull().default(3),
+  features: text("features").notNull().default("[]"), // JSON array
+  stripePriceId: text("stripe_price_id"),
+  stripeYearlyPriceId: text("stripe_yearly_price_id"),
+  trialDays: integer("trial_days").notNull().default(0),
+  isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertPlanSchema = createInsertSchema(plans).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPlan = z.infer<typeof insertPlanSchema>;
+export type Plan = typeof plans.$inferSelect;
+
+/**
+ * TENANT SUBSCRIPTIONS
+ * Links tenants to plans with status and limits (espelho de schema.ts)
+ */
+export const tenantSubscriptions = sqliteTable("tenant_subscriptions", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id).unique(),
+  planId: text("plan_id").notNull().references(() => plans.id),
+  status: text("status").notNull().default("trial"), // trial, active, suspended, cancelled
+  trialEndsAt: text("trial_ends_at"),
+  currentPeriodStart: text("current_period_start"),
+  currentPeriodEnd: text("current_period_end"),
+  cancelledAt: text("cancelled_at"),
+  metadata: text("metadata").default("{}"), // JSON: gateway IDs (stripeCustomerId, etc.)
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertTenantSubscriptionSchema = createInsertSchema(tenantSubscriptions).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTenantSubscription = z.infer<typeof insertTenantSubscriptionSchema>;
+export type TenantSubscription = typeof tenantSubscriptions.$inferSelect;
+
+/**
+ * USAGE LOGS
+ * Tracks important actions for auditing and analytics (espelho de schema.ts)
+ */
+export const usageLogs = sqliteTable("usage_logs", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").references(() => tenants.id),
+  userId: text("user_id").references(() => users.id),
+  action: text("action").notNull(),
+  details: text("details").default("{}"), // JSON
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+export const insertUsageLogSchema = createInsertSchema(usageLogs).omit({ id: true, createdAt: true });
+export type InsertUsageLog = z.infer<typeof insertUsageLogSchema>;
+export type UsageLog = typeof usageLogs.$inferSelect;
+
+// ==================== INSPECTIONS (VISTORIAS) ====================
+
+/**
+ * PROPERTY INSPECTIONS
+ * Vistorias de entrada/saída/periódicas — consumidores: server/storage.ts
+ * (seção INSPECTIONS), server/routes-inspections.ts, services/inspection-service.ts
+ */
+export const propertyInspections = sqliteTable("property_inspections", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  propertyId: text("property_id").notNull().references(() => properties.id),
+  rentalContractId: text("rental_contract_id"),
+  type: text("type").notNull(), // entry, exit, periodic
+  status: text("status").notNull().default("in_progress"), // in_progress, completed, signed
+  inspectorName: text("inspector_name").notNull(),
+  inspectorId: text("inspector_id").references(() => users.id),
+  renterName: text("renter_name"),
+  renterId: text("renter_id"),
+  scheduledDate: text("scheduled_date"),
+  completedDate: text("completed_date"),
+  signedAt: text("signed_at"),
+  overallCondition: text("overall_condition"), // excellent, good, fair, poor
+  generalNotes: text("general_notes"),
+  totalDamages: real("total_damages"),
+  previousInspectionId: text("previous_inspection_id"),
+  inspectorSignature: text("inspector_signature"), // base64
+  renterSignature: text("renter_signature"), // base64
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertPropertyInspectionSchema = createInsertSchema(propertyInspections).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPropertyInspection = z.infer<typeof insertPropertyInspectionSchema>;
+export type PropertyInspection = typeof propertyInspections.$inferSelect;
+
+/**
+ * INSPECTION ROOMS
+ * Cômodos de uma vistoria
+ */
+export const inspectionRooms = sqliteTable("inspection_rooms", {
+  id: text("id").primaryKey(),
+  inspectionId: text("inspection_id").notNull().references(() => propertyInspections.id),
+  roomType: text("room_type").notNull(), // living_room, kitchen, bedroom_1...
+  roomLabel: text("room_label").notNull(),
+  overallCondition: text("overall_condition"),
+  notes: text("notes"),
+  photos: text("photos"), // JSON array of URLs
+  order: integer("order").notNull().default(0),
+});
+
+export const insertInspectionRoomSchema = createInsertSchema(inspectionRooms).omit({ id: true });
+export type InsertInspectionRoom = z.infer<typeof insertInspectionRoomSchema>;
+export type InspectionRoom = typeof inspectionRooms.$inferSelect;
+
+/**
+ * INSPECTION ITEMS
+ * Itens avaliados em cada cômodo
+ */
+export const inspectionItems = sqliteTable("inspection_items", {
+  id: text("id").primaryKey(),
+  roomId: text("room_id").notNull().references(() => inspectionRooms.id),
+  itemName: text("item_name").notNull(),
+  condition: text("condition").notNull().default("good"), // excellent, good, fair, poor, not_applicable
+  description: text("description"),
+  hasDamage: integer("has_damage", { mode: "boolean" }).default(false),
+  damageDescription: text("damage_description"),
+  estimatedRepairCost: real("estimated_repair_cost"),
+  photos: text("photos"), // JSON array of URLs
+  previousCondition: text("previous_condition"), // condição na vistoria de entrada
+  order: integer("order").notNull().default(0),
+});
+
+export const insertInspectionItemSchema = createInsertSchema(inspectionItems).omit({ id: true });
+export type InsertInspectionItem = z.infer<typeof insertInspectionItemSchema>;
+export type InspectionItem = typeof inspectionItems.$inferSelect;
+
+// ==================== AVM (AUTOMATED VALUATION MODEL) ====================
+
+/**
+ * PROPERTY VALUATIONS
+ * Histórico de avaliações do AVM — consumidores: server/routes-avm.ts,
+ * server/services/avm-engine.ts, server/storage.ts (seção AVM)
+ */
+export const propertyValuations = sqliteTable("property_valuations", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  propertyId: text("property_id").references(() => properties.id),
+  propertyType: text("property_type").notNull(),
+  category: text("category").notNull(), // sale, rent
+  city: text("city").notNull(),
+  state: text("state").notNull(),
+  neighborhood: text("neighborhood"),
+  address: text("address"),
+  area: real("area").notNull(),
+  bedrooms: integer("bedrooms"),
+  bathrooms: integer("bathrooms"),
+  parkingSpaces: integer("parking_spaces"),
+  features: text("features"), // JSON array
+  condition: text("condition"),
+  yearBuilt: integer("year_built"),
+  estimatedValue: real("estimated_value"),
+  minValue: real("min_value"),
+  maxValue: real("max_value"),
+  pricePerSqm: real("price_per_sqm"),
+  confidenceScore: real("confidence_score"), // 0-100
+  comparablesCount: integer("comparables_count"),
+  comparablesData: text("comparables_data"), // JSON array
+  marketTrend: text("market_trend"), // up, down, stable
+  adjustments: text("adjustments"), // JSON object
+  methodology: text("methodology"),
+  reportUrl: text("report_url"),
+  requestedBy: text("requested_by").references(() => users.id),
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+export const insertPropertyValuationSchema = createInsertSchema(propertyValuations).omit({ id: true, createdAt: true });
+export type InsertPropertyValuation = z.infer<typeof insertPropertyValuationSchema>;
+export type PropertyValuation = typeof propertyValuations.$inferSelect;
+
+/**
+ * MARKET INDICES
+ * Índices de mercado agregados por cidade/tipo/categoria/período
+ */
+export const marketIndices = sqliteTable("market_indices", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  city: text("city").notNull(),
+  state: text("state"),
+  propertyType: text("property_type").notNull(),
+  category: text("category").notNull(), // sale, rent
+  avgPricePerSqm: real("avg_price_per_sqm"),
+  medianPrice: real("median_price"),
+  sampleSize: integer("sample_size"),
+  trend: text("trend").default("stable"), // up, down, stable
+  trendPercentage: real("trend_percentage"),
+  period: text("period").notNull(), // YYYY-MM
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+export const insertMarketIndexSchema = createInsertSchema(marketIndices).omit({ id: true, createdAt: true });
+export type InsertMarketIndex = z.infer<typeof insertMarketIndexSchema>;
+export type MarketIndex = typeof marketIndices.$inferSelect;
+
+// ==================== ISA (INSIDE SALES AGENT) ====================
+
+/**
+ * ISA CONVERSATIONS
+ * Conversas do agente virtual via WhatsApp — consumidores: server/routes-isa.ts,
+ * server/integrations/whatsapp/isa-engine.ts, server/storage.ts (seção ISA)
+ */
+export const isaConversations = sqliteTable("isa_conversations", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  leadId: text("lead_id").references(() => leads.id),
+  phoneNumber: text("phone_number").notNull(),
+  leadName: text("lead_name"),
+  status: text("status").notNull().default("active"), // active, qualified, transferred, closed
+  conversationStage: text("conversation_stage").default("greeting"),
+  qualificationData: text("qualification_data"), // JSON (BANT + score)
+  interestedPropertyIds: text("interested_property_ids"), // JSON array
+  temperature: text("temperature").default("unknown"), // hot, warm, cold, unknown
+  messageCount: integer("message_count").default(0),
+  assignedAgentId: text("assigned_agent_id").references(() => users.id),
+  transferredAt: text("transferred_at"),
+  visitScheduledId: text("visit_scheduled_id"),
+  lastMessageAt: text("last_message_at"),
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at"),
+});
+
+export const insertIsaConversationSchema = createInsertSchema(isaConversations).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertIsaConversation = z.infer<typeof insertIsaConversationSchema>;
+export type IsaConversation = typeof isaConversations.$inferSelect;
+
+/**
+ * ISA MESSAGES
+ * Mensagens trocadas em cada conversa ISA
+ */
+export const isaMessages = sqliteTable("isa_messages", {
+  id: text("id").primaryKey(),
+  conversationId: text("conversation_id").notNull().references(() => isaConversations.id),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  direction: text("direction").notNull(), // inbound, outbound
+  content: text("content").notNull(),
+  messageType: text("message_type").notNull().default("text"),
+  sentAt: text("sent_at"),
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+export const insertIsaMessageSchema = createInsertSchema(isaMessages).omit({ id: true, createdAt: true });
+export type InsertIsaMessage = z.infer<typeof insertIsaMessageSchema>;
+export type IsaMessage = typeof isaMessages.$inferSelect;
+
+/**
+ * ISA SETTINGS
+ * Configurações do agente ISA por tenant
+ */
+export const isaSettings = sqliteTable("isa_settings", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id).unique(),
+  enabled: integer("enabled", { mode: "boolean" }).default(false),
+  greeting: text("greeting"),
+  personality: text("personality").default("professional"),
+  workingHours: text("working_hours"), // JSON: { start, end, days }
+  autoQualify: integer("auto_qualify", { mode: "boolean" }).default(true),
+  autoScheduleVisits: integer("auto_schedule_visits", { mode: "boolean" }).default(false),
+  transferToHumanThreshold: integer("transfer_to_human_threshold").default(10),
+  faqResponses: text("faq_responses"), // JSON array
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at"),
+});
+
+export const insertIsaSettingsSchema = createInsertSchema(isaSettings).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertIsaSettings = z.infer<typeof insertIsaSettingsSchema>;
+export type IsaSettings = typeof isaSettings.$inferSelect;
+
+// ==================== AUTO-MARKETING ====================
+
+/**
+ * AUTO MARKETING CONTENT
+ * Conteúdo de marketing gerado por imóvel — consumidores:
+ * server/routes-auto-marketing.ts, server/storage.ts (seção AUTO-MARKETING)
+ */
+export const autoMarketingContent = sqliteTable("auto_marketing_content", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  propertyId: text("property_id").notNull().references(() => properties.id),
+  description: text("description"),
+  descriptionTone: text("description_tone"), // professional, casual, luxury...
+  socialMediaPost: text("social_media_post"),
+  socialMediaHashtags: text("social_media_hashtags"), // JSON array
+  emailSubject: text("email_subject"),
+  emailHtml: text("email_html"),
+  micrositeContent: text("microsite_content"), // JSON/HTML
+  status: text("status").notNull().default("draft"), // draft, published
+  generatedAt: text("generated_at"),
+  publishedAt: text("published_at"),
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at"),
+});
+
+export const insertAutoMarketingContentSchema = createInsertSchema(autoMarketingContent).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAutoMarketingContent = z.infer<typeof insertAutoMarketingContentSchema>;
+export type AutoMarketingContent = typeof autoMarketingContent.$inferSelect;

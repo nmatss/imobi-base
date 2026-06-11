@@ -63,7 +63,7 @@ export default function CheckoutSuccessPage() {
     },
     error: {
       title: "Erro ao confirmar",
-      desc: "Houve um problema ao verificar sua assinatura. Consulte /settings/billing ou entre em contato com o suporte.",
+      desc: "Houve um problema ao verificar sua assinatura. Consulte a página de Configurações ou entre em contato com o suporte.",
     },
   };
 

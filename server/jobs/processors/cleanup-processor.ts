@@ -1,6 +1,8 @@
 import { Job } from 'bullmq';
+import { sql } from 'drizzle-orm';
 import { CleanupJobData } from '../queue-manager';
 import { getRedisClient } from '../../cache/redis-client';
+import { db, isSqlite } from '../../db';
 import * as Sentry from '@sentry/node';
 import fs from 'fs/promises';
 import path from 'path';
@@ -75,34 +77,76 @@ export async function processCleanup(job: Job<CleanupJobData>): Promise<void> {
 }
 
 /**
- * Clean up expired/orphaned Redis sessions.
+ * Clean up expired/orphaned sessions.
+ *
+ * Em produção as sessões vivem no POSTGRES (connect-pg-simple, tabela
+ * "session" — ver server/routes.ts), então a limpeza principal é o DELETE
+ * por `expire < NOW()`. A varredura Redis `sess:*` é mantida apenas para o
+ * cenário dev / sessões em Redis.
  */
 async function cleanupSessions(): Promise<number> {
-  const redis = getRedisClient();
-
-  // SCAN avoids blocking Redis like KEYS does on large keyspaces.
-  let cursor = '0';
   let deletedCount = 0;
 
-  do {
-    const [nextCursor, keys] = await redis.scan(
-      cursor,
-      'MATCH',
-      'sess:*',
-      'COUNT',
-      100,
-    );
-    cursor = nextCursor;
-
-    for (const key of keys) {
-      const ttl = await redis.ttl(key);
-      // -1 = no expiration set (orphaned), -2 = already expired.
-      if (ttl === -1 || ttl === -2) {
-        await redis.del(key);
-        deletedCount++;
-      }
+  // 1) Sessões expiradas no Postgres (store de produção).
+  if (!isSqlite) {
+    try {
+      const result = await db.execute(
+        sql`DELETE FROM "session" WHERE expire < NOW()`,
+      );
+      const pgDeleted = Number(
+        (result as { rowCount?: number })?.rowCount ?? 0,
+      );
+      deletedCount += pgDeleted;
+      console.log(
+        `[CleanupProcessor] Deleted ${pgDeleted} expired Postgres sessions`,
+      );
+    } catch (error) {
+      // Tabela pode não existir em ambientes sem connect-pg-simple.
+      console.warn(
+        '[CleanupProcessor] Postgres session cleanup failed:',
+        error,
+      );
     }
-  } while (cursor !== '0');
+  }
+
+  // 2) Varredura Redis (dev / redis-sessions). getRedisClient LANÇA quando
+  // REDIS_URL não está configurada — tratamos como "sem Redis".
+  let redis: ReturnType<typeof getRedisClient>;
+  try {
+    redis = getRedisClient();
+  } catch {
+    console.log(
+      '[CleanupProcessor] Redis indisponível; pulando varredura sess:*',
+    );
+    return deletedCount;
+  }
+
+  try {
+    // SCAN avoids blocking Redis like KEYS does on large keyspaces.
+    let cursor = '0';
+
+    do {
+      const [nextCursor, keys] = await redis.scan(
+        cursor,
+        'MATCH',
+        'sess:*',
+        'COUNT',
+        100,
+      );
+      cursor = nextCursor;
+
+      for (const key of keys) {
+        const ttl = await redis.ttl(key);
+        // -1 = no expiration set (orphaned), -2 = already expired.
+        if (ttl === -1 || ttl === -2) {
+          await redis.del(key);
+          deletedCount++;
+        }
+      }
+    } while (cursor !== '0');
+  } catch (error) {
+    console.warn('[CleanupProcessor] Redis session scan failed:', error);
+  }
 
   console.log(`[CleanupProcessor] Deleted ${deletedCount} orphaned sessions`);
   return deletedCount;

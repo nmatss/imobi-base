@@ -91,7 +91,7 @@ test.describe('Smoke Tests - Critical Path @smoke', () => {
     expect(runtimeErrors).toEqual([]);
   });
 
-  test('/vistorias carrega sem erro', async ({ page }) => {
+  test('/vistorias mostra estado de upgrade sem crash', async ({ page }) => {
     const runtimeErrors: string[] = [];
     page.on('pageerror', (error) => runtimeErrors.push(error.message));
 
@@ -99,8 +99,14 @@ test.describe('Smoke Tests - Critical Path @smoke', () => {
     await page.goto('/vistorias');
 
     await expect(page).toHaveURL(/\/vistorias/);
-    await expect(page.getByRole('heading', { name: /Vistorias/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Nova Vistoria/i })).toBeVisible();
+    // O tenant seed nao tem a feature digital_inspections (plano Business):
+    // o gate do servidor retorna 403 e a pagina mostra o estado de upgrade,
+    // mantendo o h1 "Vistorias" visivel (mesmo padrao do /marketing).
+    await expect(page.getByRole('heading', { name: 'Vistorias', exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /Vistorias digitais disponiveis no plano Business/i })
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: /Ver planos/i })).toBeVisible();
     await expectNoAppCrash(page);
     expect(runtimeErrors).toEqual([]);
   });
@@ -113,14 +119,23 @@ test.describe('Smoke Tests - Critical Path @smoke', () => {
       { href: '/properties', heading: /Im.veis/i },
       { href: '/leads', heading: /CRM de Vendas/i },
       { href: '/calendar', heading: /Agenda de Visitas/i },
-      { href: '/vistorias', heading: /Vistorias/i },
+      // Match exato: a pagina bloqueada por plano tambem renderiza o heading
+      // "Vistorias digitais disponiveis no plano Business" (strict mode).
+      { href: '/vistorias', heading: 'Vistorias' },
     ];
 
     for (const destination of destinations) {
       await nav.locator(`a[href="${destination.href}"]`).click();
 
       await expect(page).toHaveURL(new RegExp(`${destination.href}$`));
-      await expect(page.getByRole('heading', { name: destination.heading })).toBeVisible();
+      // exact so vale para nomes string (ignorado em regex): evita strict-mode
+      // violation quando ha headings que contem o nome (ex.: /vistorias).
+      await expect(
+        page.getByRole('heading', {
+          name: destination.heading,
+          exact: typeof destination.heading === 'string',
+        })
+      ).toBeVisible();
       await expectNoAppCrash(page);
     }
   });

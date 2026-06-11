@@ -9,6 +9,22 @@ export default defineConfig({
   testMatch: /.*\.spec\.ts$/,
   testDir: './tests',
 
+  // QUARENTENA: suítes e2e escritas contra UI que não existe no app atual.
+  // Ver tests/e2e/QUARANTINE.md. Só tests/e2e/smoke.spec.ts reflete o app hoje.
+  // Remova a entrada daqui quando a suíte for reescrita contra a UI real.
+  testIgnore: [
+    '**/tests/e2e/auth.spec.ts',
+    '**/tests/e2e/calendar.spec.ts',
+    '**/tests/e2e/financial.spec.ts',
+    '**/tests/e2e/leads.spec.ts',
+    '**/tests/e2e/mobile.spec.ts',
+    '**/tests/e2e/properties.spec.ts',
+    '**/tests/e2e/rentals.spec.ts',
+    '**/tests/e2e/sales.spec.ts',
+    '**/tests/e2e/search.spec.ts',
+    '**/tests/e2e/settings.spec.ts',
+  ],
+
   // Maximum time one test can run for
   timeout: 30 * 1000,
 
@@ -146,8 +162,11 @@ export default defineConfig({
     },
   ],
 
-  // Run your local dev server before starting the tests
-  webServer: process.env.CI ? undefined : {
+  // Run your local dev server before starting the tests.
+  // Em CI o Playwright também sobe o servidor (não há outro processo que o faça);
+  // localmente reaproveita um dev server já em execução.
+  // BASE_URL externo (ex.: smoke pós-deploy) dispensa o servidor local.
+  webServer: process.env.BASE_URL ? undefined : {
     command: 'npm run dev',
     url: 'http://localhost:5000',
     reuseExistingServer: !process.env.CI,

@@ -319,11 +319,8 @@ export const commissionQuerySchema = paginationSchema.extend({
 
 // ============== PAYMENT SCHEMAS ==============
 
-export const createStripeSubscriptionSchema = z.object({
-  priceId: z.string().min(1, 'Price ID is required'),
-  paymentMethodId: z.string().optional(),
-  trialDays: z.number().int().min(0).max(90).optional(),
-});
+// createStripeSubscriptionSchema removido junto com o endpoint legado
+// /api/payments/stripe/create-subscription (permitia trialDays do body).
 
 export const cancelStripeSubscriptionSchema = z.object({
   subscriptionId: z.string().min(1, 'Subscription ID is required'),

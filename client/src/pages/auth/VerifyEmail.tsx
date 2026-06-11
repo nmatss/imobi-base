@@ -1,19 +1,23 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 
 export default function VerifyEmail() {
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
+  // wouter não expõe a query string no hook de rota — lê direto da URL.
+  const [token] = useState(() => new URLSearchParams(window.location.search).get("token"));
 
   const [verifying, setVerifying] = useState(true);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const [resendEmail, setResendEmail] = useState("");
+  const [resending, setResending] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -44,7 +48,7 @@ export default function VerifyEmail() {
         description: "Seu email foi verificado com sucesso!",
       });
 
-      setTimeout(() => navigate("/dashboard"), 3000);
+      setTimeout(() => setLocation("/dashboard"), 3000);
 
     } catch (error: any) {
       setError(error.message);
@@ -55,6 +59,39 @@ export default function VerifyEmail() {
       });
     } finally {
       setVerifying(false);
+    }
+  };
+
+  const handleResend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resendEmail) return;
+
+    setResending(true);
+    try {
+      const response = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: resendEmail }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao reenviar email de verificação");
+      }
+
+      toast({
+        title: "Email enviado",
+        description: data.message || "Se o email existir e não estiver verificado, você receberá um novo link",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setResending(false);
     }
   };
 
@@ -105,17 +142,29 @@ export default function VerifyEmail() {
           <div className="mt-6 space-y-3">
             <Button
               type="button"
-              onClick={() => navigate("/auth/login")}
+              onClick={() => setLocation("/login")}
               className="w-full"
             >
               Ir para login
             </Button>
-            <Link
-              to="/auth/resend-verification"
-              className="block text-center text-sm font-medium text-blue-600 hover:text-blue-500"
-            >
-              Reenviar email de verificação
-            </Link>
+
+            {/* Reenvio inline — o endpoint POST /api/auth/resend-verification
+                recebe o email e responde sempre sucesso (anti-enumeração). */}
+            <form onSubmit={handleResend} className="space-y-2 border-t pt-4">
+              <Label htmlFor="resend-email">Reenviar email de verificação</Label>
+              <Input
+                id="resend-email"
+                type="email"
+                autoComplete="email"
+                required
+                value={resendEmail}
+                onChange={(e) => setResendEmail(e.target.value)}
+                placeholder="seu@email.com"
+              />
+              <Button type="submit" variant="outline" className="w-full" isLoading={resending}>
+                Reenviar email de verificação
+              </Button>
+            </form>
           </div>
         )}
       </Card>

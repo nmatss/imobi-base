@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   Building2, Home, DollarSign, FileText, Wrench, BarChart3,
   LogOut, ChevronRight, Calendar, User, CheckCircle, Clock,
@@ -37,6 +38,7 @@ function portalFetch(url: string) {
 
 export default function OwnerPortal() {
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
@@ -138,7 +140,7 @@ export default function OwnerPortal() {
   const handleApproveTicket = async (approved: boolean) => {
     if (!selectedTicket) return;
     try {
-      await fetch(`/api/portal/owner/maintenance/${selectedTicket.id}/approve`, {
+      const res = await fetch(`/api/portal/owner/maintenance/${selectedTicket.id}/approve`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -146,11 +148,23 @@ export default function OwnerPortal() {
         credentials: "include",
         body: JSON.stringify({ approved, notes: approveNotes }),
       });
+
+      if (!res.ok) {
+        // Falha não fecha o dialog — o proprietário pode tentar de novo
+        const payload = await res.json().catch(() => null);
+        toast.error(payload?.error || payload?.message || "Erro ao registrar a aprovação. Tente novamente.");
+        return;
+      }
+
+      toast.success(approved ? "Manutenção aprovada com sucesso!" : "Manutenção recusada.");
+      // Atualiza a lista de chamados para refletir o novo status
+      queryClient.invalidateQueries({ queryKey: ["/api/portal/owner/maintenance"] });
       setApproveDialogOpen(false);
       setSelectedTicket(null);
       setApproveNotes("");
     } catch (err) {
       console.error("Error approving ticket:", err);
+      toast.error("Erro de conexão ao registrar a aprovação. Tente novamente.");
     }
   };
 

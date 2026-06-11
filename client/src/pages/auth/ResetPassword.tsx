@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useSearchParams, Link } from "react-router-dom";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,10 +8,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle2, XCircle, Eye, EyeOff } from "lucide-react";
 
 export default function ResetPassword() {
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
+  // wouter não expõe a query string no hook de rota — lê direto da URL.
+  const [token] = useState(() => new URLSearchParams(window.location.search).get("token"));
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -51,7 +51,7 @@ export default function ResetPassword() {
         description: "Link de redefinição inválido ou expirado",
         variant: "destructive",
       });
-      navigate("/auth/forgot-password");
+      setLocation("/auth/forgot-password");
       return;
     }
 
@@ -82,7 +82,7 @@ export default function ResetPassword() {
         description: error.message,
         variant: "destructive",
       });
-      setTimeout(() => navigate("/auth/forgot-password"), 2000);
+      setTimeout(() => setLocation("/auth/forgot-password"), 2000);
     } finally {
       setValidating(false);
     }
@@ -147,7 +147,7 @@ export default function ResetPassword() {
         description: "Sua senha foi alterada com sucesso",
       });
 
-      setTimeout(() => navigate("/auth/login"), 3000);
+      setTimeout(() => setLocation("/login"), 3000);
 
     } catch (error: any) {
       toast({
@@ -301,7 +301,7 @@ export default function ResetPassword() {
 
           <div className="text-center">
             <Link
-              to="/auth/login"
+              href="/login"
               className="text-sm font-medium text-blue-600 hover:text-blue-500"
             >
               Voltar para login

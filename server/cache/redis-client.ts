@@ -23,15 +23,40 @@ const defaultOptions: RedisOptions = {
 };
 
 /**
+ * Resolve a URL do Redis a partir do ambiente.
+ *
+ * Em produção/serverless (NODE_ENV=production ou VERCEL) NÃO há fallback para
+ * localhost — não existe Redis local na função e o default só geraria timeouts
+ * e rejeições. Sem REDIS_URL nesses ambientes, Redis fica explicitamente
+ * indisponível (retorna null) e os consumidores degradam para memória.
+ * Em dev, mantém o fallback para o Redis local.
+ */
+function resolveRedisUrl(): string | null {
+  if (process.env.REDIS_URL) {
+    return process.env.REDIS_URL;
+  }
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+    return null;
+  }
+  return 'redis://localhost:6379';
+}
+
+/**
  * Initialize Redis connection
- * Uses REDIS_URL from environment or falls back to local Redis
+ * Uses REDIS_URL from environment or falls back to local Redis (dev only)
  */
 export async function initializeRedis(): Promise<RedisClient> {
   if (redisClient) {
     return redisClient;
   }
 
-  const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+  const redisUrl = resolveRedisUrl();
+  if (!redisUrl) {
+    // Modo indisponível explícito (sem REDIS_URL em produção/serverless).
+    throw new Error(
+      '[Redis] REDIS_URL não configurada em produção/serverless — Redis indisponível (sem fallback para localhost)',
+    );
+  }
 
   if (process.env.NODE_ENV === 'production' && redisUrl && !redisUrl.startsWith('rediss://')) {
     console.warn('[Redis] WARNING: REDIS_URL should use rediss:// (TLS) in production');
@@ -96,14 +121,23 @@ export async function initializeRedis(): Promise<RedisClient> {
  */
 export function getRedisClient(): RedisClient {
   if (!redisClient) {
-    // Attempt lazy initialization for serverless environments
-    try {
-      initializeRedis();
-    } catch {
-      throw new Error('Redis client not initialized. Call initializeRedis() first.');
+    if (!resolveRedisUrl()) {
+      // Sem REDIS_URL em produção/serverless: indisponível explícito, sem
+      // tentar localhost (chamadores tratam o throw como "sem Redis").
+      throw new Error('Redis indisponível: REDIS_URL não configurada.');
     }
+    // Inicialização lazy: `new Redis()` dentro de initializeRedis é síncrono,
+    // então redisClient fica setado já nesta volta; o `await ping()` continua
+    // em background. A rejeição é tratada aqui (já logada/enviada ao Sentry em
+    // initializeRedis) para NUNCA virar unhandledRejection.
+    initializeRedis().catch(() => {
+      /* erro já logado e capturado em initializeRedis */
+    });
   }
-  return redisClient!;
+  if (!redisClient) {
+    throw new Error('Redis client not initialized. Call initializeRedis() first.');
+  }
+  return redisClient;
 }
 
 /**
@@ -205,7 +239,12 @@ export async function closeRedis(): Promise<void> {
  * Create a new Redis client for specific use (e.g., pub/sub)
  */
 export function createRedisClient(name?: string): RedisClient {
-  const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+  const redisUrl = resolveRedisUrl();
+  if (!redisUrl) {
+    throw new Error(
+      `[Redis:${name}] REDIS_URL não configurada em produção/serverless — Redis indisponível`,
+    );
+  }
 
   const client = new Redis(redisUrl, {
     ...defaultOptions,

@@ -9,6 +9,7 @@
 import type { Express, Request, Response } from 'express';
 import { requireAuth } from './middleware/auth';
 import { checkFeatureAccess } from './middleware/plan-limits';
+import { isAdminRole } from '@shared/constants/roles';
 import { storage } from './storage';
 import {
   insertTenantSettingsSchema,
@@ -42,7 +43,8 @@ export function registerExtensionRoutes(app: Express) {
       const tenantId = (req.user as any).tenantId;
 
       // Only admins can update tenant settings
-      if ((req.user as any).role !== 'admin') {
+      // Usa o enum canônico de roles: 'admin' hardcoded bloqueava super_admin.
+      if (!isAdminRole((req.user as any).role)) {
         return res.status(403).json({ error: "Acesso negado" });
       }
 
@@ -74,7 +76,8 @@ export function registerExtensionRoutes(app: Express) {
     try {
       const tenantId = (req.user as any).tenantId;
 
-      if ((req.user as any).role !== 'admin') {
+      // Usa o enum canônico de roles: 'admin' hardcoded bloqueava super_admin.
+      if (!isAdminRole((req.user as any).role)) {
         return res.status(403).json({ error: "Acesso negado" });
       }
 
@@ -94,7 +97,8 @@ export function registerExtensionRoutes(app: Express) {
     try {
       const tenantId = (req.user as any).tenantId;
 
-      if ((req.user as any).role !== 'admin') {
+      // Usa o enum canônico de roles: 'admin' hardcoded bloqueava super_admin.
+      if (!isAdminRole((req.user as any).role)) {
         return res.status(403).json({ error: "Acesso negado" });
       }
 
@@ -115,7 +119,8 @@ export function registerExtensionRoutes(app: Express) {
     try {
       const tenantId = (req.user as any).tenantId;
 
-      if ((req.user as any).role !== 'admin') {
+      // Usa o enum canônico de roles: 'admin' hardcoded bloqueava super_admin.
+      if (!isAdminRole((req.user as any).role)) {
         return res.status(403).json({ error: "Acesso negado" });
       }
 
@@ -185,7 +190,8 @@ export function registerExtensionRoutes(app: Express) {
     try {
       const tenantId = (req.user as any).tenantId;
 
-      if ((req.user as any).role !== 'admin') {
+      // Usa o enum canônico de roles: 'admin' hardcoded bloqueava super_admin.
+      if (!isAdminRole((req.user as any).role)) {
         return res.status(403).json({ error: "Acesso negado" });
       }
 
@@ -217,7 +223,8 @@ export function registerExtensionRoutes(app: Express) {
     try {
       const tenantId = (req.user as any).tenantId;
 
-      if ((req.user as any).role !== 'admin') {
+      // Usa o enum canônico de roles: 'admin' hardcoded bloqueava super_admin.
+      if (!isAdminRole((req.user as any).role)) {
         return res.status(403).json({ error: "Acesso negado" });
       }
 
@@ -269,7 +276,8 @@ export function registerExtensionRoutes(app: Express) {
     try {
       const tenantId = (req.user as any).tenantId;
 
-      if ((req.user as any).role !== 'admin') {
+      // Usa o enum canônico de roles: 'admin' hardcoded bloqueava super_admin.
+      if (!isAdminRole((req.user as any).role)) {
         return res.status(403).json({ error: "Acesso negado" });
       }
 

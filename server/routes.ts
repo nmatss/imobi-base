@@ -46,7 +46,12 @@ import RedisStore from "rate-limit-redis";
 import helmet from "helmet";
 import cors from "cors";
 import { apiResponse, apiError, apiPaginated } from "./utils/api-response";
-import { checkFeatureAccess } from "./middleware/plan-limits";
+import {
+  checkFeatureAccess,
+  checkPropertyLimit,
+  checkLeadLimit,
+  isLeadLimitReachedForTenant,
+} from "./middleware/plan-limits";
 import { registerSecurityRoutes } from "./routes-security";
 import {
   checkAccountLock,
@@ -480,13 +485,21 @@ export async function registerRoutes(
     next();
   });
 
-  // Redis store for rate limiting in production (falls back to in-memory).
+  // Store distribuído (Redis) para rate limiting APENAS quando REDIS_URL está
+  // explicitamente configurada — getRedisClient() cria o client de forma
+  // síncrona e nunca lança aqui, então sem este gate o RedisStore seria usado
+  // SEMPRE (inclusive apontando para localhost inexistente no Vercel) e cada
+  // request a /api/* viraria 500 por erro de store.
+  // Sem REDIS_URL: store em memória padrão do express-rate-limit. Limitação
+  // conhecida: o contador é por instância, então em múltiplas instâncias
+  // serverless o limite efetivo se multiplica — degradação aceitável até haver
+  // Redis gerenciado configurado.
   // express-rate-limit v8 requires a distinct Store instance per limiter.
   let createRateLimitStore: ((prefix: string) => RedisStore) | undefined;
-  try {
-    const { getRedisClient } = await import("./cache/redis-client");
-    const client = getRedisClient();
-    if (client) {
+  if (process.env.REDIS_URL) {
+    try {
+      const { getRedisClient } = await import("./cache/redis-client");
+      const client = getRedisClient();
       createRateLimitStore = (prefix: string) =>
         new RedisStore({
           sendCommand: (...args: string[]) =>
@@ -496,9 +509,11 @@ export async function registerRoutes(
           prefix,
         });
       console.log("[RateLimit] Using Redis store");
+    } catch {
+      console.log("[RateLimit] Redis not available, using in-memory store");
     }
-  } catch {
-    console.log("[RateLimit] Redis not available, using in-memory store");
+  } else {
+    console.log("[RateLimit] REDIS_URL not set, using in-memory store");
   }
 
   // Rate limiting - general API limiter
@@ -509,6 +524,10 @@ export async function registerRoutes(
     standardHeaders: true,
     legacyHeaders: false,
     store: createRateLimitStore?.("rl:api:"),
+    // Fail-open: se o store Redis falhar (timeout, conexão caída), a request
+    // passa sem contar — melhor que o default (passOnStoreError:false), que
+    // transforma erro de store em 500 para TODO o /api/*.
+    passOnStoreError: true,
   });
 
   // Stricter rate limiting for auth routes
@@ -521,6 +540,7 @@ export async function registerRoutes(
     standardHeaders: true,
     legacyHeaders: false,
     store: createRateLimitStore?.("rl:auth:"),
+    passOnStoreError: true, // fail-open em erro do store Redis (ver apiLimiter)
   });
 
   // Stricter rate limiting for public routes (lead creation, newsletter)
@@ -531,6 +551,7 @@ export async function registerRoutes(
     standardHeaders: true,
     legacyHeaders: false,
     store: createRateLimitStore?.("rl:public:"),
+    passOnStoreError: true, // fail-open em erro do store Redis (ver apiLimiter)
   });
 
   // Rate limiter para endpoints administrativos
@@ -542,6 +563,7 @@ export async function registerRoutes(
     standardHeaders: true,
     legacyHeaders: false,
     store: createRateLimitStore?.("rl:admin:"),
+    passOnStoreError: true, // fail-open em erro do store Redis (ver apiLimiter)
   });
 
   // Apply general rate limiting to all API routes
@@ -554,13 +576,28 @@ export async function registerRoutes(
   if (!isSqlite && process.env.DATABASE_URL) {
     // Production: use PostgreSQL for sessions
     const PgSession = connectPg(session);
+    // Pool dedicado de sessões com o MESMO racional serverless de server/db.ts:
+    // cada instância de função tem seu próprio pool, então o default do pg
+    // (max 10) multiplicado por N instâncias estoura o pooler do Supabase —
+    // furando o limite cuidadoso (max 3) do pool principal. Mantemos max 2,
+    // idle curto e allowExitOnIdle para drenar conexões entre invocações.
     const pgPool = new Pool({
       connectionString: process.env.DATABASE_URL,
+      max: 2,
+      idleTimeoutMillis: 10000,
+      allowExitOnIdle: true,
+    });
+    pgPool.on("error", (err) => {
+      console.error("[session-pool] unexpected error on idle client", err);
     });
     sessionStore = new PgSession({
       pool: pgPool,
       tableName: "session",
-      createTableIfMissing: true,
+      // NUNCA usar createTableIfMissing:true aqui: o connect-pg-simple faz
+      // fs.readFile(__dirname/table.sql), caminho que NÃO existe no bundle
+      // esbuild (serverless) — o primeiro write de sessão lançaria. A tabela é
+      // garantida pela migration migrations/20260610_000_session_table.sql.
+      createTableIfMissing: false,
     });
     console.log("Using PostgreSQL session store");
   } else {
@@ -575,6 +612,19 @@ export async function registerRoutes(
 
   // Get SESSION_SECRET from SecretManager (with fallback to process.env)
   const sessionSecret = secretManager.get("SESSION_SECRET");
+
+  // Encerramento fail-fast adequado ao runtime: em serverless (VERCEL),
+  // process.exit(1) vira crash opaco da função; lançar Error deixa o
+  // api-handler capturar como startupError e responder 500 limpo. No modo
+  // standalone (produção sem VERCEL) mantemos o process.exit original.
+  // (function declaration com retorno `never` explícito para o tsc reconhecer
+  // os caminhos abaixo como inalcançáveis e narrowar sessionSecret)
+  function failFastStartup(message: string): never {
+    if (process.env.VERCEL) {
+      throw new Error(message);
+    }
+    process.exit(1);
+  }
 
   // CRITICAL: Fail-fast validation for SESSION_SECRET in production
   // Note: SecretManager already validates this, but we keep this check for backwards compatibility
@@ -599,7 +649,9 @@ export async function registerRoutes(
         "   Generate a strong secret with: openssl rand -base64 64",
       );
       console.error("   Or run: npm run generate:secret");
-      process.exit(1); // Terminate application immediately
+      failFastStartup(
+        "SESSION_SECRET environment variable is required in production",
+      );
     }
 
     // Verify it's not a default/weak secret
@@ -612,7 +664,7 @@ export async function registerRoutes(
         "   Generate a strong secret with: openssl rand -base64 64",
       );
       console.error("   Or run: npm run generate:secret");
-      process.exit(1);
+      failFastStartup("Default SESSION_SECRET not allowed in production");
     }
 
     // Verify minimum length (256 bits = 32 bytes = 43 chars base64)
@@ -625,7 +677,7 @@ export async function registerRoutes(
         "   Generate a strong secret with: openssl rand -base64 64",
       );
       console.error("   Or run: npm run generate:secret");
-      process.exit(1);
+      failFastStartup("SESSION_SECRET must be at least 32 characters");
     }
 
     console.log("✅ SESSION_SECRET validated successfully");
@@ -1623,7 +1675,9 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/properties", requireAuth, async (req, res) => {
+  // checkPropertyLimit: bloqueia criacao acima do limite de imoveis do plano
+  // (403 + upgradeRequired — contrato do client/src/lib/plan-blocked.ts)
+  app.post("/api/properties", requireAuth, checkPropertyLimit, async (req, res) => {
     try {
       const data = insertPropertySchema.parse({
         ...req.body,
@@ -1694,6 +1748,16 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Telefone inválido" });
       }
       const data = insertLeadSchema.parse(req.body);
+      // Lead publico conta contra o limite mensal do tenant dono do site.
+      // Sem req.user aqui, entao a checagem usa o tenantId do proprio lead.
+      if (await isLeadLimitReachedForTenant(data.tenantId)) {
+        return res.status(403).json({
+          error: "Lead limit reached",
+          upgradeRequired: true,
+          message:
+            "O limite de leads/mês do plano desta imobiliária foi atingido. Faça upgrade para continuar recebendo leads.",
+        });
+      }
       const lead = await storage.createLead(data);
       res.status(201).json({ success: true, lead });
     } catch (error: unknown) {
@@ -1734,7 +1798,8 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/leads", requireAuth, async (req, res) => {
+  // checkLeadLimit: bloqueia criacao acima do limite mensal de leads do plano
+  app.post("/api/leads", requireAuth, checkLeadLimit, async (req, res) => {
     try {
       const data = insertLeadSchema.parse({
         ...req.body,
@@ -3341,7 +3406,7 @@ export async function registerRoutes(
 
   app.put("/api/settings/general", requireAuth, async (req, res) => {
     try {
-      if (req.user!.role !== "admin") {
+      if (!isAdminRole(req.user!.role)) {
         return res.status(403).json({
           error:
             "Acesso negado. Apenas administradores podem alterar configurações.",
@@ -3369,7 +3434,7 @@ export async function registerRoutes(
 
   app.put("/api/settings/brand", requireAuth, async (req, res) => {
     try {
-      if (req.user!.role !== "admin") {
+      if (!isAdminRole(req.user!.role)) {
         return res.status(403).json({
           error:
             "Acesso negado. Apenas administradores podem alterar configurações.",
@@ -3397,7 +3462,7 @@ export async function registerRoutes(
 
   app.put("/api/settings/ai", requireAuth, async (req, res) => {
     try {
-      if (req.user!.role !== "admin") {
+      if (!isAdminRole(req.user!.role)) {
         return res.status(403).json({
           error:
             "Acesso negado. Apenas administradores podem alterar configurações.",
@@ -3438,7 +3503,7 @@ export async function registerRoutes(
 
   app.post("/api/user-roles", requireAuth, async (req, res) => {
     try {
-      if (req.user!.role !== "admin") {
+      if (!isAdminRole(req.user!.role)) {
         return res.status(403).json({
           error: "Acesso negado. Apenas administradores podem criar funções.",
         });
@@ -3457,7 +3522,7 @@ export async function registerRoutes(
 
   app.patch("/api/user-roles/:id", requireAuth, async (req, res) => {
     try {
-      if (req.user!.role !== "admin") {
+      if (!isAdminRole(req.user!.role)) {
         return res.status(403).json({
           error:
             "Acesso negado. Apenas administradores podem atualizar funções.",
@@ -3487,7 +3552,7 @@ export async function registerRoutes(
 
   app.delete("/api/user-roles/:id", requireAuth, async (req, res) => {
     try {
-      if (req.user!.role !== "admin") {
+      if (!isAdminRole(req.user!.role)) {
         return res.status(403).json({
           error: "Acesso negado. Apenas administradores podem deletar funções.",
         });
@@ -3506,7 +3571,7 @@ export async function registerRoutes(
 
   app.post("/api/user-roles/seed-defaults", requireAuth, async (req, res) => {
     try {
-      if (req.user!.role !== "admin") {
+      if (!isAdminRole(req.user!.role)) {
         return res.status(403).json({
           error:
             "Acesso negado. Apenas administradores podem criar roles padrão.",
@@ -3545,7 +3610,7 @@ export async function registerRoutes(
 
   app.put("/api/integrations/:name", requireAuth, async (req, res) => {
     try {
-      if (req.user!.role !== "admin") {
+      if (!isAdminRole(req.user!.role)) {
         return res.status(403).json({
           error:
             "Acesso negado. Apenas administradores podem configurar integrações.",
@@ -3584,7 +3649,7 @@ export async function registerRoutes(
     requireAuth,
     async (req, res) => {
       try {
-        if (req.user!.role !== "admin") {
+        if (!isAdminRole(req.user!.role)) {
           return res.status(403).json({
             error:
               "Acesso negado. Apenas administradores podem alterar preferências.",
@@ -3694,7 +3759,7 @@ export async function registerRoutes(
     requireAuth,
     async (req, res) => {
       try {
-        if (req.user!.role !== "admin") {
+        if (!isAdminRole(req.user!.role)) {
           return res.status(403).json({
             error:
               "Acesso negado. Apenas administradores podem criar categorias padrão.",

@@ -643,6 +643,11 @@ export default function LeadsKanban() {
         const statusLabel = COLUMNS.find((c) => c.id === newStatus)?.label || newStatus;
         toast.success("Lead movido", `Lead movido para "${statusLabel}".`);
         await refetchLeads();
+      } else {
+        const payload = await res.json().catch(() => null);
+        toast.error("Erro ao mover lead", payload?.error || payload?.message || "Não foi possível mover o lead.");
+        // Re-sincroniza o quadro com o servidor para o card voltar à coluna original
+        await refetchLeads();
       }
     } catch (error) {
       toast.error("Erro", "Não foi possível mover o lead.");
@@ -663,6 +668,11 @@ export default function LeadsKanban() {
 
       if (res.ok) {
         toast.success("Lead movido");
+        await refetchLeads();
+      } else {
+        const payload = await res.json().catch(() => null);
+        toast.error("Erro ao mover lead", payload?.error || payload?.message || "Não foi possível mover o lead.");
+        // Re-sincroniza o quadro com o servidor para o card voltar à coluna original
         await refetchLeads();
       }
     } catch (error) {

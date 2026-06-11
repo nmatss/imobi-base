@@ -21,6 +21,7 @@ import { sendDeletionConfirmationEmail } from "./compliance-email";
 import PDFDocument from "pdfkit";
 import { createWriteStream, mkdirSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
+import os from "os";
 
 /**
  * Deriva a base legal real (LGPD Art. 7/Art. 18) conforme a ação de compliance,
@@ -51,14 +52,28 @@ function deriveLegalBasis(
   }
 }
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
+// No Vercel o filesystem do bundle é read-only; apenas /tmp é gravável.
+// HONESTIDADE: /tmp é EFÊMERO (por instância/cold start) — certificados que
+// precisem ficar baixáveis por dias exigem storage durável (Supabase Storage,
+// no backlog pós-launch). Em dev mantemos ./uploads.
+const UPLOAD_DIR =
+  process.env.UPLOAD_DIR ||
+  (process.env.VERCEL ? join(os.tmpdir(), "imobibase-uploads") : "./uploads");
 const CERTIFICATES_DIR = join(UPLOAD_DIR, "certificates");
 
-// Ensure certificates directory exists (skip in serverless/read-only environments)
-try {
+/**
+ * Garante o diretório de certificados NO MOMENTO DO USO (não só no module
+ * load): em serverless cada invocação pode cair em instância nova.
+ */
+function ensureCertificatesDir(): void {
   if (!existsSync(CERTIFICATES_DIR)) {
     mkdirSync(CERTIFICATES_DIR, { recursive: true });
   }
+}
+
+// Best-effort no load (mantém comportamento em dev); o uso real revalida.
+try {
+  ensureCertificatesDir();
 } catch {
   console.warn('[data-deletion] Cannot create certificates directory (serverless environment)');
 }
@@ -373,6 +388,7 @@ async function generateDeletionCertificate(
   deletionType: string,
   requestId: string
 ): Promise<string> {
+  ensureCertificatesDir(); // mkdir recursivo no momento do uso (serverless-safe)
   const fileName = `deletion-certificate-${randomUUID()}-${certificateNumber}.pdf`;
   const filePath = join(CERTIFICATES_DIR, fileName);
 
