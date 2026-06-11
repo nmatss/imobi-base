@@ -299,7 +299,7 @@ export class DocumentService {
 
     // Log legitimate download for audit trail
     console.log(`[CLICKSIGN] Validated URL for ${context}`, {
-      urlPreview: url.substring(0, 50) + '...',
+      urlPreview: `${url.substring(0, 50)  }...`,
       timestamp: new Date().toISOString(),
     });
   }

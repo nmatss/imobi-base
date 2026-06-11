@@ -28,19 +28,15 @@ export interface SalesFunnelProps {
 }
 
 // Format currency
-const formatPrice = (value: number): string => {
-  return new Intl.NumberFormat("pt-BR", {
+const formatPrice = (value: number): string => new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);
-};
 
 // Format large numbers
-const formatNumber = (value: number): string => {
-  return new Intl.NumberFormat("pt-BR").format(value);
-};
+const formatNumber = (value: number): string => new Intl.NumberFormat("pt-BR").format(value);
 
 // Calculate conversion rate between stages
 const calculateConversion = (current: number, previous: number): number => {

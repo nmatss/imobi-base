@@ -96,12 +96,10 @@ export default function CheckoutPage() {
     }
   };
 
-  const formatPrice = (priceInCents: number) => {
-    return new Intl.NumberFormat("pt-BR", {
+  const formatPrice = (priceInCents: number) => new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
     }).format(priceInCents / 100);
-  };
 
   if (loading) {
     return (

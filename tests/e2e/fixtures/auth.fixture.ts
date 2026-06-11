@@ -15,51 +15,43 @@ export interface AuthFixtures {
 }
 
 /**
- * Test users for different roles
+ * Usuários criados por `npm run db:seed` (server/seed.ts) — fonte única de
+ * credenciais para os specs E2E; manter em sincronia com o seed.
  */
 export const testUsers = {
   admin: {
-    email: 'admin@test.com',
-    password: 'admin123!',
-    name: 'Admin User',
+    email: 'admin@sol.com',
+    password: 'password',
+    name: 'Admin Sol',
     role: 'admin' as const,
   },
   user: {
-    email: 'user@test.com',
-    password: 'user123!',
-    name: 'Regular User',
+    email: 'admin@novacasa.com',
+    password: 'password',
+    name: 'Admin Nova Casa',
     role: 'user' as const,
   },
   viewer: {
-    email: 'viewer@test.com',
-    password: 'viewer123!',
-    name: 'Viewer User',
+    email: 'admin@novacasa.com',
+    password: 'password',
+    name: 'Admin Nova Casa',
     role: 'viewer' as const,
   },
 };
 
 /**
- * Login helper function
+ * Login helper function ("/" é a landing pública — o form fica em /login)
  */
 export async function login(page: Page, user: AuthenticatedUser) {
-  await page.goto('/');
-
-  // Check if already logged in
-  const logoutButton = await page.locator('[data-testid="user-menu"]').count();
-  if (logoutButton > 0) {
-    return;
-  }
+  await page.goto('/login');
 
   // Fill login form
-  await page.fill('[data-testid="email-input"]', user.email);
-  await page.fill('[data-testid="password-input"]', user.password);
-  await page.click('[data-testid="login-button"]');
+  await page.fill('[data-testid="input-email"]', user.email);
+  await page.fill('[data-testid="input-password"]', user.password);
+  await page.click('[data-testid="button-login"]');
 
   // Wait for redirect to dashboard
   await page.waitForURL(/\/dashboard/, { timeout: 10000 });
-
-  // Verify login success
-  await expect(page.locator('[data-testid="user-menu"]')).toBeVisible();
 }
 
 /**

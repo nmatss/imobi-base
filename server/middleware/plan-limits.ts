@@ -91,11 +91,19 @@ export async function getTenantSubscriptionStatus(
 }
 
 /**
- * Check if tenant subscription is active
+ * Check if tenant subscription is active.
+ * 'past_due' conta como ativa AQUI: o bloqueio apos o grace period de 7 dias
+ * e responsabilidade do subscription-guard global — este middleware nao deve
+ * barrar antes do guard durante o grace period.
  */
 export async function isSubscriptionActive(tenantId: string): Promise<boolean> {
   const status = await getTenantSubscriptionStatus(tenantId);
-  return status === "active" || status === "trial" || status === "free";
+  return (
+    status === "active" ||
+    status === "trial" ||
+    status === "free" ||
+    status === "past_due"
+  );
 }
 
 /**
@@ -147,8 +155,11 @@ async function checkResourceLimit(
         upgradeMessage: `Você atingiu o limite de ${resourceName} (${maxAllowed}) do seu plano. Faça upgrade para continuar.`,
       };
 
+      // upgradeRequired: true e o sinal estavel que o client (plan-blocked.ts)
+      // usa para distinguir "limite de plano" de outros 403.
       res.status(403).json({
         error: `${resourceName} limit reached`,
+        upgradeRequired: true,
         ...upgradePrompt,
       });
       return;
@@ -218,6 +229,30 @@ export async function checkLeadLimit(
     (l) => l.maxLeads,
     (tid) => storage.getTenantLeadCountThisMonth(tid),
   );
+}
+
+/**
+ * Verifica o limite mensal de leads para um tenant SEM depender de req.user.
+ * Usado na rota publica POST /api/leads/public, onde nao ha sessao mas o lead
+ * conta contra o tenant dono do site. Fail-open em erro interno: melhor
+ * aceitar um lead a mais do que perder lead de visitante por falha nossa.
+ */
+export async function isLeadLimitReachedForTenant(
+  tenantId: string,
+): Promise<boolean> {
+  try {
+    const limits = await getTenantPlanLimits(tenantId);
+    // -1 = ilimitado
+    if (limits.maxLeads === -1) return false;
+    const current = await storage.getTenantLeadCountThisMonth(tenantId);
+    return current >= limits.maxLeads;
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { middleware: "plan-limits", operation: "isLeadLimitReachedForTenant" },
+      extra: { tenantId },
+    });
+    return false;
+  }
 }
 
 /**

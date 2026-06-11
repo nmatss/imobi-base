@@ -4,9 +4,8 @@
 # Run lint-staged
 npx lint-staged
 
-# Run type check (skip full project check - use CI for that)
-# echo "Running TypeScript type check..."
-# npx tsc --noEmit
+# Full TypeScript type check runs on pre-push (see .husky/pre-push) to keep
+# commits fast. CI also enforces it as the authoritative gate.
 
 # Run tests related to changed files
 echo "Running tests for changed files..."

@@ -37,7 +37,7 @@ function deepClone<T>(obj: T): T {
 // Truncate string function
 function truncate(str: string, maxLength: number): string {
   if (str.length <= maxLength) return str;
-  return str.slice(0, maxLength - 3) + '...';
+  return `${str.slice(0, maxLength - 3)  }...`;
 }
 
 // Capitalize function

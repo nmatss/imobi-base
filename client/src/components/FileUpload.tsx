@@ -263,15 +263,13 @@ export function FileUpload({
   }, [files, fileType, bucket, category, entityType, entityId, onUploadComplete, onUploadError]);
 
   // Cleanup on unmount
-  React.useEffect(() => {
-    return () => {
+  React.useEffect(() => () => {
       files.forEach(file => {
         if (file.preview) {
           URL.revokeObjectURL(file.preview);
         }
       });
-    };
-  }, [files]);
+    }, [files]);
 
   return (
     <div className={cn('space-y-4', className)}>

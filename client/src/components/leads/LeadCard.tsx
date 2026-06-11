@@ -175,8 +175,8 @@ const LeadCardComponent = ({
                 variant="outline"
                 className="shrink-0 gap-1 text-xs px-2 py-0.5 w-fit"
                 style={{
-                  borderColor: sourceConfig.color + "40",
-                  backgroundColor: sourceConfig.color + "10",
+                  borderColor: `${sourceConfig.color  }40`,
+                  backgroundColor: `${sourceConfig.color  }10`,
                   color: sourceConfig.color,
                 }}
               >
@@ -330,9 +330,9 @@ const LeadCardComponent = ({
 };
 
 // Memoized LeadCard with intelligent prop comparison
-export const LeadCard = memo(LeadCardComponent, (prevProps, nextProps) => {
+export const LeadCard = memo(LeadCardComponent, (prevProps, nextProps) => 
   // Only re-render if critical props change
-  return (
+   (
     prevProps.id === nextProps.id &&
     prevProps.name === nextProps.name &&
     prevProps.avatar === nextProps.avatar &&
@@ -350,7 +350,7 @@ export const LeadCard = memo(LeadCardComponent, (prevProps, nextProps) => {
     prevProps.draggable === nextProps.draggable &&
     prevProps.className === nextProps.className
     // Callback functions are stable references, no need to compare
-  );
-});
+  )
+);
 
 export default LeadCard;

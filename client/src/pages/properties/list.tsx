@@ -25,7 +25,7 @@ import {
   Camera, FileCheck, Sparkles, Send, MoreVertical, Copy, CalendarPlus, ChevronDown,
   Bed, Maximize2
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/lib/toast-helpers";
 import { ImageLightbox } from "@/components/ui/image-lightbox";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -137,9 +137,139 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }
   pending: { label: "Pendente", color: "text-gray-700", bg: "bg-gray-100" },
 };
 
+// Property enriquecida com metadados de qualidade/visitas calculados em PropertiesList.
+type EnrichedProperty = Property & {
+  score: number;
+  missing: string[];
+  visitCount: number;
+  daysSinceLastVisit: number | null;
+  interestedLeads: number;
+  hasQualityIssues: boolean;
+};
+
+interface PropertyGridVirtualizedProps {
+  properties: EnrichedProperty[];
+  togglingFeatured: string | null;
+  onView: (id: string) => void;
+  onEdit: (property: EnrichedProperty) => void;
+  onDelete: (id: string) => void;
+  onShare: (property: EnrichedProperty) => void;
+  onToggleFeatured: (property: EnrichedProperty) => void;
+  onCopyLink: (property: EnrichedProperty) => void;
+  onScheduleVisit: () => void;
+  onImageClick: (images: string[]) => void;
+}
+
+/**
+ * Grid virtualizado de imóveis (view "grid").
+ * Extraído para o nível de módulo para que os hooks (useRef/useState/useEffect/useVirtualizer)
+ * fiquem no corpo de um componente React — antes estavam dentro de um IIFE no JSX.
+ */
+function PropertyGridVirtualized({
+  properties,
+  togglingFeatured,
+  onView,
+  onEdit,
+  onDelete,
+  onShare,
+  onToggleFeatured,
+  onCopyLink,
+  onScheduleVisit,
+  onImageClick,
+}: PropertyGridVirtualizedProps) {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  // Calculate columns based on viewport
+  const getColumnCount = () => {
+    if (typeof window === 'undefined') return 3;
+    const width = window.innerWidth;
+    if (width < 640) return 1;  // mobile (<640px)
+    if (width < 1024) return 2; // tablet (640-1024px)
+    return 3;                    // desktop (1024+)
+  };
+
+  const [columnCount, setColumnCount] = useState(getColumnCount);
+
+  // Update column count on resize
+  useEffect(() => {
+    const handleResize = () => setColumnCount(getColumnCount());
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const rowCount = Math.ceil(properties.length / columnCount);
+
+  const rowVirtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 280, // PropertyCard estimated height
+    overscan: 5,
+  });
+
+  return (
+    <div ref={parentRef} className="h-[calc(100vh-24rem)] overflow-auto">
+      <div
+        style={{
+          height: `${rowVirtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+          const startIndex = virtualRow.index * columnCount;
+          const rowProperties = properties.slice(startIndex, startIndex + columnCount);
+
+          return (
+            <div
+              key={virtualRow.key}
+              data-index={virtualRow.index}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
+              {/* Grid responsivo: 1 col mobile → 2 tablet → 3 desktop, com gaps adaptativos */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 px-1">
+                {rowProperties.map((property) => (
+                  <PropertyCard
+                    key={property.id}
+                    id={property.id}
+                    title={property.title}
+                    city={property.city}
+                    price={parseFloat(property.price)}
+                    bedrooms={property.bedrooms}
+                    bathrooms={property.bathrooms}
+                    area={property.area}
+                    status={property.status as "available" | "sold" | "rented" | "pending" | "reserved"}
+                    type={property.category as 'sale' | 'rent'}
+                    featured={property.featured}
+                    imageUrl={property.images?.[0]}
+                    imageCount={property.images?.length || 0}
+                    isTogglingFeatured={togglingFeatured === property.id}
+                    onView={(id) => onView(id)}
+                    onEdit={() => onEdit(property)}
+                    onDelete={(id) => onDelete(id)}
+                    onShare={() => onShare(property)}
+                    onToggleFeatured={() => onToggleFeatured(property)}
+                    onCopyLink={() => onCopyLink(property)}
+                    onScheduleVisit={() => onScheduleVisit()}
+                    onImageClick={() => onImageClick(property.images || [])}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function PropertiesList() {
   const { properties, tenant, visits, leads, refetchProperties, loading } = useImobi();
-  const { toast } = useToast();
   const [, setLocation] = useLocation();
 
   // View & Filter State
@@ -202,7 +332,7 @@ export default function PropertiesList() {
 
   // ==================== FILTERED PROPERTIES ====================
   const filteredProperties = useMemo(() => {
-    let filtered = properties.filter(p => {
+    const filtered = properties.filter(p => {
       const matchesSearch = searchQuery === "" ||
         p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -236,8 +366,7 @@ export default function PropertiesList() {
   }, [properties, searchQuery, filterCategory, filterStatus, filterType, filterCity, sortBy]);
 
   // ==================== PROPERTY ENRICHMENT ====================
-  const enrichedProperties = useMemo(() => {
-    return filteredProperties.map(property => {
+  const enrichedProperties = useMemo(() => filteredProperties.map(property => {
       const { score, missing } = calculateScore(property);
       const propertyVisits = visits.filter(v => v.propertyId === property.id);
       const lastVisit = propertyVisits.length > 0
@@ -259,8 +388,7 @@ export default function PropertiesList() {
         interestedLeads,
         hasQualityIssues: score < 70,
       };
-    });
-  }, [filteredProperties, visits, leads]);
+    }), [filteredProperties, visits, leads]);
 
   // ==================== HANDLERS ====================
   const handleImageLoad = (imageUrl: string) => {
@@ -792,97 +920,18 @@ export default function PropertiesList() {
         </div>
       ) : viewMode === "grid" ? (
         /* GRID VIEW WITH VIRTUALIZATION - Grid responsivo: 1 col mobile → 2 tablet → 3 desktop */
-        (() => {
-          const parentRef = useRef<HTMLDivElement>(null);
-
-          // Calculate columns based on viewport
-          const getColumnCount = () => {
-            if (typeof window === 'undefined') return 3;
-            const width = window.innerWidth;
-            if (width < 640) return 1;  // mobile (<640px)
-            if (width < 1024) return 2; // tablet (640-1024px)
-            return 3;                    // desktop (1024+)
-          };
-
-          const [columnCount, setColumnCount] = useState(getColumnCount);
-
-          // Update column count on resize
-          useEffect(() => {
-            const handleResize = () => setColumnCount(getColumnCount());
-            window.addEventListener('resize', handleResize);
-            return () => window.removeEventListener('resize', handleResize);
-          }, []);
-
-          const rowCount = Math.ceil(enrichedProperties.length / columnCount);
-
-          const rowVirtualizer = useVirtualizer({
-            count: rowCount,
-            getScrollElement: () => parentRef.current,
-            estimateSize: () => 280, // PropertyCard estimated height
-            overscan: 5,
-          });
-
-          return (
-            <div ref={parentRef} className="h-[calc(100vh-24rem)] overflow-auto">
-              <div
-                style={{
-                  height: `${rowVirtualizer.getTotalSize()}px`,
-                  width: '100%',
-                  position: 'relative',
-                }}
-              >
-                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                  const startIndex = virtualRow.index * columnCount;
-                  const rowProperties = enrichedProperties.slice(startIndex, startIndex + columnCount);
-
-                  return (
-                    <div
-                      key={virtualRow.key}
-                      data-index={virtualRow.index}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        transform: `translateY(${virtualRow.start}px)`,
-                      }}
-                    >
-                      {/* Grid responsivo: 1 col mobile → 2 tablet → 3 desktop, com gaps adaptativos */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 px-1">
-                        {rowProperties.map((property) => (
-                          <PropertyCard
-                            key={property.id}
-                            id={property.id}
-                            title={property.title}
-                            city={property.city}
-                            price={parseFloat(property.price)}
-                            bedrooms={property.bedrooms}
-                            bathrooms={property.bathrooms}
-                            area={property.area}
-                            status={property.status as "available" | "sold" | "rented" | "pending" | "reserved"}
-                            type={property.category as 'sale' | 'rent'}
-                            featured={property.featured}
-                            imageUrl={property.images?.[0]}
-                            imageCount={property.images?.length || 0}
-                            isTogglingFeatured={togglingFeatured === property.id}
-                            onView={(id) => setLocation(`/properties/${id}`)}
-                            onEdit={(id) => openEditModal(property)}
-                            onDelete={(id) => setDeleteConfirmId(id)}
-                            onShare={(id) => shareWhatsApp(property)}
-                            onToggleFeatured={(id) => handleToggleFeatured(property)}
-                            onCopyLink={(id) => copyLink(property)}
-                            onScheduleVisit={(id) => setLocation("/calendar")}
-                            onImageClick={(id) => openLightbox(property.images || [])}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()
+        <PropertyGridVirtualized
+          properties={enrichedProperties}
+          togglingFeatured={togglingFeatured}
+          onView={(id) => setLocation(`/properties/${id}`)}
+          onEdit={(property) => openEditModal(property)}
+          onDelete={(id) => setDeleteConfirmId(id)}
+          onShare={(property) => shareWhatsApp(property)}
+          onToggleFeatured={(property) => handleToggleFeatured(property)}
+          onCopyLink={(property) => copyLink(property)}
+          onScheduleVisit={() => setLocation("/calendar")}
+          onImageClick={(images) => openLightbox(images)}
+        />
       ) : (
         /* LIST VIEW - Responsive: stacks on very small screens, horizontal on larger */
         <div className="space-y-2 sm:space-y-2.5">

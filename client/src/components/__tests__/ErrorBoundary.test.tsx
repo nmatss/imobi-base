@@ -245,10 +245,20 @@ describe('ErrorBoundary', () => {
     });
   });
 
-  describe('Dev Mode Debug Info', () => {
-    it('should show debug info in development mode', () => {
-      const originalEnv = import.meta.env.DEV;
-      (import.meta.env as any).DEV = true;
+  describe('Debug Info', () => {
+    it('should hide debug info by default', () => {
+      render(
+        <ErrorBoundary>
+          <ThrowError />
+        </ErrorBoundary>
+      );
+
+      expect(screen.queryByText(/informações de debug/i)).not.toBeInTheDocument();
+    });
+
+    it('should show debug info when explicitly enabled', () => {
+      const originalDebugFlag = import.meta.env.VITE_SHOW_ERROR_DEBUG;
+      (import.meta.env as any).VITE_SHOW_ERROR_DEBUG = "true";
 
       render(
         <ErrorBoundary>
@@ -259,12 +269,12 @@ describe('ErrorBoundary', () => {
       expect(screen.getByText(/informações de debug/i)).toBeInTheDocument();
       expect(screen.getByText(/error: test error/i)).toBeInTheDocument();
 
-      (import.meta.env as any).DEV = originalEnv;
+      (import.meta.env as any).VITE_SHOW_ERROR_DEBUG = originalDebugFlag;
     });
 
-    it('should show component stack in development', () => {
-      const originalEnv = import.meta.env.DEV;
-      (import.meta.env as any).DEV = true;
+    it('should show component stack when debug is explicitly enabled', () => {
+      const originalDebugFlag = import.meta.env.VITE_SHOW_ERROR_DEBUG;
+      (import.meta.env as any).VITE_SHOW_ERROR_DEBUG = "true";
 
       render(
         <ErrorBoundary>
@@ -274,7 +284,7 @@ describe('ErrorBoundary', () => {
 
       expect(screen.getByText('Component Stack')).toBeInTheDocument();
 
-      (import.meta.env as any).DEV = originalEnv;
+      (import.meta.env as any).VITE_SHOW_ERROR_DEBUG = originalDebugFlag;
     });
   });
 

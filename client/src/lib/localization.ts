@@ -258,7 +258,7 @@ export function parseLocalDate(dateStr: string, language: LanguageCode = 'pt-BR'
     }
 
     // Parse locale-specific format
-    const parts = dateStr.split(/[\/\-\.]/);
+    const parts = dateStr.split(/[/\-.]/);
     if (parts.length !== 3) return null;
 
     let year: number, month: number, day: number;

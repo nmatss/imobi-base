@@ -41,15 +41,15 @@ export function useFocusTrap(options: FocusTrapOptions) {
 
     return Array.from(
       containerRef.current.querySelectorAll<HTMLElement>(selector)
-    ).filter((el) => {
+    ).filter((el) => 
       // Filter out elements that are not visible or are disabled
-      return (
+       (
         !el.hasAttribute('disabled') &&
         el.tabIndex !== -1 &&
         !el.hidden &&
         el.offsetParent !== null
-      );
-    });
+      )
+    );
   }, [containerRef]);
 
   const handleTabKey = useCallback(

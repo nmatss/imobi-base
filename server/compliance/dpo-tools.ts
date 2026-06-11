@@ -10,7 +10,8 @@
 
 import { db, schema } from "../db";
 import { eq } from "drizzle-orm";
-import { generateAuditReport } from "./audit-logger";
+import { randomUUID } from "crypto";
+import { sendBreachAlertToDpo, addBusinessDays } from "./compliance-email";
 
 /**
  * Data Inventory Report
@@ -129,7 +130,7 @@ export async function generateConsentReport(tenantId: string, startDate?: string
       total,
       active,
       withdrawn,
-      withdrawalRate: total > 0 ? ((withdrawn / total) * 100).toFixed(2) + "%" : "0%",
+      withdrawalRate: total > 0 ? `${((withdrawn / total) * 100).toFixed(2)  }%` : "0%",
     };
 
     report.withdrawalRate[type] = total > 0 ? (withdrawn / total) * 100 : 0;
@@ -206,7 +207,16 @@ export async function reportDataBreach(options: {
   const count = existingIncidents.length + 1;
   const incidentNumber = `BR-${year}-${String(count).padStart(3, "0")}`;
 
+  const isHighSeverity = options.severity === "high" || options.severity === "critical";
+
+  // LGPD Art. 48 + Res. CD/ANPD 15/2024: prazo de notificação à ANPD é de
+  // 3 (três) DIAS ÚTEIS a contar da CIÊNCIA do incidente (discoveredAt).
+  const discoveredDate = new Date(options.discoveredAt);
+  const anpdDeadlineDate = addBusinessDays(discoveredDate, 3);
+  const anpdDeadline = anpdDeadlineDate.toISOString();
+
   const [incident] = await db.insert(schema.dataBreachIncidents).values({
+    id: randomUUID(),
     tenantId: options.tenantId,
     incidentNumber,
     severity: options.severity,
@@ -219,22 +229,44 @@ export async function reportDataBreach(options: {
     discoveredAt: options.discoveredAt,
     reportedBy: options.reportedBy,
     assignedTo: options.assignedTo,
+    // Pendência de notificação à ANPD registrada em 'notes' (flag legível ao DPO).
+    notes: isHighSeverity
+      ? `PENDÊNCIA ANPD: notificar autoridade/titulares até ${anpdDeadline} (3 dias úteis a partir da ciência).`
+      : undefined,
   }).returning();
 
-  // LGPD Art. 48: Must notify ANPD within reasonable timeframe
-  // GDPR Art. 33: Must notify authority within 72 hours
-  // TODO: Send notification to ANPD if severity is high/critical
-
-  // TODO: Notify affected users if severity is high/critical
-  // LGPD Art. 48, §1: Must notify affected data subjects when risk of damage
+  // LGPD Art. 48 + Res. CD/ANPD 15/2024: disparo AUTOMÁTICO de alerta ao
+  // Encarregado (DPO) quando a severidade é high/critical, marcando o prazo.
+  if (isHighSeverity) {
+    try {
+      await sendBreachAlertToDpo({
+        incidentNumber,
+        severity: options.severity,
+        title: options.title,
+        description: options.description,
+        affectedRecordsCount: options.affectedRecordsCount,
+        discoveredAt: options.discoveredAt,
+        anpdDeadline,
+        tenantId: options.tenantId,
+        isUpdate: false,
+      });
+    } catch (error) {
+      // Falha de envio não deve impedir o registro do incidente.
+      console.error("[dpo-tools] Falha ao alertar DPO sobre incidente:", error);
+    }
+  }
 
   return {
     incidentNumber,
     id: incident.id,
-    message: "Incidente de segurança registrado. Notificações serão enviadas conforme necessário.",
+    anpdDeadline: isHighSeverity ? anpdDeadline : undefined,
+    dpoNotified: isHighSeverity,
+    message: isHighSeverity
+      ? "Incidente de segurança registrado. Encarregado (DPO) notificado; prazo ANPD de 3 dias úteis iniciado."
+      : "Incidente de segurança registrado.",
     nextSteps: [
       "Investigar a causa raiz",
-      options.severity === "high" || options.severity === "critical" ? "Notificar ANPD em até 72 horas" : null,
+      isHighSeverity ? `Notificar ANPD em até 3 dias úteis (prazo: ${anpdDeadline})` : null,
       options.affectedRecordsCount > 100 ? "Notificar usuários afetados" : null,
       "Implementar ações de contenção",
       "Documentar ações preventivas",
@@ -272,8 +304,37 @@ export async function updateDataBreach(
     updatedAt: new Date().toISOString(),
   }).where(eq(schema.dataBreachIncidents.id, incidentId));
 
+  // Disparo AUTOMÁTICO ao DPO em atualização de incidente high/critical, salvo
+  // quando já se está apenas marcando como notificado/resolvido à autoridade.
+  const isHighSeverity = incident.severity === "high" || incident.severity === "critical";
+  const alreadyReportedToAuthority =
+    !!updates.reportedToAuthorityAt || !!incident.reportedToAuthorityAt;
+  let dpoNotified = false;
+
+  if (isHighSeverity && !alreadyReportedToAuthority) {
+    const discoveredDate = new Date(incident.discoveredAt);
+    const anpdDeadline = addBusinessDays(discoveredDate, 3).toISOString();
+    try {
+      await sendBreachAlertToDpo({
+        incidentNumber: incident.incidentNumber,
+        severity: incident.severity,
+        title: incident.title,
+        description: updates.notes || incident.description,
+        affectedRecordsCount: incident.affectedRecordsCount ?? 0,
+        discoveredAt: incident.discoveredAt,
+        anpdDeadline,
+        tenantId: incident.tenantId ?? "",
+        isUpdate: true,
+      });
+      dpoNotified = true;
+    } catch (error) {
+      console.error("[dpo-tools] Falha ao re-alertar DPO em atualização de incidente:", error);
+    }
+  }
+
   return {
     message: "Incidente atualizado com sucesso",
+    dpoNotified,
   };
 }
 

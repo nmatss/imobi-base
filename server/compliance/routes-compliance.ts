@@ -50,10 +50,23 @@ export function registerComplianceRoutes(app: Express) {
   // Aplicar rate limiter globalmente em todas as rotas /api/admin/compliance
   app.use('/api/admin/compliance', adminComplianceLimiter);
 
+  // 🔒 Rate limiter para endpoints PÚBLICOS (sem autenticação) de compliance.
+  // Mais restritivo que o admin, pois são acessíveis sem login (token/sessão) e
+  // disparam ações sensíveis (confirmar exclusão, baixar certificado/export,
+  // gravar consentimento de cookie). Mitiga brute force de token e abuso.
+  const publicComplianceLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minuto
+    max: 20, // 20 requisições por minuto por chave (IP)
+    message: { error: 'Compliance API rate limit exceeded. Please slow down.' },
+    keyGenerator: generateRateLimitKey,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   // ===== PUBLIC ROUTES (no authentication required) =====
 
   // Cookie consent
-  app.post("/api/compliance/cookie-consent", async (req: Request, res: Response) => {
+  app.post("/api/compliance/cookie-consent", publicComplianceLimiter, async (req: Request, res: Response) => {
     try {
       const { preferences, sessionId, consentVersion } = req.body;
       const userId = req.user?.id;
@@ -76,7 +89,7 @@ export function registerComplianceRoutes(app: Express) {
   });
 
   // Get cookie preferences
-  app.get("/api/compliance/cookie-preferences", async (req: Request, res: Response) => {
+  app.get("/api/compliance/cookie-preferences", publicComplianceLimiter, async (req: Request, res: Response) => {
     try {
       const userId = req.user?.id;
       const sessionId = req.query.sessionId as string;
@@ -89,7 +102,7 @@ export function registerComplianceRoutes(app: Express) {
   });
 
   // Confirm account deletion (via email token)
-  app.post("/api/compliance/confirm-deletion/:token", async (req: Request, res: Response) => {
+  app.post("/api/compliance/confirm-deletion/:token", publicComplianceLimiter, async (req: Request, res: Response) => {
     try {
       const { token } = req.params;
       const ipAddress = req.ip || req.headers["x-forwarded-for"]?.toString();
@@ -102,7 +115,7 @@ export function registerComplianceRoutes(app: Express) {
   });
 
   // Download deletion certificate (public with certificate number)
-  app.get("/api/compliance/deletion-certificate/:certificateNumber", async (req: Request, res: Response) => {
+  app.get("/api/compliance/deletion-certificate/:certificateNumber", publicComplianceLimiter, async (req: Request, res: Response) => {
     try {
       const { certificateNumber } = req.params;
 
@@ -246,7 +259,7 @@ export function registerComplianceRoutes(app: Express) {
     }
   });
 
-  app.get("/api/compliance/export-data/download/:requestId", async (req: Request, res: Response) => {
+  app.get("/api/compliance/export-data/download/:requestId", publicComplianceLimiter, async (req: Request, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: "Não autenticado" });

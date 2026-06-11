@@ -14,15 +14,15 @@ describe('Auth Middleware', () => {
     statusSpy = vi.fn(() => ({ json: jsonSpy }));
 
     mockReq = {
-      isAuthenticated: vi.fn(),
+      isAuthenticated: vi.fn() as unknown as Request['isAuthenticated'],
       user: undefined,
       path: '/api/test',
       method: 'GET',
     };
 
     mockRes = {
-      status: statusSpy,
-      json: jsonSpy,
+      status: statusSpy as unknown as Response['status'],
+      json: jsonSpy as unknown as Response['json'],
     };
 
     mockNext = vi.fn();
@@ -30,7 +30,7 @@ describe('Auth Middleware', () => {
 
   describe('requireAuth', () => {
     it('should allow authenticated user with tenantId', () => {
-      mockReq.isAuthenticated = vi.fn(() => true);
+      mockReq.isAuthenticated = vi.fn(() => true) as unknown as Request['isAuthenticated'];
       mockReq.user = {
         id: 1,
         tenantId: 'tenant-123',
@@ -44,7 +44,7 @@ describe('Auth Middleware', () => {
     });
 
     it('should reject unauthenticated user', () => {
-      mockReq.isAuthenticated = vi.fn(() => false);
+      mockReq.isAuthenticated = vi.fn(() => false) as unknown as Request['isAuthenticated'];
 
       requireAuth(mockReq as Request, mockRes as Response, mockNext);
 
@@ -57,7 +57,7 @@ describe('Auth Middleware', () => {
     });
 
     it('should reject authenticated user without tenantId', () => {
-      mockReq.isAuthenticated = vi.fn(() => true);
+      mockReq.isAuthenticated = vi.fn(() => true) as unknown as Request['isAuthenticated'];
       mockReq.user = {
         id: 1,
         role: 'user',
@@ -74,7 +74,7 @@ describe('Auth Middleware', () => {
     });
 
     it('should reject if user object is missing', () => {
-      mockReq.isAuthenticated = vi.fn(() => true);
+      mockReq.isAuthenticated = vi.fn(() => true) as unknown as Request['isAuthenticated'];
       mockReq.user = undefined;
 
       requireAuth(mockReq as Request, mockRes as Response, mockNext);
@@ -86,7 +86,7 @@ describe('Auth Middleware', () => {
 
   describe('requireAdmin', () => {
     it('should allow admin user', () => {
-      mockReq.isAuthenticated = vi.fn(() => true);
+      mockReq.isAuthenticated = vi.fn(() => true) as unknown as Request['isAuthenticated'];
       mockReq.user = {
         id: 1,
         tenantId: 'tenant-123',
@@ -100,7 +100,7 @@ describe('Auth Middleware', () => {
     });
 
     it('should allow super_admin user', () => {
-      mockReq.isAuthenticated = vi.fn(() => true);
+      mockReq.isAuthenticated = vi.fn(() => true) as unknown as Request['isAuthenticated'];
       mockReq.user = {
         id: 1,
         tenantId: 'tenant-123',
@@ -114,7 +114,7 @@ describe('Auth Middleware', () => {
     });
 
     it('should reject regular user', () => {
-      mockReq.isAuthenticated = vi.fn(() => true);
+      mockReq.isAuthenticated = vi.fn(() => true) as unknown as Request['isAuthenticated'];
       mockReq.user = {
         id: 1,
         tenantId: 'tenant-123',
@@ -132,7 +132,7 @@ describe('Auth Middleware', () => {
     });
 
     it('should reject unauthenticated user', () => {
-      mockReq.isAuthenticated = vi.fn(() => false);
+      mockReq.isAuthenticated = vi.fn(() => false) as unknown as Request['isAuthenticated'];
 
       requireAdmin(mockReq as Request, mockRes as Response, mockNext);
 
@@ -143,7 +143,7 @@ describe('Auth Middleware', () => {
 
   describe('requireSuperAdmin', () => {
     it('should allow super_admin user', () => {
-      mockReq.isAuthenticated = vi.fn(() => true);
+      mockReq.isAuthenticated = vi.fn(() => true) as unknown as Request['isAuthenticated'];
       mockReq.user = {
         id: 1,
         tenantId: 'tenant-123',
@@ -157,7 +157,7 @@ describe('Auth Middleware', () => {
     });
 
     it('should reject admin user', () => {
-      mockReq.isAuthenticated = vi.fn(() => true);
+      mockReq.isAuthenticated = vi.fn(() => true) as unknown as Request['isAuthenticated'];
       mockReq.user = {
         id: 1,
         tenantId: 'tenant-123',
@@ -175,7 +175,7 @@ describe('Auth Middleware', () => {
     });
 
     it('should reject regular user', () => {
-      mockReq.isAuthenticated = vi.fn(() => true);
+      mockReq.isAuthenticated = vi.fn(() => true) as unknown as Request['isAuthenticated'];
       mockReq.user = {
         id: 1,
         tenantId: 'tenant-123',
@@ -189,7 +189,7 @@ describe('Auth Middleware', () => {
     });
 
     it('should reject unauthenticated user', () => {
-      mockReq.isAuthenticated = vi.fn(() => false);
+      mockReq.isAuthenticated = vi.fn(() => false) as unknown as Request['isAuthenticated'];
 
       requireSuperAdmin(mockReq as Request, mockRes as Response, mockNext);
 

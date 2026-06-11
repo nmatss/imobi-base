@@ -80,9 +80,7 @@ export function InquilinosTab({
     const renterPayments = payments.filter((p) => contractIds.includes(p.rentalContractId));
 
     // Calculate total monthly value from active contracts
-    const totalMonthlyValue = activeContracts.reduce((sum, c) => {
-      return sum + Number(c.rentValue || 0) + Number(c.condoFee || 0) + Number(c.iptuValue || 0);
-    }, 0);
+    const totalMonthlyValue = activeContracts.reduce((sum, c) => sum + Number(c.rentValue || 0) + Number(c.condoFee || 0) + Number(c.iptuValue || 0), 0);
 
     // Check for overdue payments
     const now = new Date();

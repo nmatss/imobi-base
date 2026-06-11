@@ -136,8 +136,7 @@ export function AdvancedFilters({ filters, onFiltersChange, cities, stats }: Adv
     onFiltersChange(DEFAULT_FILTERS);
   };
 
-  const hasActiveFilters = () => {
-    return (
+  const hasActiveFilters = () => (
       filters.search !== "" ||
       filters.category.length > 0 ||
       filters.type.length > 0 ||
@@ -151,7 +150,6 @@ export function AdvancedFilters({ filters, onFiltersChange, cities, stats }: Adv
       filters.maxArea < 1000 ||
       filters.featured !== null
     );
-  };
 
   const activeFilterCount = () => {
     let count = 0;
@@ -174,9 +172,7 @@ export function AdvancedFilters({ filters, onFiltersChange, cities, stats }: Adv
     return `R$ ${value}`;
   };
 
-  const toggleArrayValue = <T,>(array: T[], value: T): T[] => {
-    return array.includes(value) ? array.filter((v) => v !== value) : [...array, value];
-  };
+  const toggleArrayValue = <T,>(array: T[], value: T): T[] => array.includes(value) ? array.filter((v) => v !== value) : [...array, value];
 
   return (
     <div className="space-y-4">

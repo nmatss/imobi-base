@@ -100,7 +100,7 @@ export function registerAVMRoutes(app: Express) {
       });
     } catch (error: any) {
       console.error("AVM evaluation error:", error);
-      res.status(500).json({ error: "Erro ao calcular avaliacao: " + error.message });
+      res.status(500).json({ error: `Erro ao calcular avaliacao: ${  error.message}` });
     }
   });
 
@@ -130,7 +130,7 @@ export function registerAVMRoutes(app: Express) {
         if (property.features) {
           features = JSON.parse(property.features);
         }
-      } catch {}
+      } catch { /* ignore: JSON inválido em features -> mantém lista vazia */ }
 
       const input: ValuationInput = {
         propertyType: property.type,
@@ -182,7 +182,7 @@ export function registerAVMRoutes(app: Express) {
       });
     } catch (error: any) {
       console.error("AVM quick evaluation error:", error);
-      res.status(500).json({ error: "Erro ao calcular avaliacao: " + error.message });
+      res.status(500).json({ error: `Erro ao calcular avaliacao: ${  error.message}` });
     }
   });
 
@@ -197,7 +197,7 @@ export function registerAVMRoutes(app: Express) {
       res.json(valuations);
     } catch (error: any) {
       console.error("AVM history error:", error);
-      res.status(500).json({ error: "Erro ao buscar historico: " + error.message });
+      res.status(500).json({ error: `Erro ao buscar historico: ${  error.message}` });
     }
   });
 
@@ -218,7 +218,7 @@ export function registerAVMRoutes(app: Express) {
       res.json(valuation);
     } catch (error: any) {
       console.error("AVM history detail error:", error);
-      res.status(500).json({ error: "Erro ao buscar avaliacao: " + error.message });
+      res.status(500).json({ error: `Erro ao buscar avaliacao: ${  error.message}` });
     }
   });
 
@@ -240,7 +240,7 @@ export function registerAVMRoutes(app: Express) {
       res.json({ success: true });
     } catch (error: any) {
       console.error("AVM delete error:", error);
-      res.status(500).json({ error: "Erro ao excluir avaliacao: " + error.message });
+      res.status(500).json({ error: `Erro ao excluir avaliacao: ${  error.message}` });
     }
   });
 
@@ -260,7 +260,7 @@ export function registerAVMRoutes(app: Express) {
       res.json(indices);
     } catch (error: any) {
       console.error("AVM market indices error:", error);
-      res.status(500).json({ error: "Erro ao buscar indices: " + error.message });
+      res.status(500).json({ error: `Erro ao buscar indices: ${  error.message}` });
     }
   });
 
@@ -279,7 +279,7 @@ export function registerAVMRoutes(app: Express) {
       });
     } catch (error: any) {
       console.error("AVM recalculate error:", error);
-      res.status(500).json({ error: "Erro ao recalcular indices: " + error.message });
+      res.status(500).json({ error: `Erro ao recalcular indices: ${  error.message}` });
     }
   });
 
@@ -315,7 +315,7 @@ export function registerAVMRoutes(app: Express) {
       res.json(filtered);
     } catch (error: any) {
       console.error("AVM comparables error:", error);
-      res.status(500).json({ error: "Erro ao buscar comparaveis: " + error.message });
+      res.status(500).json({ error: `Erro ao buscar comparaveis: ${  error.message}` });
     }
   });
 
@@ -335,7 +335,7 @@ export function registerAVMRoutes(app: Express) {
       res.json(data);
     } catch (error: any) {
       console.error("AVM price map error:", error);
-      res.status(500).json({ error: "Erro ao buscar mapa de precos: " + error.message });
+      res.status(500).json({ error: `Erro ao buscar mapa de precos: ${  error.message}` });
     }
   });
 }

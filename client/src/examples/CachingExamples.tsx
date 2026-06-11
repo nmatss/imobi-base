@@ -74,12 +74,13 @@ export function LeadSearch() {
 
 // ==================== Exemplo 3: Optimistic Update (Kanban) ====================
 import { useUpdateLeadStatus } from '@/hooks/useLeads';
+import type { LeadStatus } from '@/lib/imobi-context';
 
 function LeadKanbanBoardExample() {
   const { data: leads = [] } = useLeads();
   const updateStatus = useUpdateLeadStatus();
 
-  const handleStatusChange = (leadId: string, newStatus: string) => {
+  const handleStatusChange = (leadId: string, newStatus: LeadStatus) => {
     // Atualização otimista - UI atualiza imediatamente
     updateStatus.mutate(
       { id: leadId, status: newStatus },
@@ -92,7 +93,7 @@ function LeadKanbanBoardExample() {
     );
   };
 
-  const columns = ['new', 'qualification', 'visit', 'proposal', 'contract'];
+  const columns: LeadStatus[] = ['new', 'qualification', 'visit', 'proposal', 'contract'];
 
   return (
     <div className="flex gap-4">

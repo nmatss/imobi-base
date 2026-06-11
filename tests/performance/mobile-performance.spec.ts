@@ -23,8 +23,7 @@ test.describe('Mobile Performance Metrics', () => {
   test('First Contentful Paint (FCP) acceptable', async ({ page }) => {
     await page.goto('/dashboard');
 
-    const metrics = await page.evaluate(() => {
-      return new Promise((resolve) => {
+    const metrics = await page.evaluate(() => new Promise((resolve) => {
         const observer = new PerformanceObserver((list) => {
           const entries = list.getEntries();
           const fcpEntry = entries.find(entry => entry.name === 'first-contentful-paint');
@@ -36,8 +35,7 @@ test.describe('Mobile Performance Metrics', () => {
 
         // Fallback timeout
         setTimeout(() => resolve(0), 5000);
-      });
-    });
+      }));
 
     // FCP should be under 1.8s for mobile (Google Core Web Vitals)
     expect(metrics).toBeGreaterThan(0);
@@ -48,8 +46,7 @@ test.describe('Mobile Performance Metrics', () => {
     await page.goto('/dashboard');
     await page.waitForLoadState('networkidle');
 
-    const lcp = await page.evaluate(() => {
-      return new Promise<number>((resolve) => {
+    const lcp = await page.evaluate(() => new Promise<number>((resolve) => {
         const observer = new PerformanceObserver((list) => {
           const entries = list.getEntries();
           const lastEntry = entries[entries.length - 1] as any;
@@ -62,8 +59,7 @@ test.describe('Mobile Performance Metrics', () => {
         setTimeout(() => {
           resolve(0);
         }, 5000);
-      });
-    });
+      }));
 
     // LCP should be under 2.5s (Good)
     if (lcp > 0) {
@@ -76,8 +72,7 @@ test.describe('Mobile Performance Metrics', () => {
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
-    const cls = await page.evaluate(() => {
-      return new Promise<number>((resolve) => {
+    const cls = await page.evaluate(() => new Promise<number>((resolve) => {
         let clsScore = 0;
 
         const observer = new PerformanceObserver((list) => {
@@ -93,8 +88,7 @@ test.describe('Mobile Performance Metrics', () => {
         setTimeout(() => {
           resolve(clsScore);
         }, 2000);
-      });
-    });
+      }));
 
     // CLS should be under 0.1 (Good)
     expect(cls).toBeLessThan(0.1);
@@ -249,8 +243,7 @@ test.describe('Mobile Render Performance', () => {
     await page.goto('/properties');
     await page.waitForLoadState('networkidle');
 
-    const scrollPerf = await page.evaluate(() => {
-      return new Promise((resolve) => {
+    const scrollPerf = await page.evaluate(() => new Promise((resolve) => {
         const startTime = performance.now();
         let frameCount = 0;
 
@@ -265,8 +258,7 @@ test.describe('Mobile Render Performance', () => {
 
         window.scrollBy(0, 100);
         requestAnimationFrame(countFrames);
-      });
-    });
+      }));
 
     // Should achieve at least 30 FPS (30 frames in 1 second)
     expect(scrollPerf).toBeGreaterThan(30);
@@ -280,8 +272,7 @@ test.describe('Mobile Render Performance', () => {
     const button = page.locator('button').first();
 
     if (await button.count() > 0) {
-      const animPerf = await button.evaluate((el) => {
-        return new Promise((resolve) => {
+      const animPerf = await button.evaluate((el) => new Promise((resolve) => {
           const startTime = performance.now();
 
           el.addEventListener('transitionend', () => {
@@ -291,8 +282,7 @@ test.describe('Mobile Render Performance', () => {
 
           // Trigger hover
           el.dispatchEvent(new Event('mouseenter'));
-        });
-      });
+        }));
 
       // Transition should complete quickly
       expect(animPerf).toBeLessThan(500);
@@ -303,8 +293,7 @@ test.describe('Mobile Render Performance', () => {
     await page.goto('/dashboard');
     await page.waitForLoadState('networkidle');
 
-    const longTasks = await page.evaluate(() => {
-      return new Promise<number>((resolve) => {
+    const longTasks = await page.evaluate(() => new Promise<number>((resolve) => {
         const tasks: number[] = [];
 
         const observer = new PerformanceObserver((list) => {
@@ -322,8 +311,7 @@ test.describe('Mobile Render Performance', () => {
         setTimeout(() => {
           resolve(tasks.length);
         }, 3000);
-      });
-    });
+      }));
 
     // Should have minimal long tasks
     expect(longTasks).toBeLessThan(5);
@@ -395,12 +383,10 @@ test.describe('Mobile Memory Performance', () => {
     await page.goto('/dashboard');
     await page.waitForLoadState('networkidle');
 
-    const memory = await page.evaluate(() => {
-      return (performance as any).memory ? {
+    const memory = await page.evaluate(() => (performance as any).memory ? {
         usedJSHeapSize: (performance as any).memory.usedJSHeapSize,
         totalJSHeapSize: (performance as any).memory.totalJSHeapSize,
-      } : null;
-    });
+      } : null);
 
     if (memory) {
       const usedMB = memory.usedJSHeapSize / 1024 / 1024;
@@ -414,9 +400,7 @@ test.describe('Mobile Memory Performance', () => {
     await page.goto('/dashboard');
     await page.waitForLoadState('networkidle');
 
-    const initialMemory = await page.evaluate(() => {
-      return (performance as any).memory?.usedJSHeapSize || 0;
-    });
+    const initialMemory = await page.evaluate(() => (performance as any).memory?.usedJSHeapSize || 0);
 
     // Navigate multiple times
     for (let i = 0; i < 5; i++) {
@@ -428,9 +412,7 @@ test.describe('Mobile Memory Performance', () => {
       await page.waitForLoadState('networkidle');
     }
 
-    const finalMemory = await page.evaluate(() => {
-      return (performance as any).memory?.usedJSHeapSize || 0;
-    });
+    const finalMemory = await page.evaluate(() => (performance as any).memory?.usedJSHeapSize || 0);
 
     if (initialMemory > 0 && finalMemory > 0) {
       const memoryIncrease = finalMemory - initialMemory;

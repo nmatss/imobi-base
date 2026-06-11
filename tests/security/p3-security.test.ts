@@ -19,6 +19,7 @@ import {
 import { responseCompression } from '../../server/middleware/compression';
 import { errorHandler, AppError, ValidationError } from '../../server/middleware/error-handler';
 import { WebhookManager, verifyWebhookSignature } from '../../server/security/webhooks';
+import { SecurityEventSeverity } from '../../server/security/security-monitor';
 
 describe('P3 Security Improvements', () => {
   describe('Security Headers Middleware', () => {
@@ -140,9 +141,14 @@ describe('P3 Security Improvements', () => {
     });
 
     it('should reject requests with missing Content-Type', async () => {
+      // Envia um corpo bruto (Buffer) SEM Content-Type. O superagent só injeta
+      // um Content-Type default para corpos string; com Buffer + .unset() o
+      // header fica genuinamente ausente, mas o Content-Length declara o corpo,
+      // então o middleware deve exigir o Content-Type.
       const response = await request(app)
         .post('/test')
-        .send({ test: 'data' });
+        .unset('Content-Type')
+        .send(Buffer.from('raw body without content-type'));
 
       expect(response.status).toBe(400);
       expect(response.body.error).toContain('Content-Type');
@@ -184,7 +190,7 @@ describe('P3 Security Improvements', () => {
     });
 
     it('should reject URLs that are too long', async () => {
-      const longUrl = '/test?' + 'x'.repeat(200);
+      const longUrl = `/test?${  'x'.repeat(200)}`;
       const response = await request(app).post(longUrl);
       expect(response.status).toBe(414);
       expect(response.body.error).toBe('URL too long');
@@ -406,7 +412,7 @@ describe('P3 Security Improvements', () => {
       webhookManager.addWebhook('high-only', {
         url: 'https://example.com/webhook',
         secret: 'secret',
-        minSeverity: 'high',
+        minSeverity: SecurityEventSeverity.HIGH,
         enabled: true,
       });
 
@@ -527,9 +533,13 @@ describe('Integration: Full Security Stack', () => {
   });
 
   it('should validate and limit requests', async () => {
+    // Corpo bruto (Buffer) SEM Content-Type: deve ser barrado pelo
+    // validateContentType com 400. Usamos Buffer + .unset() porque o superagent
+    // só adiciona um Content-Type default a corpos string.
     const response = await request(app)
       .post('/api/test')
-      .send({ test: 'data' });
+      .unset('Content-Type')
+      .send(Buffer.from('raw body without content-type'));
 
     expect(response.status).toBe(400);
     expect(response.body.error).toContain('Content-Type');

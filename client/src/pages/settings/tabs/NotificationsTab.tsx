@@ -253,11 +253,9 @@ export function NotificationsTab() {
     }
   };
 
-  const getRecipientLabels = (recipients: string[]) => {
-    return recipients
+  const getRecipientLabels = (recipients: string[]) => recipients
       .map((r) => AVAILABLE_RECIPIENTS.find((ar) => ar.id === r)?.label || r)
       .join(", ");
-  };
 
   // Count active channels
   const activeChannels = {

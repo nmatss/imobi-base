@@ -59,9 +59,7 @@ vi.mock('file-type', () => ({
 
 describe('File Validator Security Tests', () => {
   // Helper function to create buffers - just use standard Buffer.from
-  const createBuffer = (bytes: number[]): Buffer => {
-    return Buffer.from(bytes);
-  };
+  const createBuffer = (bytes: number[]): Buffer => Buffer.from(bytes);
 
   describe('validateFileContent - Magic Bytes Validation', () => {
     it('should validate a valid JPEG file', async () => {
@@ -514,14 +512,14 @@ describe('File Validator Security Tests', () => {
 
     describe('Length limitation', () => {
       it('should truncate very long filenames to 255 characters', () => {
-        const longName = 'a'.repeat(300) + '.jpg';
+        const longName = `${'a'.repeat(300)  }.jpg`;
         const sanitized = sanitizeFilename(longName);
         expect(sanitized.length).toBeLessThanOrEqual(255);
         expect(sanitized).toMatch(/\.jpg$/);
       });
 
       it('should preserve extension when truncating', () => {
-        const longName = 'verylongfilename'.repeat(20) + '.jpeg';
+        const longName = `${'verylongfilename'.repeat(20)  }.jpeg`;
         const sanitized = sanitizeFilename(longName);
         expect(sanitized).toMatch(/\.jpeg$/);
         expect(sanitized.length).toBeLessThanOrEqual(255);
@@ -883,7 +881,7 @@ describe('File Validator Security Tests', () => {
     });
 
     it('should handle extremely long filenames', () => {
-      const longFilename = 'a'.repeat(500) + '.jpg';
+      const longFilename = `${'a'.repeat(500)  }.jpg`;
       const sanitized = sanitizeFilename(longFilename);
 
       expect(sanitized.length).toBeLessThanOrEqual(255);

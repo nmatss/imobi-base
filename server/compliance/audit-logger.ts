@@ -5,6 +5,8 @@
 
 import { db, schema } from "../db";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { randomUUID } from "crypto";
+import { maskByFieldName } from "../utils/pii-mask";
 
 interface AuditLogEntry {
   tenantId?: string;
@@ -30,6 +32,8 @@ interface AuditLogEntry {
 export async function logComplianceAudit(entry: AuditLogEntry) {
   try {
     await db.insert(schema.complianceAuditLog).values({
+      // id explícito: a coluna não tem default no schema SQLite (dev/test).
+      id: randomUUID(),
       tenantId: entry.tenantId,
       userId: entry.userId,
       actorId: entry.actorId,
@@ -90,15 +94,24 @@ export async function logDataModification(
   ipAddress?: string,
   userAgent?: string
 ) {
-  // Anonymize sensitive data in changed fields
+  // Redige/mascara dados pessoais nos campos alterados antes de persistir no log.
+  // - Segredos puros (sem valor útil em log) => [REDACTED].
+  // - PII com sufixo útil para diagnóstico (CPF/CNPJ, e-mail, telefone, conta
+  //   bancária, Pix) => mascaramento parcial via pii-mask (mostra só o final).
   const anonymizedChanges: Record<string, { old: string; new: string }> = {};
-  const sensitiveFields = ["password", "cpfCnpj", "rg", "bankAccount", "pixKey"];
+  const fullyRedactedFields = ["password", "rg", "passwordHash", "secret", "token"];
+  const maskableFields = ["cpfCnpj", "cpf", "cnpj", "email", "phone", "bankAccount", "bankAgency", "pixKey"];
 
   for (const [field, values] of Object.entries(changedFields)) {
-    if (sensitiveFields.includes(field)) {
+    if (fullyRedactedFields.includes(field)) {
       anonymizedChanges[field] = {
         old: values.old ? "[REDACTED]" : "",
         new: values.new ? "[REDACTED]" : "",
+      };
+    } else if (maskableFields.includes(field)) {
+      anonymizedChanges[field] = {
+        old: values.old ? maskByFieldName(field, values.old) : "",
+        new: values.new ? maskByFieldName(field, values.new) : "",
       };
     } else {
       anonymizedChanges[field] = {

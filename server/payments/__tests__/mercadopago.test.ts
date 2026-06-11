@@ -14,22 +14,19 @@ const mockPaymentCancel = vi.fn();
 const mockPreferenceCreate = vi.fn();
 
 // Mock MercadoPago SDK
+// Usamos classes (não arrow functions) porque o serviço instancia esses símbolos
+// com `new` — arrow functions não podem ser usadas como construtor.
 vi.mock('mercadopago', () => {
-  return {
-    MercadoPagoConfig: vi.fn().mockImplementation(function() {}),
-    Payment: vi.fn().mockImplementation(function() {
-      return {
-        create: (...args: any[]) => mockPaymentCreate(...args),
-        get: (...args: any[]) => mockPaymentGet(...args),
-        cancel: (...args: any[]) => mockPaymentCancel(...args),
-      };
-    }),
-    Preference: vi.fn().mockImplementation(function() {
-      return {
-        create: (...args: any[]) => mockPreferenceCreate(...args),
-      };
-    }),
-  };
+  class MercadoPagoConfig {}
+  class Payment {
+    create = (...args: any[]) => mockPaymentCreate(...args);
+    get = (...args: any[]) => mockPaymentGet(...args);
+    cancel = (...args: any[]) => mockPaymentCancel(...args);
+  }
+  class Preference {
+    create = (...args: any[]) => mockPreferenceCreate(...args);
+  }
+  return { MercadoPagoConfig, Payment, Preference };
 });
 
 vi.mock('@sentry/node');
@@ -436,7 +433,7 @@ describe('MercadoPagoService', () => {
       expect(result).toBe(false);
     });
 
-    it('should allow webhooks when secret not configured', () => {
+    it('should reject webhooks when secret not configured', () => {
       delete process.env.MERCADOPAGO_WEBHOOK_SECRET;
 
       const result = MercadoPagoService.verifyWebhookSignature(
@@ -445,7 +442,8 @@ describe('MercadoPagoService', () => {
         'payment_123'
       );
 
-      expect(result).toBe(true);
+      // FAIL-CLOSED: sem secret configurado o webhook é rejeitado.
+      expect(result).toBe(false);
     });
 
     it('should reject malformed signature', () => {

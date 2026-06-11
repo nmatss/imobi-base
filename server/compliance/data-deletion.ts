@@ -17,18 +17,63 @@ import {
   DEFAULT_RETENTION_POLICY,
   type RetentionPolicy,
 } from "./anonymizer";
+import { sendDeletionConfirmationEmail } from "./compliance-email";
 import PDFDocument from "pdfkit";
 import { createWriteStream, mkdirSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
+import os from "os";
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
+/**
+ * Deriva a base legal real (LGPD Art. 7/Art. 18) conforme a ação de compliance,
+ * em vez de hardcode "consent" para tudo.
+ *
+ * - Solicitação/confirmação de exclusão pelo titular = exercício do direito de
+ *   eliminação (LGPD Art. 18, VI) => base "consent" (revogação do consentimento).
+ * - A própria EXECUÇÃO da exclusão/anonimização é uma obrigação legal de atender
+ *   o pedido do titular => "legal_obligation".
+ */
+function deriveLegalBasis(
+  action:
+    | "account_deletion_requested"
+    | "account_deletion_confirmed"
+    | "account_deletion_completed"
+    | "account_deletion_cancelled",
+): string {
+  switch (action) {
+    case "account_deletion_completed":
+      // Cumprir a eliminação é obrigação legal decorrente do direito do titular.
+      return "legal_obligation";
+    case "account_deletion_requested":
+    case "account_deletion_confirmed":
+    case "account_deletion_cancelled":
+    default:
+      // Exercício/revogação de consentimento pelo titular.
+      return "consent";
+  }
+}
+
+// No Vercel o filesystem do bundle é read-only; apenas /tmp é gravável.
+// HONESTIDADE: /tmp é EFÊMERO (por instância/cold start) — certificados que
+// precisem ficar baixáveis por dias exigem storage durável (Supabase Storage,
+// no backlog pós-launch). Em dev mantemos ./uploads.
+const UPLOAD_DIR =
+  process.env.UPLOAD_DIR ||
+  (process.env.VERCEL ? join(os.tmpdir(), "imobibase-uploads") : "./uploads");
 const CERTIFICATES_DIR = join(UPLOAD_DIR, "certificates");
 
-// Ensure certificates directory exists (skip in serverless/read-only environments)
-try {
+/**
+ * Garante o diretório de certificados NO MOMENTO DO USO (não só no module
+ * load): em serverless cada invocação pode cair em instância nova.
+ */
+function ensureCertificatesDir(): void {
   if (!existsSync(CERTIFICATES_DIR)) {
     mkdirSync(CERTIFICATES_DIR, { recursive: true });
   }
+}
+
+// Best-effort no load (mantém comportamento em dev); o uso real revalida.
+try {
+  ensureCertificatesDir();
 } catch {
   console.warn('[data-deletion] Cannot create certificates directory (serverless environment)');
 }
@@ -72,8 +117,11 @@ export async function requestAccountDeletion(options: DeletionRequestOptions) {
   const retentionPolicy = DEFAULT_RETENTION_POLICY;
   const dataRetention = JSON.stringify(retentionPolicy);
 
-  // Create deletion request
+  // Create deletion request.
+  // Geramos o id explicitamente: a coluna id não tem default no schema SQLite
+  // (dev/test) e o insert direto (sem passar pela storage) precisa fornecê-lo.
   const [request] = await db.insert(schema.accountDeletionRequests).values({
+    id: randomUUID(),
     userId,
     tenantId,
     confirmationToken,
@@ -95,12 +143,17 @@ export async function requestAccountDeletion(options: DeletionRequestOptions) {
     entityId: userId,
     details: JSON.stringify({ reason, deletionType }),
     ipAddress,
-    legalBasis: "consent",
+    legalBasis: deriveLegalBasis("account_deletion_requested"),
     severity: "warning",
   });
 
-  // TODO: Send confirmation email with token
-  // await sendDeletionConfirmationEmail(user.email, confirmationToken);
+  // Enviar e-mail de confirmação com o token (LGPD Art. 18). O envio não deve
+  // impedir a criação da solicitação caso o transporte falhe.
+  try {
+    await sendDeletionConfirmationEmail(user.email, user.name, confirmationToken);
+  } catch (error) {
+    console.error("[data-deletion] Falha ao enviar e-mail de confirmação de exclusão:", error);
+  }
 
   return {
     requestId: request.id,
@@ -144,7 +197,7 @@ export async function confirmAccountDeletion(confirmationToken: string, ipAddres
     entityType: "user",
     entityId: request.userId,
     ipAddress,
-    legalBasis: "consent",
+    legalBasis: deriveLegalBasis("account_deletion_confirmed"),
     severity: "warning",
   });
 
@@ -221,7 +274,7 @@ async function processAccountDeletion(
       entityType: "user",
       entityId: userId,
       details: JSON.stringify({ deletionType, certificateNumber }),
-      legalBasis: "consent",
+      legalBasis: deriveLegalBasis("account_deletion_completed"),
       severity: "critical",
     });
 
@@ -276,25 +329,34 @@ async function performAnonymization(userId: string, tenantId: string) {
   const anonymizedUser = anonymizeUser(user);
   await db.update(schema.users).set(anonymizedUser).where(eq(schema.users.id, userId));
 
-  // Anonymize related data based on retention policy
-  const retentionPolicy = DEFAULT_RETENTION_POLICY;
+  // Anonymize related data based on retention policy (DEFAULT_RETENTION_POLICY).
 
-  // If user was a lead, anonymize lead data
-  const leads = await db.select().from(schema.leads).where(eq(schema.leads.email, user.email));
+  // CORREÇÃO DE BUG (anonimização cruzada): cruzar titular por e-mail SEM filtrar
+  // tenantId anonimizava registros de HOMÔNIMOS (mesmo e-mail) de OUTROS tenants.
+  // Adicionamos o filtro por tenantId para isolar o tratamento ao tenant do titular.
+
+  // If user was a lead, anonymize lead data (somente no tenant do titular)
+  const leads = await db.select().from(schema.leads).where(
+    and(eq(schema.leads.email, user.email), eq(schema.leads.tenantId, tenantId))
+  );
   for (const lead of leads) {
     const anonymizedLead = anonymizeLead(lead);
     await db.update(schema.leads).set(anonymizedLead).where(eq(schema.leads.id, lead.id));
   }
 
-  // If user was an owner, anonymize owner data
-  const owners = await db.select().from(schema.owners).where(eq(schema.owners.email, user.email));
+  // If user was an owner, anonymize owner data (somente no tenant do titular)
+  const owners = await db.select().from(schema.owners).where(
+    and(eq(schema.owners.email, user.email), eq(schema.owners.tenantId, tenantId))
+  );
   for (const owner of owners) {
     const anonymizedOwner = anonymizeOwner(owner);
     await db.update(schema.owners).set(anonymizedOwner).where(eq(schema.owners.id, owner.id));
   }
 
-  // If user was a renter, anonymize renter data
-  const renters = await db.select().from(schema.renters).where(eq(schema.renters.email, user.email));
+  // If user was a renter, anonymize renter data (somente no tenant do titular)
+  const renters = await db.select().from(schema.renters).where(
+    and(eq(schema.renters.email, user.email), eq(schema.renters.tenantId, tenantId))
+  );
   for (const renter of renters) {
     const anonymizedRenter = anonymizeRenter(renter);
     await db.update(schema.renters).set(anonymizedRenter).where(eq(schema.renters.id, renter.id));
@@ -326,6 +388,7 @@ async function generateDeletionCertificate(
   deletionType: string,
   requestId: string
 ): Promise<string> {
+  ensureCertificatesDir(); // mkdir recursivo no momento do uso (serverless-safe)
   const fileName = `deletion-certificate-${randomUUID()}-${certificateNumber}.pdf`;
   const filePath = join(CERTIFICATES_DIR, fileName);
 
@@ -509,7 +572,7 @@ export async function cancelDeletionRequest(requestId: string, userId: string) {
     action: "account_deletion_cancelled",
     entityType: "user",
     entityId: userId,
-    legalBasis: "consent",
+    legalBasis: deriveLegalBasis("account_deletion_cancelled"),
     severity: "info",
   });
 

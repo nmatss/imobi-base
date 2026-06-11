@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { MapPin, Phone, Mail, ArrowRight, BedDouble, Bath, Ruler, Check, Building, Loader2, Search, Filter, Menu, X, MessageCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Helmet } from "react-helmet";
+import { unwrapList } from "@/lib/api-envelope";
 
 type Tenant = {
   id: string;
@@ -79,7 +80,7 @@ export default function TenantLanding() {
         const propertiesRes = await fetch(`/api/properties/public/${tenantData.id}`);
         if (propertiesRes.ok) {
           const propertiesData = await propertiesRes.json();
-          setProperties(propertiesData);
+          setProperties(unwrapList<Property>(propertiesData));
         }
       } catch (err) {
         setError("Erro ao carregar dados");

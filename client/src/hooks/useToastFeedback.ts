@@ -1,3 +1,4 @@
+import { createElement } from "react";
 import { toast as sonnerToast } from "sonner";
 import { CheckCircle2, XCircle, AlertTriangle, Info } from "lucide-react";
 
@@ -27,7 +28,7 @@ export function useToastFeedback() {
   const success = (message: string, description?: string) => {
     sonnerToast.success(message, {
       description,
-      icon: CheckCircle2,
+      icon: createElement(CheckCircle2),
       duration: 4000,
     });
   };
@@ -35,7 +36,7 @@ export function useToastFeedback() {
   const error = (message: string, description?: string) => {
     sonnerToast.error(message, {
       description,
-      icon: XCircle,
+      icon: createElement(XCircle),
       duration: 5000,
     });
   };
@@ -43,7 +44,7 @@ export function useToastFeedback() {
   const warning = (message: string, description?: string) => {
     sonnerToast.warning(message, {
       description,
-      icon: AlertTriangle,
+      icon: createElement(AlertTriangle),
       duration: 4500,
     });
   };
@@ -51,17 +52,15 @@ export function useToastFeedback() {
   const info = (message: string, description?: string) => {
     sonnerToast.info(message, {
       description,
-      icon: Info,
+      icon: createElement(Info),
       duration: 4000,
     });
   };
 
-  const loading = (message: string, description?: string) => {
-    return sonnerToast.loading(message, {
+  const loading = (message: string, description?: string) => sonnerToast.loading(message, {
       description,
       duration: Infinity, // Não fecha automaticamente
     });
-  };
 
   const promise = <T,>(
     promise: Promise<T>,
@@ -70,13 +69,11 @@ export function useToastFeedback() {
       success: string | ((data: T) => string);
       error: string | ((error: any) => string);
     }
-  ) => {
-    return sonnerToast.promise(promise, {
+  ) => sonnerToast.promise(promise, {
       loading: messages.loading,
       success: messages.success,
       error: messages.error,
     });
-  };
 
   const dismiss = (toastId?: string | number) => {
     sonnerToast.dismiss(toastId);
@@ -102,7 +99,7 @@ export const toastHelpers = {
    */
   saved: (itemName = "Dados") => {
     sonnerToast.success(`${itemName} salvos com sucesso`, {
-      icon: CheckCircle2,
+      icon: createElement(CheckCircle2),
       duration: 3000,
     });
   },
@@ -112,7 +109,7 @@ export const toastHelpers = {
    */
   created: (itemName = "Item") => {
     sonnerToast.success(`${itemName} criado com sucesso`, {
-      icon: CheckCircle2,
+      icon: createElement(CheckCircle2),
       duration: 3000,
     });
   },
@@ -122,7 +119,7 @@ export const toastHelpers = {
    */
   updated: (itemName = "Item") => {
     sonnerToast.success(`${itemName} atualizado com sucesso`, {
-      icon: CheckCircle2,
+      icon: createElement(CheckCircle2),
       duration: 3000,
     });
   },
@@ -132,7 +129,7 @@ export const toastHelpers = {
    */
   deleted: (itemName = "Item") => {
     sonnerToast.success(`${itemName} deletado com sucesso`, {
-      icon: CheckCircle2,
+      icon: createElement(CheckCircle2),
       duration: 3000,
     });
   },
@@ -143,7 +140,7 @@ export const toastHelpers = {
   errorGeneric: (action = "realizar a operação") => {
     sonnerToast.error(`Erro ao ${action}`, {
       description: "Por favor, tente novamente",
-      icon: XCircle,
+      icon: createElement(XCircle),
       duration: 5000,
     });
   },
@@ -154,7 +151,7 @@ export const toastHelpers = {
   validationError: (message = "Verifique os campos do formulário") => {
     sonnerToast.error("Erro de validação", {
       description: message,
-      icon: AlertTriangle,
+      icon: createElement(AlertTriangle),
       duration: 5000,
     });
   },
@@ -165,7 +162,7 @@ export const toastHelpers = {
   unsavedChanges: () => {
     sonnerToast.warning("Você tem alterações não salvas", {
       description: "Certifique-se de salvar antes de sair",
-      icon: AlertTriangle,
+      icon: createElement(AlertTriangle),
       duration: 5000,
     });
   },
@@ -175,7 +172,7 @@ export const toastHelpers = {
    */
   copied: (itemName = "Texto") => {
     sonnerToast.success(`${itemName} copiado para área de transferência`, {
-      icon: CheckCircle2,
+      icon: createElement(CheckCircle2),
       duration: 2000,
     });
   },

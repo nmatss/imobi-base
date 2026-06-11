@@ -6,6 +6,7 @@
 import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
 import { requireAuth } from "./middleware/auth";
+import { checkFeatureAccess } from "./middleware/plan-limits";
 import { asyncHandler, BadRequestError, NotFoundError } from "./middleware/error-handler";
 import {
   getDefaultRooms,
@@ -16,9 +17,44 @@ import {
   getTemplates,
 } from "./services/inspection-service";
 
+/**
+ * Carrega um room garantindo que pertence à inspection já validada do tenant.
+ * Sem isso, roomId arbitrário permitiria ler/alterar rooms de outros tenants
+ * (IDOR): o storage filtra apenas por id. Retornamos 404 (não 403) para não
+ * vazar a existência do recurso — padrão do projeto.
+ */
+async function getRoomScopedToInspection(roomId: string, inspectionId: string) {
+  const room = await storage.getInspectionRoom(roomId);
+  if (!room || room.inspectionId !== inspectionId) {
+    throw new NotFoundError("Room");
+  }
+  return room;
+}
+
+/**
+ * Carrega um item validando a cadeia completa item → room → inspection.
+ * Garante que o item pertence ao room da URL e que esse room pertence à
+ * inspection do tenant da sessão (anti-IDOR).
+ */
+async function getItemScopedToInspection(
+  itemId: string,
+  roomId: string,
+  inspectionId: string
+) {
+  // Valida primeiro o room contra a inspection do tenant.
+  await getRoomScopedToInspection(roomId, inspectionId);
+
+  const item = await storage.getInspectionItem(itemId);
+  if (!item || item.roomId !== roomId) {
+    throw new NotFoundError("Item");
+  }
+  return item;
+}
+
 export function registerInspectionRoutes(app: Express) {
-  // Apply auth to all inspection routes
-  app.use("/api/inspections", requireAuth);
+  // Auth + gate de plano: digital_inspections é feature do plano Business
+  // (server/seed-plans.ts). Sem o gate, qualquer plano acessava o módulo.
+  app.use("/api/inspections", requireAuth, checkFeatureAccess("digital_inspections"));
 
   /**
    * GET /api/inspections/templates
@@ -91,6 +127,15 @@ export function registerInspectionRoutes(app: Express) {
 
       if (!propertyId || !type || !inspectorName) {
         throw new BadRequestError("propertyId, type, and inspectorName are required");
+      }
+
+      // Anti-IDOR: previousInspectionId vem do body — valida que a vistoria
+      // anterior pertence ao tenant antes de copiar condições dela.
+      if (previousInspectionId) {
+        const previous = await storage.getPropertyInspection(previousInspectionId);
+        if (!previous || previous.tenantId !== tenantId) {
+          throw new NotFoundError("Previous inspection");
+        }
       }
 
       // Create the inspection
@@ -261,6 +306,9 @@ export function registerInspectionRoutes(app: Express) {
         throw new NotFoundError("Inspection");
       }
 
+      // Anti-IDOR: garante que o room pertence à inspection validada.
+      await getRoomScopedToInspection(req.params.roomId, inspection.id);
+
       const updated = await storage.updateInspectionRoom(req.params.roomId, req.body);
       if (!updated) {
         throw new NotFoundError("Room");
@@ -284,6 +332,9 @@ export function registerInspectionRoutes(app: Express) {
         throw new NotFoundError("Inspection");
       }
 
+      // Anti-IDOR: garante que o room pertence à inspection validada.
+      await getRoomScopedToInspection(req.params.roomId, inspection.id);
+
       await storage.deleteInspectionRoom(req.params.roomId);
       res.json({ success: true });
     })
@@ -302,6 +353,10 @@ export function registerInspectionRoutes(app: Express) {
       if (!inspection || inspection.tenantId !== tenantId) {
         throw new NotFoundError("Inspection");
       }
+
+      // Anti-IDOR: garante que o room destino pertence à inspection validada
+      // antes de criar o item nele.
+      await getRoomScopedToInspection(req.params.roomId, inspection.id);
 
       const { itemName, order } = req.body;
       if (!itemName) {
@@ -333,17 +388,21 @@ export function registerInspectionRoutes(app: Express) {
         throw new NotFoundError("Inspection");
       }
 
+      // Anti-IDOR: valida a cadeia item → room → inspection do tenant.
+      const item = await getItemScopedToInspection(
+        req.params.itemId,
+        req.params.roomId,
+        inspection.id
+      );
+
       const updateData = { ...req.body };
 
       // Auto-calculate repair cost if damage is marked and condition is fair/poor
-      if (updateData.hasDamage && updateData.condition) {
-        const item = await storage.getInspectionItem(req.params.itemId);
-        if (item && !updateData.estimatedRepairCost) {
-          updateData.estimatedRepairCost = estimateRepairCost(
-            item.itemName,
-            updateData.condition
-          );
-        }
+      if (updateData.hasDamage && updateData.condition && !updateData.estimatedRepairCost) {
+        updateData.estimatedRepairCost = estimateRepairCost(
+          item.itemName,
+          updateData.condition
+        );
       }
 
       const updated = await storage.updateInspectionItem(req.params.itemId, updateData);
@@ -376,7 +435,7 @@ export function registerInspectionRoutes(app: Express) {
       // Calculate total damages
       const rooms = await storage.getInspectionRoomsByInspection(inspection.id);
       let totalDamages = 0;
-      let conditionCounts: Record<string, number> = { excellent: 0, good: 0, fair: 0, poor: 0 };
+      const conditionCounts: Record<string, number> = { excellent: 0, good: 0, fair: 0, poor: 0 };
 
       for (const room of rooms) {
         const items = await storage.getInspectionItemsByRoom(room.id);
@@ -477,7 +536,8 @@ export function registerInspectionRoutes(app: Express) {
       }
 
       const entryInspection = await storage.getPropertyInspection(inspection.previousInspectionId);
-      if (!entryInspection) {
+      // Anti-IDOR: a vistoria de entrada também precisa ser do tenant.
+      if (!entryInspection || entryInspection.tenantId !== tenantId) {
         throw new NotFoundError("Entry inspection");
       }
 
@@ -531,7 +591,8 @@ export function registerInspectionRoutes(app: Express) {
       if (inspection.previousInspectionId) {
         try {
           const entryInspection = await storage.getPropertyInspection(inspection.previousInspectionId);
-          if (entryInspection) {
+          // Anti-IDOR: só compara se a vistoria de entrada for do tenant.
+          if (entryInspection && entryInspection.tenantId === tenantId) {
             const entryRooms = await storage.getInspectionRoomsByInspection(entryInspection.id);
             const entryRoomsWithItems = await Promise.all(
               entryRooms.map(async (room) => ({

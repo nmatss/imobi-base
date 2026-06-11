@@ -73,9 +73,7 @@ export const createMockStripe = () => ({
     confirm: vi.fn().mockResolvedValue({ ...mockStripePaymentIntent, status: 'succeeded' }),
   },
   webhooks: {
-    constructEvent: vi.fn((payload, signature, secret) => {
-      return mockStripeWebhookEvent('customer.subscription.created', mockStripeSubscription);
-    }),
+    constructEvent: vi.fn((payload, signature, secret) => mockStripeWebhookEvent('customer.subscription.created', mockStripeSubscription)),
   },
   prices: {
     list: vi.fn().mockResolvedValue({

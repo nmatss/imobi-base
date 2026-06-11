@@ -26,14 +26,12 @@ export function ProfilePhotoUpload({
   const [localPhotoUrl, setLocalPhotoUrl] = useState(photoUrl);
   const [uploading, setUploading] = useState(false);
 
-  const getInitials = (name: string) => {
-    return name
+  const getInitials = (name: string) => name
       .split(" ")
       .map((n) => n[0])
       .join("")
       .toUpperCase()
       .slice(0, 2);
-  };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

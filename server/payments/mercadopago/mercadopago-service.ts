@@ -5,6 +5,7 @@
 
 import { MercadoPagoConfig, Payment, Preference } from 'mercadopago';
 import * as Sentry from '@sentry/node';
+import crypto from 'crypto';
 
 // Initialize Mercado Pago client
 const client = new MercadoPagoConfig({
@@ -42,6 +43,14 @@ export interface MercadoPagoCreditCardData {
   token: string;
   installments: number;
   tenantId: string;
+  /**
+   * Optional card brand (payment_method_id), e.g. 'visa', 'master', 'amex'.
+   * MercadoPago resolves the brand from the card token automatically, so this
+   * should only be passed when the caller already knows it (from the
+   * CardForm/SDK that generated the token). NEVER hardcode a brand: an
+   * incorrect payment_method_id makes MercadoPago reject the payment.
+   */
+  paymentMethodId?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -157,12 +166,23 @@ export class MercadoPagoService {
    */
   static async createCreditCardPayment(data: MercadoPagoCreditCardData): Promise<MercadoPagoPaymentStatus> {
     try {
-      const paymentData = {
+      // payment_method_id (card brand) is derived by MercadoPago from the card
+      // token. We only forward it when the caller explicitly provides it from
+      // the validated input — never hardcode a brand, since a wrong brand makes
+      // MercadoPago reject the payment.
+      const paymentData: {
+        transaction_amount: number;
+        description: string;
+        token: string;
+        installments: number;
+        payment_method_id?: string;
+        payer: { email: string };
+        metadata: Record<string, unknown>;
+      } = {
         transaction_amount: data.amount,
         description: data.description,
         token: data.token,
         installments: data.installments,
-        payment_method_id: 'visa', // This should be determined from the token
         payer: {
           email: data.email,
         },
@@ -171,6 +191,10 @@ export class MercadoPagoService {
           ...data.metadata,
         },
       };
+
+      if (data.paymentMethodId) {
+        paymentData.payment_method_id = data.paymentMethodId;
+      }
 
       const result = await payment.create({ body: paymentData });
 
@@ -280,17 +304,34 @@ export class MercadoPagoService {
   }
 
   /**
-   * Verify webhook signature
+   * Verify webhook signature (FAIL-CLOSED).
+   *
+   * MercadoPago signs webhooks with HMAC-SHA256 over the manifest
+   * `id:<dataId>;request-id:<xRequestId>;ts:<timestamp>;`. The x-signature
+   * header carries `ts=<timestamp>,v1=<hash>`.
+   *
+   * Security posture:
+   * - If the secret is missing in production, we REJECT (return false). A
+   *   misconfigured secret must never silently accept unauthenticated
+   *   webhooks (which could forge "approved" payments). Outside production we
+   *   reject as well but emit a louder warning so local/dev setups surface it.
+   * - The hash comparison uses crypto.timingSafeEqual with a length guard to
+   *   avoid timing side-channels.
    */
   static verifyWebhookSignature(xSignature: string, xRequestId: string, dataId: string): boolean {
     try {
-      // Mercado Pago webhook verification
       // The signature format is: ts={timestamp},v1={hash}
       const secret = process.env.MERCADOPAGO_WEBHOOK_SECRET || '';
 
       if (!secret) {
-        console.warn('Mercado Pago webhook secret not configured');
-        return true; // Allow webhooks if secret not configured
+        // FAIL-CLOSED: never accept webhooks without a configured secret.
+        const message = 'MercadoPago webhook secret not configured — rejecting webhook';
+        console.error(message);
+        Sentry.captureMessage(message, {
+          level: 'error',
+          tags: { service: 'mercadopago', operation: 'verifyWebhookSignature' },
+        });
+        return false;
       }
 
       // Parse signature
@@ -305,14 +346,28 @@ export class MercadoPagoService {
       const timestamp = tsMatch.split('=')[1];
       const hash = v1Match.split('=')[1];
 
-      // Create signature
-      const crypto = require('crypto');
+      if (!timestamp || !hash) {
+        return false;
+      }
+
+      // Create expected signature
       const manifest = `id:${dataId};request-id:${xRequestId};ts:${timestamp};`;
       const hmac = crypto.createHmac('sha256', secret);
       hmac.update(manifest);
       const expectedHash = hmac.digest('hex');
 
-      return hash === expectedHash;
+      // Constant-time comparison with length guard. timingSafeEqual throws if
+      // the buffers differ in length, so we guard first (and the guard itself
+      // does not leak meaningful timing because both values are hex of fixed
+      // size when valid).
+      const hashBuffer = Buffer.from(hash, 'hex');
+      const expectedBuffer = Buffer.from(expectedHash, 'hex');
+
+      if (hashBuffer.length !== expectedBuffer.length) {
+        return false;
+      }
+
+      return crypto.timingSafeEqual(hashBuffer, expectedBuffer);
     } catch (error) {
       Sentry.captureException(error, {
         tags: { service: 'mercadopago', operation: 'verifyWebhookSignature' },

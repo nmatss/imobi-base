@@ -10,7 +10,7 @@
     "api/index.mjs": {
       "maxDuration": 60,
       "memory": 1024,
-      "includeFiles": "api/_handler.mjs"
+      "includeFiles": "{api/_handler.mjs,server/email/templates/**}"
     }
   },
   "rewrites": [
@@ -76,8 +76,8 @@
     { "path": "/api/cron/cleanup-sessions", "schedule": "0 2 * * *" },
     { "path": "/api/cron/cleanup-logs", "schedule": "0 4 * * *" },
     { "path": "/api/cron/integration-sync", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/database-backup", "schedule": "0 5 * * *" },
     { "path": "/api/cron/cleanup-temp-files", "schedule": "0 6 * * 0" },
+    { "path": "/api/cron/cleanup-soft-deletes", "schedule": "0 7 * * 0" },
     { "path": "/api/cron/enforce-plan-limits", "schedule": "30 6 * * *" }
   ],
   "env": {

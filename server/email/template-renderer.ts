@@ -1,11 +1,22 @@
 import fs from 'fs/promises';
+import { existsSync } from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __filename = typeof import.meta?.url === 'string'
-  ? fileURLToPath(import.meta.url)
-  : __filename ?? '';
-const __dirname = __filename ? path.dirname(__filename) : process.cwd();
+// Resolve o diretório de templates sem depender de import.meta (o bundle CJS
+// não suporta) nem da localização do bundle (no Vercel o handler roda em
+// /var/task/api, mas includeFiles preserva o caminho server/email/templates).
+function resolveTemplatesDir(): string {
+  const candidates = [
+    process.env.EMAIL_TEMPLATES_DIR,
+    path.join(process.cwd(), 'server', 'email', 'templates'),
+    path.join(process.cwd(), 'templates'),
+  ].filter((dir): dir is string => Boolean(dir));
+
+  for (const dir of candidates) {
+    if (existsSync(dir)) return dir;
+  }
+  return candidates[candidates.length - 1];
+}
 
 export interface TemplateData {
   [key: string]: any;
@@ -27,7 +38,7 @@ export class TemplateRenderer {
   private templatesDir: string;
 
   constructor(templatesDir?: string) {
-    this.templatesDir = templatesDir || path.join(__dirname, 'templates');
+    this.templatesDir = templatesDir || resolveTemplatesDir();
   }
 
   /**
@@ -105,9 +116,7 @@ export class TemplateRenderer {
    * Gets nested value from object using dot notation
    */
   private getNestedValue(obj: any, path: string): any {
-    return path.split('.').reduce((current, part) => {
-      return current?.[part];
-    }, obj);
+    return path.split('.').reduce((current, part) => current?.[part], obj);
   }
 
   /**

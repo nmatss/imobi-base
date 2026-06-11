@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { DashboardAgenda, AgendaItem } from './DashboardAgenda';
-import { DashboardRecentActivity, Activity } from './DashboardRecentActivity';
+import { DashboardRecentActivity, type ActivityItem } from './DashboardRecentActivity';
 
 // ========================================
 // EXEMPLO 1: DashboardAgenda
@@ -89,7 +89,7 @@ export function AgendaExample() {
 // ========================================
 
 export function RecentActivityExample() {
-  const activities: Activity[] = [
+  const activities: ActivityItem[] = [
     {
       id: '1',
       type: 'lead',
@@ -162,7 +162,7 @@ export function DashboardWithAgendaAndActivity() {
     },
   ]);
 
-  const activities: Activity[] = [
+  const activities: ActivityItem[] = [
     {
       id: '1',
       type: 'lead',
@@ -213,7 +213,7 @@ export function DashboardWithAgendaAndActivity() {
 
 export function DashboardWithAPI() {
   const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([]);
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Simula fetch de dados da API

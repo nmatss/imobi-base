@@ -161,6 +161,7 @@
     "jspdf": "^3.0.4",
     "leaflet": "^1.9.4",
     "libphonenumber-js": "^1.12.33",
+    "lru-cache": "^10.4.3",
     "lucide-react": "^0.545.0",
     "memorystore": "^1.6.7",
     "mercadopago": "^2.11.0",

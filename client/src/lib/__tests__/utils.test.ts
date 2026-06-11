@@ -10,7 +10,8 @@ describe('Utils', () => {
     });
 
     it('should handle conditional classes', () => {
-      const result = cn('base', false && 'conditional', 'other');
+      const isActive = false;
+      const result = cn('base', isActive && 'conditional', 'other');
       expect(result).toContain('base');
       expect(result).toContain('other');
       expect(result).not.toContain('conditional');
@@ -51,10 +52,11 @@ describe('Utils', () => {
     });
 
     it('should handle complex combinations', () => {
+      const includeExtra = false;
       const result = cn(
         'base-class',
         { 'conditional': true },
-        false && 'not-included',
+        includeExtra && 'not-included',
         ['array1', 'array2'],
         'final'
       );

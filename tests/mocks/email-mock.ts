@@ -59,18 +59,14 @@ export const clearSentEmails = () => {
   sentEmails.length = 0;
 };
 
-export const findEmailByRecipient = (email: string) => {
-  return sentEmails.find(msg => {
+export const findEmailByRecipient = (email: string) => sentEmails.find(msg => {
     if (Array.isArray(msg.to)) {
       return msg.to.includes(email);
     }
     return msg.to === email;
   });
-};
 
-export const findEmailBySubject = (subject: string) => {
-  return sentEmails.find(msg => msg.subject.includes(subject));
-};
+export const findEmailBySubject = (subject: string) => sentEmails.find(msg => msg.subject.includes(subject));
 
 // Email template mock
 export const mockEmailTemplate = (templateName: string, data: Record<string, any>) => {

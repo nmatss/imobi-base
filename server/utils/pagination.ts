@@ -482,7 +482,5 @@ export function createPaginator<T>() {
     queryFn: (limit: number, offset: number) => Promise<T[]>,
     countFn: () => Promise<number>,
     params: PaginationParams
-  ): Promise<PaginatedResponse<T>> => {
-    return paginate(queryFn, countFn, params);
-  };
+  ): Promise<PaginatedResponse<T>> => paginate(queryFn, countFn, params);
 }

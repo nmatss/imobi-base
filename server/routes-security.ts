@@ -165,13 +165,9 @@ export async function createAuditLog(
 }
 
 // Input validation helpers
-const isValidToken = (token: string): boolean => {
-  return typeof token === 'string' && /^\d{6}$/.test(token);
-};
+const isValidToken = (token: string): boolean => typeof token === 'string' && /^\d{6}$/.test(token);
 
-const isValidBackupCode = (code: string): boolean => {
-  return typeof code === 'string' && /^[A-Z0-9]{8}$/.test(code.toUpperCase());
-};
+const isValidBackupCode = (code: string): boolean => typeof code === 'string' && /^[A-Z0-9]{8}$/.test(code.toUpperCase());
 
 const sanitizeString = (str: any, maxLength = 255): string | null => {
   if (typeof str !== 'string') return null;

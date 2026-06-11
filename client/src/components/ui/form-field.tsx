@@ -25,7 +25,7 @@ export interface FormFieldProps {
   /** Helper text to display below the input */
   helperText?: string;
   /** Form field element (Input, Select, Textarea, etc.) */
-  children: React.ReactElement;
+  children: React.ReactElement<any>;
   /** Additional className for the container */
   className?: string;
 }

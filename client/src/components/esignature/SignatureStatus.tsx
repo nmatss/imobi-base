@@ -80,9 +80,10 @@ export function SignatureStatus({ documentKey, listKey, showActions = true }: Si
   });
 
   const { data: signersData, isLoading: signersLoading } = useQuery({
-    queryKey: ['signers-status', listKey],
+    queryKey: ['signers-status', listKey, documentKey],
     queryFn: async () => {
-      const res = await fetch(`/api/esignature/signers/${listKey}`);
+      // documentKey é exigido pela rota para validar o tenant dono do documento (isolamento multi-tenant)
+      const res = await fetch(`/api/esignature/signers/${listKey}?documentKey=${encodeURIComponent(documentKey)}`);
       if (!res.ok) throw new Error('Failed to load signers');
       return res.json();
     },
@@ -107,14 +108,12 @@ export function SignatureStatus({ documentKey, listKey, showActions = true }: Si
     window.open(`/api/esignature/download/${documentKey}`, '_blank');
   };
 
-  const getInitials = (name: string) => {
-    return name
+  const getInitials = (name: string) => name
       .split(' ')
       .map(n => n[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
-  };
 
   return (
     <Card>

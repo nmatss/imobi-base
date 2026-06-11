@@ -31,6 +31,9 @@ const PropertyDetails = lazy(() => import("@/pages/public/property-details"));
 const PublicProperties = lazy(() => import("@/pages/public/properties"));
 const ProductLanding = lazy(() => import("@/pages/public/product-landing"));
 const SignupPage = lazy(() => import("@/pages/auth/signup"));
+const ForgotPasswordPage = lazy(() => import("@/pages/auth/ForgotPassword"));
+const ResetPasswordPage = lazy(() => import("@/pages/auth/ResetPassword"));
+const VerifyEmailPage = lazy(() => import("@/pages/auth/VerifyEmail"));
 const AutoMarketingPage = lazy(() => import("@/pages/auto-marketing"));
 const AvmPage = lazy(() => import("@/pages/avm"));
 const IsaPage = lazy(() => import("@/pages/isa"));
@@ -42,6 +45,7 @@ const PortalLogin = lazy(() => import("@/pages/portal/portal-login"));
 const OwnerPortal = lazy(() => import("@/pages/portal/owner-portal"));
 const RenterPortal = lazy(() => import("@/pages/portal/renter-portal"));
 const PortalAdmin = lazy(() => import("@/pages/portal/portal-admin"));
+const PortalResetPassword = lazy(() => import("@/pages/portal/reset-password"));
 const OnboardingPage = lazy(() => import("@/pages/onboarding"));
 const PricingPage = lazy(() => import("@/pages/public/pricing"));
 const TermsPage = lazy(() => import("@/pages/public/terms"));
@@ -193,7 +197,7 @@ function LoginPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password" className="text-sm font-medium">Senha</Label>
-                <a href="#" className="text-sm text-primary hover:underline">Esqueceu?</a>
+                <a href="/auth/forgot-password" className="text-sm text-primary hover:underline">Esqueceu?</a>
               </div>
               <Input
                 id="password"
@@ -236,18 +240,18 @@ function LoginPage() {
 }
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { user, logout } = useImobi();
+  const { user, loading, logout } = useImobi();
   const [, setLocation] = useLocation();
 
   // Redirect to login if not authenticated (useEffect to avoid setState during render)
   useEffect(() => {
-    if (!user) {
+    if (!loading && !user) {
       setLocation("/login");
     }
-  }, [user, setLocation]);
+  }, [loading, user, setLocation]);
 
   // Show loader while checking auth or redirecting
-  if (!user) {
+  if (loading || !user) {
     return <PageLoader />;
   }
 
@@ -273,20 +277,23 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 }
 
 function SuperAdminRoute({ component: Component }: { component: React.ComponentType }) {
-  const { user } = useImobi();
+  const { user, loading } = useImobi();
   const [, setLocation] = useLocation();
 
   // Redirect to login if not authenticated (useEffect to avoid setState during render)
   useEffect(() => {
+    if (loading) {
+      return;
+    }
     if (!user) {
       setLocation("/login");
     } else if (user.role !== "superadmin") {
       setLocation("/dashboard");
     }
-  }, [user, setLocation]);
+  }, [loading, user, setLocation]);
 
   // Show loader while checking auth or redirecting
-  if (!user || user.role !== "superadmin") {
+  if (loading || !user || user.role !== "superadmin") {
     return <PageLoader />;
   }
 
@@ -313,12 +320,18 @@ function Router() {
         <Route key="landing" path="/" component={() => <ErrorBoundary><ProductLanding /></ErrorBoundary>} />
         <Route key="login" path="/login" component={() => <ErrorBoundary><LoginPage /></ErrorBoundary>} />
         <Route key="signup" path="/signup" component={() => <ErrorBoundary><SignupPage /></ErrorBoundary>} />
+        {/* Fluxo de recuperação de senha/verificação de email — os links dos
+            emails do servidor apontam para /auth/reset-password e /auth/verify-email */}
+        <Route key="forgot-password" path="/auth/forgot-password" component={() => <ErrorBoundary><ForgotPasswordPage /></ErrorBoundary>} />
+        <Route key="reset-password" path="/auth/reset-password" component={() => <ErrorBoundary><ResetPasswordPage /></ErrorBoundary>} />
+        <Route key="verify-email" path="/auth/verify-email" component={() => <ErrorBoundary><VerifyEmailPage /></ErrorBoundary>} />
         <Route key="pricing" path="/pricing" component={() => <ErrorBoundary><PricingPage /></ErrorBoundary>} />
         <Route key="termos" path="/termos" component={() => <ErrorBoundary><TermsPage /></ErrorBoundary>} />
         <Route key="privacidade" path="/privacidade" component={() => <ErrorBoundary><PrivacyPage /></ErrorBoundary>} />
 
         {/* Portal Routes (standalone) */}
         <Route key="portal-login" path="/portal/login" component={() => <ErrorBoundary><PortalLogin /></ErrorBoundary>} />
+        <Route key="portal-reset" path="/portal/reset-password" component={() => <ErrorBoundary><PortalResetPassword /></ErrorBoundary>} />
         <Route key="portal-owner" path="/portal/owner" component={() => <ErrorBoundary><OwnerPortal /></ErrorBoundary>} />
         <Route key="portal-renter" path="/portal/renter" component={() => <ErrorBoundary><RenterPortal /></ErrorBoundary>} />
 
@@ -345,6 +358,8 @@ function Router() {
         <Route key="checkout-cancel" path="/checkout/cancel" component={() => <ProtectedRoute component={CheckoutCancelPage} />} />
         <Route key="checkout" path="/checkout/:planId" component={() => <ProtectedRoute component={CheckoutPage} />} />
         <Route key="settings" path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
+        {/* Deep-link usado no pós-checkout — renderiza a mesma página de configurações */}
+        <Route key="settings-billing" path="/settings/billing" component={() => <ProtectedRoute component={SettingsPage} />} />
 
         {/* Admin Routes (SuperAdmin only) */}
         <Route key="admin" path="/admin" component={() => <SuperAdminRoute component={AdminDashboard} />} />

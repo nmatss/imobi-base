@@ -29,6 +29,54 @@ import {
 const documentService = new DocumentService();
 const signerService = new SignerService();
 
+/**
+ * Tenant isolation for ClickSign documents.
+ *
+ * A ClickSign documentKey is linked to a tenant through the `contracts` table:
+ * contracts.clicksignDocumentKey -> contracts.tenantId. This is the only
+ * persisted relationship that ties an external ClickSign identifier back to an
+ * ImobiBase tenant (present in both the Postgres and SQLite schemas).
+ *
+ * Resolves the owning tenant of a documentKey. Returns null when no contract
+ * references it (e.g. document never persisted locally / unknown key).
+ *
+ * IMPORTANT: this NEVER trusts a tenantId coming from the request — the caller
+ * must compare the result against req.user!.tenantId.
+ */
+async function resolveDocumentTenantId(documentKey: string): Promise<string | null> {
+  if (!documentKey) return null;
+  const rows = await db
+    .select({ tenantId: schema.contracts.tenantId })
+    .from(schema.contracts)
+    .where(eq(schema.contracts.clicksignDocumentKey, documentKey))
+    .limit(1);
+  return rows.length > 0 ? rows[0].tenantId : null;
+}
+
+/**
+ * Fail-closed tenant guard for a documentKey.
+ *
+ * Throws a 404-style BadRequestError-compatible response when the document does
+ * NOT belong to the authenticated tenant. We return 404 (not 403) so we never
+ * leak whether a given documentKey exists in another tenant.
+ *
+ * Returns true on success; on failure it writes the 404 response and returns
+ * false so the caller can stop processing.
+ */
+async function ensureDocumentBelongsToTenant(
+  documentKey: string,
+  tenantId: string,
+  res: Response,
+): Promise<boolean> {
+  const ownerTenantId = await resolveDocumentTenantId(documentKey);
+  if (ownerTenantId === null || ownerTenantId !== tenantId) {
+    // 404 to avoid leaking existence of resources from other tenants.
+    res.status(404).json({ error: 'Document not found' });
+    return false;
+  }
+  return true;
+}
+
 export function registerESignatureRoutes(app: Express) {
   // Apply authentication and feature flag to ALL e-signature routes
   app.use('/api/esignature', requireAuth, checkFeatureAccess('digital_contracts'));
@@ -214,8 +262,13 @@ export function registerESignatureRoutes(app: Express) {
   app.get('/api/esignature/status/:documentKey', async (req: Request, res: Response) => {
     try {
       const { documentKey } = req.params;
-      // User authentication enforced by global middleware
-      // tenantId available via req.user!.tenantId if needed for validation
+      const tenantId = req.user!.tenantId;
+
+      // Tenant isolation: reject (404) if this document does not belong to the
+      // authenticated tenant. Prevents cross-tenant status disclosure.
+      if (!(await ensureDocumentBelongsToTenant(documentKey, tenantId, res))) {
+        return;
+      }
 
       const document = await documentService.getDocument(documentKey);
       const isComplete = await documentService.isDocumentComplete(documentKey);
@@ -245,8 +298,19 @@ export function registerESignatureRoutes(app: Express) {
   app.get('/api/esignature/signers/:listKey', async (req: Request, res: Response) => {
     try {
       const { listKey } = req.params;
-      // User authentication enforced by global middleware
-      // tenantId available via req.user!.tenantId if needed for validation
+      const tenantId = req.user!.tenantId;
+
+      // Tenant isolation for listKey:
+      // A ClickSign listKey is NOT persisted in our schema, so it cannot be
+      // resolved to a tenant directly from the database. To remain fail-closed,
+      // we require the caller to provide the parent `documentKey` (which IS
+      // linked to a tenant via the contracts table) and we validate ownership
+      // of that document. Without an owned documentKey we deny with 404 instead
+      // of leaking another tenant's signer data.
+      const documentKey = (req.query.documentKey as string | undefined) ?? '';
+      if (!(await ensureDocumentBelongsToTenant(documentKey, tenantId, res))) {
+        return;
+      }
 
       const status = await signerService.getSignerStatus(listKey);
 
@@ -269,11 +333,13 @@ export function registerESignatureRoutes(app: Express) {
       const { documentKey } = req.params;
       const tenantId = req.user!.tenantId;
 
-      const document = await documentService.getDocument(documentKey);
+      // Tenant isolation: reject (404) if this signed document does not belong
+      // to the authenticated tenant BEFORE fetching/streaming any content.
+      if (!(await ensureDocumentBelongsToTenant(documentKey, tenantId, res))) {
+        return;
+      }
 
-      // Validate document ownership (tenant isolation)
-      // Note: This requires documentService to support tenant validation
-      // For now, we trust the documentKey is unique and user is authenticated
+      const document = await documentService.getDocument(documentKey);
 
       if (document.status !== 'closed') {
         res.status(400).json({ error: 'Document is not fully signed yet' });
@@ -310,6 +376,12 @@ export function registerESignatureRoutes(app: Express) {
       // Get tenantId from authenticated user (not from request body)
       const tenantId = req.user!.tenantId;
       const { reason } = req.body;
+
+      // Tenant isolation: reject (404) if this document does not belong to the
+      // authenticated tenant. Prevents cross-tenant cancellation.
+      if (!(await ensureDocumentBelongsToTenant(documentKey, tenantId, res))) {
+        return;
+      }
 
       await documentService.cancelDocument(documentKey);
 
@@ -462,8 +534,14 @@ export function registerESignatureRoutes(app: Express) {
   app.get('/api/esignature/audit/:documentId', async (req: Request, res: Response) => {
     try {
       const { documentId } = req.params;
-      // User authentication enforced by global middleware
-      // tenantId available via req.user!.tenantId if needed for validation
+      const tenantId = req.user!.tenantId;
+
+      // Tenant isolation: documentId here is the ClickSign documentKey used as
+      // the audit entityId. Reject (404) if it does not belong to the
+      // authenticated tenant before disclosing the audit trail.
+      if (!(await ensureDocumentBelongsToTenant(documentId, tenantId, res))) {
+        return;
+      }
 
       const report = await auditTrailService.generateDocumentAuditReport(documentId);
 

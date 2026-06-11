@@ -70,83 +70,83 @@ describe('SVG Sanitizer', () => {
   });
 
   describe('sanitizeSVG', () => {
-    it('should remove script tags', () => {
+    it('should remove script tags', async () => {
       const maliciousSVG = '<svg><script>alert("XSS")</script><circle cx="50" cy="50" r="40"/></svg>';
-      const sanitized = sanitizeSVG(maliciousSVG);
+      const sanitized = await sanitizeSVG(maliciousSVG);
       expect(sanitized).not.toContain('<script>');
       expect(sanitized).toContain('<circle');
     });
 
-    it('should remove event handlers', () => {
+    it('should remove event handlers', async () => {
       const maliciousSVG = '<svg onload="alert(\'XSS\')"><circle cx="50" cy="50" r="40"/></svg>';
-      const sanitized = sanitizeSVG(maliciousSVG);
+      const sanitized = await sanitizeSVG(maliciousSVG);
       expect(sanitized).not.toContain('onload');
       expect(sanitized).toContain('<circle');
     });
 
-    it('should preserve safe SVG elements', () => {
+    it('should preserve safe SVG elements', async () => {
       const safeSVG = '<svg width="100" height="100"><circle cx="50" cy="50" r="40" fill="red"/><rect x="10" y="10" width="30" height="30"/></svg>';
-      const sanitized = sanitizeSVG(safeSVG);
+      const sanitized = await sanitizeSVG(safeSVG);
       expect(sanitized).toContain('circle');
       expect(sanitized).toContain('rect');
       expect(sanitized).toContain('fill="red"');
     });
 
-    it('should remove foreignObject tags', () => {
+    it('should remove foreignObject tags', async () => {
       const maliciousSVG = '<svg><foreignObject><body><script>alert("XSS")</script></body></foreignObject><circle cx="50" cy="50" r="40"/></svg>';
-      const sanitized = sanitizeSVG(maliciousSVG);
+      const sanitized = await sanitizeSVG(maliciousSVG);
       expect(sanitized).not.toContain('foreignObject');
       expect(sanitized).toContain('<circle');
     });
 
-    it('should throw error on invalid input', () => {
-      expect(() => sanitizeSVG('')).toThrow();
-      expect(() => sanitizeSVG(null as any)).toThrow();
-      expect(() => sanitizeSVG(undefined as any)).toThrow();
+    it('should throw error on invalid input', async () => {
+      await expect(sanitizeSVG('')).rejects.toThrow();
+      await expect(sanitizeSVG(null as any)).rejects.toThrow();
+      await expect(sanitizeSVG(undefined as any)).rejects.toThrow();
     });
   });
 
   describe('validateAndSanitizeSVG', () => {
-    it('should return safe:true for clean SVG', () => {
+    it('should return safe:true for clean SVG', async () => {
       const safeSVG = '<svg width="100" height="100"><circle cx="50" cy="50" r="40" fill="blue"/></svg>';
-      const result = validateAndSanitizeSVG(safeSVG);
+      const result = await validateAndSanitizeSVG(safeSVG);
       expect(result.safe).toBe(true);
       expect(result.sanitized).toContain('circle');
       expect(result.warnings).toHaveLength(0);
     });
 
-    it('should return safe:true after sanitizing malicious SVG', () => {
+    it('should return safe:true after sanitizing malicious SVG', async () => {
       const maliciousSVG = '<svg><script>alert("XSS")</script><circle cx="50" cy="50" r="40"/></svg>';
-      const result = validateAndSanitizeSVG(maliciousSVG);
+      const result = await validateAndSanitizeSVG(maliciousSVG);
       expect(result.safe).toBe(true);
       expect(result.sanitized).not.toContain('<script>');
       expect(result.sanitized).toContain('<circle');
       expect(result.warnings.length).toBeGreaterThan(0);
     });
 
-    it('should return safe:false for extremely malicious content', () => {
+    it('should return safe:false for extremely malicious content', async () => {
       // Test with content that can't be safely sanitized
       const extremelyMalicious = '\0\0\0';
-      const result = validateAndSanitizeSVG(extremelyMalicious);
+      const result = await validateAndSanitizeSVG(extremelyMalicious);
       expect(result.safe).toBe(false);
       expect(result.reason).toBeDefined();
     });
 
-    it('should include warnings for suspicious content', () => {
+    it('should include warnings for suspicious content', async () => {
       const suspiciousSVG = '<svg><script>alert("XSS")</script></svg>';
-      const result = validateAndSanitizeSVG(suspiciousSVG);
+      const result = await validateAndSanitizeSVG(suspiciousSVG);
       expect(result.warnings.length).toBeGreaterThan(0);
     });
   });
 
   describe('Security Edge Cases', () => {
-    it('should handle nested malicious content', () => {
+    it('should handle nested malicious content', async () => {
       const nestedMalicious = '<svg><g><g><script>alert("XSS")</script></g></g></svg>';
-      const sanitized = sanitizeSVG(nestedMalicious);
+      const sanitized = await sanitizeSVG(nestedMalicious);
       expect(sanitized).not.toContain('<script>');
     });
 
-    it('should handle multiple attack vectors', () => {
+    it('should handle multiple attack vectors', async () => {
       const multipleAttacks = `
         <svg onload="alert('XSS')">
           <script>alert("XSS")</script>
@@ -154,7 +154,7 @@ describe('SVG Sanitizer', () => {
           <foreignObject><body onload="alert('XSS')"></body></foreignObject>
         </svg>
       `;
-      const sanitized = sanitizeSVG(multipleAttacks);
+      const sanitized = await sanitizeSVG(multipleAttacks);
       expect(sanitized).not.toContain('onload');
       expect(sanitized).not.toContain('<script>');
       expect(sanitized).not.toContain('javascript:');
@@ -167,7 +167,7 @@ describe('SVG Sanitizer', () => {
       expect(result.safe).toBe(false);
     });
 
-    it('should preserve gradients and filters', () => {
+    it('should preserve gradients and filters', async () => {
       const complexSVG = `
         <svg>
           <defs>
@@ -179,7 +179,7 @@ describe('SVG Sanitizer', () => {
           <rect fill="url(#grad1)" width="100" height="100"/>
         </svg>
       `;
-      const sanitized = sanitizeSVG(complexSVG);
+      const sanitized = await sanitizeSVG(complexSVG);
       expect(sanitized).toContain('linearGradient');
       expect(sanitized).toContain('stop');
       expect(sanitized).toContain('rect');

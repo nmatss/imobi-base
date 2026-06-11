@@ -249,7 +249,7 @@ export class ContractGenerator {
     }
 
     // Descrição do Imóvel
-    let propertyStartY = buyerStartY + (data.buyer.phone ? 47 : 41);
+    const propertyStartY = buyerStartY + (data.buyer.phone ? 47 : 41);
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'bold');
     pdf.text('DESCRIÇÃO DO IMÓVEL', 20, propertyStartY);

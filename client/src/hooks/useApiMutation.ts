@@ -24,7 +24,7 @@ export interface ApiMutationOptions<TData, TVariables> {
   /** Nome do recurso (ex: "lead", "propriedade") */
   resourceName: string;
   /** Keys do React Query para invalidar */
-  invalidateKeys?: string[][];
+  invalidateKeys?: readonly (readonly unknown[])[];
   /** Mensagem de sucesso customizada */
   successMessage?: string | ((data: TData) => string);
   /** Mensagem de erro customizada */
@@ -155,10 +155,10 @@ export function useApiMutation<TData = unknown, TVariables = unknown>(
       return false;
     },
 
-    retryDelay: (attemptIndex) => {
+    retryDelay: (attemptIndex) => 
       // Exponential backoff: 1s, 2s, 4s...
-      return Math.min(1000 * 2 ** attemptIndex, 10000);
-    },
+       Math.min(1000 * 2 ** attemptIndex, 10000)
+    ,
   });
 }
 

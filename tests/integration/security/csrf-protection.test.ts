@@ -1,452 +1,384 @@
 /**
- * CSRF Protection Integration Tests
- * Tests CSRF token generation, validation, and rotation
+ * CSRF Protection — Integração REAL
+ *
+ * Antes esta suíte montava um app Express MOCK self-contained (createTestApp)
+ * que reimplementava o middleware de CSRF — ou seja, testava uma cópia, não o
+ * código de produção. Aqui exercitamos o CSRF REAL do app:
+ *
+ *  - Sobe o ROUTER REAL (`registerRoutes` de server/routes.ts) com o STORAGE
+ *    REAL contra um SQLite de teste isolado por arquivo (parallel-safe).
+ *  - O CSRF real usa o padrão Double Submit Cookie: o middleware
+ *    `csrfProtection` (server/routes.ts) compara o cookie httpOnly `csrf-token`
+ *    com o header `x-csrf-token` em métodos mutantes (POST/PATCH/DELETE...),
+ *    usando `crypto.timingSafeEqual`. O login (`POST /api/auth/login`) seta o
+ *    cookie e devolve o mesmo valor no corpo (`csrfToken`) para ser ecoado no
+ *    header. O agent do supertest guarda o cookie automaticamente.
+ *  - Provamos: (a) mutação em rota real protegida SEM o header X-CSRF-Token é
+ *    rejeitada com 403; (b) COM o token correto é aceita; (c) rotas
+ *    CSRF-excluded (login, webhook do Stripe) passam pelo middleware sem token.
+ *
+ * Observação sobre o comportamento REAL (não enfraquecemos asserções p/ verde):
+ *  - O middleware compara cookie vs header (Double Submit Cookie). Ele NÃO
+ *    compara contra um valor guardado na sessão. Logo, um par cookie+header
+ *    arbitrário porém IGUAL passaria a validação — isso é inerente ao padrão
+ *    Double Submit (sem segredo de servidor) e é o comportamento real esperado.
+ *    Por isso o ataque relevante e testável aqui é: header ausente, ou
+ *    header != cookie da sessão (que é o caso do atacante cross-site, que não
+ *    consegue ler o cookie httpOnly para refleti-lo no header).
  */
+import {
+  describe,
+  it,
+  expect,
+  beforeAll,
+  afterAll,
+} from "vitest";
+import request from "supertest";
+import type { Express } from "express";
+import bcrypt from "bcryptjs";
+import {
+  prepareTestEnv,
+  setupFreshDatabase,
+  restoreDatabase,
+  buildRealApp,
+  flushRateLimitKeys,
+} from "../../helpers/tenant-isolation-app";
 
-import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
-import request from 'supertest';
-import express, { type Express, type Request, type Response, type NextFunction } from 'express';
-import session from 'express-session';
-import { randomBytes } from 'crypto';
+// Precisa rodar ANTES de qualquer import de server/* (feito dentro de buildRealApp).
+prepareTestEnv();
 
-// Mock session store
-const mockSessions = new Map<string, any>();
-
-// CSRF excluded paths
-const csrfExcludedPaths = [
-  '/api/auth/login',
-  '/api/auth/register',
-  '/api/webhooks/stripe',
-  '/api/webhooks/whatsapp',
-  '/api/health',
-];
-
-function generateCSRFToken(): string {
-  return randomBytes(32).toString('base64url');
+interface StorageLike {
+  createTenant: (data: Record<string, unknown>) => Promise<{ id: string }>;
+  createUser: (data: Record<string, unknown>) => Promise<{ id: string }>;
+  getProperty: (id: string) => Promise<{ title?: string } | undefined>;
 }
 
-function createTestApp(): Express {
-  const app = express();
-
-  app.use(express.json());
-
-  // Session middleware
-  app.use(session({
-    secret: 'test-secret-csrf',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: false,
-      httpOnly: true,
-      sameSite: 'strict',
-    },
-    store: {
-      get: (sid, callback) => callback(null, mockSessions.get(sid) || null),
-      set: (sid, session, callback) => {
-        mockSessions.set(sid, session);
-        callback(null);
-      },
-      destroy: (sid, callback) => {
-        mockSessions.delete(sid);
-        callback(null);
-      },
-      touch: (sid, session, callback) => {
-        mockSessions.set(sid, session);
-        callback(null);
-      },
-    } as any,
-  }));
-
-  // CSRF Token Generation Middleware
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    if (!req.session.csrfToken) {
-      req.session.csrfToken = generateCSRFToken();
-    }
-    next();
-  });
-
-  // CSRF Validation Middleware
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    // Skip CSRF for excluded paths
-    if (csrfExcludedPaths.some(path => req.path.startsWith(path))) {
-      return next();
-    }
-
-    // Skip for GET, HEAD, OPTIONS
-    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
-      return next();
-    }
-
-    const csrfTokenFromHeader = req.headers['x-csrf-token'] as string;
-    const csrfTokenFromSession = req.session.csrfToken;
-
-    if (!csrfTokenFromHeader) {
-      return res.status(403).json({
-        error: 'CSRF token missing',
-        code: 'CSRF_TOKEN_MISSING',
-      });
-    }
-
-    if (csrfTokenFromHeader !== csrfTokenFromSession) {
-      return res.status(403).json({
-        error: 'Invalid CSRF token',
-        code: 'CSRF_TOKEN_INVALID',
-      });
-    }
-
-    next();
-  });
-
-  // Test routes
-  app.get('/api/csrf-token', (req: Request, res: Response) => {
-    res.json({
-      csrfToken: req.session.csrfToken,
-    });
-  });
-
-  app.post('/api/auth/login', (req: Request, res: Response) => {
-    const { email, password } = req.body;
-
-    if (email === 'test@example.com' && password === 'password123') {
-      // Regenerate CSRF token after login
-      const oldToken = req.session.csrfToken;
-      req.session.csrfToken = generateCSRFToken();
-
-      return res.json({
-        success: true,
-        user: { id: '1', email },
-        csrfToken: req.session.csrfToken,
-        oldToken, // For testing
-      });
-    }
-
-    res.status(401).json({ error: 'Invalid credentials' });
-  });
-
-  app.post('/api/protected-resource', (req: Request, res: Response) => {
-    res.json({
-      success: true,
-      message: 'Protected resource accessed',
-      data: req.body,
-    });
-  });
-
-  app.put('/api/protected-update', (req: Request, res: Response) => {
-    res.json({
-      success: true,
-      message: 'Resource updated',
-    });
-  });
-
-  app.delete('/api/protected-delete', (req: Request, res: Response) => {
-    res.json({
-      success: true,
-      message: 'Resource deleted',
-    });
-  });
-
-  app.post('/api/webhooks/stripe', (req: Request, res: Response) => {
-    res.json({
-      success: true,
-      message: 'Webhook received',
-    });
-  });
-
-  app.get('/api/health', (_req: Request, res: Response) => {
-    res.json({ status: 'ok' });
-  });
-
-  return app;
-}
-
-describe('CSRF Protection Integration Tests', () => {
+describe("CSRF Protection — REAL app + REAL middleware (Double Submit Cookie)", () => {
   let app: Express;
-  let agent: request.SuperAgentTest;
+  let storage: StorageLike;
+  let closeDb: () => Promise<void>;
 
-  beforeAll(() => {
-    app = createTestApp();
-  });
+  // Agente autenticado (mantém cookie de sessão + cookie httpOnly csrf-token).
+  let agent: ReturnType<typeof request.agent>;
+  let csrfToken: string;
+  let tenantId: string;
+  let userEmail: string;
 
-  beforeEach(() => {
+  const PASSWORD = "SenhaForteDeTeste123!";
+
+  beforeAll(async () => {
+    // tests/setup.ts roda seu beforeAll global e pode sobrescrever env; reaplica.
+    prepareTestEnv();
+    setupFreshDatabase();
+    const built = await buildRealApp();
+    app = built.app;
+    storage = built.storage as unknown as StorageLike;
+    closeDb = built.closeDb;
+
+    const tenant = await storage.createTenant({
+      name: "Imobiliária CSRF",
+      slug: `imob-csrf-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+      primaryColor: "#0066cc",
+      secondaryColor: "#333333",
+      email: "contato-csrf@example.com",
+    });
+    tenantId = tenant.id;
+
+    userEmail = `user-csrf-${Date.now()}@example.com`;
+    const hashed = await bcrypt.hash(PASSWORD, 10);
+    await storage.createUser({
+      tenantId,
+      name: "Corretor CSRF",
+      email: userEmail,
+      password: hashed,
+      role: "admin",
+    });
+
+    // Evita 429 falso por contadores acumulados de rate-limit.
+    await flushRateLimitKeys();
+
+    // Login: /api/auth/login é CSRF-excluded (não precisa de token) e devolve o
+    // par cookie httpOnly `csrf-token` + corpo `csrfToken` (Double Submit Cookie).
     agent = request.agent(app);
-    mockSessions.clear();
+    const loginRes = await agent
+      .post("/api/auth/login")
+      .send({ email: userEmail, password: PASSWORD });
+
+    expect(loginRes.status).toBe(200);
+    expect(loginRes.body.user.tenantId).toBe(tenantId);
+    csrfToken = loginRes.body.csrfToken;
+    expect(csrfToken).toBeTruthy();
+  }, 30000);
+
+  afterAll(async () => {
+    try {
+      if (closeDb) await closeDb();
+    } finally {
+      restoreDatabase();
+    }
   });
 
-  describe('CSRF Token Generation', () => {
-    it('should generate CSRF token on first request', async () => {
-      const res = await agent
-        .get('/api/csrf-token')
-        .expect(200);
+  // ---------------------------------------------------------------------------
+  // (a) Mutação SEM header X-CSRF-Token é REJEITADA com 403
+  // ---------------------------------------------------------------------------
+  describe("Mutação SEM header X-CSRF-Token -> 403", () => {
+    it("POST /api/properties sem X-CSRF-Token é rejeitado (403)", async () => {
+      const res = await agent.post("/api/properties").send({
+        title: "Casa sem token",
+        type: "house",
+        category: "sale",
+        price: "500000",
+        address: "Rua A, 1",
+        city: "São Paulo",
+        state: "SP",
+        status: "available",
+      });
 
-      expect(res.body.csrfToken).toBeDefined();
-      expect(res.body.csrfToken).toHaveLength(43); // base64url(32 bytes)
+      expect(res.status).toBe(403);
+      // Erro vem do middleware real: { error: "CSRF token missing", required: {...} }
+      expect(res.body.error).toContain("CSRF token missing");
+      expect(res.body.required).toMatchObject({
+        cookie: "csrf-token",
+        header: "x-csrf-token",
+      });
     });
 
-    it('should maintain same CSRF token across requests in same session', async () => {
-      const res1 = await agent.get('/api/csrf-token').expect(200);
-      const token1 = res1.body.csrfToken;
-
-      const res2 = await agent.get('/api/csrf-token').expect(200);
-      const token2 = res2.body.csrfToken;
-
-      expect(token1).toBe(token2);
-    });
-
-    it('should generate different tokens for different sessions', async () => {
-      const agent1 = request.agent(app);
-      const agent2 = request.agent(app);
-
-      const res1 = await agent1.get('/api/csrf-token').expect(200);
-      const res2 = await agent2.get('/api/csrf-token').expect(200);
-
-      expect(res1.body.csrfToken).toBeDefined();
-      expect(res2.body.csrfToken).toBeDefined();
-      expect(res1.body.csrfToken).not.toBe(res2.body.csrfToken);
-    });
-  });
-
-  describe('CSRF Token Validation', () => {
-    it('should accept request with valid CSRF token', async () => {
-      // Get CSRF token
-      const tokenRes = await agent.get('/api/csrf-token').expect(200);
-      const csrfToken = tokenRes.body.csrfToken;
-
-      // Make protected request with valid token
-      const res = await agent
-        .post('/api/protected-resource')
-        .set('X-CSRF-Token', csrfToken)
-        .send({ data: 'test' })
-        .expect(200);
-
-      expect(res.body.success).toBe(true);
-    });
-
-    it('should reject POST request without CSRF token', async () => {
-      await agent.get('/api/csrf-token').expect(200);
-
-      const res = await agent
-        .post('/api/protected-resource')
-        .send({ data: 'test' })
-        .expect(403);
-
-      expect(res.body.error).toContain('CSRF token missing');
-      expect(res.body.code).toBe('CSRF_TOKEN_MISSING');
-    });
-
-    it('should reject request with invalid CSRF token', async () => {
-      await agent.get('/api/csrf-token').expect(200);
-
-      const res = await agent
-        .post('/api/protected-resource')
-        .set('X-CSRF-Token', 'invalid-token-12345')
-        .send({ data: 'test' })
-        .expect(403);
-
-      expect(res.body.error).toContain('Invalid CSRF token');
-      expect(res.body.code).toBe('CSRF_TOKEN_INVALID');
-    });
-
-    it('should reject request with CSRF token from different session', async () => {
-      const agent1 = request.agent(app);
-      const agent2 = request.agent(app);
-
-      // Get token from agent1
-      const tokenRes = await agent1.get('/api/csrf-token').expect(200);
-      const csrfToken = tokenRes.body.csrfToken;
-
-      // Try to use token from agent1 in agent2's session
-      const res = await agent2
-        .post('/api/protected-resource')
-        .set('X-CSRF-Token', csrfToken)
-        .send({ data: 'test' })
-        .expect(403);
-
-      expect(res.body.error).toContain('Invalid CSRF token');
-    });
-  });
-
-  describe('CSRF Protection for Different HTTP Methods', () => {
-    it('should protect POST requests', async () => {
-      const tokenRes = await agent.get('/api/csrf-token').expect(200);
-      const csrfToken = tokenRes.body.csrfToken;
-
-      await agent
-        .post('/api/protected-resource')
-        .set('X-CSRF-Token', csrfToken)
-        .send({ data: 'test' })
-        .expect(200);
-    });
-
-    it('should protect PUT requests', async () => {
-      const tokenRes = await agent.get('/api/csrf-token').expect(200);
-      const csrfToken = tokenRes.body.csrfToken;
-
-      await agent
-        .put('/api/protected-update')
-        .set('X-CSRF-Token', csrfToken)
-        .send({ data: 'update' })
-        .expect(200);
-    });
-
-    it('should protect DELETE requests', async () => {
-      const tokenRes = await agent.get('/api/csrf-token').expect(200);
-      const csrfToken = tokenRes.body.csrfToken;
-
-      await agent
-        .delete('/api/protected-delete')
-        .set('X-CSRF-Token', csrfToken)
-        .expect(200);
-    });
-
-    it('should NOT protect GET requests', async () => {
-      // GET requests should not require CSRF token
-      await agent
-        .get('/api/csrf-token')
-        .expect(200);
-    });
-  });
-
-  describe('CSRF Token Rotation After Login', () => {
-    it('should rotate CSRF token after successful login', async () => {
-      // Get initial CSRF token
-      const initialRes = await agent.get('/api/csrf-token').expect(200);
-      const initialToken = initialRes.body.csrfToken;
-
-      // Login (login endpoint is CSRF-exempt)
-      const loginRes = await agent
-        .post('/api/auth/login')
+    it("PATCH /api/properties/:id sem X-CSRF-Token é rejeitado (403 antes de tocar o recurso)", async () => {
+      // Cria um imóvel real (com token) para ter um :id válido.
+      const created = await agent
+        .post("/api/properties")
+        .set("x-csrf-token", csrfToken)
         .send({
-          email: 'test@example.com',
-          password: 'password123',
-        })
-        .expect(200);
+          title: "Casa para PATCH",
+          type: "house",
+          category: "sale",
+          price: "600000",
+          address: "Rua B, 2",
+          city: "São Paulo",
+          state: "SP",
+          status: "available",
+        });
+      expect(created.status).toBe(201);
+      const propertyId: string = created.body.data.id;
 
-      const newToken = loginRes.body.csrfToken;
-      const oldToken = loginRes.body.oldToken;
+      const res = await agent
+        .patch(`/api/properties/${propertyId}`)
+        .send({ title: "HACKED-SEM-CSRF" });
 
-      // Verify token was rotated
-      expect(newToken).toBeDefined();
-      expect(oldToken).toBe(initialToken);
-      expect(newToken).not.toBe(oldToken);
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain("CSRF token missing");
 
-      // Old token should not work anymore
-      const failRes = await agent
-        .post('/api/protected-resource')
-        .set('X-CSRF-Token', oldToken)
-        .send({ data: 'test' })
-        .expect(403);
-
-      expect(failRes.body.error).toContain('Invalid CSRF token');
-
-      // New token should work
-      await agent
-        .post('/api/protected-resource')
-        .set('X-CSRF-Token', newToken)
-        .send({ data: 'test' })
-        .expect(200);
+      // O CSRF bloqueia ANTES do handler: o recurso não foi modificado.
+      const after = await storage.getProperty(propertyId);
+      expect(after?.title).toBe("Casa para PATCH");
     });
-  });
 
-  describe('CSRF Excluded Paths', () => {
-    it('should allow webhook endpoints without CSRF token', async () => {
-      await agent
-        .post('/api/webhooks/stripe')
+    it("DELETE /api/properties/:id sem X-CSRF-Token é rejeitado (403, recurso preservado)", async () => {
+      const created = await agent
+        .post("/api/properties")
+        .set("x-csrf-token", csrfToken)
         .send({
-          event: 'payment.succeeded',
-          data: { amount: 1000 },
-        })
-        .expect(200);
-    });
+          title: "Casa para DELETE",
+          type: "house",
+          category: "sale",
+          price: "700000",
+          address: "Rua C, 3",
+          city: "São Paulo",
+          state: "SP",
+          status: "available",
+        });
+      expect(created.status).toBe(201);
+      const propertyId: string = created.body.data.id;
 
-    it('should allow login endpoint without CSRF token', async () => {
-      await agent
-        .post('/api/auth/login')
+      const res = await agent.delete(`/api/properties/${propertyId}`);
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain("CSRF token missing");
+
+      // CSRF bloqueou antes do handler: o recurso continua existindo.
+      expect(await storage.getProperty(propertyId)).toBeTruthy();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // (b) Mutação COM o csrfToken correto é ACEITA
+  // ---------------------------------------------------------------------------
+  describe("Mutação COM X-CSRF-Token correto é aceita", () => {
+    it("POST /api/properties com X-CSRF-Token cria o imóvel (201)", async () => {
+      const res = await agent
+        .post("/api/properties")
+        .set("x-csrf-token", csrfToken)
         .send({
-          email: 'test@example.com',
-          password: 'password123',
-        })
-        .expect(200);
+          title: "Casa com token válido",
+          type: "house",
+          category: "sale",
+          price: "800000",
+          address: "Rua D, 4",
+          city: "São Paulo",
+          state: "SP",
+          status: "available",
+        });
+
+      expect(res.status).toBe(201);
+      expect(res.body.data.id).toBeTruthy();
+      expect(res.body.data.tenantId).toBe(tenantId);
     });
 
-    it('should allow health check without CSRF token', async () => {
-      await agent
-        .get('/api/health')
-        .expect(200);
+    it("PATCH /api/properties/:id com X-CSRF-Token edita o imóvel (200)", async () => {
+      const created = await agent
+        .post("/api/properties")
+        .set("x-csrf-token", csrfToken)
+        .send({
+          title: "Antes da edição",
+          type: "house",
+          category: "sale",
+          price: "900000",
+          address: "Rua E, 5",
+          city: "São Paulo",
+          state: "SP",
+          status: "available",
+        });
+      expect(created.status).toBe(201);
+      const propertyId: string = created.body.data.id;
+
+      const res = await agent
+        .patch(`/api/properties/${propertyId}`)
+        .set("x-csrf-token", csrfToken)
+        .send({ title: "Depois da edição" });
+
+      expect(res.status).toBe(200);
+      const after = await storage.getProperty(propertyId);
+      expect(after?.title).toBe("Depois da edição");
     });
   });
 
-  describe('CSRF Token Tampering Detection', () => {
-    it('should reject modified CSRF token', async () => {
-      const tokenRes = await agent.get('/api/csrf-token').expect(200);
-      const csrfToken = tokenRes.body.csrfToken;
-
-      // Tamper with token
-      const tamperedToken = csrfToken.slice(0, -5) + 'XXXXX';
-
+  // ---------------------------------------------------------------------------
+  // Token presente porém INVÁLIDO (não bate com o cookie da sessão) -> 403
+  // Este é o cenário real do atacante cross-site: não consegue ler o cookie
+  // httpOnly, então o header que ele força nunca casa com o cookie.
+  // ---------------------------------------------------------------------------
+  describe("Header X-CSRF-Token presente mas != cookie da sessão -> 403", () => {
+    it("token de comprimento diferente -> 403 (timingSafeEqual lança, vira 'Invalid CSRF token format')", async () => {
       const res = await agent
-        .post('/api/protected-resource')
-        .set('X-CSRF-Token', tamperedToken)
-        .send({ data: 'test' })
-        .expect(403);
+        .post("/api/properties")
+        .set("x-csrf-token", "token-curto-invalido")
+        .send({
+          title: "Casa token inválido",
+          type: "house",
+          category: "sale",
+          price: "100000",
+          address: "Rua F, 6",
+          city: "São Paulo",
+          state: "SP",
+          status: "available",
+        });
 
-      expect(res.body.error).toContain('Invalid CSRF token');
+      expect(res.status).toBe(403);
+      // Cookie e header têm comprimentos diferentes => timingSafeEqual lança =>
+      // o middleware real captura e responde "Invalid CSRF token format".
+      expect(res.body.error).toBe("Invalid CSRF token format");
     });
 
-    it('should reject empty CSRF token', async () => {
-      await agent.get('/api/csrf-token').expect(200);
+    it("token de MESMO comprimento mas valor diferente -> 403 (CSRF token mismatch)", async () => {
+      // base64url de 32 bytes => 43 chars, mesmo comprimento do token real.
+      const sameLengthWrong = "A".repeat(csrfToken.length);
+      expect(sameLengthWrong.length).toBe(csrfToken.length);
 
       const res = await agent
-        .post('/api/protected-resource')
-        .set('X-CSRF-Token', '')
-        .send({ data: 'test' })
-        .expect(403);
+        .post("/api/properties")
+        .set("x-csrf-token", sameLengthWrong)
+        .send({
+          title: "Casa token mismatch",
+          type: "house",
+          category: "sale",
+          price: "100000",
+          address: "Rua G, 7",
+          city: "São Paulo",
+          state: "SP",
+          status: "available",
+        });
 
-      expect(res.body.error).toContain('CSRF token missing');
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe("CSRF token mismatch");
     });
 
-    it('should reject CSRF token with SQL injection attempt', async () => {
-      await agent.get('/api/csrf-token').expect(200);
-
+    it("header X-CSRF-Token vazio -> 403 (tratado como ausente)", async () => {
       const res = await agent
-        .post('/api/protected-resource')
-        .set('X-CSRF-Token', "' OR '1'='1")
-        .send({ data: 'test' })
-        .expect(403);
+        .post("/api/properties")
+        .set("x-csrf-token", "")
+        .send({
+          title: "Casa token vazio",
+          type: "house",
+          category: "sale",
+          price: "100000",
+          address: "Rua H, 8",
+          city: "São Paulo",
+          state: "SP",
+          status: "available",
+        });
 
-      expect(res.body.error).toContain('Invalid CSRF token');
-    });
-
-    it('should reject CSRF token with XSS attempt', async () => {
-      await agent.get('/api/csrf-token').expect(200);
-
-      const res = await agent
-        .post('/api/protected-resource')
-        .set('X-CSRF-Token', '<script>alert(1)</script>')
-        .send({ data: 'test' })
-        .expect(403);
-
-      expect(res.body.error).toContain('Invalid CSRF token');
+      expect(res.status).toBe(403);
+      expect(res.body.error).toContain("CSRF token missing");
     });
   });
 
-  describe('CSRF Double Submit Cookie Pattern', () => {
-    it('should validate CSRF token matches session value', async () => {
-      const tokenRes = await agent.get('/api/csrf-token').expect(200);
-      const csrfToken = tokenRes.body.csrfToken;
+  // ---------------------------------------------------------------------------
+  // Métodos seguros (GET) não exigem CSRF
+  // ---------------------------------------------------------------------------
+  describe("Métodos seguros não exigem CSRF", () => {
+    it("GET /api/properties não exige X-CSRF-Token (200)", async () => {
+      const res = await agent.get("/api/properties");
+      expect(res.status).toBe(200);
+    });
 
-      // Valid token should work
-      await agent
-        .post('/api/protected-resource')
-        .set('X-CSRF-Token', csrfToken)
-        .send({ data: 'test' })
-        .expect(200);
+    it("GET /api/csrf-token renova o token sem exigir header (200)", async () => {
+      const res = await agent.get("/api/csrf-token");
+      expect(res.status).toBe(200);
+      expect(res.body.csrfToken).toBeTruthy();
+    });
+  });
 
-      // Different token should fail
-      await agent
-        .post('/api/protected-resource')
-        .set('X-CSRF-Token', generateCSRFToken())
-        .send({ data: 'test' })
-        .expect(403);
+  // ---------------------------------------------------------------------------
+  // (c) Rotas CSRF-excluded passam pelo middleware SEM token
+  // Asserção: NÃO retornam o 403 de CSRF. Podem falhar adiante por outras
+  // razões (credenciais, assinatura do webhook), mas não por CSRF.
+  // ---------------------------------------------------------------------------
+  describe("Rotas CSRF-excluded passam pelo middleware sem token", () => {
+    it("POST /api/auth/login não é bloqueado por CSRF (credenciais válidas -> 200)", async () => {
+      // Novo agent (sem cookie csrf-token) prova que login não precisa de CSRF.
+      const fresh = request.agent(app);
+      await flushRateLimitKeys();
+      const res = await fresh
+        .post("/api/auth/login")
+        .send({ email: userEmail, password: PASSWORD });
+
+      expect(res.status).toBe(200);
+      expect(res.body.csrfToken).toBeTruthy();
+    });
+
+    it("POST /api/auth/login com credenciais erradas -> 401 (não 403 de CSRF)", async () => {
+      const fresh = request.agent(app);
+      await flushRateLimitKeys();
+      const res = await fresh
+        .post("/api/auth/login")
+        .send({ email: userEmail, password: "senha-errada" });
+
+      // Excluída do CSRF: o erro NUNCA é o 403 de "CSRF token missing".
+      expect(res.status).not.toBe(403);
+      expect(res.body.error).not.toContain("CSRF token missing");
+      expect(res.status).toBe(401);
+    });
+
+    it("POST /api/webhooks/stripe não é bloqueado por CSRF (sem token -> falha de assinatura 400, não 403)", async () => {
+      const fresh = request.agent(app);
+      const res = await fresh
+        .post("/api/webhooks/stripe")
+        .send({ type: "checkout.session.completed", data: {} });
+
+      // Excluída do CSRF: passa pelo middleware. O handler do Stripe rejeita por
+      // falta de assinatura (400) — o que prova que não foi barrado por CSRF.
+      expect(res.status).not.toBe(403);
+      expect(res.body?.error ?? "").not.toContain("CSRF token missing");
+      expect(res.status).toBe(400);
     });
   });
 });

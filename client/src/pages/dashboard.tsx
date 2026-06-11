@@ -28,7 +28,7 @@ import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { Spinner } from "@/components/ui/spinner";
 
 // Lazy load Recharts components to reduce initial bundle size
-const Bar = lazy(() => import("recharts").then(m => ({ default: m.Bar })));
+const Bar = lazy(() => import("recharts").then(m => ({ default: m.Bar as unknown as React.ComponentType<any> })));
 const BarChart = lazy(() => import("recharts").then(m => ({ default: m.BarChart })));
 const ResponsiveContainer = lazy(() => import("recharts").then(m => ({ default: m.ResponsiveContainer })));
 const XAxis = lazy(() => import("recharts").then(m => ({ default: m.XAxis })));
@@ -45,12 +45,16 @@ const FOLLOW_UP_TYPE_LABELS: Record<string, string> = {
   other: "Outro",
 };
 
+// WCAG AA compliant lead status colors.
+// Single source of truth: tailwind.config.js theme.extend.colors.status (-700 palette).
+// The previous values (blue-500/purple-500/orange-500/yellow-500/green-500) failed the
+// 4.5:1 contrast ratio both as white-on-color avatars and as color-on-tint badges.
 const LEAD_STATUS_COLORS: Record<string, string> = {
-  new: "#3b82f6",
-  qualification: "#8b5cf6",
-  visit: "#f97316",
-  proposal: "#eab308",
-  contract: "#22c55e",
+  new: "#047857", // status.new (green-700)
+  qualification: "#7c3aed", // status.qualification (purple-700)
+  visit: "#c2410c", // status.visit (orange-700)
+  proposal: "#0e7490", // status.proposal (cyan-700)
+  contract: "#047857", // status.contract (green-700)
 };
 
 const LEAD_STATUS_LABELS: Record<string, string> = {
@@ -129,6 +133,13 @@ export default function Dashboard() {
       if (res.ok) {
         toast({ title: "Lembrete concluído", description: "O lembrete foi marcado como concluído." });
         refetchFollowUps();
+      } else {
+        const payload = await res.json().catch(() => null);
+        toast({
+          title: "Erro",
+          description: payload?.error || payload?.message || "Não foi possível concluir o lembrete.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       toast({ title: "Erro", description: "Não foi possível concluir o lembrete.", variant: "destructive" });
@@ -188,6 +199,13 @@ export default function Dashboard() {
         setNewLeadForm({ name: "", email: "", phone: "", source: "website" });
         await refetchLeads();
         toast({ title: "Lead criado", description: "O lead foi cadastrado com sucesso." });
+      } else {
+        const payload = await res.json().catch(() => null);
+        toast({
+          title: "Erro ao criar lead",
+          description: payload?.error || payload?.message || "Não foi possível criar o lead.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Failed to create lead:", error);
@@ -197,11 +215,9 @@ export default function Dashboard() {
     }
   }
 
-  const totalContractValue = useMemo(() => {
-    return contracts
+  const totalContractValue = useMemo(() => contracts
       .filter(c => c.status === "signed")
-      .reduce((sum, c) => sum + parseCurrencyValue(c.value), 0);
-  }, [contracts]);
+      .reduce((sum, c) => sum + parseCurrencyValue(c.value), 0), [contracts]);
 
   // Action buttons for mobile sheet
   const ActionButtons = ({ inSheet = false }: { inSheet?: boolean }) => (
@@ -661,7 +677,7 @@ export default function Dashboard() {
                                 variant="secondary"
                                 className="text-xs px-2 py-0.5"
                                 style={{
-                                  backgroundColor: LEAD_STATUS_COLORS[lead.status] + "20",
+                                  backgroundColor: `${LEAD_STATUS_COLORS[lead.status]  }20`,
                                   color: LEAD_STATUS_COLORS[lead.status]
                                 }}
                               >
@@ -774,7 +790,7 @@ export default function Dashboard() {
                             boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                             fontSize: '13px'
                           }}
-                          formatter={(value: number, name: string) => {
+                          formatter={(value, name) => {
                             if (name === "sale") return [value, "Venda"];
                             if (name === "rent") return [value, "Aluguel"];
                             return [value, name];

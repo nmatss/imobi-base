@@ -12,6 +12,8 @@ const BLOCKED_HOSTS = [
   '169.254.169.254', // AWS metadata
   'metadata.google.internal', // GCP metadata
   'fd00:ec2::254', // AWS IMDSv2 IPv6
+  '::1', // IPv6 loopback
+  '::', // IPv6 unspecified
 ];
 
 const ALLOWED_PROTOCOLS = ['https:', 'http:'];
@@ -40,7 +42,14 @@ export function validateExternalUrl(urlString: string): URLValidationResult {
     }
 
     // 3. Verificar hosts bloqueados
-    const hostname = url.hostname.toLowerCase();
+    // url.hostname mantém os colchetes em IPv6 (ex.: "[fd00:ec2::254]"), o que
+    // impediria o match exato contra entradas de BLOCKED_HOSTS sem colchetes.
+    // Normalizamos removendo os colchetes para comparar literais IPv6.
+    const rawHostname = url.hostname.toLowerCase();
+    const hostname =
+      rawHostname.startsWith('[') && rawHostname.endsWith(']')
+        ? rawHostname.slice(1, -1)
+        : rawHostname;
 
     for (const blocked of BLOCKED_HOSTS) {
       if (hostname === blocked || hostname.endsWith(`.${blocked}`)) {
@@ -51,11 +60,32 @@ export function validateExternalUrl(urlString: string): URLValidationResult {
       }
     }
 
-    // 4. Verificar IPs privados
+    // 3b. Bloquear hostname malformado (labels vazios), ex.: ".com", "a..b"
+    if (
+      !hostname ||
+      hostname.startsWith('.') ||
+      hostname.endsWith('.') ||
+      hostname.includes('..')
+    ) {
+      return {
+        valid: false,
+        error: 'Malformed hostname',
+      };
+    }
+
+    // 4. Verificar IPs privados (IPv4)
     if (isPrivateIP(hostname)) {
       return {
         valid: false,
         error: 'Access to private IP addresses is forbidden',
+      };
+    }
+
+    // 4b. Verificar IPv6 loopback/privado/link-local (fora dos literais já em BLOCKED_HOSTS)
+    if (isPrivateIPv6(hostname)) {
+      return {
+        valid: false,
+        error: 'Access to private IPv6 addresses is forbidden',
       };
     }
 
@@ -74,6 +104,22 @@ export function validateExternalUrl(urlString: string): URLValidationResult {
       error: `Invalid URL format: ${error.message}`,
     };
   }
+}
+
+/**
+ * Verifica se hostname é IPv6 loopback/privado/link-local.
+ * Cobre ::1 (loopback), :: (unspecified), fc00::/7 (ULA, prefixos fc/fd) e
+ * fe80::/10 (link-local). Recebe o hostname já sem colchetes.
+ */
+function isPrivateIPv6(hostname: string): boolean {
+  if (!hostname.includes(':')) return false;
+  const h = hostname.toLowerCase();
+  if (h === '::1' || h === '::') return true;
+  // ULA fc00::/7 -> primeiro hextet começa com fc ou fd
+  if (/^f[cd][0-9a-f]{0,2}:/.test(h)) return true;
+  // link-local fe80::/10 -> fe8x..feb x
+  if (/^fe[89ab][0-9a-f]?:/.test(h)) return true;
+  return false;
 }
 
 /**

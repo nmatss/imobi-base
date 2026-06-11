@@ -43,8 +43,7 @@ export function useLeadFilters(leads: Lead[]) {
     setFilters(DEFAULT_FILTERS);
   }, []);
 
-  const filteredLeads = useMemo(() => {
-    return leads.filter((lead) => {
+  const filteredLeads = useMemo(() => leads.filter((lead) => {
       // Search filter
       if (filters.search) {
         const searchLower = filters.search.toLowerCase();
@@ -95,8 +94,7 @@ export function useLeadFilters(leads: Lead[]) {
       }
 
       return true;
-    });
-  }, [leads, filters]);
+    }), [leads, filters]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;

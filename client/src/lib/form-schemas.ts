@@ -15,7 +15,7 @@ function validateCPF(cpf: string): boolean {
     sum += parseInt(cleaned.charAt(i)) * (10 - i);
   }
   let mod = sum % 11;
-  let digit1 = mod < 2 ? 0 : 11 - mod;
+  const digit1 = mod < 2 ? 0 : 11 - mod;
 
   if (parseInt(cleaned.charAt(9)) !== digit1) return false;
 
@@ -24,7 +24,7 @@ function validateCPF(cpf: string): boolean {
     sum += parseInt(cleaned.charAt(i)) * (11 - i);
   }
   mod = sum % 11;
-  let digit2 = mod < 2 ? 0 : 11 - mod;
+  const digit2 = mod < 2 ? 0 : 11 - mod;
 
   return parseInt(cleaned.charAt(10)) === digit2;
 }
@@ -376,9 +376,7 @@ export const rentalContractSchema = z.object({
     .optional()
     .or(z.literal("")),
 }).refine(
-  (data) => {
-    return data.endDate > data.startDate;
-  },
+  (data) => data.endDate > data.startDate,
   {
     message: "Data de término deve ser posterior à data de início",
     path: ["endDate"],

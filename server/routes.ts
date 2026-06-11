@@ -38,6 +38,7 @@ import {
   insertCommissionSchema,
 } from "@shared/schema-sqlite";
 import type { User } from "@shared/schema-sqlite";
+import { ROLES, isAdminRole, isSuperAdminRole } from "@shared/constants/roles";
 import connectPg from "connect-pg-simple";
 import pkg from "pg";
 import rateLimit from "express-rate-limit";
@@ -45,8 +46,18 @@ import RedisStore from "rate-limit-redis";
 import helmet from "helmet";
 import cors from "cors";
 import { apiResponse, apiError, apiPaginated } from "./utils/api-response";
-import { checkFeatureAccess } from "./middleware/plan-limits";
+import {
+  checkFeatureAccess,
+  checkPropertyLimit,
+  checkLeadLimit,
+  isLeadLimitReachedForTenant,
+} from "./middleware/plan-limits";
 import { registerSecurityRoutes } from "./routes-security";
+import {
+  checkAccountLock,
+  handleFailedLogin,
+  handleSuccessfulLogin,
+} from "./auth/security";
 import { registerFeatureRoutes } from "./routes-features";
 import { registerPaymentRoutes } from "./routes-payments";
 import { registerAdminBootstrapRoutes } from "./routes-admin-bootstrap";
@@ -111,6 +122,62 @@ async function comparePassword(
   stored: string,
 ): Promise<boolean> {
   return await bcrypt.compare(supplied, stored);
+}
+
+// ===== ACCOUNT LOCKOUT — BEST-EFFORT WRAPPERS =====
+// A persistência de login_history e das colunas de lock pode não existir no
+// Postgres (login_history é SQLite-only no schema dual; users pode não ter as
+// colunas de lock em PG). Por isso estes wrappers nunca quebram o login: o
+// bloqueio funciona onde as colunas existem, mas falha de escrita é só logada.
+async function safeCheckAccountLock(
+  userId: string,
+): Promise<{ locked: boolean }> {
+  try {
+    const result = await checkAccountLock(userId);
+    return { locked: result.locked };
+  } catch (err) {
+    console.warn(
+      "[auth] checkAccountLock indisponível (colunas de lock podem não existir):",
+      err instanceof Error ? err.message : err,
+    );
+    return { locked: false };
+  }
+}
+
+async function safeHandleFailedLogin(
+  userId: string | null,
+  email: string,
+  reason: string,
+  req: Request,
+): Promise<void> {
+  if (!userId) {
+    // Sem userId não há linha de users para incrementar; loginHistory de
+    // usuário inexistente é puramente auditoria e best-effort.
+    return;
+  }
+  try {
+    await handleFailedLogin(userId, email, reason, req);
+  } catch (err) {
+    console.warn(
+      "[auth] handleFailedLogin best-effort falhou (persistência de lockout indisponível):",
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
+async function safeHandleSuccessfulLogin(
+  userId: string,
+  email: string,
+  req: Request,
+): Promise<void> {
+  try {
+    await handleSuccessfulLogin(userId, email, req);
+  } catch (err) {
+    console.warn(
+      "[auth] handleSuccessfulLogin best-effort falhou (persistência de login indisponível):",
+      err instanceof Error ? err.message : err,
+    );
+  }
 }
 
 // ===== TENANT ISOLATION HELPERS (IDOR Prevention) =====
@@ -418,23 +485,35 @@ export async function registerRoutes(
     next();
   });
 
-  // Redis store for rate limiting in production (falls back to in-memory)
-  let rateLimitStore: RedisStore | undefined;
-  try {
-    const { getRedisClient } = await import("./cache/redis-client");
-    const client = getRedisClient();
-    if (client) {
-      rateLimitStore = new RedisStore({
-        sendCommand: (...args: string[]) =>
-          client.call(args[0], ...args.slice(1)) as Promise<
-            boolean | number | string | (boolean | number | string)[]
-          >,
-        prefix: "rl:",
-      });
+  // Store distribuído (Redis) para rate limiting APENAS quando REDIS_URL está
+  // explicitamente configurada — getRedisClient() cria o client de forma
+  // síncrona e nunca lança aqui, então sem este gate o RedisStore seria usado
+  // SEMPRE (inclusive apontando para localhost inexistente no Vercel) e cada
+  // request a /api/* viraria 500 por erro de store.
+  // Sem REDIS_URL: store em memória padrão do express-rate-limit. Limitação
+  // conhecida: o contador é por instância, então em múltiplas instâncias
+  // serverless o limite efetivo se multiplica — degradação aceitável até haver
+  // Redis gerenciado configurado.
+  // express-rate-limit v8 requires a distinct Store instance per limiter.
+  let createRateLimitStore: ((prefix: string) => RedisStore) | undefined;
+  if (process.env.REDIS_URL) {
+    try {
+      const { getRedisClient } = await import("./cache/redis-client");
+      const client = getRedisClient();
+      createRateLimitStore = (prefix: string) =>
+        new RedisStore({
+          sendCommand: (...args: string[]) =>
+            client.call(args[0], ...args.slice(1)) as Promise<
+              boolean | number | string | (boolean | number | string)[]
+            >,
+          prefix,
+        });
       console.log("[RateLimit] Using Redis store");
+    } catch {
+      console.log("[RateLimit] Redis not available, using in-memory store");
     }
-  } catch {
-    console.log("[RateLimit] Redis not available, using in-memory store");
+  } else {
+    console.log("[RateLimit] REDIS_URL not set, using in-memory store");
   }
 
   // Rate limiting - general API limiter
@@ -444,7 +523,11 @@ export async function registerRoutes(
     message: { error: "Muitas requisições. Tente novamente mais tarde." },
     standardHeaders: true,
     legacyHeaders: false,
-    store: rateLimitStore,
+    store: createRateLimitStore?.("rl:api:"),
+    // Fail-open: se o store Redis falhar (timeout, conexão caída), a request
+    // passa sem contar — melhor que o default (passOnStoreError:false), que
+    // transforma erro de store em 500 para TODO o /api/*.
+    passOnStoreError: true,
   });
 
   // Stricter rate limiting for auth routes
@@ -456,7 +539,8 @@ export async function registerRoutes(
     },
     standardHeaders: true,
     legacyHeaders: false,
-    store: rateLimitStore,
+    store: createRateLimitStore?.("rl:auth:"),
+    passOnStoreError: true, // fail-open em erro do store Redis (ver apiLimiter)
   });
 
   // Stricter rate limiting for public routes (lead creation, newsletter)
@@ -466,7 +550,8 @@ export async function registerRoutes(
     message: { error: "Muitas requisições. Tente novamente mais tarde." },
     standardHeaders: true,
     legacyHeaders: false,
-    store: rateLimitStore,
+    store: createRateLimitStore?.("rl:public:"),
+    passOnStoreError: true, // fail-open em erro do store Redis (ver apiLimiter)
   });
 
   // Rate limiter para endpoints administrativos
@@ -477,7 +562,8 @@ export async function registerRoutes(
     keyGenerator: generateRateLimitKey,
     standardHeaders: true,
     legacyHeaders: false,
-    store: rateLimitStore,
+    store: createRateLimitStore?.("rl:admin:"),
+    passOnStoreError: true, // fail-open em erro do store Redis (ver apiLimiter)
   });
 
   // Apply general rate limiting to all API routes
@@ -490,13 +576,28 @@ export async function registerRoutes(
   if (!isSqlite && process.env.DATABASE_URL) {
     // Production: use PostgreSQL for sessions
     const PgSession = connectPg(session);
+    // Pool dedicado de sessões com o MESMO racional serverless de server/db.ts:
+    // cada instância de função tem seu próprio pool, então o default do pg
+    // (max 10) multiplicado por N instâncias estoura o pooler do Supabase —
+    // furando o limite cuidadoso (max 3) do pool principal. Mantemos max 2,
+    // idle curto e allowExitOnIdle para drenar conexões entre invocações.
     const pgPool = new Pool({
       connectionString: process.env.DATABASE_URL,
+      max: 2,
+      idleTimeoutMillis: 10000,
+      allowExitOnIdle: true,
+    });
+    pgPool.on("error", (err) => {
+      console.error("[session-pool] unexpected error on idle client", err);
     });
     sessionStore = new PgSession({
       pool: pgPool,
       tableName: "session",
-      createTableIfMissing: true,
+      // NUNCA usar createTableIfMissing:true aqui: o connect-pg-simple faz
+      // fs.readFile(__dirname/table.sql), caminho que NÃO existe no bundle
+      // esbuild (serverless) — o primeiro write de sessão lançaria. A tabela é
+      // garantida pela migration migrations/20260610_000_session_table.sql.
+      createTableIfMissing: false,
     });
     console.log("Using PostgreSQL session store");
   } else {
@@ -511,6 +612,19 @@ export async function registerRoutes(
 
   // Get SESSION_SECRET from SecretManager (with fallback to process.env)
   const sessionSecret = secretManager.get("SESSION_SECRET");
+
+  // Encerramento fail-fast adequado ao runtime: em serverless (VERCEL),
+  // process.exit(1) vira crash opaco da função; lançar Error deixa o
+  // api-handler capturar como startupError e responder 500 limpo. No modo
+  // standalone (produção sem VERCEL) mantemos o process.exit original.
+  // (function declaration com retorno `never` explícito para o tsc reconhecer
+  // os caminhos abaixo como inalcançáveis e narrowar sessionSecret)
+  function failFastStartup(message: string): never {
+    if (process.env.VERCEL) {
+      throw new Error(message);
+    }
+    process.exit(1);
+  }
 
   // CRITICAL: Fail-fast validation for SESSION_SECRET in production
   // Note: SecretManager already validates this, but we keep this check for backwards compatibility
@@ -535,7 +649,9 @@ export async function registerRoutes(
         "   Generate a strong secret with: openssl rand -base64 64",
       );
       console.error("   Or run: npm run generate:secret");
-      process.exit(1); // Terminate application immediately
+      failFastStartup(
+        "SESSION_SECRET environment variable is required in production",
+      );
     }
 
     // Verify it's not a default/weak secret
@@ -548,7 +664,7 @@ export async function registerRoutes(
         "   Generate a strong secret with: openssl rand -base64 64",
       );
       console.error("   Or run: npm run generate:secret");
-      process.exit(1);
+      failFastStartup("Default SESSION_SECRET not allowed in production");
     }
 
     // Verify minimum length (256 bits = 32 bytes = 43 chars base64)
@@ -561,7 +677,7 @@ export async function registerRoutes(
         "   Generate a strong secret with: openssl rand -base64 64",
       );
       console.error("   Or run: npm run generate:secret");
-      process.exit(1);
+      failFastStartup("SESSION_SECRET must be at least 32 characters");
     }
 
     console.log("✅ SESSION_SECRET validated successfully");
@@ -614,13 +730,42 @@ export async function registerRoutes(
   // Passport configuration
   passport.use(
     new LocalStrategy(
-      { usernameField: "email" },
-      async (email, password, done) => {
+      { usernameField: "email", passReqToCallback: true },
+      async (req, email, password, done) => {
         try {
           const user = await storage.getUserByEmail(email);
-          if (!user || !(await comparePassword(password, user.password))) {
+          if (!user) {
+            // Não revela existência da conta; registra tentativa best-effort.
+            await safeHandleFailedLogin(
+              null,
+              email,
+              "user_not_found",
+              req,
+            );
             return done(null, false, { message: "Email ou senha incorretos" });
           }
+
+          // 1) Antes de validar a senha, checar bloqueio de conta (fail-safe).
+          const lockStatus = await safeCheckAccountLock(user.id);
+          if (lockStatus.locked) {
+            return done(null, false, {
+              message: "Conta bloqueada temporariamente. Tente novamente mais tarde.",
+            });
+          }
+
+          // 2) Validar senha.
+          if (!(await comparePassword(password, user.password))) {
+            await safeHandleFailedLogin(
+              user.id,
+              email,
+              "invalid_password",
+              req,
+            );
+            return done(null, false, { message: "Email ou senha incorretos" });
+          }
+
+          // 3) Sucesso: resetar contadores / registrar login (best-effort).
+          await safeHandleSuccessfulLogin(user.id, email, req);
           return done(null, user);
         } catch (err) {
           return done(err);
@@ -683,7 +828,7 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) {
       return res.status(401).json({ error: "Não autenticado" });
     }
-    if (req.user!.role !== "superadmin") {
+    if (!isSuperAdminRole(req.user!.role)) {
       return res.status(403).json({
         error: "Acesso negado. Apenas superadmins podem acessar esta rota.",
       });
@@ -699,8 +844,8 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Não autenticado" });
       }
 
-      // Admin sempre tem todas as permissões
-      if (req.user.role === "admin") {
+      // Admin e super_admin sempre têm todas as permissões
+      if (isAdminRole(req.user.role)) {
         return next();
       }
 
@@ -711,9 +856,40 @@ export async function registerRoutes(
           return res.status(403).json({ error: "Usuário não encontrado" });
         }
 
-        // Se não tem roleId, usa role padrão (legado)
+        // Caminho legado: usuário sem roleId (sistema antigo de RBAC).
+        // FAIL-SAFE: em vez de liberar tudo (fail-open), deriva permissões
+        // a partir do texto user.role. Apenas admin/super_admin recebem
+        // acesso total; member tem leitura+escrita; viewer só leitura;
+        // qualquer outra role desconhecida é negada (403).
         if (!(user as User & { roleId?: string }).roleId) {
-          return next(); // Compatibilidade com sistema antigo
+          const legacyRole = user.role;
+          console.warn(
+            `[requirePermission] caminho legado (sem roleId) para user=${user.id} role=${legacyRole} module=${module} action=${action}`,
+          );
+
+          if (isAdminRole(legacyRole)) {
+            return next();
+          }
+
+          const isReadAction =
+            action === "read" ||
+            action === "view" ||
+            action === "list" ||
+            action === "get";
+
+          if (legacyRole === ROLES.MEMBER) {
+            // member: conjunto padrão (leitura + escrita básica)
+            return next();
+          }
+
+          if (legacyRole === ROLES.VIEWER && isReadAction) {
+            return next();
+          }
+
+          // default (inclui role "user" legada e desconhecidas): negar
+          return res.status(403).json({
+            error: `Sem permissão para ${action} em ${module}`,
+          });
         }
 
         // Busca as permissões da role
@@ -725,7 +901,10 @@ export async function registerRoutes(
         }
 
         // Verifica permissão
-        const permissions = role.permissions as Record<string, unknown>;
+        const permissions = role.permissions as unknown as Record<
+          string,
+          unknown
+        >;
         if (!permissions || typeof permissions !== "object") {
           return res.status(403).json({ error: "Permissões não configuradas" });
         }
@@ -771,7 +950,12 @@ export async function registerRoutes(
       version: process.env.VERCEL_GIT_COMMIT_SHA?.substring(0, 7) || "dev",
       checks: {} as Record<
         string,
-        { status: string; latencyMs?: number; error?: string }
+        {
+          status: string;
+          latencyMs?: number;
+          error?: string;
+          databaseConfigured?: boolean;
+        }
       >,
     };
 
@@ -779,9 +963,13 @@ export async function registerRoutes(
     const showDbDetails = req.query.debug === process.env.HEALTH_DEBUG_TOKEN;
     try {
       const t0 = Date.now();
-      const { db } = await import("./db");
+      const { db, isSqlite } = await import("./db");
       const { sql } = await import("drizzle-orm");
-      await db.execute(sql`SELECT 1`);
+      if (isSqlite) {
+        await db.run(sql`SELECT 1`);
+      } else {
+        await db.execute(sql`SELECT 1`);
+      }
       healthCheck.checks.database = {
         status: "ok",
         latencyMs: Date.now() - t0,
@@ -803,8 +991,10 @@ export async function registerRoutes(
         status: "fail",
         error: showDbDetails ? msg : `connection ${kind}`,
         databaseConfigured: Boolean(process.env.DATABASE_URL),
-      } as Record<string, unknown>;
-      healthCheck.status = "degraded";
+      };
+      // DB é dependência crítica: falha => status "error" (HTTP 503).
+      // Degradações não-críticas (Stripe/Redis) mantêm "degraded" (HTTP 200).
+      healthCheck.status = "error";
     }
 
     // Redis (opcional — so marcar fail se estiver configurado e indisponivel)
@@ -921,9 +1111,9 @@ export async function registerRoutes(
       const mapped = dbPlans.map((p: Record<string, unknown>) => ({
         id: p.slug || p.id,
         name: p.name,
-        price: Math.round(parseFloat(p.price) * 100), // cents for Stripe compat
-        monthlyPrice: parseFloat(p.price),
-        yearlyPrice: p.yearlyPrice ? parseFloat(p.yearlyPrice) : null,
+        price: Math.round(parseFloat(String(p.price)) * 100), // cents for Stripe compat
+        monthlyPrice: parseFloat(String(p.price)),
+        yearlyPrice: p.yearlyPrice ? parseFloat(String(p.yearlyPrice)) : null,
         interval: "month",
         maxUsers: p.maxUsers,
         maxProperties: p.maxProperties,
@@ -1363,7 +1553,7 @@ export async function registerRoutes(
       if (!tenant)
         return res.status(404).json({ error: "Empresa não encontrada" });
       // Only allow access to own tenant data (unless superadmin)
-      if (tenant.id !== req.user!.tenantId && req.user!.role !== "superadmin") {
+      if (tenant.id !== req.user!.tenantId && !isSuperAdminRole(req.user!.role)) {
         return res.status(403).json({ error: "Acesso negado" });
       }
       res.json(tenant);
@@ -1485,7 +1675,9 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/properties", requireAuth, async (req, res) => {
+  // checkPropertyLimit: bloqueia criacao acima do limite de imoveis do plano
+  // (403 + upgradeRequired — contrato do client/src/lib/plan-blocked.ts)
+  app.post("/api/properties", requireAuth, checkPropertyLimit, async (req, res) => {
     try {
       const data = insertPropertySchema.parse({
         ...req.body,
@@ -1508,7 +1700,14 @@ export async function registerRoutes(
       const existing = await storage.getProperty(req.params.id);
       await validateResourceTenant(existing, req.user!.tenantId, "Imóvel");
 
-      const property = await storage.updateProperty(req.params.id, req.body);
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...safe
+      } = req.body;
+      const property = await storage.updateProperty(req.params.id, safe);
       if (!property)
         return res.status(404).json({ error: "Imóvel não encontrado" });
       res.json(property);
@@ -1549,6 +1748,16 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Telefone inválido" });
       }
       const data = insertLeadSchema.parse(req.body);
+      // Lead publico conta contra o limite mensal do tenant dono do site.
+      // Sem req.user aqui, entao a checagem usa o tenantId do proprio lead.
+      if (await isLeadLimitReachedForTenant(data.tenantId)) {
+        return res.status(403).json({
+          error: "Lead limit reached",
+          upgradeRequired: true,
+          message:
+            "O limite de leads/mês do plano desta imobiliária foi atingido. Faça upgrade para continuar recebendo leads.",
+        });
+      }
       const lead = await storage.createLead(data);
       res.status(201).json({ success: true, lead });
     } catch (error: unknown) {
@@ -1589,7 +1798,8 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/leads", requireAuth, async (req, res) => {
+  // checkLeadLimit: bloqueia criacao acima do limite mensal de leads do plano
+  app.post("/api/leads", requireAuth, checkLeadLimit, async (req, res) => {
     try {
       const data = insertLeadSchema.parse({
         ...req.body,
@@ -1612,7 +1822,14 @@ export async function registerRoutes(
       const existing = await storage.getLead(req.params.id);
       await validateResourceTenant(existing, req.user!.tenantId, "Lead");
 
-      const lead = await storage.updateLead(req.params.id, req.body);
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...safe
+      } = req.body;
+      const lead = await storage.updateLead(req.params.id, safe);
       if (!lead) return res.status(404).json({ error: "Lead não encontrado" });
       res.json(lead);
     } catch (error: unknown) {
@@ -1659,12 +1876,17 @@ export async function registerRoutes(
   // ===== INTERACTION ROUTES =====
   app.get("/api/leads/:leadId/interactions", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: validate the parent lead belongs to the tenant
+      const lead = await storage.getLead(req.params.leadId);
+      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
       const interactions = await storage.getInteractionsByLead(
         req.params.leadId,
       );
       res.json(interactions);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar interações" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar interações";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -1674,13 +1896,18 @@ export async function registerRoutes(
         ...req.body,
         userId: req.user!.id,
       });
+      // IDOR Protection: validate the target lead belongs to the tenant
+      // before attaching an interaction to it.
+      const lead = await storage.getLead(data.leadId);
+      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
       const interaction = await storage.createInteraction(data);
       res.status(201).json(interaction);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error ? error.message : "Erro ao criar interação",
-      });
+      const httpErr = toHttpError(error);
+      // Erros de validacao do Zod / corpo invalido continuam como 400.
+      const status = httpErr.status === 500 ? 400 : httpErr.status;
+      const message = httpErr.message || "Erro ao criar interação";
+      res.status(status).json({ error: message });
     }
   });
 
@@ -1715,7 +1942,14 @@ export async function registerRoutes(
       const existing = await storage.getVisit(req.params.id);
       await validateResourceTenant(existing, req.user!.tenantId, "Visita");
 
-      const visit = await storage.updateVisit(req.params.id, req.body);
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...safe
+      } = req.body;
+      const visit = await storage.updateVisit(req.params.id, safe);
       if (!visit)
         return res.status(404).json({ error: "Visita não encontrada" });
       res.json(visit);
@@ -1788,7 +2022,14 @@ export async function registerRoutes(
       const existing = await storage.getContract(req.params.id);
       await validateResourceTenant(existing, req.user!.tenantId, "Contrato");
 
-      const contract = await storage.updateContract(req.params.id, req.body);
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...safe
+      } = req.body;
+      const contract = await storage.updateContract(req.params.id, safe);
       if (!contract)
         return res.status(404).json({ error: "Contrato não encontrado" });
       res.json(contract);
@@ -1856,11 +2097,13 @@ export async function registerRoutes(
   app.get("/api/owners/:id", requireAuth, async (req, res) => {
     try {
       const owner = await storage.getOwner(req.params.id);
-      if (!owner)
-        return res.status(404).json({ error: "Locador não encontrado" });
+      // IDOR Protection: Validate tenant ownership
+      await validateResourceTenant(owner, req.user!.tenantId, "Locador");
       res.json(owner);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar locador" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar locador";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -1886,7 +2129,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Locador não encontrado" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const owner = await storage.updateOwner(req.params.id, allowedFields);
       res.json(owner);
     } catch (error: unknown) {
@@ -1924,11 +2173,13 @@ export async function registerRoutes(
   app.get("/api/renters/:id", requireAuth, async (req, res) => {
     try {
       const renter = await storage.getRenter(req.params.id);
-      if (!renter)
-        return res.status(404).json({ error: "Inquilino não encontrado" });
+      // IDOR Protection: Validate tenant ownership
+      await validateResourceTenant(renter, req.user!.tenantId, "Inquilino");
       res.json(renter);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar inquilino" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar inquilino";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -1955,7 +2206,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Inquilino não encontrado" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const renter = await storage.updateRenter(req.params.id, allowedFields);
       res.json(renter);
     } catch (error: unknown) {
@@ -1997,13 +2254,17 @@ export async function registerRoutes(
   app.get("/api/rental-contracts/:id", requireAuth, async (req, res) => {
     try {
       const contract = await storage.getRentalContract(req.params.id);
-      if (!contract)
-        return res
-          .status(404)
-          .json({ error: "Contrato de aluguel não encontrado" });
+      // IDOR Protection: Validate tenant ownership
+      await validateResourceTenant(
+        contract,
+        req.user!.tenantId,
+        "Contrato de aluguel",
+      );
       res.json(contract);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar contrato de aluguel" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar contrato de aluguel";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -2027,26 +2288,29 @@ export async function registerRoutes(
 
   app.patch("/api/rental-contracts/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: 404 em mismatch de tenant (não vaza existência do ID).
       const existing = await storage.getRentalContract(req.params.id);
-      if (!existing)
-        return res
-          .status(404)
-          .json({ error: "Contrato de aluguel não encontrado" });
-      if (existing.tenantId !== req.user!.tenantId)
-        return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      await validateResourceTenant(
+        existing,
+        req.user!.tenantId,
+        "Contrato de aluguel",
+      );
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const contract = await storage.updateRentalContract(
         req.params.id,
         allowedFields,
       );
       res.json(contract);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro ao atualizar contrato de aluguel",
-      });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao atualizar contrato de aluguel";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -2072,14 +2336,25 @@ export async function registerRoutes(
     requireAuth,
     async (req, res) => {
       try {
+        // IDOR Protection: validate the parent contract belongs to the tenant
+        // before exposing any of its payments.
+        const contract = await storage.getRentalContract(
+          req.params.contractId,
+        );
+        await validateResourceTenant(
+          contract,
+          req.user!.tenantId,
+          "Contrato de aluguel",
+        );
         const payments = await storage.getRentalPaymentsByContract(
           req.params.contractId,
         );
         res.json(payments);
       } catch (error: unknown) {
-        res
-          .status(500)
-          .json({ error: "Erro ao buscar pagamentos do contrato" });
+        const httpErr = toHttpError(error);
+        const message =
+          httpErr.message || "Erro ao buscar pagamentos do contrato";
+        res.status(httpErr.status).json({ error: message });
       }
     },
   );
@@ -2087,11 +2362,13 @@ export async function registerRoutes(
   app.get("/api/rental-payments/:id", requireAuth, async (req, res) => {
     try {
       const payment = await storage.getRentalPayment(req.params.id);
-      if (!payment)
-        return res.status(404).json({ error: "Pagamento não encontrado" });
+      // IDOR Protection: Validate tenant ownership
+      await validateResourceTenant(payment, req.user!.tenantId, "Pagamento");
       res.json(payment);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar pagamento" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar pagamento";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -2118,7 +2395,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Pagamento não encontrado" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const payment = await storage.updateRentalPayment(
         req.params.id,
         allowedFields,
@@ -2297,7 +2580,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Repasse não encontrado" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const transfer = await storage.updateRentalTransfer(
         req.params.id,
         allowedFields,
@@ -2430,11 +2719,13 @@ export async function registerRoutes(
   app.get("/api/sale-proposals/:id", requireAuth, async (req, res) => {
     try {
       const proposal = await storage.getSaleProposal(req.params.id);
-      if (!proposal)
-        return res.status(404).json({ error: "Proposta não encontrada" });
+      // IDOR Protection: Validate tenant ownership
+      await validateResourceTenant(proposal, req.user!.tenantId, "Proposta");
       res.json(proposal);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar proposta" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar proposta";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -2456,36 +2747,39 @@ export async function registerRoutes(
 
   app.patch("/api/sale-proposals/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: 404 em mismatch de tenant (não vaza existência do ID).
       const existing = await storage.getSaleProposal(req.params.id);
-      if (!existing)
-        return res.status(404).json({ error: "Proposta não encontrada" });
-      if (existing.tenantId !== req.user!.tenantId)
-        return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      await validateResourceTenant(existing, req.user!.tenantId, "Proposta");
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const proposal = await storage.updateSaleProposal(
         req.params.id,
         allowedFields,
       );
       res.json(proposal);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error ? error.message : "Erro ao atualizar proposta",
-      });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao atualizar proposta";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
   app.delete("/api/sale-proposals/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: 404 em mismatch de tenant (não vaza existência do ID).
       const existing = await storage.getSaleProposal(req.params.id);
-      if (!existing)
-        return res.status(404).json({ error: "Proposta não encontrada" });
-      if (existing.tenantId !== req.user!.tenantId)
-        return res.status(403).json({ error: "Acesso negado" });
+      await validateResourceTenant(existing, req.user!.tenantId, "Proposta");
       await storage.deleteSaleProposal(req.params.id);
       res.json({ success: true });
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao deletar proposta" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao deletar proposta";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -2502,10 +2796,13 @@ export async function registerRoutes(
   app.get("/api/property-sales/:id", requireAuth, async (req, res) => {
     try {
       const sale = await storage.getPropertySale(req.params.id);
-      if (!sale) return res.status(404).json({ error: "Venda não encontrada" });
+      // IDOR Protection: Validate tenant ownership
+      await validateResourceTenant(sale, req.user!.tenantId, "Venda");
       res.json(sale);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar venda" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar venda";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -2532,7 +2829,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Venda não encontrada" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const sale = await storage.updatePropertySale(
         req.params.id,
         allowedFields,
@@ -2581,7 +2884,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Categoria não encontrada" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const category = await storage.updateFinanceCategory(
         req.params.id,
         allowedFields,
@@ -2634,11 +2943,13 @@ export async function registerRoutes(
   app.get("/api/finance-entries/:id", requireAuth, async (req, res) => {
     try {
       const entry = await storage.getFinanceEntry(req.params.id);
-      if (!entry)
-        return res.status(404).json({ error: "Lançamento não encontrado" });
+      // IDOR Protection: Validate tenant ownership
+      await validateResourceTenant(entry, req.user!.tenantId, "Lançamento");
       res.json(entry);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar lançamento" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar lançamento";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -2660,38 +2971,39 @@ export async function registerRoutes(
 
   app.patch("/api/finance-entries/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: 404 em mismatch de tenant (não vaza existência do ID).
       const existing = await storage.getFinanceEntry(req.params.id);
-      if (!existing)
-        return res.status(404).json({ error: "Lançamento não encontrado" });
-      if (existing.tenantId !== req.user!.tenantId)
-        return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      await validateResourceTenant(existing, req.user!.tenantId, "Lançamento");
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const entry = await storage.updateFinanceEntry(
         req.params.id,
         allowedFields,
       );
       res.json(entry);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro ao atualizar lançamento",
-      });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao atualizar lançamento";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
   app.delete("/api/finance-entries/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: 404 em mismatch de tenant (não vaza existência do ID).
       const existing = await storage.getFinanceEntry(req.params.id);
-      if (!existing)
-        return res.status(404).json({ error: "Lançamento não encontrado" });
-      if (existing.tenantId !== req.user!.tenantId)
-        return res.status(403).json({ error: "Acesso negado" });
+      await validateResourceTenant(existing, req.user!.tenantId, "Lançamento");
       await storage.deleteFinanceEntry(req.params.id);
       res.json({ success: true });
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao deletar lançamento" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao deletar lançamento";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -2727,7 +3039,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Tag não encontrada" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const tag = await storage.updateLeadTag(req.params.id, allowedFields);
       res.json(tag);
     } catch (error: unknown) {
@@ -2763,10 +3081,15 @@ export async function registerRoutes(
 
   app.get("/api/leads/:leadId/tags", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: validate the parent lead belongs to the tenant
+      const lead = await storage.getLead(req.params.leadId);
+      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
       const tags = await storage.getTagsByLead(req.params.leadId);
       res.json(tags);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar tags do lead" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar tags do lead";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -2776,12 +3099,19 @@ export async function registerRoutes(
         leadId: req.params.leadId,
         tagId: req.body.tagId,
       });
+      // IDOR Protection: validate both the lead and the tag belong to the
+      // tenant before linking them.
+      const lead = await storage.getLead(req.params.leadId);
+      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
+      const tag = await storage.getLeadTag(data.tagId);
+      await validateResourceTenant(tag, req.user!.tenantId, "Tag");
       const link = await storage.addTagToLead(data);
       res.status(201).json(link);
     } catch (error: unknown) {
-      res.status(400).json({
-        error: error instanceof Error ? error.message : "Erro ao adicionar tag",
-      });
+      const httpErr = toHttpError(error);
+      const status = httpErr.status === 500 ? 400 : httpErr.status;
+      const message = httpErr.message || "Erro ao adicionar tag";
+      res.status(status).json({ error: message });
     }
   });
 
@@ -2790,10 +3120,16 @@ export async function registerRoutes(
     requireAuth,
     async (req, res) => {
       try {
+        // IDOR Protection: validate the parent lead belongs to the tenant
+        // before removing any tag link.
+        const lead = await storage.getLead(req.params.leadId);
+        await validateResourceTenant(lead, req.user!.tenantId, "Lead");
         await storage.removeTagFromLead(req.params.leadId, req.params.tagId);
         res.json({ success: true });
       } catch (error: unknown) {
-        res.status(500).json({ error: "Erro ao remover tag" });
+        const httpErr = toHttpError(error);
+        const message = httpErr.message || "Erro ao remover tag";
+        res.status(httpErr.status).json({ error: message });
       }
     },
   );
@@ -2885,21 +3221,28 @@ export async function registerRoutes(
 
   app.get("/api/leads/:leadId/follow-ups", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: validate the parent lead belongs to the tenant
+      const lead = await storage.getLead(req.params.leadId);
+      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
       const followUps = await storage.getFollowUpsByLead(req.params.leadId);
       res.json(followUps);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar follow-ups do lead" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar follow-ups do lead";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
   app.get("/api/follow-ups/:id", requireAuth, async (req, res) => {
     try {
       const followUp = await storage.getFollowUp(req.params.id);
-      if (!followUp)
-        return res.status(404).json({ error: "Follow-up não encontrado" });
+      // IDOR Protection: Validate tenant ownership
+      await validateResourceTenant(followUp, req.user!.tenantId, "Follow-up");
       res.json(followUp);
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar follow-up" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao buscar follow-up";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -2921,38 +3264,39 @@ export async function registerRoutes(
 
   app.patch("/api/follow-ups/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: 404 em mismatch de tenant (não vaza existência do ID).
       const existing = await storage.getFollowUp(req.params.id);
-      if (!existing)
-        return res.status(404).json({ error: "Follow-up não encontrado" });
-      if (existing.tenantId !== req.user!.tenantId)
-        return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      await validateResourceTenant(existing, req.user!.tenantId, "Follow-up");
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const followUp = await storage.updateFollowUp(
         req.params.id,
         allowedFields,
       );
       res.json(followUp);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro ao atualizar follow-up",
-      });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao atualizar follow-up";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
   app.delete("/api/follow-ups/:id", requireAuth, async (req, res) => {
     try {
+      // IDOR Protection: 404 em mismatch de tenant (não vaza existência do ID).
       const existing = await storage.getFollowUp(req.params.id);
-      if (!existing)
-        return res.status(404).json({ error: "Follow-up não encontrado" });
-      if (existing.tenantId !== req.user!.tenantId)
-        return res.status(403).json({ error: "Acesso negado" });
+      await validateResourceTenant(existing, req.user!.tenantId, "Follow-up");
       await storage.deleteFollowUp(req.params.id);
       res.json({ success: true });
     } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao deletar follow-up" });
+      const httpErr = toHttpError(error);
+      const message = httpErr.message || "Erro ao deletar follow-up";
+      res.status(httpErr.status).json({ error: message });
     }
   });
 
@@ -3062,7 +3406,7 @@ export async function registerRoutes(
 
   app.put("/api/settings/general", requireAuth, async (req, res) => {
     try {
-      if (req.user!.role !== "admin") {
+      if (!isAdminRole(req.user!.role)) {
         return res.status(403).json({
           error:
             "Acesso negado. Apenas administradores podem alterar configurações.",
@@ -3090,7 +3434,7 @@ export async function registerRoutes(
 
   app.put("/api/settings/brand", requireAuth, async (req, res) => {
     try {
-      if (req.user!.role !== "admin") {
+      if (!isAdminRole(req.user!.role)) {
         return res.status(403).json({
           error:
             "Acesso negado. Apenas administradores podem alterar configurações.",
@@ -3118,7 +3462,7 @@ export async function registerRoutes(
 
   app.put("/api/settings/ai", requireAuth, async (req, res) => {
     try {
-      if (req.user!.role !== "admin") {
+      if (!isAdminRole(req.user!.role)) {
         return res.status(403).json({
           error:
             "Acesso negado. Apenas administradores podem alterar configurações.",
@@ -3159,7 +3503,7 @@ export async function registerRoutes(
 
   app.post("/api/user-roles", requireAuth, async (req, res) => {
     try {
-      if (req.user!.role !== "admin") {
+      if (!isAdminRole(req.user!.role)) {
         return res.status(403).json({
           error: "Acesso negado. Apenas administradores podem criar funções.",
         });
@@ -3178,7 +3522,7 @@ export async function registerRoutes(
 
   app.patch("/api/user-roles/:id", requireAuth, async (req, res) => {
     try {
-      if (req.user!.role !== "admin") {
+      if (!isAdminRole(req.user!.role)) {
         return res.status(403).json({
           error:
             "Acesso negado. Apenas administradores podem atualizar funções.",
@@ -3189,7 +3533,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Função não encontrada" });
       if (existing.tenantId !== req.user!.tenantId)
         return res.status(403).json({ error: "Acesso negado" });
-      const { tenantId, id, ...allowedFields } = req.body;
+      // Mass-assignment guard: strip immutable fields before update.
+      const {
+        tenantId: _t,
+        id: _id,
+        createdAt: _c,
+        ...allowedFields
+      } = req.body;
       const role = await storage.updateUserRole(req.params.id, allowedFields);
       res.json(role);
     } catch (error: unknown) {
@@ -3202,7 +3552,7 @@ export async function registerRoutes(
 
   app.delete("/api/user-roles/:id", requireAuth, async (req, res) => {
     try {
-      if (req.user!.role !== "admin") {
+      if (!isAdminRole(req.user!.role)) {
         return res.status(403).json({
           error: "Acesso negado. Apenas administradores podem deletar funções.",
         });
@@ -3221,7 +3571,7 @@ export async function registerRoutes(
 
   app.post("/api/user-roles/seed-defaults", requireAuth, async (req, res) => {
     try {
-      if (req.user!.role !== "admin") {
+      if (!isAdminRole(req.user!.role)) {
         return res.status(403).json({
           error:
             "Acesso negado. Apenas administradores podem criar roles padrão.",
@@ -3260,7 +3610,7 @@ export async function registerRoutes(
 
   app.put("/api/integrations/:name", requireAuth, async (req, res) => {
     try {
-      if (req.user!.role !== "admin") {
+      if (!isAdminRole(req.user!.role)) {
         return res.status(403).json({
           error:
             "Acesso negado. Apenas administradores podem configurar integrações.",
@@ -3299,7 +3649,7 @@ export async function registerRoutes(
     requireAuth,
     async (req, res) => {
       try {
-        if (req.user!.role !== "admin") {
+        if (!isAdminRole(req.user!.role)) {
           return res.status(403).json({
             error:
               "Acesso negado. Apenas administradores podem alterar preferências.",
@@ -3409,7 +3759,7 @@ export async function registerRoutes(
     requireAuth,
     async (req, res) => {
       try {
-        if (req.user!.role !== "admin") {
+        if (!isAdminRole(req.user!.role)) {
           return res.status(403).json({
             error:
               "Acesso negado. Apenas administradores podem criar categorias padrão.",
@@ -3554,8 +3904,8 @@ export async function registerRoutes(
         const { action, startDate } = req.query;
         // Sanitize pagination with max limit of 100
         const { page, limit } = sanitizePagination(
-          req.query.page,
-          req.query.limit,
+          req.query.page as string | undefined,
+          req.query.limit as string | undefined,
           100,
         );
 

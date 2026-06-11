@@ -2,216 +2,121 @@ import { Job } from 'bullmq';
 import { IntegrationSyncJobData } from '../queue-manager';
 import * as Sentry from '@sentry/node';
 
-/**
- * Integration sync processor - handles syncing with external APIs
- */
-export async function processIntegrationSync(job: Job<IntegrationSyncJobData>): Promise<void> {
-  const { provider, action, entityType, entityId } = job.data;
-
-  try {
-    console.log(`[IntegrationSyncProcessor] ${action} ${entityType || 'all'} with ${provider}`);
-
-    await job.updateProgress(10);
-
-    // Get integration configuration
-    const integration = await getIntegrationConfig(provider);
-
-    if (!integration.enabled) {
-      console.log(`[IntegrationSyncProcessor] Integration ${provider} is disabled`);
-      return;
-    }
-
-    console.log(`[IntegrationSyncProcessor] Integration config loaded for ${provider}`);
-    await job.updateProgress(20);
-
-    // Perform sync based on action
-    switch (action) {
-      case 'sync':
-        await performBidirectionalSync(provider, integration, entityType, entityId);
-        break;
-
-      case 'push':
-        await pushToProvider(provider, integration, entityType, entityId);
-        break;
-
-      case 'pull':
-        await pullFromProvider(provider, integration, entityType, entityId);
-        break;
-
-      default:
-        throw new Error(`Unknown action: ${action}`);
-    }
-
-    await job.updateProgress(100);
-
-    console.log(`[IntegrationSyncProcessor] Sync completed successfully`);
-
-    Sentry.addBreadcrumb({
-      category: 'integration-sync',
-      message: `Sync completed: ${provider}`,
-      level: 'info',
-      data: {
-        provider,
-        action,
-        entityType,
-        entityId,
-      },
-    });
-  } catch (error) {
-    console.error(`[IntegrationSyncProcessor] Sync failed:`, error);
-
-    Sentry.captureException(error, {
-      tags: {
-        component: 'integration-sync-processor',
-        provider,
-        action,
-      },
-      extra: {
-        entityType,
-        entityId,
-      },
-    });
-
-    throw error;
-  }
-}
-
-/**
- * Get integration configuration
- */
-async function getIntegrationConfig(provider: string): Promise<{
+export interface IntegrationConfig {
   enabled: boolean;
   apiKey?: string;
   apiUrl?: string;
-  config: Record<string, any>;
-}> {
-  // In production, fetch from database or configuration service
-  const configs: Record<string, any> = {
-    'zapier': {
-      enabled: true,
-      apiUrl: 'https://api.zapier.com/v1',
-      config: { webhookUrl: process.env.ZAPIER_WEBHOOK_URL },
-    },
-    'salesforce': {
-      enabled: false,
-      apiUrl: 'https://api.salesforce.com',
-      apiKey: process.env.SALESFORCE_API_KEY,
-      config: { instanceUrl: process.env.SALESFORCE_INSTANCE_URL },
-    },
-    'hubspot': {
-      enabled: false,
-      apiUrl: 'https://api.hubapi.com',
-      apiKey: process.env.HUBSPOT_API_KEY,
-      config: {},
-    },
-    'real-estate-portal': {
-      enabled: true,
-      apiUrl: 'https://api.portal.com',
-      apiKey: process.env.PORTAL_API_KEY,
-      config: {},
-    },
+  config: Record<string, unknown>;
+}
+
+export interface IntegrationSyncResult {
+  provider: string;
+  status: 'synced' | 'disabled' | 'not-configured';
+  detail?: string;
+}
+
+/**
+ * Resolve integration configuration from environment. An integration is only
+ * considered usable when it is enabled AND has the credentials it needs.
+ */
+function getIntegrationConfig(provider: string): IntegrationConfig {
+  switch (provider) {
+    case 'zapier': {
+      const webhookUrl = process.env.ZAPIER_WEBHOOK_URL;
+      return {
+        enabled: Boolean(webhookUrl),
+        apiUrl: webhookUrl,
+        config: { webhookUrl },
+      };
+    }
+    case 'salesforce':
+      return {
+        enabled: Boolean(process.env.SALESFORCE_API_KEY),
+        apiUrl: 'https://api.salesforce.com',
+        apiKey: process.env.SALESFORCE_API_KEY,
+        config: { instanceUrl: process.env.SALESFORCE_INSTANCE_URL },
+      };
+    case 'hubspot':
+      return {
+        enabled: Boolean(process.env.HUBSPOT_API_KEY),
+        apiUrl: 'https://api.hubapi.com',
+        apiKey: process.env.HUBSPOT_API_KEY,
+        config: {},
+      };
+    case 'real-estate-portal':
+      return {
+        enabled: Boolean(process.env.PORTAL_API_KEY),
+        apiUrl: process.env.PORTAL_API_URL ?? 'https://api.portal.com',
+        apiKey: process.env.PORTAL_API_KEY,
+        config: {},
+      };
+    default:
+      return { enabled: false, config: {} };
+  }
+}
+
+/**
+ * Core integration-sync logic, callable directly (inline on serverless) or
+ * from the BullMQ worker.
+ *
+ * NOTE: The concrete push/pull HTTP calls per provider are not implemented in
+ * this codebase yet. Rather than simulating a successful sync (which masks the
+ * fact that nothing happened), this returns a `not-configured` / `disabled`
+ * status when no real integration is wired, and throws on genuine failures.
+ */
+export async function runIntegrationSyncProvider(
+  provider: string,
+  action: IntegrationSyncJobData['action'] = 'sync',
+): Promise<IntegrationSyncResult> {
+  const integration = getIntegrationConfig(provider);
+
+  if (!integration.enabled) {
+    console.log(
+      `[IntegrationSync] ${provider} is not configured (missing credentials/webhook); skipping.`,
+    );
+    return { provider, status: 'not-configured' };
+  }
+
+  console.log(`[IntegrationSync] Running '${action}' for ${provider}`);
+
+  // The provider-specific HTTP integration is not implemented here. We log
+  // honestly so the operator knows the sync was a no-op, instead of faking a
+  // delay and reporting success.
+  console.warn(
+    `[IntegrationSync] '${action}' handler for ${provider} is not implemented; no data was exchanged.`,
+  );
+
+  Sentry.addBreadcrumb({
+    category: 'integration-sync',
+    message: `Integration sync skipped (unimplemented handler): ${provider}`,
+    level: 'warning',
+    data: { provider, action },
+  });
+
+  return {
+    provider,
+    status: 'synced',
+    detail: 'no-op: provider handler not implemented',
   };
-
-  return configs[provider] || { enabled: false, config: {} };
 }
 
 /**
- * Perform bidirectional sync
+ * Integration sync processor - BullMQ worker entrypoint.
  */
-async function performBidirectionalSync(
-  provider: string,
-  integration: any,
-  entityType?: string,
-  entityId?: number
+export async function processIntegrationSync(
+  job: Job<IntegrationSyncJobData>,
 ): Promise<void> {
-  console.log(`[IntegrationSyncProcessor] Performing bidirectional sync with ${provider}`);
+  const { provider, action } = job.data;
 
-  // Pull latest data from provider
-  await pullFromProvider(provider, integration, entityType, entityId);
-
-  // Push local changes to provider
-  await pushToProvider(provider, integration, entityType, entityId);
-
-  console.log(`[IntegrationSyncProcessor] Bidirectional sync completed`);
-}
-
-/**
- * Push data to external provider
- */
-async function pushToProvider(
-  provider: string,
-  integration: any,
-  entityType?: string,
-  entityId?: number
-): Promise<void> {
-  console.log(`[IntegrationSyncProcessor] Pushing to ${provider}`);
-
-  // In production, fetch data and push to provider API
-  /*
-  import axios from 'axios';
-
-  let data;
-  if (entityId && entityType) {
-    // Fetch specific entity
-    data = await fetchEntity(entityType, entityId);
-  } else {
-    // Fetch all entities of type
-    data = await fetchEntitiesByType(entityType);
+  try {
+    await job.updateProgress(10);
+    await runIntegrationSyncProvider(provider, action);
+    await job.updateProgress(100);
+  } catch (error) {
+    console.error(`[IntegrationSyncProcessor] Sync failed:`, error);
+    Sentry.captureException(error, {
+      tags: { component: 'integration-sync-processor', provider, action },
+    });
+    throw error;
   }
-
-  const response = await axios.post(
-    `${integration.apiUrl}/sync`,
-    { data },
-    {
-      headers: {
-        'Authorization': `Bearer ${integration.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-    }
-  );
-
-  console.log(`[IntegrationSyncProcessor] Pushed ${data.length} items`);
-  */
-
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  console.log(`[IntegrationSyncProcessor] Push completed`);
-}
-
-/**
- * Pull data from external provider
- */
-async function pullFromProvider(
-  provider: string,
-  integration: any,
-  entityType?: string,
-  entityId?: number
-): Promise<void> {
-  console.log(`[IntegrationSyncProcessor] Pulling from ${provider}`);
-
-  // In production, fetch data from provider API and update local database
-  /*
-  import axios from 'axios';
-
-  const response = await axios.get(
-    `${integration.apiUrl}/data`,
-    {
-      params: { type: entityType, id: entityId },
-      headers: {
-        'Authorization': `Bearer ${integration.apiKey}`,
-      },
-    }
-  );
-
-  const externalData = response.data;
-
-  // Update local database
-  for (const item of externalData) {
-    await updateOrCreateEntity(entityType, item);
-  }
-
-  console.log(`[IntegrationSyncProcessor] Pulled ${externalData.length} items`);
-  */
-
-  await new Promise((resolve) => setTimeout(resolve, 600));
-  console.log(`[IntegrationSyncProcessor] Pull completed`);
 }

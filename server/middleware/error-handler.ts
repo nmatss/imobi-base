@@ -312,5 +312,5 @@ export function asyncHandler(
  * 404 handler - should be registered after all routes
  */
 export function notFoundHandler(req: Request, res: Response, next: NextFunction) {
-  next(new NotFoundError(`Route ${req.method} ${req.path} not found`));
+  next(new NotFoundError(`Route ${req.method} ${req.path}`));
 }

@@ -40,11 +40,15 @@ describe('Error Handler Middleware', () => {
       body: {},
       query: {},
       params: {},
+      // errorHandler chama req.get('user-agent') para logging; o mock precisa expor get().
+      get: vi.fn(() => undefined) as unknown as Request['get'],
     };
 
     mockRes = {
-      status: statusSpy,
-      json: jsonSpy,
+      status: statusSpy as unknown as Response['status'],
+      json: jsonSpy as unknown as Response['json'],
+      // errorHandler seta headers de seguranca na resposta de erro.
+      setHeader: vi.fn() as unknown as Response['setHeader'],
     };
 
     mockNext = vi.fn();
@@ -134,7 +138,7 @@ describe('Error Handler Middleware', () => {
       expect(jsonSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           error: 'Property not found',
-          statusCode: 404,
+          status: 404,
         })
       );
     });
@@ -153,7 +157,7 @@ describe('Error Handler Middleware', () => {
       expect(jsonSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           error: 'Validation failed',
-          statusCode: 400,
+          status: 400,
           errors: expect.arrayContaining([
             expect.objectContaining({
               field: 'name',
@@ -173,7 +177,7 @@ describe('Error Handler Middleware', () => {
       expect(jsonSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           error: 'Unknown error',
-          statusCode: 500,
+          status: 500,
         })
       );
     });
@@ -186,12 +190,12 @@ describe('Error Handler Middleware', () => {
 
       errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
 
-      expect(jsonSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          error: 'An unexpected error occurred',
-          statusCode: 500,
-        })
-      );
+      // Em producao a mensagem real e dinamica: "An unexpected error occurred. Error ID: ERR-...".
+      // O importante e que NAO vaze o detalhe interno ('Internal database error').
+      const prodResponse = jsonSpy.mock.calls[0][0];
+      expect(prodResponse.status).toBe(500);
+      expect(prodResponse.error).toMatch(/^An unexpected error occurred/);
+      expect(prodResponse.error).not.toContain('Internal database error');
 
       process.env.NODE_ENV = originalEnv;
     });

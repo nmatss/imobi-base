@@ -9,6 +9,48 @@ import { storage } from '../../storage';
 import * as Sentry from '@sentry/node';
 
 /**
+ * Idempotencia via Redis SETNX (espelha o padrao do Stripe webhook).
+ * Retorna true se for a primeira vez que vemos este data.id (deve processar).
+ * Retorna false se ja foi processado dentro do TTL (nao processar de novo).
+ * Se o Redis estiver indisponivel, retorna true (fail-open) e deixa o
+ * MercadoPago fazer retry — melhor processar duas vezes que perder evento.
+ */
+async function markEventAsProcessing(eventKey: string): Promise<boolean> {
+  if (!process.env.REDIS_URL) return true;
+  try {
+    const { getRedisClient } = await import('../../cache/redis-client');
+    const client = getRedisClient();
+    const key = `mercadopago:webhook:${eventKey}`;
+    // NX = only set if not exists. EX = expiration in seconds (24h).
+    const result = await client.set(key, '1', 'EX', 24 * 60 * 60, 'NX');
+    return result === 'OK';
+  } catch (err) {
+    // Fail-open: se Redis falhar, prossegue e aceita risco de dupla execucao
+    console.warn('[mercadopago-webhook] Idempotency check failed (fail-open):', err);
+    Sentry.captureMessage('MercadoPago webhook idempotency fail-open', {
+      level: 'warning',
+      extra: { eventKey, error: err instanceof Error ? err.message : String(err) },
+    });
+    return true;
+  }
+}
+
+/**
+ * Marca o evento como falhou para permitir retry: deleta a chave de
+ * idempotencia para que o proximo webhook possa reprocessar.
+ */
+async function markEventAsFailed(eventKey: string): Promise<void> {
+  if (!process.env.REDIS_URL) return;
+  try {
+    const { getRedisClient } = await import('../../cache/redis-client');
+    const client = getRedisClient();
+    await client.del(`mercadopago:webhook:${eventKey}`);
+  } catch (err) {
+    console.warn('[mercadopago-webhook] Failed to clear idempotency key:', err);
+  }
+}
+
+/**
  * Extract tenant ID from payment metadata.
  * MercadoPagoService stores it as metadata.tenant_id when creating payments.
  */
@@ -138,66 +180,83 @@ async function handleSubscriptionAuthorizedPayment(dataId: string): Promise<void
 }
 
 /**
- * Main webhook handler for Mercado Pago
+ * Main webhook handler for Mercado Pago.
+ *
+ * Pipeline (espelha o padrao-ouro do Stripe webhook):
+ * 1. FAIL-CLOSED na assinatura: se faltar x-signature / x-request-id / data.id
+ *    => 401. Se a assinatura nao bater (ou o secret nao estiver configurado)
+ *    => 401. Nunca pula a verificacao.
+ * 2. Idempotencia via Redis SETNX (24h TTL) por data.id. Se ja processado,
+ *    responde 200 (duplicate) sem reprocessar.
+ * 3. Dispatch do handler especifico.
+ * 4. Em erro transitorio do processamento, limpa a chave de idempotencia e
+ *    responde 500 para o MercadoPago fazer retry. 200 so em sucesso/duplicado.
  */
 export async function handleMercadoPagoWebhook(req: Request, res: Response): Promise<void> {
+  const { type, data } = req.body ?? {};
+
+  const xSignature = req.headers['x-signature'] as string | undefined;
+  const xRequestId = req.headers['x-request-id'] as string | undefined;
+  const dataId = data?.id ? String(data.id) : undefined;
+
+  // 1. FAIL-CLOSED signature verification — required headers must be present.
+  if (!xSignature || !xRequestId || !dataId) {
+    console.warn('[mercadopago-webhook] Missing x-signature, x-request-id or data.id');
+    res.status(401).json({ error: 'Missing signature headers' });
+    return;
+  }
+
+  const isValid = MercadoPagoService.verifyWebhookSignature(xSignature, xRequestId, dataId);
+  if (!isValid) {
+    console.warn('[mercadopago-webhook] Invalid Mercado Pago webhook signature');
+    res.status(401).json({ error: 'Invalid signature' });
+    return;
+  }
+
+  // 2. Idempotencia — processa cada (type:data.id) no maximo uma vez por 24h.
+  const eventKey = `${type ?? 'unknown'}:${dataId}`;
+  const isNew = await markEventAsProcessing(eventKey);
+  if (!isNew) {
+    console.log(`[mercadopago-webhook] Duplicate event ignored: ${eventKey}`);
+    res.status(200).json({ success: true, duplicate: true });
+    return;
+  }
+
+  console.log(`📨 [mercadopago-webhook] Processing: ${type} (${dataId})`);
+
+  // 3 + 4. Dispatch + handling com retry em caso de erro transitorio.
   try {
-    const { type, data } = req.body;
-
-    // Verify webhook signature
-    const xSignature = req.headers['x-signature'] as string;
-    const xRequestId = req.headers['x-request-id'] as string;
-
-    if (xSignature && xRequestId && data?.id) {
-      const isValid = MercadoPagoService.verifyWebhookSignature(
-        xSignature,
-        xRequestId,
-        data.id
-      );
-
-      if (!isValid) {
-        console.warn('Invalid Mercado Pago webhook signature');
-        res.status(401).json({ error: 'Invalid signature' });
-        return;
-      }
-    }
-
-    console.log(`Mercado Pago webhook: ${type}`);
-
-    // Handle different notification types
     switch (type) {
       case 'payment':
-        if (data?.id) {
-          await handlePaymentNotification(data.id);
-        }
+        await handlePaymentNotification(dataId);
         break;
 
       case 'subscription_preapproval':
-        if (data?.id) {
-          await handleSubscriptionPreapproval(data.id);
-        }
+        await handleSubscriptionPreapproval(dataId);
         break;
 
       case 'subscription_authorized_payment':
-        if (data?.id) {
-          await handleSubscriptionAuthorizedPayment(data.id);
-        }
+        await handleSubscriptionAuthorizedPayment(dataId);
         break;
 
       default:
-        console.log(`Unhandled Mercado Pago notification type: ${type}`);
+        console.log(`[mercadopago-webhook] Unhandled notification type: ${type}`);
     }
 
-    // Always return 200 to acknowledge receipt
     res.status(200).json({ success: true });
   } catch (error) {
-    console.error('Error processing Mercado Pago webhook:', error);
+    console.error('[mercadopago-webhook] Error processing webhook:', error);
     Sentry.captureException(error, {
       tags: { webhook: 'mercadopago', handler: 'main' },
+      extra: { eventKey },
     });
 
-    // Still return 200 to prevent retries for errors we can't fix
-    res.status(200).json({ success: true });
+    // Permite retry: limpa a chave de idempotencia e responde 500 para que o
+    // MercadoPago dispare o proximo retry automatico.
+    await markEventAsFailed(eventKey);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Webhook processing failed',
+    });
   }
 }
 
@@ -215,17 +274,37 @@ export async function handleMercadoPagoIPN(req: Request, res: Response): Promise
 
     console.log(`Mercado Pago IPN: topic=${topic}, id=${id}`);
 
-    if (topic === 'payment') {
-      await handlePaymentNotification(id as string);
+    // Idempotencia por (topic:id), espelhando o webhook principal.
+    const eventKey = `ipn:${topic}:${id}`;
+    const isNew = await markEventAsProcessing(eventKey);
+    if (!isNew) {
+      console.log(`[mercadopago-ipn] Duplicate event ignored: ${eventKey}`);
+      res.status(200).json({ success: true, duplicate: true });
+      return;
     }
 
-    res.status(200).json({ success: true });
+    try {
+      if (topic === 'payment') {
+        await handlePaymentNotification(id as string);
+      }
+      res.status(200).json({ success: true });
+    } catch (error) {
+      console.error('[mercadopago-ipn] Error processing IPN:', error);
+      Sentry.captureException(error, {
+        tags: { webhook: 'mercadopago', handler: 'ipn' },
+        extra: { eventKey },
+      });
+      // Permite retry: limpa a chave e responde 500.
+      await markEventAsFailed(eventKey);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : 'IPN processing failed',
+      });
+    }
   } catch (error) {
-    console.error('Error processing Mercado Pago IPN:', error);
+    console.error('[mercadopago-ipn] Unexpected error:', error);
     Sentry.captureException(error, {
       tags: { webhook: 'mercadopago', handler: 'ipn' },
     });
-
-    res.status(200).json({ success: true });
+    res.status(500).json({ error: 'IPN processing failed' });
   }
 }

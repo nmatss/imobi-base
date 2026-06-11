@@ -120,14 +120,12 @@ export function useUnsavedChangesDialog() {
     resolve: null,
   });
 
-  const confirm = React.useCallback(() => {
-    return new Promise<boolean>((resolve) => {
+  const confirm = React.useCallback(() => new Promise<boolean>((resolve) => {
       setDialogState({
         isOpen: true,
         resolve,
       });
-    });
-  }, []);
+    }), []);
 
   const handleConfirm = React.useCallback(() => {
     dialogState.resolve?.(true);

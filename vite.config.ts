@@ -101,58 +101,103 @@ export default defineConfig(({ mode }) => ({
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        // Optimized manual chunks for better code splitting
-        manualChunks: {
+        // Optimized manual chunks for better code splitting.
+        // Forma de função (não objeto) para capturar submódulos CJS como
+        // lodash/isArray — o formato objeto só move o entry do pacote.
+        manualChunks(id: string) {
+          // Helper virtual de interop CJS do Rollup: compartilhado por todos
+          // os chunks vendor; sem destino fixo ele "ancora" num chunk pesado
+          // (charts/maps) e o torna dependência estática da entry.
+          if (id.includes("commonjsHelpers") || id.includes("commonjs-dynamic-modules")) {
+            return "vendor-shared";
+          }
+          if (!id.includes("node_modules")) return undefined;
+
+          const pkg = (name: string) => id.includes(`node_modules/${name}/`);
+
+          // Deps compartilhadas entre react-helmet (eager) e recharts (lazy).
+          // Sem este chunk o Rollup as embute em vendor-charts, fazendo a
+          // entry pré-carregar ~514 kB de charts em toda página pública.
+          if (
+            pkg("prop-types") ||
+            pkg("react-is") ||
+            pkg("lodash") ||
+            pkg("tiny-invariant") ||
+            pkg("fast-equals") ||
+            pkg("eventemitter3")
+          ) {
+            return "vendor-shared";
+          }
+
+          // Charts and visualizations (+ deps exclusivas d3-*)
+          if (pkg("recharts") || id.includes("node_modules/d3-")) {
+            return "vendor-charts";
+          }
+
           // Core React libraries
-          "vendor-react": ["react", "react-dom", "wouter"],
+          if (pkg("react") || pkg("react-dom") || pkg("scheduler") || pkg("wouter")) {
+            return "vendor-react";
+          }
 
           // UI Component libraries (Radix)
-          "vendor-ui-dialog": [
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-alert-dialog",
-          ],
-          "vendor-ui-dropdown": [
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-select",
-            "@radix-ui/react-menubar",
-          ],
-          "vendor-ui-forms": [
-            "@radix-ui/react-checkbox",
-            "@radix-ui/react-radio-group",
-            "@radix-ui/react-switch",
-            "@radix-ui/react-slider",
-          ],
-          "vendor-ui-misc": [
-            "@radix-ui/react-tooltip",
-            "@radix-ui/react-popover",
-            "@radix-ui/react-tabs",
-            "@radix-ui/react-accordion",
-          ],
-
-          // Charts and visualizations
-          "vendor-charts": ["recharts"],
+          if (pkg("@radix-ui/react-dialog") || pkg("@radix-ui/react-alert-dialog")) {
+            return "vendor-ui-dialog";
+          }
+          if (
+            pkg("@radix-ui/react-dropdown-menu") ||
+            pkg("@radix-ui/react-select") ||
+            pkg("@radix-ui/react-menubar")
+          ) {
+            return "vendor-ui-dropdown";
+          }
+          if (
+            pkg("@radix-ui/react-checkbox") ||
+            pkg("@radix-ui/react-radio-group") ||
+            pkg("@radix-ui/react-switch") ||
+            pkg("@radix-ui/react-slider")
+          ) {
+            return "vendor-ui-forms";
+          }
+          if (
+            pkg("@radix-ui/react-tooltip") ||
+            pkg("@radix-ui/react-popover") ||
+            pkg("@radix-ui/react-tabs") ||
+            pkg("@radix-ui/react-accordion")
+          ) {
+            return "vendor-ui-misc";
+          }
 
           // Forms and validation
-          "vendor-forms": ["react-hook-form", "@hookform/resolvers", "zod"],
+          if (pkg("react-hook-form") || pkg("@hookform/resolvers") || pkg("zod")) {
+            return "vendor-forms";
+          }
 
           // Date utilities
-          "vendor-date": ["date-fns", "react-day-picker"],
+          if (pkg("date-fns") || pkg("react-day-picker")) {
+            return "vendor-date";
+          }
 
           // Maps
-          "vendor-maps": ["leaflet", "react-leaflet"],
+          if (pkg("leaflet") || pkg("react-leaflet")) {
+            return "vendor-maps";
+          }
 
           // Query and state
-          "vendor-query": ["@tanstack/react-query"],
+          if (pkg("@tanstack/react-query")) {
+            return "vendor-query";
+          }
 
           // Icons
-          "vendor-icons": ["lucide-react"],
+          if (pkg("lucide-react")) {
+            return "vendor-icons";
+          }
 
           // Utilities
-          "vendor-utils": [
-            "clsx",
-            "tailwind-merge",
-            "class-variance-authority",
-          ],
+          if (pkg("clsx") || pkg("tailwind-merge") || pkg("class-variance-authority")) {
+            return "vendor-utils";
+          }
+
+          return undefined;
         },
         // Better file naming for cache optimization
         chunkFileNames: "assets/js/[name]-[hash].js",

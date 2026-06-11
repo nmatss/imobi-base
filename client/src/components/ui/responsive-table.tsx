@@ -58,8 +58,7 @@ export function ResponsiveTable<T = any>({
     return String(index);
   };
 
-  const renderDefaultCard = (row: T) => {
-    return (
+  const renderDefaultCard = (row: T) => (
       <Card className="p-4 space-y-2">
         {columns
           .filter((col) => !col.hideOnMobile)
@@ -74,7 +73,6 @@ export function ResponsiveTable<T = any>({
           })}
       </Card>
     );
-  };
 
   const cardRenderer = renderCard || renderDefaultCard;
 

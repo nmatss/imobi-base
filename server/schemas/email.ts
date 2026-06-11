@@ -35,12 +35,12 @@ export const sendEmailSchema = z.object({
   html: z.string().optional(),
   text: z.string().optional(),
   templateName: z.string().optional(),
-  templateData: z.record(z.any()).optional(),
+  templateData: z.record(z.string(), z.any()).optional(),
   tenantBranding: tenantBrandingSchema.optional(),
   attachments: z.array(emailAttachmentSchema).max(10, 'Maximum 10 attachments').optional(),
   replyTo: z.string().email('Invalid reply-to email').optional(),
   priority: z.enum(['high', 'normal', 'low'], {
-    errorMap: () => ({ message: 'Priority must be: high, normal, or low' }),
+    error: () => 'Priority must be: high, normal, or low',
   }).optional(),
   queue: z.boolean().optional(),
 }).refine((data) => data.html || data.text || data.templateName, {
@@ -56,7 +56,7 @@ export const bulkEmailRecipientSchema = z.object({
   html: z.string().optional(),
   text: z.string().optional(),
   templateName: z.string().optional(),
-  templateData: z.record(z.any()).optional(),
+  templateData: z.record(z.string(), z.any()).optional(),
   attachments: z.array(emailAttachmentSchema).max(10, 'Maximum 10 attachments').optional(),
   replyTo: z.string().email('Invalid reply-to email').optional(),
   priority: z.enum(['high', 'normal', 'low']).optional(),
@@ -84,7 +84,7 @@ export const testEmailSchema = z.object({
  * Preview template schema
  */
 export const previewTemplateSchema = z.object({
-  data: z.record(z.any()).optional(),
+  data: z.record(z.string(), z.any()).optional(),
   branding: tenantBrandingSchema.optional(),
 });
 

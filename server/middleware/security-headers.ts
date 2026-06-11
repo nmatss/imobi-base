@@ -143,12 +143,12 @@ export function securityHeaders(options: SecurityHeadersOptions = {}): (req: Req
     // Set appropriate caching based on request type
     if (isApiRequest) {
       // API responses: no caching
-      res.setHeader('Cache-Control', config.cacheControl.api);
+      res.setHeader('Cache-Control', config.cacheControl.api ?? 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
     } else if (req.path.match(/\.(js|css|jpg|jpeg|png|gif|svg|woff|woff2|ttf|eot)$/)) {
       // Static assets: aggressive caching
-      res.setHeader('Cache-Control', config.cacheControl.static);
+      res.setHeader('Cache-Control', config.cacheControl.static ?? 'public, max-age=31536000, immutable');
     } else {
       // HTML pages: moderate caching
       res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
@@ -187,8 +187,23 @@ export function validateContentType(allowedTypes: string[] = ['application/json'
       return next();
     }
 
-    // Skip if no body
-    if (!req.body || Object.keys(req.body).length === 0) {
+    // Decide if the request carries a body. We must NOT rely on `req.body`
+    // because body parsers (e.g. express.json) only populate it for
+    // content-types they recognize — a request with a missing or wrong
+    // Content-Type would leave `req.body` empty and silently bypass this
+    // check. Instead, detect a declared body via transport headers so the
+    // validation runs even when the body was never parsed.
+    const hasParsedBody =
+      typeof req.body === 'object' &&
+      req.body !== null &&
+      Object.keys(req.body).length > 0;
+    const contentLength = parseInt(req.get('Content-Length') ?? '', 10);
+    const declaresBody =
+      (Number.isFinite(contentLength) && contentLength > 0) ||
+      req.get('Transfer-Encoding') !== undefined;
+
+    // Skip if there is genuinely no body to validate.
+    if (!hasParsedBody && !declaresBody) {
       return next();
     }
 
@@ -233,7 +248,8 @@ export function preventMimeSniffing(req: Request, res: Response, next: NextFunct
  */
 export function securityHeadersDebug(req: Request, res: Response): void {
   if (process.env.NODE_ENV === 'production') {
-    return res.status(404).json({ error: 'Not found' });
+    res.status(404).json({ error: 'Not found' });
+    return;
   }
 
   const headers = {

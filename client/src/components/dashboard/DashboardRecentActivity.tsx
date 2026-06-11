@@ -12,7 +12,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Link } from 'wouter';
 
-export interface Activity {
+export interface ActivityItem {
   id: string;
   type: 'lead' | 'property' | 'visit' | 'proposal' | 'contract';
   description: string;
@@ -21,7 +21,7 @@ export interface Activity {
 }
 
 export interface DashboardRecentActivityProps {
-  activities: Activity[];
+  activities: ActivityItem[];
   maxItems?: number;
 }
 

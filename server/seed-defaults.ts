@@ -446,12 +446,17 @@ export async function seedDefaultFinanceCategories(storage: any, tenantId: strin
  * Seed default notification preferences for a tenant
  */
 export async function seedDefaultNotificationPreferences(storage: any, tenantId: string) {
-  const preferences = DEFAULT_NOTIFICATION_PREFERENCES.map(pref => ({
-    ...pref,
-    tenantId,
-  }));
-
-  return await storage.updateNotificationPreferences(tenantId, preferences);
+  // storage não tem um setter em lote; usa o createOrUpdate por evento (idempotente).
+  const results = [];
+  for (const pref of DEFAULT_NOTIFICATION_PREFERENCES) {
+    results.push(
+      await storage.createOrUpdateNotificationPreference(tenantId, pref.eventType, {
+        ...pref,
+        tenantId,
+      }),
+    );
+  }
+  return results;
 }
 
 /**
@@ -470,11 +475,11 @@ export async function setupNewTenant(storage: any, tenant: any) {
   console.log("  ✅ Default finance categories created");
 
   // Create tenant settings
-  await storage.createTenantSettings(getDefaultTenantSettings(tenant));
+  await storage.createOrUpdateTenantSettings(tenant.id, getDefaultTenantSettings(tenant));
   console.log("  ✅ Tenant settings created");
 
   // Create AI settings
-  await storage.createAISettings(getDefaultAISettings(tenant));
+  await storage.createOrUpdateAISettings(tenant.id, getDefaultAISettings(tenant));
   console.log("  ✅ AI settings created");
 
   // Create notification preferences

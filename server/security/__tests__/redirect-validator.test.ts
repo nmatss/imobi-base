@@ -183,7 +183,7 @@ describe('Redirect Validator - P2 Security Fix', () => {
     });
 
     it('should handle very long URLs', () => {
-      const longPath = '/dashboard?param=' + 'a'.repeat(10000);
+      const longPath = `/dashboard?param=${  'a'.repeat(10000)}`;
       const result = isValidRedirectUrl(longPath);
       expect(result.valid).toBe(true);
     });

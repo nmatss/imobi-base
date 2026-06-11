@@ -10,12 +10,81 @@ import bcrypt from "bcryptjs";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { requireAuth } from "./middleware/auth";
-import { randomBytes } from "crypto";
+import { getEmailService } from "./email/email-service";
+import { randomBytes, timingSafeEqual } from "crypto";
 import type { ClientPortalAccess } from "@shared/schema-sqlite";
 
 // Portal JWT secret - required in production, default only for development
 const PORTAL_JWT_SECRET = process.env.PORTAL_JWT_SECRET || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('PORTAL_JWT_SECRET is required in production'); })() : 'dev-portal-secret-change-in-prod');
 const PORTAL_JWT_EXPIRY = "24h";
+
+// Base URL used to build self-service links sent by email
+const PORTAL_APP_URL = process.env.APP_URL || process.env.BASE_URL || "http://localhost:5000";
+
+/**
+ * Shape of the brand/white-label payload exposed to the portal client.
+ * Combines tenant defaults (logo/primaryColor) with brandSettings (favicon,
+ * secondaryColor, social/footer copy) when available.
+ */
+interface PortalBrand {
+  id: string;
+  name: string;
+  slug: string;
+  logo: string | null;
+  primaryColor: string | null;
+  secondaryColor: string | null;
+  faviconUrl: string | null;
+  footerText: string | null;
+  phone?: string | null;
+  email?: string | null;
+}
+
+/**
+ * Builds the white-label brand payload for a tenant, merging brandSettings.
+ * Never throws: on any failure it falls back to tenant-only data.
+ */
+async function buildPortalBrand(
+  tenant: { id: string; name: string; slug: string; logo?: string | null; primaryColor?: string | null; secondaryColor?: string | null; phone?: string | null; email?: string | null } | undefined,
+  includeContact = false,
+): Promise<PortalBrand | null> {
+  if (!tenant) return null;
+
+  let brand: Record<string, unknown> | undefined;
+  try {
+    brand = await storage.getBrandSettings(tenant.id);
+  } catch {
+    brand = undefined;
+  }
+
+  const payload: PortalBrand = {
+    id: tenant.id,
+    name: tenant.name,
+    slug: tenant.slug,
+    logo: (brand?.logoUrl as string | undefined) ?? tenant.logo ?? null,
+    primaryColor: (brand?.primaryColor as string | undefined) ?? tenant.primaryColor ?? null,
+    secondaryColor: (brand?.secondaryColor as string | undefined) ?? tenant.secondaryColor ?? null,
+    faviconUrl: (brand?.faviconUrl as string | undefined) ?? null,
+    footerText: (brand?.footerText as string | undefined) ?? null,
+  };
+
+  if (includeContact) {
+    payload.phone = tenant.phone ?? null;
+    payload.email = tenant.email ?? null;
+  }
+
+  return payload;
+}
+
+/**
+ * Constant-time comparison of two reset tokens (hex strings) to avoid
+ * leaking timing information when validating the token.
+ */
+function tokensMatch(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
 
 // Extend Request to include portal user
 interface PortalUser {
@@ -149,13 +218,7 @@ export function registerPortalRoutes(app: Express): void {
           name: clientName,
           tenantId: access.tenantId,
         },
-        tenant: tenant ? {
-          id: tenant.id,
-          name: tenant.name,
-          slug: tenant.slug,
-          logo: tenant.logo,
-          primaryColor: tenant.primaryColor,
-        } : null,
+        tenant: await buildPortalBrand(tenant),
       });
     } catch (err) {
       console.error("Portal login error:", err);
@@ -172,20 +235,107 @@ export function registerPortalRoutes(app: Express): void {
       }
 
       const access = await storage.getPortalAccessByEmail(email);
-      if (access) {
+      if (access && access.isActive) {
         const resetToken = randomBytes(32).toString("hex");
         const expires = new Date(Date.now() + 3600000).toISOString(); // 1 hour
         await storage.updatePortalAccess(access.id, {
           resetToken,
           resetTokenExpires: expires,
-        } as any);
-        // In production, send email with reset link
+        } as Partial<ClientPortalAccess>);
+
+        // Build the self-service reset link. Email + token are required to
+        // locate and validate the access on the reset-password endpoint.
+        const resetUrl = `${PORTAL_APP_URL}/portal/reset-password?token=${resetToken}&email=${encodeURIComponent(access.email)}`;
+
+        // Resolve client name + tenant branding for the email
+        const tenant = await storage.getTenant(access.tenantId);
+        let clientName = "Cliente";
+        if (access.clientType === "owner") {
+          const owner = await storage.getOwner(access.clientId);
+          clientName = owner?.name || clientName;
+        } else if (access.clientType === "renter") {
+          const renter = await storage.getRenter(access.clientId);
+          clientName = renter?.name || clientName;
+        }
+        const brand = await buildPortalBrand(tenant, true);
+
+        // Send the reset email. Wrapped in try/catch so that an unconfigured
+        // email service (e.g. in dev) never breaks the anti-enumeration flow.
+        try {
+          const emailService = getEmailService();
+          await emailService.sendTemplate(
+            "password-reset",
+            access.email,
+            "Redefinição de senha - Portal do Cliente",
+            {
+              name: clientName,
+              resetUrl,
+              expirationTime: 1,
+            },
+            {
+              logo: brand?.logo || undefined,
+              primaryColor: brand?.primaryColor || undefined,
+              secondaryColor: brand?.secondaryColor || undefined,
+              companyName: tenant?.name || undefined,
+              email: tenant?.email || undefined,
+            },
+            { queue: true },
+          );
+        } catch (emailErr) {
+          console.error("Portal forgot password email error:", emailErr);
+        }
       }
 
       // Always return success to prevent email enumeration
       res.json({ message: "Se o email estiver cadastrado, você receberá instruções para redefinição de senha." });
     } catch (err) {
       console.error("Portal forgot password error:", err);
+      res.status(500).json({ error: "Erro interno do servidor" });
+    }
+  });
+
+  // POST /api/portal/reset-password
+  // Consumes a reset token (from the forgot-password email) and sets a new
+  // password. The token is single-use: it is cleared after a successful reset.
+  app.post("/api/portal/reset-password", portalAuthLimiter, async (req: Request, res: Response) => {
+    try {
+      const { token, email, password } = req.body;
+
+      if (!token || !email || !password) {
+        return res.status(400).json({ error: "Token, email e nova senha são obrigatórios" });
+      }
+      if (typeof password !== "string" || password.length < 8) {
+        return res.status(400).json({ error: "A nova senha deve ter pelo menos 8 caracteres" });
+      }
+
+      const access = await storage.getPortalAccessByEmail(email);
+
+      // Validate token presence, match (constant-time) and expiry. Use a
+      // generic error to avoid revealing which check failed.
+      const invalid =
+        !access ||
+        !access.isActive ||
+        !access.resetToken ||
+        !access.resetTokenExpires ||
+        !tokensMatch(access.resetToken, String(token)) ||
+        new Date(access.resetTokenExpires).getTime() < Date.now();
+
+      if (invalid || !access) {
+        return res.status(400).json({ error: "Token inválido ou expirado. Solicite uma nova redefinição." });
+      }
+
+      const passwordHash = await bcrypt.hash(password, 12);
+
+      // Set the new password and invalidate the token in a single update.
+      await storage.updatePortalAccess(access.id, {
+        passwordHash,
+        resetToken: null,
+        resetTokenExpires: null,
+      } as Partial<ClientPortalAccess>);
+
+      res.json({ message: "Senha redefinida com sucesso. Você já pode fazer login." });
+    } catch (err) {
+      console.error("Portal reset password error:", err);
       res.status(500).json({ error: "Erro interno do servidor" });
     }
   });
@@ -228,15 +378,7 @@ export function registerPortalRoutes(app: Express): void {
           phone: clientPhone,
           lastLogin: access.lastLogin,
         },
-        tenant: tenant ? {
-          id: tenant.id,
-          name: tenant.name,
-          slug: tenant.slug,
-          logo: tenant.logo,
-          primaryColor: tenant.primaryColor,
-          phone: tenant.phone,
-          email: tenant.email,
-        } : null,
+        tenant: await buildPortalBrand(tenant, true),
       });
     } catch (err) {
       console.error("Portal me error:", err);

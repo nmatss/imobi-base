@@ -17,13 +17,11 @@ import { Badge } from "@/components/ui/badge";
 
 export function ToastExamples() {
   // Simulate async operation
-  const simulateAsyncOperation = () => {
-    return new Promise((resolve, reject) => {
+  const simulateAsyncOperation = () => new Promise((resolve, reject) => {
       setTimeout(() => {
         Math.random() > 0.3 ? resolve({ name: "João Silva" }) : reject(new Error("Falha na conexão"));
       }, 2000);
     });
-  };
 
   return (
     <div className="container mx-auto p-6 max-w-6xl">

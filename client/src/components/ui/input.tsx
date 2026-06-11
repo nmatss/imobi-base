@@ -2,22 +2,14 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-export interface InputProps extends React.ComponentProps<"input"> {
-  /** ID for linking with label using htmlFor */
-  id?: string;
-  /** ARIA label for accessibility when no visible label */
-  "aria-label"?: string;
-  /** ID of element describing this input */
-  "aria-describedby"?: string;
-  /** Indicates invalid state */
-  "aria-invalid"?: boolean;
-  /** Indicates required field */
-  "aria-required"?: boolean;
-}
+// All standard input attributes (including id and ARIA attributes such as
+// aria-label, aria-describedby, aria-invalid, aria-required) are already
+// provided by React.ComponentProps<"input">. We keep this interface as an
+// extension point without narrowing those built-in types.
+export interface InputProps extends React.ComponentProps<"input"> {}
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, ...props }, ref) => {
-    return (
+  ({ className, type, ...props }, ref) => (
       <input
         type={type}
         className={cn(
@@ -28,7 +20,6 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         {...props}
       />
     )
-  }
 )
 Input.displayName = "Input"
 

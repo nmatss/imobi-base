@@ -89,14 +89,28 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription): Pro
       );
       if (matchedPlan) {
         updateData.planId = matchedPlan.id;
+      } else {
+        // Cliente PAGOU mas nenhum plano casa com o price — sem alerta, ele
+        // ficaria silenciosamente no plano antigo/free. Alerta operacional.
+        console.error(
+          `[stripe-webhook] Nenhum plano ativo casa com o price ${priceId} ` +
+            `(subscription.created, tenant ${tenantId}, sub ${subscription.id}). ` +
+            `Verifique stripePriceId/stripeYearlyPriceId na tabela plans.`,
+        );
+        Sentry.captureException(
+          new Error(`Stripe price sem plano mapeado: ${priceId}`),
+          {
+            tags: { webhook: 'stripe', event: 'subscription.created', issue: 'unmapped_price' },
+            extra: { tenantId, priceId, subscriptionId: subscription.id },
+          },
+        );
       }
     }
 
-    // Preserva metadata existente (stripeCustomerId vem do checkout) e adiciona
-    // stripeSubscriptionId para reactivate/manage operations futuras.
-    const existing = await storage.getTenantSubscription(tenantId);
+    // Garante stripeCustomerId/stripeSubscriptionId para operacoes futuras
+    // (cancel/reactivate/portal). updateTenantSubscription faz MERGE do
+    // metadata, entao chaves ja gravadas por outros eventos sao preservadas.
     updateData.metadata = {
-      ...((existing?.metadata as Record<string, unknown>) || {}),
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscription.id,
     };
@@ -132,11 +146,17 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Pro
       throw new Error('Tenant ID not found in customer metadata');
     }
 
+    // O status local segue o subscription.status REAL do Stripe:
+    // - cancel_at_period_end NAO vira 'cancelled' imediato: o cliente pagou o
+    //   periodo e mantem acesso ate o fim (vira flag metadata.cancelAtPeriodEnd
+    //   para o front exibir aviso). 'cancelled' so quando o Stripe cancela.
+    // - past_due/unpaid viram 'past_due' (NAO 'suspended'): ativa o grace
+    //   period de 7 dias do subscription-guard antes do bloqueio total.
     let status = 'active';
-    if (subscription.status === 'canceled' || subscription.cancel_at_period_end) {
+    if (subscription.status === 'canceled') {
       status = 'cancelled';
     } else if (subscription.status === 'past_due' || subscription.status === 'unpaid') {
-      status = 'suspended';
+      status = 'past_due';
     } else if (subscription.status === 'trialing') {
       status = 'trial';
     }
@@ -158,15 +178,31 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Pro
       );
       if (matchedPlan) {
         updateData.planId = matchedPlan.id;
+      } else {
+        // Mesmo alerta do subscription.created: price sem plano mapeado
+        // significa cliente pagando sem receber o plano correspondente.
+        console.error(
+          `[stripe-webhook] Nenhum plano ativo casa com o price ${priceId} ` +
+            `(subscription.updated, tenant ${tenantId}, sub ${subscription.id}). ` +
+            `Verifique stripePriceId/stripeYearlyPriceId na tabela plans.`,
+        );
+        Sentry.captureException(
+          new Error(`Stripe price sem plano mapeado: ${priceId}`),
+          {
+            tags: { webhook: 'stripe', event: 'subscription.updated', issue: 'unmapped_price' },
+            extra: { tenantId, priceId, subscriptionId: subscription.id },
+          },
+        );
       }
     }
 
-    // Preserva metadata existente + garante que subscriptionId esta salvo
-    const existing = await storage.getTenantSubscription(tenantId);
+    // Garante subscriptionId salvo + flag de cancelamento agendado.
+    // updateTenantSubscription faz MERGE do metadata (chaves existentes
+    // de outros eventos sao preservadas).
     updateData.metadata = {
-      ...((existing?.metadata as Record<string, unknown>) || {}),
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscription.id,
+      cancelAtPeriodEnd: subscription.cancel_at_period_end === true,
     };
 
     await storage.updateTenantSubscription(tenantId, updateData);
@@ -322,9 +358,11 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void
       throw new Error('Tenant ID not found in customer metadata');
     }
 
-    // Update subscription status to suspended
+    // Primeira falha de pagamento → 'past_due': o subscription-guard concede
+    // 7 dias de grace period antes de bloquear. O Stripe retenta a cobranca e,
+    // se esgotar, customer.subscription.updated/deleted rebaixa o status.
     await storage.updateTenantSubscription(tenantId, {
-      status: 'suspended',
+      status: 'past_due',
     });
 
     console.log(`⚠️  Payment failed for tenant ${tenantId}, invoice: ${invoice.id}`);
@@ -472,6 +510,8 @@ async function handleCheckoutSessionCompleted(
 
     // Persiste stripeCustomerId o quanto antes. customer.subscription.created
     // ja atualiza o planId/status; aqui so garantimos que o customerId esta la.
+    // updateTenantSubscription faz MERGE do metadata: se subscription.created
+    // processou primeiro, o stripeSubscriptionId gravado la NAO e apagado.
     await storage.updateTenantSubscription(tenantId, {
       metadata: { stripeCustomerId: customerId },
     });

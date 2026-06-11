@@ -12,17 +12,33 @@ import type { User } from "@shared/schema-sqlite";
 import archiver from "archiver";
 import { createWriteStream, mkdirSync, existsSync } from "fs";
 import { join } from "path";
+import os from "os";
 import { logComplianceAudit } from "./audit-logger";
 
 const EXPORT_EXPIRY_DAYS = 7; // Export links expire after 7 days
-const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
+
+// No Vercel o filesystem do bundle é read-only; apenas /tmp é gravável.
+// HONESTIDADE: /tmp é EFÊMERO (por instância/cold start) — o link de download
+// de 7 dias só é confiável com storage durável (Supabase Storage, no backlog
+// pós-launch). Em dev mantemos ./uploads.
+const UPLOAD_DIR =
+  process.env.UPLOAD_DIR ||
+  (process.env.VERCEL ? join(os.tmpdir(), "imobibase-uploads") : "./uploads");
 const EXPORTS_DIR = join(UPLOAD_DIR, "exports");
 
-// Ensure exports directory exists (skip in serverless/read-only environments)
-try {
+/**
+ * Garante o diretório de exports NO MOMENTO DO USO (não só no module load):
+ * em serverless cada invocação pode cair em instância nova sem o diretório.
+ */
+function ensureExportsDir(): void {
   if (!existsSync(EXPORTS_DIR)) {
     mkdirSync(EXPORTS_DIR, { recursive: true });
   }
+}
+
+// Best-effort no load (mantém comportamento em dev); o uso real revalida.
+try {
+  ensureExportsDir();
 } catch {
   console.warn('[data-export] Cannot create exports directory (serverless environment)');
 }
@@ -64,8 +80,10 @@ export async function requestDataExport(options: DataExportOptions) {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + EXPORT_EXPIRY_DAYS);
 
-  // Create export request
+  // Create export request.
+  // id explícito: a coluna não tem default no schema SQLite (dev/test).
   const [request] = await db.insert(schema.dataExportRequests).values({
+    id: randomUUID(),
     userId,
     tenantId,
     requestToken,
@@ -131,6 +149,7 @@ async function processDataExport(
     const exportData = await collectUserData(userId, tenantId, includeRelated);
 
     // Generate export file
+    ensureExportsDir(); // mkdir recursivo no momento do uso (serverless-safe)
     const fileName = `data-export-${randomUUID()}-${Date.now()}.${format === "json" ? "zip" : "zip"}`;
     const filePath = join(EXPORTS_DIR, fileName);
 

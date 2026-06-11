@@ -60,19 +60,15 @@ export interface ProposalCardProps {
 }
 
 // Format currency
-const formatPrice = (value: number): string => {
-  return new Intl.NumberFormat("pt-BR", {
+const formatPrice = (value: number): string => new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);
-};
 
 // Calculate percentage of asking price
-const calculatePricePercentage = (proposed: number, asking: number): number => {
-  return Math.round((proposed / asking) * 100);
-};
+const calculatePricePercentage = (proposed: number, asking: number): number => Math.round((proposed / asking) * 100);
 
 // Get status configuration
 const getStatusConfig = (

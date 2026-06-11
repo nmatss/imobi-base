@@ -9,7 +9,7 @@ import { db } from "../../db";
 import { whatsappTemplates, type InsertWhatsappTemplate } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 import { whatsappAPI } from "./business-api";
-import { log } from "../../index";
+import { log } from "../../utils/log";
 
 export interface TemplateVariable {
   [key: string]: string;
@@ -155,7 +155,7 @@ export class TemplateManager {
    * Get all templates for a tenant
    */
   async getTemplates(tenantId: string, category?: string) {
-    let query = db.select().from(whatsappTemplates).where(eq(whatsappTemplates.tenantId, tenantId));
+    const query = db.select().from(whatsappTemplates).where(eq(whatsappTemplates.tenantId, tenantId));
 
     const templates = await query;
 

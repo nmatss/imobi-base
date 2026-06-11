@@ -51,6 +51,7 @@ export function sanitizeCss(css: string): string {
     .replace(/binding:/gi, '')
     .replace(/@import/gi, '')
     .replace(/url\s*\(/gi, '') // Desabilitar url()
+    // eslint-disable-next-line no-control-regex -- remoção de caracteres de controle é proposital (sanitização)
     .replace(/[\x00-\x1f\x7f]/g, '') // Remover caracteres de controle
     .replace(/<|>/g, ''); // Remover < e >
 }

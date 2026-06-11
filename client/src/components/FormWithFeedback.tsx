@@ -79,7 +79,7 @@ export function FormWithFeedback({
   enableNavigationPrompt = true,
   className,
 }: FormWithFeedbackProps) {
-  const { confirmNavigation, cancelNavigation, blocker } = useUnsavedChanges(
+  const { confirmNavigation, cancelNavigation, showPrompt } = useUnsavedChanges(
     enableNavigationPrompt && hasUnsavedChanges
   );
 
@@ -98,7 +98,7 @@ export function FormWithFeedback({
       {/* Dialog de confirmação */}
       {enableNavigationPrompt && (
         <UnsavedChangesDialog
-          open={blocker.state === "blocked"}
+          open={showPrompt}
           onOpenChange={(open) => !open && cancelNavigation()}
           onConfirm={confirmNavigation}
           onCancel={cancelNavigation}

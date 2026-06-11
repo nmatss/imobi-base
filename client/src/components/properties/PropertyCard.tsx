@@ -284,9 +284,9 @@ const PropertyCardComponent = ({
 };
 
 // Memoized PropertyCard with intelligent prop comparison
-export const PropertyCard = memo(PropertyCardComponent, (prevProps, nextProps) => {
+export const PropertyCard = memo(PropertyCardComponent, (prevProps, nextProps) => 
   // Only re-render if critical props change
-  return (
+   (
     prevProps.id === nextProps.id &&
     prevProps.title === nextProps.title &&
     prevProps.city === nextProps.city &&
@@ -301,5 +301,5 @@ export const PropertyCard = memo(PropertyCardComponent, (prevProps, nextProps) =
     prevProps.imageCount === nextProps.imageCount &&
     prevProps.isTogglingFeatured === nextProps.isTogglingFeatured
     // Callback functions are stable references, no need to compare
-  );
-});
+  )
+);

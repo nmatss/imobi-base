@@ -259,13 +259,9 @@ test.describe('Responsive Features', () => {
     await page.goto('/dashboard');
     await page.waitForLoadState('networkidle');
 
-    const scrollWidth = await page.evaluate(() => {
-      return document.documentElement.scrollWidth;
-    });
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
 
-    const clientWidth = await page.evaluate(() => {
-      return document.documentElement.clientWidth;
-    });
+    const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
 
     // Allow small differences due to scrollbars
     expect(scrollWidth).toBeLessThanOrEqual(clientWidth + 20);

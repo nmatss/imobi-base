@@ -104,9 +104,7 @@ function validateRelativeUrl(url: string): {
     const pathOnly = url.split('?')[0].split('#')[0];
 
     // Check if path is in allowed list
-    const isAllowed = ALLOWED_REDIRECT_PATHS.some(allowedPath => {
-      return pathOnly === allowedPath || pathOnly.startsWith(allowedPath + '/');
-    });
+    const isAllowed = ALLOWED_REDIRECT_PATHS.some(allowedPath => pathOnly === allowedPath || pathOnly.startsWith(`${allowedPath  }/`));
 
     if (!isAllowed) {
       return {
@@ -152,9 +150,7 @@ function validateAbsoluteUrl(url: string): {
 
     // Check if domain is in allowed list
     const hostname = parsedUrl.hostname.toLowerCase();
-    const isAllowedDomain = ALLOWED_REDIRECT_DOMAINS.some(allowedDomain => {
-      return hostname === allowedDomain || hostname.endsWith('.' + allowedDomain);
-    });
+    const isAllowedDomain = ALLOWED_REDIRECT_DOMAINS.some(allowedDomain => hostname === allowedDomain || hostname.endsWith(`.${  allowedDomain}`));
 
     if (!isAllowedDomain) {
       return {

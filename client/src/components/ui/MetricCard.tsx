@@ -22,9 +22,9 @@ function TrendBadge({ value, direction }: TrendBadgeProps) {
     <div
       className={cn(
         "flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-md",
-        direction === 'up' && "text-emerald-700 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400",
+        direction === 'up' && "text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-400",
         direction === 'down' && "text-red-700 bg-red-100 dark:bg-red-900/30 dark:text-red-400",
-        direction === 'neutral' && "text-slate-700 bg-slate-100 dark:bg-slate-900/30 dark:text-slate-400"
+        direction === 'neutral' && "text-gray-700 bg-gray-100 dark:bg-gray-900/30 dark:text-gray-400"
       )}
       role="status"
       aria-label={ariaLabel}
@@ -62,7 +62,7 @@ const MetricCardComponent = ({
     <Card
       className={cn(
         "transition-shadow duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        onClick && "cursor-pointer hover:shadow-md hover:-translate-y-0.5",
+        onClick && "cursor-pointer hover:shadow-lg hover:-translate-y-0.5",
         className
       )}
       onClick={onClick}
@@ -112,9 +112,9 @@ const MetricCardComponent = ({
 };
 
 // Memoized MetricCard with intelligent prop comparison
-export const MetricCard = memo(MetricCardComponent, (prevProps, nextProps) => {
+export const MetricCard = memo(MetricCardComponent, (prevProps, nextProps) => 
   // Only re-render if critical props change
-  return (
+   (
     prevProps.label === nextProps.label &&
     prevProps.value === nextProps.value &&
     prevProps.icon === nextProps.icon &&
@@ -123,5 +123,5 @@ export const MetricCard = memo(MetricCardComponent, (prevProps, nextProps) => {
     prevProps.trend?.direction === nextProps.trend?.direction &&
     prevProps.trend?.label === nextProps.trend?.label
     // onClick is a stable reference, no need to compare
-  );
-});
+  )
+);

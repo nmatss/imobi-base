@@ -122,19 +122,17 @@ export default function LogsPage() {
     return <Activity className="h-3 w-3" />;
   };
 
-  const formatAction = (action: string) => {
-    return action
+  const formatAction = (action: string) => action
       .split("_")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
-  };
 
   const formatDetails = (details: any) => {
     if (!details || Object.keys(details).length === 0) return "-";
 
     try {
       const detailsStr = JSON.stringify(details, null, 2);
-      return detailsStr.length > 100 ? detailsStr.substring(0, 100) + "..." : detailsStr;
+      return detailsStr.length > 100 ? `${detailsStr.substring(0, 100)  }...` : detailsStr;
     } catch {
       return "-";
     }

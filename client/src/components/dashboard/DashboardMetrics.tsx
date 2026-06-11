@@ -38,7 +38,7 @@ export interface MetricCardProps {
   iconColor: string;
 }
 
-const MetricCard = memo(function MetricCard({
+const MetricCard = memo(({
   icon: Icon,
   label,
   value,
@@ -48,7 +48,7 @@ const MetricCard = memo(function MetricCard({
   onClick,
   iconBgColor,
   iconColor,
-}: MetricCardProps) {
+}: MetricCardProps) => {
   const TrendIcon = trend?.direction === "up" ? TrendingUp : trend?.direction === "down" ? TrendingDown : Minus;
   const trendColor = trend?.direction === "up" ? "text-green-600" : trend?.direction === "down" ? "text-red-600" : "text-gray-500";
 
@@ -67,7 +67,7 @@ const MetricCard = memo(function MetricCard({
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <p className="text-sm font-medium text-muted-foreground">{label}</p>
-            <h3 className="text-3xl font-bold text-foreground mt-1">{value}</h3>
+            <h3 className="text-2xl xs:text-3xl sm:text-4xl font-bold text-foreground mt-1">{value}</h3>
             {trend && (
               <div className={`flex items-center gap-1 mt-2 text-xs ${trendColor}`}>
                 <TrendIcon className="h-3 w-3" />
@@ -90,7 +90,7 @@ const MetricCard = memo(function MetricCard({
   );
 });
 
-export const DashboardMetrics = memo(function DashboardMetrics({ metrics, isLoading }: DashboardMetricsProps) {
+export const DashboardMetrics = memo(({ metrics, isLoading }: DashboardMetricsProps) => {
   const [, setLocation] = useLocation();
 
   // Calcular trend direction automaticamente
@@ -108,7 +108,7 @@ export const DashboardMetrics = memo(function DashboardMetrics({ metrics, isLoad
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+    <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
       {/* Imóveis Ativos */}
       <MetricCard
         icon={Building2}

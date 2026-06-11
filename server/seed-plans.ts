@@ -4,7 +4,7 @@
  * Uses upsert (ON CONFLICT slug DO UPDATE) so it's safe to run repeatedly.
  */
 
-import { db } from "./db";
+import { db, isSqlite } from "./db";
 import { plans } from "../shared/schema";
 
 const PLAN_DEFINITIONS = [
@@ -132,9 +132,8 @@ const PLAN_DEFINITIONS = [
 ];
 
 // Permite rodar diretamente: npx tsx server/seed-plans.ts
-const isDirectRun =
-  import.meta.url === `file://${process.argv[1]}` ||
-  process.argv[1]?.endsWith("seed-plans.ts");
+// (sem import.meta para o bundle CJS não emitir empty-import-meta)
+const isDirectRun = process.argv[1]?.endsWith("seed-plans.ts") ?? false;
 if (isDirectRun) {
   seedPlans()
     .then(() => process.exit(0))
@@ -145,6 +144,11 @@ if (isDirectRun) {
 }
 
 export async function seedPlans(): Promise<void> {
+  if (isSqlite) {
+    console.log("Plans seed skipped: plans table is PostgreSQL-only in SQLite development mode");
+    return;
+  }
+
   try {
     for (const plan of PLAN_DEFINITIONS) {
       await db

@@ -202,6 +202,17 @@ export function registerFeatureRoutes(app: Express) {
   app.get("/api/leads/:leadId/score", requireAuth, async (req, res) => {
     try {
       const { leadId } = req.params;
+      const tenantId = req.user!.tenantId;
+
+      // Anti-IDOR: o lead precisa pertencer ao tenant da sessão (404 para não
+      // vazar existência de leads de outros tenants).
+      const leadResult = await db.select({ id: leads.id }).from(leads).where(and(
+        eq(leads.id, leadId),
+        eq(leads.tenantId, tenantId)
+      ));
+      if (leadResult.length === 0) {
+        return res.status(404).json({ error: "Lead não encontrado" });
+      }
 
       const score = await db.select().from(leadScores).where(eq(leadScores.leadId, leadId));
 
@@ -401,6 +412,15 @@ export function registerFeatureRoutes(app: Express) {
         return res.status(400).json({ error: "Tipo e URL são obrigatórios" });
       }
 
+      // Anti-IDOR: virtual_tours não tem tenantId — o escopo de tenant é
+      // derivado da property. Só cria tour em imóvel do tenant da sessão.
+      const property = await db.select({ id: properties.id, tenantId: properties.tenantId })
+        .from(properties)
+        .where(eq(properties.id, propertyId));
+      if (property.length === 0 || property[0].tenantId !== req.user!.tenantId) {
+        return res.status(404).json({ error: "Imóvel não encontrado" });
+      }
+
       const existing = await db.select().from(virtualTours).where(eq(virtualTours.propertyId, propertyId));
 
       const tour = await db.insert(virtualTours).values({
@@ -428,6 +448,15 @@ export function registerFeatureRoutes(app: Express) {
     try {
       const { propertyId } = req.params;
 
+      // Rota pública (site do tenant exibe tours), mas valida que a property
+      // existe — 404 em vez de lista vazia para id inexistente.
+      const property = await db.select({ id: properties.id })
+        .from(properties)
+        .where(eq(properties.id, propertyId));
+      if (property.length === 0) {
+        return res.status(404).json({ error: "Imóvel não encontrado" });
+      }
+
       const tours = await db.select()
         .from(virtualTours)
         .where(and(
@@ -447,6 +476,21 @@ export function registerFeatureRoutes(app: Express) {
   app.delete("/api/virtual-tours/:tourId", requireAuth, async (req, res) => {
     try {
       const { tourId } = req.params;
+
+      // Anti-IDOR: valida a cadeia tour → property → tenant da sessão antes
+      // de apagar (a tabela virtual_tours não tem tenantId próprio).
+      const tour = await db.select({ id: virtualTours.id, propertyId: virtualTours.propertyId })
+        .from(virtualTours)
+        .where(eq(virtualTours.id, tourId));
+      if (tour.length === 0) {
+        return res.status(404).json({ error: "Tour não encontrado" });
+      }
+      const property = await db.select({ id: properties.id, tenantId: properties.tenantId })
+        .from(properties)
+        .where(eq(properties.id, tour[0].propertyId));
+      if (property.length === 0 || property[0].tenantId !== req.user!.tenantId) {
+        return res.status(404).json({ error: "Tour não encontrado" });
+      }
 
       await db.delete(virtualTours).where(eq(virtualTours.id, tourId));
 
@@ -479,11 +523,26 @@ export function registerFeatureRoutes(app: Express) {
   // Save comparison
   app.post("/api/property-comparisons", async (req, res) => {
     try {
-      const { tenantId, propertyIds, userId, leadId, sessionId, notes } = req.body;
+      const { propertyIds, userId, leadId, sessionId, notes } = req.body;
 
-      if (!tenantId || !propertyIds || propertyIds.length < 2) {
+      if (!Array.isArray(propertyIds) || propertyIds.length < 2) {
         return res.status(400).json({ error: "Selecione pelo menos 2 imóveis" });
       }
+
+      // Segurança: NÃO aceitamos tenantId do body (permitiria gravar
+      // comparações em nome de outro tenant). O tenant é derivado das
+      // properties: todas precisam existir e pertencer ao MESMO tenant.
+      const comparisonProps = await db.select({ id: properties.id, tenantId: properties.tenantId })
+        .from(properties)
+        .where(inArray(properties.id, propertyIds));
+      if (comparisonProps.length !== propertyIds.length) {
+        return res.status(400).json({ error: "Um ou mais imóveis são inválidos" });
+      }
+      const tenantIds = new Set(comparisonProps.map((p: { tenantId: string }) => p.tenantId));
+      if (tenantIds.size !== 1) {
+        return res.status(400).json({ error: "Todos os imóveis devem pertencer à mesma imobiliária" });
+      }
+      const tenantId = comparisonProps[0].tenantId;
 
       const comparison = await db.insert(propertyComparisons).values({
         id: nanoid(),
@@ -786,7 +845,9 @@ export function registerFeatureRoutes(app: Express) {
 
       const campaign = await db.select().from(dripCampaigns).where(eq(dripCampaigns.id, campaignId));
 
-      if (campaign.length === 0) {
+      // Anti-IDOR: 404 também quando a campanha é de outro tenant (não vaza
+      // a existência do recurso).
+      if (campaign.length === 0 || campaign[0].tenantId !== req.user!.tenantId) {
         return res.status(404).json({ error: "Campanha não encontrada" });
       }
 
@@ -817,7 +878,8 @@ export function registerFeatureRoutes(app: Express) {
 
       const campaign = await db.select().from(dripCampaigns).where(eq(dripCampaigns.id, campaignId));
 
-      if (campaign.length === 0) {
+      // Anti-IDOR: 404 quando a campanha não existe ou é de outro tenant.
+      if (campaign.length === 0 || campaign[0].tenantId !== req.user!.tenantId) {
         return res.status(404).json({ error: "Campanha não encontrada" });
       }
 
@@ -840,6 +902,28 @@ export function registerFeatureRoutes(app: Express) {
     try {
       const { campaignId } = req.params;
       const { leadId } = req.body;
+      const tenantId = req.user!.tenantId;
+
+      if (!leadId || typeof leadId !== "string") {
+        return res.status(400).json({ error: "leadId é obrigatório" });
+      }
+
+      // Anti-IDOR: a campanha precisa ser do tenant da sessão.
+      const campaign = await db.select({ id: dripCampaigns.id, tenantId: dripCampaigns.tenantId })
+        .from(dripCampaigns)
+        .where(eq(dripCampaigns.id, campaignId));
+      if (campaign.length === 0 || campaign[0].tenantId !== tenantId) {
+        return res.status(404).json({ error: "Campanha não encontrada" });
+      }
+
+      // Anti-IDOR: o lead inscrito também precisa pertencer ao tenant.
+      const lead = await db.select({ id: leads.id }).from(leads).where(and(
+        eq(leads.id, leadId),
+        eq(leads.tenantId, tenantId)
+      ));
+      if (lead.length === 0) {
+        return res.status(404).json({ error: "Lead não encontrado" });
+      }
 
       // Check if already enrolled
       const existing = await db.select()

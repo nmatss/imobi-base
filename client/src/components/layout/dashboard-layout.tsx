@@ -93,20 +93,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       try {
         const res = await fetch("/api/follow-ups?status=pending", { credentials: "include" });
         if (res.ok) setFollowUps(await res.json());
-      } catch (e) {}
+      } catch (e) { /* ignore: erro transitório ao buscar follow-ups, próximo intervalo tenta de novo */ }
     };
     fetchFollowUps();
     const interval = setInterval(fetchFollowUps, 60000);
     return () => clearInterval(interval);
   }, []);
 
-  const pendingFollowUps = useMemo(() => {
-    return followUps
+  const pendingFollowUps = useMemo(() => followUps
       .filter(f => f.status === "pending")
       .sort((a, b) => new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime())
       .slice(0, 5)
-      .map(f => ({ ...f, lead: leads.find(l => l.id === f.leadId), isOverdue: isPast(new Date(f.dueAt)) && !isToday(new Date(f.dueAt)) }));
-  }, [followUps, leads]);
+      .map(f => ({ ...f, lead: leads.find(l => l.id === f.leadId), isOverdue: isPast(new Date(f.dueAt)) && !isToday(new Date(f.dueAt)) })), [followUps, leads]);
 
   const notificationCount = followUps.filter(f => f.status === "pending").length;
 

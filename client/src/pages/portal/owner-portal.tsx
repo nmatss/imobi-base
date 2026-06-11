@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   Building2, Home, DollarSign, FileText, Wrench, BarChart3,
   LogOut, ChevronRight, Calendar, User, CheckCircle, Clock,
@@ -37,6 +38,7 @@ function portalFetch(url: string) {
 
 export default function OwnerPortal() {
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
@@ -55,16 +57,43 @@ export default function OwnerPortal() {
     } catch { return {}; }
   }, []);
 
+  const [brand, setBrand] = useState<any>(tenant);
+
   useEffect(() => {
-    // Check auth via httpOnly cookie
+    // Check auth via httpOnly cookie and refresh white-label branding
     fetch("/api/portal/me", { credentials: "include" })
       .then(res => {
         if (!res.ok) throw new Error("Not authenticated");
+        return res.json();
+      })
+      .then(data => {
+        if (data?.tenant) {
+          setBrand(data.tenant);
+          try {
+            localStorage.setItem("portal_tenant", JSON.stringify(data.tenant));
+          } catch { /* ignore quota errors */ }
+        }
       })
       .catch(() => {
         setLocation("/portal/login");
       });
   }, [setLocation]);
+
+  // Apply dynamic favicon and document title (white-label)
+  useEffect(() => {
+    if (brand?.name) {
+      document.title = `${brand.name} - Portal do Proprietário`;
+    }
+    if (brand?.faviconUrl) {
+      let link = document.querySelector<HTMLLinkElement>("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = "icon";
+        document.head.appendChild(link);
+      }
+      link.href = brand.faviconUrl;
+    }
+  }, [brand]);
 
   const { data: dashboard } = useQuery({
     queryKey: ["/api/portal/owner/dashboard"],
@@ -111,7 +140,7 @@ export default function OwnerPortal() {
   const handleApproveTicket = async (approved: boolean) => {
     if (!selectedTicket) return;
     try {
-      await fetch(`/api/portal/owner/maintenance/${selectedTicket.id}/approve`, {
+      const res = await fetch(`/api/portal/owner/maintenance/${selectedTicket.id}/approve`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -119,11 +148,23 @@ export default function OwnerPortal() {
         credentials: "include",
         body: JSON.stringify({ approved, notes: approveNotes }),
       });
+
+      if (!res.ok) {
+        // Falha não fecha o dialog — o proprietário pode tentar de novo
+        const payload = await res.json().catch(() => null);
+        toast.error(payload?.error || payload?.message || "Erro ao registrar a aprovação. Tente novamente.");
+        return;
+      }
+
+      toast.success(approved ? "Manutenção aprovada com sucesso!" : "Manutenção recusada.");
+      // Atualiza a lista de chamados para refletir o novo status
+      queryClient.invalidateQueries({ queryKey: ["/api/portal/owner/maintenance"] });
       setApproveDialogOpen(false);
       setSelectedTicket(null);
       setApproveNotes("");
     } catch (err) {
       console.error("Error approving ticket:", err);
+      toast.error("Erro de conexão ao registrar a aprovação. Tente novamente.");
     }
   };
 
@@ -155,24 +196,25 @@ export default function OwnerPortal() {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(num || 0);
   };
 
-  const primaryColor = tenant?.primaryColor || "#0066cc";
+  const primaryColor = brand?.primaryColor || "#0066cc";
+  const secondaryColor = brand?.secondaryColor || "#333333";
 
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-50">
+      <header className="bg-white border-b sticky top-0 z-50" style={{ borderTopWidth: 3, borderTopColor: secondaryColor }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-3">
-              {tenant?.logo ? (
-                <img src={tenant.logo} alt={tenant.name} className="h-8 w-8 rounded-lg object-cover" />
+              {brand?.logo ? (
+                <img src={brand.logo} alt={brand.name} className="h-8 w-8 rounded-lg object-cover" />
               ) : (
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white" style={{ backgroundColor: primaryColor }}>
                   <Building2 className="h-5 w-5" />
                 </div>
               )}
               <div>
-                <p className="font-semibold text-sm">{tenant?.name || "Portal"}</p>
+                <p className="font-semibold text-sm">{brand?.name || "Portal"}</p>
                 <p className="text-xs text-muted-foreground">Portal do Proprietário</p>
               </div>
             </div>
@@ -648,6 +690,15 @@ export default function OwnerPortal() {
           </TabsContent>
         </Tabs>
       </main>
+
+      {/* White-label footer */}
+      <footer className="border-t mt-8 py-6" style={{ borderTopColor: secondaryColor }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-muted-foreground">
+          {brand?.footerText
+            ? <p>{brand.footerText}</p>
+            : <p>&copy; {new Date().getFullYear()} {brand?.name || "Portal do Cliente"}. Todos os direitos reservados.</p>}
+        </div>
+      </footer>
 
       {/* Approve Dialog */}
       <Dialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>

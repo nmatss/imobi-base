@@ -12,13 +12,26 @@ import { users, loginHistory } from "@shared/schema-sqlite";
 import { eq, and, gt } from "drizzle-orm";
 import { sendPasswordResetEmail, sendPasswordChangedEmail } from "./email-service";
 import { createAuditLog } from "../routes-security";
+import { getRedisClient } from "../cache/redis-client";
 
 // Rate limiting for password reset requests
 const resetRequestLimiter = new Map<string, { count: number; resetAt: number }>();
 const RESET_RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour
 const RESET_RATE_LIMIT_MAX = 3; // Max 3 requests per hour
 
-function checkResetRateLimit(email: string): { allowed: boolean; remainingAttempts: number; resetIn: number } {
+interface ResetRateLimitResult {
+  allowed: boolean;
+  remainingAttempts: number;
+  resetIn: number;
+}
+
+/**
+ * Fallback in-memory. LIMITAÇÃO CONHECIDA: em serverless (Vercel) cada
+ * instância tem seu próprio Map, então o limite NÃO é compartilhado entre
+ * instâncias — um atacante pode exceder o limite global. Só é usado quando
+ * Redis não está disponível.
+ */
+function checkResetRateLimitMemory(email: string): ResetRateLimitResult {
   const now = Date.now();
   const key = `reset:${email.toLowerCase()}`;
   const record = resetRequestLimiter.get(key);
@@ -41,6 +54,38 @@ function checkResetRateLimit(email: string): { allowed: boolean; remainingAttemp
 
   record.count++;
   return { allowed: true, remainingAttempts: RESET_RATE_LIMIT_MAX - record.count, resetIn: record.resetAt - now };
+}
+
+/**
+ * Rate limit distribuído via Redis (INCR + EXPIRE por email) — funciona entre
+ * instâncias serverless. getRedisClient LANÇA quando REDIS_URL não está
+ * configurada; nesse caso (ou em erro de rede) caímos no Map in-memory.
+ */
+async function checkResetRateLimit(email: string): Promise<ResetRateLimitResult> {
+  const windowSeconds = Math.ceil(RESET_RATE_LIMIT_WINDOW / 1000);
+  const key = `rl:pwreset:${email.toLowerCase()}`;
+
+  try {
+    const redis = getRedisClient();
+    const count = await redis.incr(key);
+    if (count === 1) {
+      await redis.expire(key, windowSeconds);
+    }
+    const ttl = await redis.ttl(key);
+    const resetIn = (ttl > 0 ? ttl : windowSeconds) * 1000;
+
+    if (count > RESET_RATE_LIMIT_MAX) {
+      return { allowed: false, remainingAttempts: 0, resetIn };
+    }
+    return {
+      allowed: true,
+      remainingAttempts: RESET_RATE_LIMIT_MAX - count,
+      resetIn,
+    };
+  } catch {
+    // Sem Redis: fallback in-memory (não compartilhado entre instâncias).
+    return checkResetRateLimitMemory(email);
+  }
 }
 
 function generateResetToken(): string {
@@ -115,8 +160,8 @@ export function registerPasswordResetRoutes(app: Express) {
 
       const normalizedEmail = email.toLowerCase().trim();
 
-      // Rate limiting
-      const rateLimit = checkResetRateLimit(normalizedEmail);
+      // Rate limiting (Redis distribuído com fallback in-memory)
+      const rateLimit = await checkResetRateLimit(normalizedEmail);
       if (!rateLimit.allowed) {
         return res.status(429).json({
           error: "Muitas solicitações. Tente novamente mais tarde.",

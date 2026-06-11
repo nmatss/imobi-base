@@ -17,19 +17,21 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
       path: req.path,
       method: req.method,
     });
-    return res.status(401).json({
+    res.status(401).json({
       error: 'Authentication required',
       code: 'UNAUTHORIZED'
     });
+    return;
   }
 
   // Ensure user has tenantId for multi-tenancy
   if (!req.user.tenantId) {
     console.warn('User authenticated but missing tenantId:', req.user);
-    return res.status(403).json({
+    res.status(403).json({
       error: 'Invalid user session',
       code: 'INVALID_SESSION'
     });
+    return;
   }
 
   next();
@@ -41,10 +43,11 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
  */
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   if (!req.isAuthenticated() || !req.user) {
-    return res.status(401).json({
+    res.status(401).json({
       error: 'Authentication required',
       code: 'UNAUTHORIZED'
     });
+    return;
   }
 
   if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
@@ -53,10 +56,11 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
       role: req.user.role,
       path: req.path,
     });
-    return res.status(403).json({
+    res.status(403).json({
       error: 'Admin privileges required',
       code: 'FORBIDDEN'
     });
+    return;
   }
 
   next();
@@ -68,10 +72,11 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
  */
 export function requireSuperAdmin(req: Request, res: Response, next: NextFunction): void {
   if (!req.isAuthenticated() || !req.user) {
-    return res.status(401).json({
+    res.status(401).json({
       error: 'Authentication required',
       code: 'UNAUTHORIZED'
     });
+    return;
   }
 
   if (req.user.role !== 'super_admin') {
@@ -80,10 +85,11 @@ export function requireSuperAdmin(req: Request, res: Response, next: NextFunctio
       role: req.user.role,
       path: req.path,
     });
-    return res.status(403).json({
+    res.status(403).json({
       error: 'Super admin privileges required',
       code: 'FORBIDDEN'
     });
+    return;
   }
 
   next();

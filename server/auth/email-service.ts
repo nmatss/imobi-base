@@ -40,7 +40,7 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
       console.log('EMAIL NOT CONFIGURED - Would send email:');
       console.log('To:', to);
       console.log('Subject:', subject);
-      console.log('Content:', html.substring(0, 200) + '...');
+      console.log('Content:', `${html.substring(0, 200)  }...`);
       console.log('='.repeat(80));
       return;
     }

@@ -90,23 +90,28 @@ const workers = new Map<string, Worker>();
 const queueEvents = new Map<string, QueueEvents>();
 
 // Default queue options
-const defaultQueueOptions: QueueOptions = {
-  connection: getRedisClient(),
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: {
-      type: 'exponential',
-      delay: 5000, // Start with 5 seconds
+// IMPORTANTE: a connection é resolvida LAZY (dentro de createQueue/registerWorker),
+// nunca no module-load — em serverless sem REDIS_URL, getRedisClient() lança, e um
+// throw no import derrubaria o api-handler inteiro mesmo sem nenhuma fila em uso.
+function buildDefaultQueueOptions(): QueueOptions {
+  return {
+    connection: getRedisClient(),
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: {
+        type: 'exponential',
+        delay: 5000, // Start with 5 seconds
+      },
+      removeOnComplete: {
+        age: 24 * 3600, // Keep completed jobs for 24 hours
+        count: 1000, // Keep max 1000 completed jobs
+      },
+      removeOnFail: {
+        age: 7 * 24 * 3600, // Keep failed jobs for 7 days
+      },
     },
-    removeOnComplete: {
-      age: 24 * 3600, // Keep completed jobs for 24 hours
-      count: 1000, // Keep max 1000 completed jobs
-    },
-    removeOnFail: {
-      age: 7 * 24 * 3600, // Keep failed jobs for 7 days
-    },
-  },
-};
+  };
+}
 
 // Default worker options
 const defaultWorkerOptions: Omit<WorkerOptions, 'connection'> = {
@@ -127,7 +132,7 @@ export function createQueue<T = any>(
   }
 
   const queue = new Queue<T>(name, {
-    ...defaultQueueOptions,
+    ...buildDefaultQueueOptions(),
     ...options,
   });
 

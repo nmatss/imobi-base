@@ -16,8 +16,7 @@ L.Icon.Default.mergeOptions({
 });
 
 // Custom marker icons by property type
-const createCustomIcon = (color: string) => {
-  return L.divIcon({
+const createCustomIcon = (color: string) => L.divIcon({
     className: 'custom-marker',
     html: `<div style="
       background-color: ${color};
@@ -42,7 +41,6 @@ const createCustomIcon = (color: string) => {
     iconAnchor: [16, 32],
     popupAnchor: [0, -32],
   });
-};
 
 const TYPE_COLORS: Record<string, string> = {
   apartment: '#3b82f6',

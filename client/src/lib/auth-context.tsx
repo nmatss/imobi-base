@@ -2,6 +2,7 @@ import React from "react";
 // @ts-nocheck
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { useLocation } from "wouter";
+import { unwrapData } from "@/lib/api-envelope";
 
 // ==================== TYPES ====================
 
@@ -19,7 +20,11 @@ type AuthContextType = {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  checkAuth: () => Promise<void>;
+  /**
+   * Verifica a autenticação. Resolve para uma função de cleanup opcional
+   * que cancela atualizações de estado se o componente for desmontado.
+   */
+  checkAuth: () => Promise<(() => void) | undefined>;
 };
 
 // ==================== CONTEXT ====================
@@ -47,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mounted) return;
 
       if (res.ok) {
-        const data = await res.json();
+        const data = unwrapData<{ user: User }>(await res.json());
         if (mounted) {
           setUser(data.user);
         }

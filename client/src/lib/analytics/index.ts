@@ -221,7 +221,10 @@ export function trackError(error: Error, context?: Record<string, unknown>) {
     ReactGA.event({
       category: "Error",
       action: error.message,
-      label: context?.page || window.location.pathname,
+      label:
+        typeof context?.page === "string"
+          ? context.page
+          : window.location.pathname,
       nonInteraction: true,
     });
   }

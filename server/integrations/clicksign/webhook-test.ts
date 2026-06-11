@@ -104,7 +104,7 @@ const validPayload: MockWebhookPayload = {
 const validSignature = generateWebhookSignature(validPayload, WEBHOOK_SECRET);
 const isValid = validateWebhookSignature(validPayload, validSignature, WEBHOOK_SECRET);
 console.log('✓ Valid signature test:', isValid ? 'PASSED' : 'FAILED');
-console.log('  Signature:', validSignature.substring(0, 20) + '...\n');
+console.log('  Signature:', `${validSignature.substring(0, 20)  }...\n`);
 
 // Test 2: Invalid signature
 console.log('Test 2: Invalid Signature');
@@ -151,8 +151,8 @@ console.log('Test 8: Timing-Safe Comparison');
 const sig1 = generateWebhookSignature(validPayload, WEBHOOK_SECRET);
 const sig2 = generateWebhookSignature(validPayload, WEBHOOK_SECRET);
 console.log('✓ Same payload produces same signature:', sig1 === sig2 ? 'PASSED' : 'FAILED');
-console.log('  Sig1:', sig1.substring(0, 20) + '...');
-console.log('  Sig2:', sig2.substring(0, 20) + '...\n');
+console.log('  Sig1:', `${sig1.substring(0, 20)  }...`);
+console.log('  Sig2:', `${sig2.substring(0, 20)  }...\n`);
 
 console.log('=== All Tests Completed ===');
 console.log('\nExample Usage:');

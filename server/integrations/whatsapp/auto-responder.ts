@@ -12,7 +12,7 @@ import { db } from "../../db";
 import { whatsappAutoResponses, whatsappConversations, tenantSettings } from "@shared/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { messageQueue } from "./message-queue";
-import { log } from "../../index";
+import { log } from "../../utils/log";
 import { isAIAvailable, generateLeadResponse, type ISAContext } from "../../services/ai-service";
 
 interface ProcessMessageParams {

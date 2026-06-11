@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import React, { useState, useEffect, useMemo } from "react";
 import { Helmet } from "react-helmet";
+import { unwrapList, getPaginationTotal } from "@/lib/api-envelope";
 
 type Tenant = {
   id: string;
@@ -60,6 +61,27 @@ type Property = {
   status: string;
   featured: boolean;
 };
+
+// O endpoint público é paginado (limit máximo 100 no servidor); a vitrine
+// completa precisa de todas as páginas, senão imóveis além do primeiro lote
+// ficam invisíveis e o slider de preço é calibrado só com a primeira página.
+async function fetchAllPublicProperties(tenantId: string): Promise<Property[]> {
+  const limit = 100;
+  const all: Property[] = [];
+
+  for (let page = 1; page <= 20; page++) {
+    const res = await fetch(`/api/properties/public/${tenantId}?page=${page}&limit=${limit}`);
+    if (!res.ok) break;
+    const payload = await res.json();
+    const batch = unwrapList<Property>(payload);
+    all.push(...batch);
+
+    const total = getPaginationTotal(payload);
+    if (batch.length < limit || (total !== undefined && all.length >= total)) break;
+  }
+
+  return all;
+}
 
 export default function PublicProperties() {
   const [match, params] = useRoute("/e/:rest*");
@@ -106,18 +128,15 @@ export default function PublicProperties() {
         const tenantData = await tenantRes.json();
         setTenant(tenantData);
 
-        // Fetch public properties for this tenant
-        const propertiesRes = await fetch(`/api/properties/public/${tenantData.id}`);
-        if (propertiesRes.ok) {
-          const propertiesData = await propertiesRes.json();
-          setProperties(propertiesData);
+        // Fetch public properties for this tenant (todas as páginas)
+        const allProperties = await fetchAllPublicProperties(tenantData.id);
+        setProperties(allProperties);
 
-          // Set initial price range based on actual data
-          if (propertiesData.length > 0) {
-            const prices = propertiesData.map((p: Property) => parseFloat(p.price));
-            const maxPrice = Math.max(...prices);
-            setPriceRange([0, Math.ceil(maxPrice / 100000) * 100000]);
-          }
+        // Set initial price range based on actual data
+        if (allProperties.length > 0) {
+          const prices = allProperties.map((p: Property) => parseFloat(p.price));
+          const maxPrice = Math.max(...prices);
+          setPriceRange([0, Math.ceil(maxPrice / 100000) * 100000]);
         }
       } catch (err) {
         setError("Erro ao carregar dados");
@@ -138,7 +157,7 @@ export default function PublicProperties() {
 
   // Filter and sort properties
   const filteredAndSortedProperties = useMemo(() => {
-    let filtered = properties.filter(property => {
+    const filtered = properties.filter(property => {
       // Category filter
       if (categoryFilter !== "all" && property.category !== categoryFilter) return false;
 

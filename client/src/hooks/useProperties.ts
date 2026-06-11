@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast-enhanced";
 import type { Property } from "@/lib/imobi-context";
+import { unwrapList } from "@/lib/api-envelope";
 
 // ==================== TYPES ====================
 
@@ -65,7 +66,8 @@ async function fetchProperties(filters?: PropertyFilters): Promise<Property[]> {
     throw new Error(error.error || "Failed to fetch properties");
   }
 
-  return response.json();
+  // /api/properties é paginado: responde envelope { success, data, meta }
+  return unwrapList<Property>(await response.json());
 }
 
 async function fetchPropertyById(id: string): Promise<Property> {

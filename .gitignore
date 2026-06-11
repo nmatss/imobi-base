@@ -70,3 +70,6 @@ storybook-static
 
 # Claude Code local state (worktrees, session data)
 .claude/
+
+# Runtime upload artifacts (dev/test gerados em tempo de execução)
+uploads/

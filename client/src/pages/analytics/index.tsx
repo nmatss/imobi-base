@@ -224,7 +224,7 @@ export default function AnalyticsPage() {
                 <XAxis
                   dataKey="date"
                   tickFormatter={(v) => {
-                    const d = new Date(v + "T00:00:00");
+                    const d = new Date(`${v  }T00:00:00`);
                     return `${d.getDate()}/${d.getMonth() + 1}`;
                   }}
                   fontSize={12}
@@ -232,7 +232,7 @@ export default function AnalyticsPage() {
                 <YAxis fontSize={12} />
                 <RechartsTooltip
                   labelFormatter={(v) => {
-                    const d = new Date(v + "T00:00:00");
+                    const d = new Date(`${v  }T00:00:00`);
                     return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
                   }}
                   formatter={(value: number) => [value, "Pageviews"]}
@@ -382,7 +382,7 @@ export default function AnalyticsPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-xs text-gray-500 max-w-[200px] truncate">
-                      {err.userAgent ? err.userAgent.slice(0, 60) + '...' : '-'}
+                      {err.userAgent ? `${err.userAgent.slice(0, 60)  }...` : '-'}
                     </TableCell>
                     <TableCell className="text-right text-sm text-gray-500 whitespace-nowrap">
                       {new Date(err.createdAt).toLocaleString('pt-BR')}

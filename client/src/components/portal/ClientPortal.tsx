@@ -176,12 +176,10 @@ export function ClientPortal({ clientId, token }: ClientPortalProps) {
     }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
+  const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
     }).format(value);
-  };
 
   if (isLoading) {
     return (

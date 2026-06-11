@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast-enhanced";
 import type { Lead, LeadStatus } from "@/lib/imobi-context";
+import { unwrapList } from "@/lib/api-envelope";
 
 // ==================== TYPES ====================
 
@@ -62,7 +63,8 @@ async function fetchLeads(filters?: LeadFilters): Promise<Lead[]> {
     throw new Error(error.error || "Failed to fetch leads");
   }
 
-  return response.json();
+  // /api/leads é paginado: responde envelope { success, data, meta }
+  return unwrapList<Lead>(await response.json());
 }
 
 async function fetchLeadById(id: string): Promise<Lead> {

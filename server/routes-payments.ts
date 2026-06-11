@@ -11,17 +11,9 @@ import { MercadoPagoService } from './payments/mercadopago/mercadopago-service';
 import { handleMercadoPagoWebhook, handleMercadoPagoIPN } from './payments/mercadopago/mercadopago-webhooks';
 import { storage } from './storage';
 import * as Sentry from '@sentry/node';
-import { validateBody } from './middleware/validate';
 import { asyncHandler, AuthError } from './middleware/error-handler';
 import { idempotencyCheck } from './middleware/idempotency';
 import { generateRateLimitKey } from './middleware/rate-limit-key-generator';
-import {
-  createStripeSubscriptionSchema,
-  cancelStripeSubscriptionSchema,
-  updatePaymentMethodSchema,
-  createPixPaymentSchema,
-  createBoletoPaymentSchema,
-} from './schemas';
 
 /**
  * Rate limiter para criacao/modificacao de subscriptions e pagamentos.
@@ -52,65 +44,11 @@ const paymentMutationLimiter = rateLimit({
 export function registerPaymentRoutes(app: Express): void {
   // ============== STRIPE ROUTES ==============
 
-  /**
-   * Create Stripe subscription
-   */
-  app.post('/api/payments/stripe/create-subscription', paymentMutationLimiter, idempotencyCheck, validateBody(createStripeSubscriptionSchema), asyncHandler(async (req: Request, res: Response) => {
-    if (!req.user) {
-      throw new AuthError();
-    }
-
-    const { priceId, paymentMethodId, trialDays } = req.body;
-    const tenantId = req.user.tenantId;
-
-      // Get or create Stripe customer
-      const tenant = await storage.getTenantById(tenantId);
-      if (!tenant) {
-        res.status(404).json({ error: 'Tenant not found' });
-        return;
-      }
-
-      let customerId: string;
-      const subscription = await storage.getTenantSubscription(tenantId);
-
-      if (subscription?.metadata?.stripeCustomerId) {
-        customerId = subscription.metadata.stripeCustomerId as string;
-      } else {
-        const customer = await StripeService.createCustomer({
-          email: tenant.email || req.user.email,
-          name: tenant.name,
-          tenantId,
-        });
-        customerId = customer.id;
-
-        // Update subscription with customer ID
-        await storage.updateTenantSubscription(tenantId, {
-          metadata: { stripeCustomerId: customerId },
-        });
-      }
-
-      // Attach payment method if provided
-      if (paymentMethodId) {
-        await StripeService.attachPaymentMethod({
-          customerId,
-          paymentMethodId,
-        });
-      }
-
-      // Create subscription
-      const stripeSubscription = await StripeService.createSubscription({
-        customerId,
-        priceId,
-        trialPeriodDays: trialDays,
-        metadata: { tenantId },
-      });
-
-    res.json({
-      subscriptionId: stripeSubscription.id,
-      status: stripeSubscription.status,
-      clientSecret: (stripeSubscription.latest_invoice as any)?.payment_intent?.client_secret,
-    });
-  }));
+  // NOTA: o endpoint legado POST /api/payments/stripe/create-subscription foi
+  // REMOVIDO (sem call sites no client/testes). Ele aceitava trialDays ate 90
+  // do body e priceId sem validacao, sem guard de duplicata — permitia trial
+  // gratis repetivel. O fluxo oficial e create-checkout-session (abaixo), que
+  // valida o priceId contra os planos ativos e usa o trial da config do plano.
 
   /**
    * Cancel Stripe subscription.
@@ -197,12 +135,14 @@ export function registerPaymentRoutes(app: Express): void {
         return;
       }
 
-      // Bloqueia criacao de checkout se tenant ja tem subscription ativa.
-      // Usuario deve usar o Customer Portal para upgrade/downgrade.
+      // Bloqueia criacao de checkout se tenant ja tem subscription ativa
+      // (incluindo suspended/past_due — a assinatura no Stripe ainda existe e
+      // um novo checkout criaria uma SEGUNDA assinatura = double-billing).
+      // Usuario deve usar o Customer Portal para upgrade/downgrade/regularizar.
       const existingSub = await storage.getTenantSubscription(tenantId);
       if (
         existingSub &&
-        ['active', 'trial', 'trialing', 'past_due'].includes(
+        ['active', 'trial', 'trialing', 'past_due', 'suspended'].includes(
           String(existingSub.status || ''),
         ) &&
         (existingSub.metadata as Record<string, unknown> | undefined)

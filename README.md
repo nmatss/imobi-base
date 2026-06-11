@@ -139,6 +139,13 @@ npm run dev
 
 Acesse `http://localhost:5000`
 
+Credenciais criadas por `npm run db:seed`:
+
+| Tenant          | Login                 | Senha      | Site público |
+| --------------- | --------------------- | ---------- | ------------ |
+| Imobiliária Sol | `admin@sol.com`       | `password` | `/e/sol`     |
+| Nova Casa       | `admin@novacasa.com`  | `password` | `/e/nova-casa` |
+
 ---
 
 ## Scripts

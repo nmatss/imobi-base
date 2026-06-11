@@ -89,18 +89,35 @@ class SecretManager {
   initialize(env: Record<string, string | undefined>): void {
     const errors: string[] = [];
     const warnings: string[] = [];
+    const isProduction = env.NODE_ENV === 'production';
+    const isServerless = Boolean(env.VERCEL);
+    const shouldReportAsError = isProduction || isServerless;
+    const usingSqlite =
+      env.USE_SQLITE === 'true' || (!env.DATABASE_URL && !shouldReportAsError);
+
+    const addValidationIssue = (message: string) => {
+      if (shouldReportAsError) {
+        errors.push(message);
+      } else {
+        warnings.push(message);
+      }
+    };
 
     for (const [key, config] of Object.entries(SECRET_CONFIGS)) {
       const value = env[key];
+      const required =
+        config.required && !(key === 'DATABASE_URL' && usingSqlite);
 
-      // Verificar se secret obrigatório está presente
-      if (config.required && !value) {
-        errors.push(`Missing required secret: ${key} - ${config.description}`);
+      // Verificar se secret obrigatório está presente.
+      // Em dev/test vira warning — silenciar completamente esconderia a
+      // configuração faltante até o primeiro deploy.
+      if (required && !value) {
+        addValidationIssue(`Missing required secret: ${key} - ${config.description}`);
         continue;
       }
 
       if (!value) {
-        if (process.env.NODE_ENV === 'production') {
+        if (isProduction) {
           warnings.push(`Optional secret not configured: ${key}`);
         }
         continue;
@@ -108,7 +125,7 @@ class SecretManager {
 
       // Validar comprimento mínimo
       if (config.minLength && value.length < config.minLength) {
-        errors.push(
+        addValidationIssue(
           `Secret ${key} too short. ` +
           `Minimum ${config.minLength} characters, got ${value.length}`
         );
@@ -116,7 +133,7 @@ class SecretManager {
 
       // Validar padrão
       if (config.pattern && !config.pattern.test(value)) {
-        errors.push(
+        addValidationIssue(
           `Secret ${key} has invalid format. ` +
           `Expected pattern: ${config.pattern}`
         );
@@ -131,17 +148,17 @@ class SecretManager {
       console.error('🚨 SECRET VALIDATION ERRORS:');
       errors.forEach(err => console.error(`   - ${err}`));
 
-      if (process.env.NODE_ENV === 'production' && !process.env.VERCEL) {
+      if (isProduction && !isServerless) {
         console.error('');
         console.error('Application cannot start in production with invalid secrets');
         process.exit(1);
-      } else if (process.env.VERCEL) {
+      } else if (isServerless) {
         console.error('⚠️  Secret validation errors in serverless - continuing with warnings');
       }
     }
 
     // Reportar warnings
-    if (warnings.length > 0 && process.env.NODE_ENV === 'production') {
+    if (warnings.length > 0) {
       console.warn('⚠️  SECRET WARNINGS:');
       warnings.forEach(warn => console.warn(`   - ${warn}`));
     }

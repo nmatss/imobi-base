@@ -16,9 +16,7 @@ test.describe('CSS Grid Support', () => {
 
     if (count > 0) {
       const grid = gridElements.first();
-      const computedStyle = await grid.evaluate((el) => {
-        return window.getComputedStyle(el).display;
-      });
+      const computedStyle = await grid.evaluate((el) => window.getComputedStyle(el).display);
 
       expect(computedStyle).toBe('grid');
     }
@@ -55,9 +53,7 @@ test.describe('Flexbox Support', () => {
 
     if (count > 0) {
       const flex = flexElements.first();
-      const computedStyle = await flex.evaluate((el) => {
-        return window.getComputedStyle(el).display;
-      });
+      const computedStyle = await flex.evaluate((el) => window.getComputedStyle(el).display);
 
       expect(computedStyle).toMatch(/flex/);
     }
@@ -72,9 +68,7 @@ test.describe('Flexbox Support', () => {
 
     if (count > 0) {
       const flex = flexElements.first();
-      const direction = await flex.evaluate((el) => {
-        return window.getComputedStyle(el).flexDirection;
-      });
+      const direction = await flex.evaluate((el) => window.getComputedStyle(el).flexDirection);
 
       expect(['row', 'column', 'row-reverse', 'column-reverse']).toContain(direction);
     }
@@ -89,9 +83,7 @@ test.describe('Flexbox Support', () => {
 
     if (count > 0) {
       const flex = flexElements.first();
-      const justify = await flex.evaluate((el) => {
-        return window.getComputedStyle(el).justifyContent;
-      });
+      const justify = await flex.evaluate((el) => window.getComputedStyle(el).justifyContent);
 
       expect(justify).toBeTruthy();
     }
@@ -139,9 +131,7 @@ test.describe('Modern CSS Features', () => {
     await page.waitForLoadState('networkidle');
 
     const roundedElements = page.locator('[class*="rounded"]').first();
-    const borderRadius = await roundedElements.evaluate((el) => {
-      return window.getComputedStyle(el).borderRadius;
-    });
+    const borderRadius = await roundedElements.evaluate((el) => window.getComputedStyle(el).borderRadius);
 
     expect(borderRadius).not.toBe('0px');
   });
@@ -154,9 +144,7 @@ test.describe('Modern CSS Features', () => {
     const count = await shadowElements.count();
 
     if (count > 0) {
-      const shadow = await shadowElements.first().evaluate((el) => {
-        return window.getComputedStyle(el).boxShadow;
-      });
+      const shadow = await shadowElements.first().evaluate((el) => window.getComputedStyle(el).boxShadow);
 
       expect(shadow).not.toBe('none');
     }
@@ -170,9 +158,7 @@ test.describe('Modern CSS Features', () => {
     const count = await transitionElements.count();
 
     if (count > 0) {
-      const transition = await transitionElements.first().evaluate((el) => {
-        return window.getComputedStyle(el).transition;
-      });
+      const transition = await transitionElements.first().evaluate((el) => window.getComputedStyle(el).transition);
 
       expect(transition).not.toBe('all 0s ease 0s');
     }
@@ -186,9 +172,7 @@ test.describe('Modern CSS Features', () => {
     const buttons = page.locator('button').first();
     await buttons.hover();
 
-    const transform = await buttons.evaluate((el) => {
-      return window.getComputedStyle(el).transform;
-    });
+    const transform = await buttons.evaluate((el) => window.getComputedStyle(el).transform);
 
     // Transform should be defined (even if 'none')
     expect(transform).toBeTruthy();
@@ -218,14 +202,10 @@ test.describe('Typography', () => {
     await page.waitForLoadState('networkidle');
 
     const heading = page.locator('h1, h2').first();
-    const headingSize = await heading.evaluate((el) => {
-      return parseInt(window.getComputedStyle(el).fontSize);
-    });
+    const headingSize = await heading.evaluate((el) => parseInt(window.getComputedStyle(el).fontSize));
 
     const body = page.locator('body');
-    const bodySize = await body.evaluate((el) => {
-      return parseInt(window.getComputedStyle(el).fontSize);
-    });
+    const bodySize = await body.evaluate((el) => parseInt(window.getComputedStyle(el).fontSize));
 
     // Heading should be larger than body text
     expect(headingSize).toBeGreaterThan(bodySize);
@@ -261,9 +241,7 @@ test.describe('Layout & Positioning', () => {
     const count = await stickyElements.count();
 
     if (count > 0) {
-      const position = await stickyElements.first().evaluate((el) => {
-        return window.getComputedStyle(el).position;
-      });
+      const position = await stickyElements.first().evaluate((el) => window.getComputedStyle(el).position);
 
       expect(position).toBe('sticky');
     }
@@ -277,9 +255,7 @@ test.describe('Layout & Positioning', () => {
     const count = await zElements.count();
 
     if (count > 0) {
-      const zIndex = await zElements.first().evaluate((el) => {
-        return window.getComputedStyle(el).zIndex;
-      });
+      const zIndex = await zElements.first().evaluate((el) => window.getComputedStyle(el).zIndex);
 
       expect(zIndex).not.toBe('auto');
     }
@@ -293,9 +269,7 @@ test.describe('Layout & Positioning', () => {
     const count = await overflowElements.count();
 
     if (count > 0) {
-      const overflow = await overflowElements.first().evaluate((el) => {
-        return window.getComputedStyle(el).overflow;
-      });
+      const overflow = await overflowElements.first().evaluate((el) => window.getComputedStyle(el).overflow);
 
       expect(['visible', 'hidden', 'scroll', 'auto']).toContain(overflow);
     }
@@ -311,9 +285,7 @@ test.describe('Colors & Opacity', () => {
     const count = await opacityElements.count();
 
     if (count > 0) {
-      const opacity = await opacityElements.first().evaluate((el) => {
-        return window.getComputedStyle(el).opacity;
-      });
+      const opacity = await opacityElements.first().evaluate((el) => window.getComputedStyle(el).opacity);
 
       // Opacity should be a number between 0 and 1
       expect(parseFloat(opacity)).toBeGreaterThanOrEqual(0);
@@ -368,9 +340,7 @@ test.describe('Responsive CSS', () => {
     await page.goto('/dashboard');
     await page.waitForLoadState('networkidle');
 
-    const supportsContainerQueries = await page.evaluate(() => {
-      return CSS.supports('container-type', 'inline-size');
-    });
+    const supportsContainerQueries = await page.evaluate(() => CSS.supports('container-type', 'inline-size'));
 
     // Just verify browser capability
     expect(typeof supportsContainerQueries).toBe('boolean');
@@ -384,9 +354,7 @@ test.describe('Browser-Specific Features', () => {
       await page.waitForLoadState('networkidle');
 
       // Check for webkit-specific properties
-      const hasWebkit = await page.evaluate(() => {
-        return 'webkitTransform' in document.body.style;
-      });
+      const hasWebkit = await page.evaluate(() => 'webkitTransform' in document.body.style);
 
       expect(typeof hasWebkit).toBe('boolean');
     }
@@ -422,9 +390,7 @@ test.describe('Animations', () => {
     const count = await animatedElements.count();
 
     if (count > 0) {
-      const animation = await animatedElements.first().evaluate((el) => {
-        return window.getComputedStyle(el).animation;
-      });
+      const animation = await animatedElements.first().evaluate((el) => window.getComputedStyle(el).animation);
 
       // Animation property should exist
       expect(animation).toBeTruthy();

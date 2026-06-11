@@ -375,8 +375,7 @@ export default function CalendarPage() {
   }, [visits, getVisitDetails]);
 
   // Filter visits
-  const filteredVisits = useMemo(() => {
-    return visits.filter(v => {
+  const filteredVisits = useMemo(() => visits.filter(v => {
       // Status filter (from legend chips)
       if (!visibleStatuses.includes(v.status)) return false;
 
@@ -402,8 +401,7 @@ export default function CalendarPage() {
       }
 
       return true;
-    });
-  }, [visits, filters, visibleStatuses, getVisitDetails]);
+    }), [visits, filters, visibleStatuses, getVisitDetails]);
 
   // Week calculations
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
@@ -426,9 +424,7 @@ export default function CalendarPage() {
   }
 
   // Get visits for a specific date
-  const getVisitsForDate = useCallback((date: Date) => {
-    return filteredVisits.filter(v => isSameDay(new Date(v.scheduledFor), date));
-  }, [filteredVisits]);
+  const getVisitsForDate = useCallback((date: Date) => filteredVisits.filter(v => isSameDay(new Date(v.scheduledFor), date)), [filteredVisits]);
 
   // Get available time slots for a date (excluding already scheduled visits)
   const getAvailableSlots = useCallback((date: Date) => {
@@ -817,9 +813,7 @@ export default function CalendarPage() {
   };
 
   // Get status config
-  const getStatusConfig = (status: string) => {
-    return STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.scheduled;
-  };
+  const getStatusConfig = (status: string) => STATUS_CONFIG[status as keyof typeof STATUS_CONFIG] || STATUS_CONFIG.scheduled;
 
   // Parse feedback from notes
   const parseFeedback = (notes: string | null) => {
