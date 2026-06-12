@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -267,6 +268,7 @@ function ChartSkeleton() {
 }
 
 export default function ReportsPage() {
+  usePageTitle("Relatórios Gerenciais");
   const [loading, setLoading] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
   const [generatingReport, setGeneratingReport] = useState<string | null>(null);
@@ -461,7 +463,7 @@ export default function ReportsPage() {
     setShowDatePicker(false);
   };
 
-  const handleExport = async (format: 'pdf' | 'excel' | 'print') => {
+  const handleExport = async (format: 'excel' | 'print') => {
     setExportLoading(true);
     try {
       if (format === 'print') {
@@ -479,10 +481,6 @@ export default function ReportsPage() {
         link.download = `relatorio_${selectedReport}_${new Date().toISOString().split('T')[0]}.csv`;
         link.click();
         toast.action.downloaded("Relatório CSV");
-      } else if (format === 'pdf') {
-        // Simulate processing time
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        toast.info("Em desenvolvimento", "Exportação para PDF será implementada em breve");
       }
       setShowExportOptions(false);
     } catch (error) {
@@ -618,22 +616,6 @@ export default function ReportsPage() {
           </SheetDescription>
         </SheetHeader>
         <div className="mt-6 space-y-3">
-          <Button
-            variant="outline"
-            className="w-full h-14 justify-start text-left"
-            onClick={() => handleExport('pdf')}
-            disabled={exportLoading}
-          >
-            {exportLoading ? (
-              <Spinner className="h-5 w-5 mr-3" />
-            ) : (
-              <FileText className="h-5 w-5 mr-3 text-red-500" />
-            )}
-            <div>
-              <div className="font-semibold">{exportLoading ? 'Exportando...' : 'PDF'}</div>
-              {!exportLoading && <div className="text-xs text-muted-foreground">Documento portátil</div>}
-            </div>
-          </Button>
           <Button
             variant="outline"
             className="w-full h-14 justify-start text-left"
@@ -1027,7 +1009,7 @@ export default function ReportsPage() {
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Exportar como PDF, Excel ou Imprimir</p>
+              <p>Exportar como Excel ou Imprimir</p>
             </TooltipContent>
           </Tooltip>
         </div>

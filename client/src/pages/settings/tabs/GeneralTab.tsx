@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
 import { SettingsCard } from "../components/SettingsCard";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/lib/toast-helpers";
-import { AlertCircle, CheckCircle2, Building2, Landmark, Clock } from "lucide-react";
+import { AlertCircle, CheckCircle2, Building2, Landmark, Clock, Eraser, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getCSRFToken } from "@/lib/queryClient";
 import type { TenantSettings } from "../types";
 
 interface GeneralTabProps {
@@ -22,6 +25,8 @@ interface ValidationState {
 
 export function GeneralTab({ initialData, onSave }: GeneralTabProps) {
   const [isSaving, setIsSaving] = useState(false);
+  const [isClearingDemo, setIsClearingDemo] = useState(false);
+  const { confirm, dialog } = useConfirmDialog();
   const [formData, setFormData] = useState<Partial<TenantSettings>>({
     name: initialData.name || "",
     cnpj: initialData.cnpj || "",
@@ -146,6 +151,44 @@ export function GeneralTab({ initialData, onSave }: GeneralTabProps) {
   const getFieldStatus = (field: keyof ValidationState) => {
     if (!touched[field]) return "default";
     return validation[field] ? "valid" : "invalid";
+  };
+
+  const handleClearDemoData = async () => {
+    const confirmed = await confirm({
+      title: "Limpar dados de exemplo?",
+      description:
+        'Todos os imóveis, leads, visitas e lançamentos financeiros marcados com o prefixo "[Exemplo]" serão removidos permanentemente. Seus dados reais não serão afetados.',
+      confirmText: "Limpar dados de exemplo",
+      variant: "destructive",
+    });
+    if (!confirmed) return;
+
+    setIsClearingDemo(true);
+    try {
+      const csrfToken = getCSRFToken();
+      const res = await fetch("/api/onboarding/demo-data", {
+        method: "DELETE",
+        headers: csrfToken ? { "X-CSRF-Token": csrfToken } : undefined,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Falha ao remover dados de exemplo");
+      const data = await res.json();
+      const total = data?.removed
+        ? data.removed.properties + data.removed.leads + data.removed.visits + data.removed.financeEntries
+        : 0;
+      if (total > 0) {
+        toast.success(
+          "Dados de exemplo removidos",
+          `${data.removed.properties} imóveis, ${data.removed.leads} leads, ${data.removed.visits} visitas e ${data.removed.financeEntries} lançamentos excluídos.`
+        );
+      } else {
+        toast.info("Nenhum dado de exemplo encontrado", "Sua conta não possui registros de demonstração.");
+      }
+    } catch (error) {
+      toast.errors.operation("remover os dados de exemplo");
+    } finally {
+      setIsClearingDemo(false);
+    }
   };
 
   return (
@@ -471,6 +514,38 @@ export function GeneralTab({ initialData, onSave }: GeneralTabProps) {
           </p>
         </div>
       </SettingsCard>
+
+      {/* Demo Data */}
+      <SettingsCard
+        title="Dados de Exemplo"
+        description="Remova os registros de demonstração criados durante o onboarding."
+        showSaveButton={false}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <p className="text-sm text-muted-foreground">
+            Imóveis, leads, visitas e lançamentos financeiros com o prefixo{" "}
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 align-middle">
+              [Exemplo]
+            </Badge>{" "}
+            serão excluídos. Seus dados reais não serão afetados.
+          </p>
+          <Button
+            variant="outline"
+            onClick={handleClearDemoData}
+            disabled={isClearingDemo}
+            className="shrink-0 gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+          >
+            {isClearingDemo ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Eraser className="w-4 h-4" />
+            )}
+            Limpar dados de exemplo
+          </Button>
+        </div>
+      </SettingsCard>
+
+      {dialog}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useImobi, User as UserType, Lead, Property } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -236,6 +237,7 @@ type Filters = {
 };
 
 export default function VendasPage() {
+  usePageTitle("Vendas");
   const { leads, properties, tenant, user } = useImobi();
   const { toast } = useToast();
 

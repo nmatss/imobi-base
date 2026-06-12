@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { Suspense, lazy, useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useImobi } from "@/lib/imobi-context";
@@ -22,6 +23,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { DashboardMetrics } from "@/components/dashboard/DashboardMetrics";
+import { GettingStartedChecklist } from "@/components/dashboard/GettingStartedChecklist";
+import { useFirstAccessTour } from "@/hooks/use-first-access-tour";
 import { DashboardPipeline } from "@/components/dashboard/DashboardPipeline";
 import { DashboardCardSkeleton } from "@/components/ui/skeleton-loaders";
 import { PageErrorBoundary } from "@/components/PageErrorBoundary";
@@ -95,6 +98,8 @@ function formatCurrency(value: number) {
 }
 
 export default function Dashboard() {
+  usePageTitle("Dashboard");
+  useFirstAccessTour();
   const { tenant, refetchLeads, contracts, leads } = useImobi();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -474,6 +479,11 @@ export default function Dashboard() {
           </Card>
         </section>
       )}
+
+      {/* ==================== PRIMEIROS PASSOS (some quando completo) ==================== */}
+      <PageErrorBoundary componentName="GettingStartedChecklist" pageName="Dashboard">
+        <GettingStartedChecklist />
+      </PageErrorBoundary>
 
       {/* ==================== KPIs PRINCIPAIS - COMPONENTE NOVO ==================== */}
       <PageErrorBoundary componentName="DashboardMetrics" pageName="Dashboard">

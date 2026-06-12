@@ -1,8 +1,9 @@
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, ArrowLeft, Home } from "lucide-react";
+import { ArrowLeft, Home } from "lucide-react";
 import { SeoHead } from "@/components/seo/SeoHead";
+import { Logo } from "@/components/brand/logo";
 
 export default function NotFound() {
   return (
@@ -13,12 +14,12 @@ export default function NotFound() {
         path="/404"
         noindex
       />
-      <Card className="w-full max-w-md">
+      <div className="flex flex-col items-center gap-8 w-full max-w-md">
+      <Logo wordmarkClassName="text-2xl" iconClassName="h-10 w-10" />
+      <Card className="w-full">
         <CardContent className="pt-8 pb-6">
           <div className="flex flex-col items-center text-center gap-4 mb-6">
-            <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
-              <AlertCircle className="h-8 w-8 text-destructive" />
-            </div>
+            <p className="font-heading font-extrabold text-6xl text-primary/20 leading-none">404</p>
             <div>
               <h1 className="text-3xl font-heading font-bold">
                 Página não encontrada
@@ -47,6 +48,7 @@ export default function NotFound() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

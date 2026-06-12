@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import { useEffect, useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,7 @@ interface Plan {
 }
 
 export default function CheckoutPage() {
+  usePageTitle("Confirmar Assinatura");
   const params = useParams<{ planId: string }>();
   const [, setLocation] = useLocation();
   const [plan, setPlan] = useState<Plan | null>(null);

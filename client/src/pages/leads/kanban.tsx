@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useImobi, LeadStatus, Lead } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -296,6 +297,7 @@ function isHotLead(lead: Lead, followUps: FollowUp[], interactions: Interaction[
 // ==================== MAIN COMPONENT ====================
 
 export default function LeadsKanban() {
+  usePageTitle("Funil de Leads");
   const { leads, tenant, properties, refetchLeads, user } = useImobi();
   const [, setLocation] = useLocation();
 
@@ -1045,17 +1047,14 @@ export default function LeadsKanban() {
         onCall={(id) => window.open(`tel:${lead.phone}`)}
         onMessage={(id) => openWhatsApp(lead)}
         onEmail={(id) => {
-          // TODO: Open email modal
-          toast.toast("Em breve", { description: "Funcionalidade de email em desenvolvimento" });
+          if (lead.email) {
+            window.open(`mailto:${lead.email}`);
+          } else {
+            toast.error("Lead sem email", "Cadastre um email para este lead antes de enviar mensagens.");
+          }
         }}
-        onEdit={(id) => {
-          // TODO: Open edit modal
-          toast.toast("Em breve", { description: "Funcionalidade de edição em desenvolvimento" });
-        }}
-        onMove={(id) => {
-          // TODO: Open move modal
-          toast.toast("Em breve", { description: "Use drag & drop ou o menu para mover leads" });
-        }}
+        onEdit={(id) => openLeadDetail(lead)}
+        onMove={(id) => openLeadDetail(lead)}
         onArchive={(id) => handleArchive(id)}
         onClick={(id) => isBulkMode ? toggleLeadSelection(id) : openLeadDetail(lead)}
         draggable={!isMobile && !isBulkMode}

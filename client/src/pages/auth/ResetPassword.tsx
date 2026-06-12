@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle2, XCircle, Eye, EyeOff } from "lucide-react";
 
 export default function ResetPassword() {
+  usePageTitle("Redefinir Senha");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   // wouter não expõe a query string no hook de rota — lê direto da URL.

@@ -31,12 +31,11 @@ import {
   Mail,
   Building2,
   DollarSign,
-  FileText,
   CreditCard,
   Loader2,
 } from "lucide-react";
 import type { Owner, RentalContract, RentalTransfer, Property } from "../../types";
-import { formatPrice } from "../../types";
+import { formatPrice, formatMonth, getStatusColor, getStatusLabel } from "../../types";
 
 interface LocadoresTabProps {
   owners: Owner[];
@@ -44,7 +43,6 @@ interface LocadoresTabProps {
   transfers: RentalTransfer[];
   properties: Property[];
   onCreateOwner: () => void;
-  onViewOwner: (owner: Owner) => void;
   onEditOwner: (owner: Owner) => void;
   onGenerateTransfer: (owner: Owner) => void;
   loading?: boolean;
@@ -56,7 +54,6 @@ export function LocadoresTab({
   transfers,
   properties,
   onCreateOwner,
-  onViewOwner,
   onEditOwner,
   onGenerateTransfer,
   loading,
@@ -195,10 +192,6 @@ export function LocadoresTab({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => onViewOwner(owner)}>
-                            <FileText className="h-4 w-4 mr-2" />
-                            Ver Detalhes
-                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => onEditOwner(owner)}>
                             <Building2 className="h-4 w-4 mr-2" />
                             Editar
@@ -252,10 +245,6 @@ export function LocadoresTab({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onViewOwner(owner)}>
-                        <FileText className="h-4 w-4 mr-2" />
-                        Ver Detalhes
-                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onEditOwner(owner)}>
                         <Building2 className="h-4 w-4 mr-2" />
                         Editar
@@ -338,15 +327,64 @@ export function LocadoresTab({
 
       {/* Statement Sheet */}
       <Sheet open={isStatementOpen} onOpenChange={setIsStatementOpen}>
-        <SheetContent side="right" className="w-full sm:w-[500px]">
+        <SheetContent side="right" className="w-full sm:w-[500px] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Extrato - {selectedOwner?.name}</SheetTitle>
           </SheetHeader>
-          <div className="mt-4">
-            <p className="text-sm text-muted-foreground">
-              Funcionalidade de extrato será implementada em breve.
-            </p>
-          </div>
+          {selectedOwner && (() => {
+            const ownerTransfers = transfers
+              .filter((t) => t.ownerId === selectedOwner.id)
+              .sort((a, b) => b.referenceMonth.localeCompare(a.referenceMonth));
+            const totalPaid = ownerTransfers
+              .filter((t) => t.status === "paid")
+              .reduce((sum, t) => sum + Number(t.netAmount || 0), 0);
+            const totalPending = ownerTransfers
+              .filter((t) => t.status === "pending")
+              .reduce((sum, t) => sum + Number(t.netAmount || 0), 0);
+
+            return (
+              <div className="mt-4 space-y-4">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-3 bg-green-50 rounded-lg text-center">
+                    <p className="text-xs text-green-700 font-medium">Repassado</p>
+                    <p className="text-lg font-bold text-green-600">{formatPrice(totalPaid)}</p>
+                  </div>
+                  <div className="p-3 bg-orange-50 rounded-lg text-center">
+                    <p className="text-xs text-orange-700 font-medium">Pendente</p>
+                    <p className="text-lg font-bold text-orange-600">{formatPrice(totalPending)}</p>
+                  </div>
+                </div>
+
+                {ownerTransfers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Nenhum repasse registrado para este locador.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {ownerTransfers.map((transfer) => (
+                      <div
+                        key={transfer.id}
+                        className="flex items-center justify-between p-3 rounded-lg border"
+                      >
+                        <div>
+                          <p className="text-sm font-medium">{formatMonth(transfer.referenceMonth)}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Bruto: {formatPrice(Number(transfer.grossAmount || 0))}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold">{formatPrice(Number(transfer.netAmount || 0))}</p>
+                          <Badge className={`${getStatusColor(transfer.status)} text-[10px]`}>
+                            {getStatusLabel(transfer.status)}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </SheetContent>
       </Sheet>
     </div>

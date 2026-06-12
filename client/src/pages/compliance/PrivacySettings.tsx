@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Download, Trash2, FileText, Shield, AlertTriangle, CheckCircle, Clock } from "lucide-react";
 
 export default function PrivacySettings() {
@@ -10,6 +11,7 @@ export default function PrivacySettings() {
   const [deletionStatus, setDeletionStatus] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { confirm: confirmDialog, dialog: confirmDialogElement } = useConfirmDialog();
 
   useEffect(() => {
     loadConsents();
@@ -84,11 +86,14 @@ export default function PrivacySettings() {
   };
 
   const handleDeleteAccount = async () => {
-    if (!confirm(
-      "ATENÇÃO: Esta ação é irreversível. Seus dados serão anonimizados e você não poderá mais acessar sua conta. Tem certeza que deseja continuar?"
-    )) {
-      return;
-    }
+    const confirmed = await confirmDialog({
+      title: "Excluir conta permanentemente?",
+      description:
+        "ATENÇÃO: esta ação é irreversível. Seus dados serão anonimizados e você não poderá mais acessar sua conta.",
+      confirmText: "Excluir minha conta",
+      variant: "destructive",
+    });
+    if (!confirmed) return;
 
     setLoading(true);
     try {
@@ -146,6 +151,7 @@ export default function PrivacySettings() {
 
   return (
     <div className="container max-w-4xl mx-auto py-8 px-4">
+      {confirmDialogElement}
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Configurações de Privacidade</h1>
         <p className="text-gray-600">

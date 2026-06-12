@@ -9,7 +9,7 @@ import {
   animate,
 } from "framer-motion";
 import {
-  Building2,
+
   CheckCircle2,
   LayoutDashboard,
   Users,
@@ -38,6 +38,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Logo } from "@/components/brand/logo";
 import { SeoHead, OrganizationSchema } from "@/components/seo/SeoHead";
 import {
   Accordion,
@@ -216,14 +217,7 @@ export default function ProductLanding() {
         transition={{ duration: 0.5 }}
       >
         <div className="container mx-auto px-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 font-heading font-bold text-xl tracking-tight">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center text-white shadow-lg shadow-primary/20">
-              <Building2 className="w-5 h-5" />
-            </div>
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
-              ImobiBase
-            </span>
-          </div>
+          <Logo wordmarkClassName="text-xl" iconClassName="h-9 w-9 drop-shadow-md" />
 
           <nav className="hidden md:flex gap-8 text-sm font-medium text-muted-foreground">
             {[
@@ -1210,12 +1204,7 @@ export default function ProductLanding() {
           <div className="container mx-auto px-4">
             <div className="grid md:grid-cols-3 gap-12 mb-16">
               <div>
-                <div className="flex items-center gap-2 font-heading font-bold text-2xl mb-6">
-                  <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
-                    <Building2 className="w-4 h-4" />
-                  </div>
-                  ImobiBase
-                </div>
+                <Logo className="mb-6" wordmarkClassName="text-2xl" iconClassName="h-9 w-9" />
                 <p className="text-muted-foreground leading-relaxed mb-6">
                   Transformando a maneira como imobiliárias e corretores fazem
                   negócios no Brasil.

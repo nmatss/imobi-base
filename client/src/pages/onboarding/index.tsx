@@ -1,6 +1,8 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState } from "react";
 import { useLocation } from "wouter";
 import { useImobi } from "@/lib/imobi-context";
+import { getCSRFToken } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,6 +59,7 @@ type BrandFormData = {
 };
 
 export default function OnboardingPage() {
+  usePageTitle("Bem-vindo");
   const { user, tenant } = useImobi();
   const [, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState(1);
@@ -78,6 +81,7 @@ export default function OnboardingPage() {
     area: "",
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isSeedingDemo, setIsSeedingDemo] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(tenant?.logo || null);
   const [selectedPlan, setSelectedPlan] = useState<string>("free");
@@ -153,6 +157,28 @@ export default function OnboardingPage() {
   };
 
   const handleFinish = () => {
+    setLocation("/dashboard");
+  };
+
+  const handleExploreWithDemoData = async () => {
+    setIsSeedingDemo(true);
+    try {
+      // 409 = dados de exemplo já existem; nos dois casos o dashboard estará
+      // populado, então seguimos para ele de qualquer forma.
+      const csrfToken = getCSRFToken();
+      await fetch("/api/onboarding/demo-data", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+        },
+        credentials: "include",
+      });
+    } catch {
+      // silently continue — fluxo de onboarding não deve travar
+    } finally {
+      setIsSeedingDemo(false);
+    }
     setLocation("/dashboard");
   };
 
@@ -588,16 +614,34 @@ export default function OnboardingPage() {
       </div>
       <h1 className="text-3xl md:text-4xl font-heading font-bold mb-4">Tudo pronto!</h1>
       <p className="text-lg text-muted-foreground max-w-lg mb-8">
-        Sua imobiliaria esta configurada e pronta para uso. Comece a explorar o painel agora.
+        Sua imobiliaria esta configurada e pronta para uso. Quer ver o painel
+        ja funcionando com imoveis, leads e visitas de exemplo?
       </p>
 
-      <Button
-        size="lg"
-        className="h-14 px-10 text-lg rounded-full shadow-lg shadow-primary/20 mb-8"
-        onClick={handleFinish}
-      >
-        Ir para o Dashboard <ArrowRight className="ml-2 w-5 h-5" />
-      </Button>
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4">
+        <Button
+          size="lg"
+          className="h-14 px-8 text-lg rounded-full shadow-lg shadow-primary/20"
+          onClick={handleExploreWithDemoData}
+          isLoading={isSeedingDemo}
+        >
+          <Sparkles className="mr-2 w-5 h-5" />
+          Explorar com dados de exemplo
+        </Button>
+        <Button
+          size="lg"
+          variant="outline"
+          className="h-14 px-8 text-lg rounded-full"
+          onClick={handleFinish}
+          disabled={isSeedingDemo}
+        >
+          Comecar do zero <ArrowRight className="ml-2 w-5 h-5" />
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground mb-8 max-w-md">
+        Os dados de exemplo sao marcados com o prefixo [Exemplo] e podem ser
+        removidos a qualquer momento em Configuracoes.
+      </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-2xl">
         <button

@@ -16,7 +16,7 @@ export interface SeoHeadProps {
 const DEFAULT_SITE =
   (typeof window !== "undefined" && window.location?.origin) ||
   "https://imobibase.com";
-const DEFAULT_IMAGE = "/opengraph.jpg";
+const DEFAULT_IMAGE = "/opengraph.png";
 
 export function SeoHead({
   title,
@@ -80,7 +80,7 @@ export const OrganizationSchema = {
   "@type": "Organization",
   name: "ImobiBase",
   url: "https://imobibase.com",
-  logo: "https://imobibase.com/favicon.png",
+  logo: "https://imobibase.com/icon-512.png",
   sameAs: [
     "https://instagram.com/imobibase",
     "https://linkedin.com/company/imobibase",

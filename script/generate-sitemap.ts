@@ -37,6 +37,8 @@ const ROUTES: SitemapRoute[] = [
   { loc: "/pricing", changefreq: "weekly", priority: 0.9 },
   { loc: "/termos", changefreq: "monthly", priority: 0.3 },
   { loc: "/privacidade", changefreq: "monthly", priority: 0.3 },
+  { loc: "/contato", changefreq: "monthly", priority: 0.6 },
+  { loc: "/novidades", changefreq: "weekly", priority: 0.5 },
 ];
 
 function buildXml(routes: SitemapRoute[], lastmod: string): string {

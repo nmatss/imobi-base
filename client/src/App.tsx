@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Toaster } from "@/components/ui/sonner";
-import { Building2 } from "lucide-react";
+import { Logo, LogoIcon } from "@/components/brand/logo";
 import { SeoHead } from "@/components/seo/SeoHead";
 
 // Lazy-loaded components for better code splitting
@@ -50,9 +50,12 @@ const OnboardingPage = lazy(() => import("@/pages/onboarding"));
 const PricingPage = lazy(() => import("@/pages/public/pricing"));
 const TermsPage = lazy(() => import("@/pages/public/terms"));
 const PrivacyPage = lazy(() => import("@/pages/public/privacy"));
+const ContactPage = lazy(() => import("@/pages/public/contact"));
+const ChangelogPage = lazy(() => import("@/pages/public/changelog"));
 const CheckoutPage = lazy(() => import("@/pages/checkout"));
 const CheckoutSuccessPage = lazy(() => import("@/pages/checkout/success"));
 const CheckoutCancelPage = lazy(() => import("@/pages/checkout/cancel"));
+const HelpPage = lazy(() => import("@/pages/help"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 const AdminDashboard = lazy(() => import("@/pages/admin"));
 const TenantsPage = lazy(() => import("@/pages/admin/tenants"));
@@ -122,10 +125,10 @@ function LoginPage() {
         
         <div className="relative z-10">
           <div className="flex items-center gap-3 text-white">
-            <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-              <Building2 className="h-7 w-7" />
+            <div className="w-12 h-12 rounded-xl bg-white/95 shadow-lg flex items-center justify-center">
+              <LogoIcon className="h-8 w-8" />
             </div>
-            <span className="font-heading font-bold text-2xl">ImobiBase</span>
+            <span className="font-heading font-extrabold text-2xl tracking-tight">ImobiBase</span>
           </div>
         </div>
         
@@ -154,18 +157,15 @@ function LoginPage() {
         </div>
         
         <div className="relative z-10 text-white/60 text-sm">
-          © 2024 ImobiBase. Todos os direitos reservados.
+          © {new Date().getFullYear()} ImobiBase. Todos os direitos reservados.
         </div>
       </div>
       
       {/* Right Side - Login Form */}
       <div className="flex-1 flex items-center justify-center p-8 bg-background">
         <div className="w-full max-w-md space-y-8">
-          <div className="lg:hidden flex items-center justify-center gap-2 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white">
-              <Building2 className="h-6 w-6" />
-            </div>
-            <span className="font-heading font-bold text-xl">ImobiBase</span>
+          <div className="lg:hidden flex items-center justify-center mb-8">
+            <Logo wordmarkClassName="text-xl" iconClassName="h-10 w-10" />
           </div>
           
           <div className="text-center lg:text-left">
@@ -328,6 +328,8 @@ function Router() {
         <Route key="pricing" path="/pricing" component={() => <ErrorBoundary><PricingPage /></ErrorBoundary>} />
         <Route key="termos" path="/termos" component={() => <ErrorBoundary><TermsPage /></ErrorBoundary>} />
         <Route key="privacidade" path="/privacidade" component={() => <ErrorBoundary><PrivacyPage /></ErrorBoundary>} />
+        <Route key="contato" path="/contato" component={() => <ErrorBoundary><ContactPage /></ErrorBoundary>} />
+        <Route key="novidades" path="/novidades" component={() => <ErrorBoundary><ChangelogPage /></ErrorBoundary>} />
 
         {/* Portal Routes (standalone) */}
         <Route key="portal-login" path="/portal/login" component={() => <ErrorBoundary><PortalLogin /></ErrorBoundary>} />
@@ -357,6 +359,9 @@ function Router() {
         <Route key="checkout-success" path="/checkout/success" component={() => <ProtectedRoute component={CheckoutSuccessPage} />} />
         <Route key="checkout-cancel" path="/checkout/cancel" component={() => <ProtectedRoute component={CheckoutCancelPage} />} />
         <Route key="checkout" path="/checkout/:planId" component={() => <ProtectedRoute component={CheckoutPage} />} />
+        {/* Central de Ajuda — lista em /ajuda e artigo em /ajuda/:slug (mesma página) */}
+        <Route key="ajuda" path="/ajuda" component={() => <ProtectedRoute component={HelpPage} />} />
+        <Route key="ajuda-artigo" path="/ajuda/:slug" component={() => <ProtectedRoute component={HelpPage} />} />
         <Route key="settings" path="/settings" component={() => <ProtectedRoute component={SettingsPage} />} />
         {/* Deep-link usado no pós-checkout — renderiza a mesma página de configurações */}
         <Route key="settings-billing" path="/settings/billing" component={() => <ProtectedRoute component={SettingsPage} />} />

@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useImobi, Visit, Lead, Property } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -211,6 +212,7 @@ const TIME_SLOTS = [
 ];
 
 export default function CalendarPage() {
+  usePageTitle("Agenda de Visitas");
   const { visits, leads, properties, user, refetchVisits } = useImobi();
   const { toast } = useToast();
 

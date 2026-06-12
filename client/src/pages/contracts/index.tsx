@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { useImobi, Contract, Lead, Property } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -175,6 +176,7 @@ const WIZARD_STEPS = [
 ];
 
 export default function ContractsPage() {
+  usePageTitle("Propostas e Contratos");
   const { contracts, leads, properties, tenant, user, refetchContracts } = useImobi();
   const { toast } = useToast();
 

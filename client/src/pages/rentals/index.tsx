@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useCallback, useEffect, useState } from "react";
 import { useImobi } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -133,6 +134,7 @@ const RENTAL_AI_PROMPTS: RentalAIPrompt[] = [
 ];
 
 export default function RentalsPage() {
+  usePageTitle("Aluguéis");
   const { properties, tenant } = useImobi();
   const { toast } = useToast();
 
@@ -160,6 +162,9 @@ export default function RentalsPage() {
   const [isContractModalOpen, setIsContractModalOpen] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  const [editingOwner, setEditingOwner] = useState<Owner | null>(null);
+  const [editingRenter, setEditingRenter] = useState<Renter | null>(null);
+  const [viewingTransfer, setViewingTransfer] = useState<RentalTransfer | null>(null);
 
   // Form states
   const [ownerForm, setOwnerForm] = useState<OwnerForm>({
@@ -316,20 +321,59 @@ export default function RentalsPage() {
   }, [activeTab, fetchReports]);
 
   // CRUD Handlers
-  const handleCreateOwner = async (e: React.FormEvent) => {
+  const EMPTY_OWNER_FORM: OwnerForm = { name: "", email: "", phone: "", cpfCnpj: "", address: "", bankName: "", bankAgency: "", bankAccount: "", pixKey: "", notes: "" };
+  const EMPTY_RENTER_FORM: RenterForm = { name: "", email: "", phone: "", cpfCnpj: "", rg: "", profession: "", income: "", address: "", emergencyContact: "", emergencyPhone: "", notes: "" };
+
+  const openEditOwner = (owner: Owner) => {
+    setEditingOwner(owner);
+    setOwnerForm({
+      name: owner.name,
+      email: owner.email || "",
+      phone: owner.phone,
+      cpfCnpj: owner.cpfCnpj || "",
+      address: owner.address || "",
+      bankName: owner.bankName || "",
+      bankAgency: owner.bankAgency || "",
+      bankAccount: owner.bankAccount || "",
+      pixKey: owner.pixKey || "",
+      notes: owner.notes || "",
+    });
+    setIsOwnerModalOpen(true);
+  };
+
+  const openEditRenter = (renter: Renter) => {
+    setEditingRenter(renter);
+    setRenterForm({
+      name: renter.name,
+      email: renter.email || "",
+      phone: renter.phone,
+      cpfCnpj: renter.cpfCnpj || "",
+      rg: renter.rg || "",
+      profession: renter.profession || "",
+      income: renter.income || "",
+      address: renter.address || "",
+      emergencyContact: renter.emergencyContact || "",
+      emergencyPhone: renter.emergencyPhone || "",
+      notes: renter.notes || "",
+    });
+    setIsRenterModalOpen(true);
+  };
+
+  const handleSubmitOwner = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const res = await fetch("/api/owners", {
-        method: "POST",
+      const res = await fetch(editingOwner ? `/api/owners/${editingOwner.id}` : "/api/owners", {
+        method: editingOwner ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(ownerForm),
       });
-      if (!res.ok) throw new Error("Erro ao criar locador");
-      toast({ title: "Sucesso", description: "Locador criado com sucesso" });
+      if (!res.ok) throw new Error(editingOwner ? "Erro ao atualizar locador" : "Erro ao criar locador");
+      toast({ title: "Sucesso", description: editingOwner ? "Locador atualizado com sucesso" : "Locador criado com sucesso" });
       setIsOwnerModalOpen(false);
-      setOwnerForm({ name: "", email: "", phone: "", cpfCnpj: "", address: "", bankName: "", bankAgency: "", bankAccount: "", pixKey: "", notes: "" });
+      setEditingOwner(null);
+      setOwnerForm(EMPTY_OWNER_FORM);
       fetchData();
     } catch (error: any) {
       toast({ title: "Erro", description: error.message, variant: "destructive" });
@@ -338,26 +382,51 @@ export default function RentalsPage() {
     }
   };
 
-  const handleCreateRenter = async (e: React.FormEvent) => {
+  const handleSubmitRenter = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const res = await fetch("/api/renters", {
-        method: "POST",
+      const res = await fetch(editingRenter ? `/api/renters/${editingRenter.id}` : "/api/renters", {
+        method: editingRenter ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify(renterForm),
       });
-      if (!res.ok) throw new Error("Erro ao criar inquilino");
-      toast({ title: "Sucesso", description: "Inquilino criado com sucesso" });
+      if (!res.ok) throw new Error(editingRenter ? "Erro ao atualizar inquilino" : "Erro ao criar inquilino");
+      toast({ title: "Sucesso", description: editingRenter ? "Inquilino atualizado com sucesso" : "Inquilino criado com sucesso" });
       setIsRenterModalOpen(false);
-      setRenterForm({ name: "", email: "", phone: "", cpfCnpj: "", rg: "", profession: "", income: "", address: "", emergencyContact: "", emergencyPhone: "", notes: "" });
+      setEditingRenter(null);
+      setRenterForm(EMPTY_RENTER_FORM);
       fetchData();
     } catch (error: any) {
       toast({ title: "Erro", description: error.message, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleExportTransfer = (transfer: RentalTransfer) => {
+    const owner = owners.find((o) => o.id === transfer.ownerId);
+    const lines = [
+      ["Referência", formatMonth(transfer.referenceMonth)],
+      ["Locador", owner?.name || "-"],
+      ["Valor Bruto", formatPrice(Number(transfer.grossAmount || 0))],
+      ["Taxa de Administração", formatPrice(Number(transfer.administrationFee || 0))],
+      ["Deduções de Manutenção", formatPrice(Number(transfer.maintenanceDeductions || 0))],
+      ["Outras Deduções", formatPrice(Number(transfer.otherDeductions || 0))],
+      ["Valor Líquido", formatPrice(Number(transfer.netAmount || 0))],
+      ["Status", getStatusLabel(transfer.status)],
+      ["Pago em", transfer.paidDate ? formatDate(transfer.paidDate) : "-"],
+      ["Forma de Pagamento", transfer.paymentMethod || "-"],
+    ];
+    const csv = "Campo,Valor\n" + lines.map(([k, v]) => `"${k}","${v}"`).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `repasse_${transfer.referenceMonth}_${(owner?.name || "locador").replace(/\s+/g, "_")}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    toast({ title: "Repasse exportado", description: "O arquivo CSV foi baixado" });
   };
 
   const handleCreateContract = async (e: React.FormEvent) => {
@@ -615,8 +684,7 @@ export default function RentalsPage() {
             transfers={transfers}
             properties={properties}
             onCreateOwner={() => setIsOwnerModalOpen(true)}
-            onViewOwner={(owner) => toast({ title: "Em breve", description: "Detalhes do locador" })}
-            onEditOwner={(owner) => toast({ title: "Em breve", description: "Editar locador" })}
+            onEditOwner={openEditOwner}
             onGenerateTransfer={(owner) => {
               const now = new Date();
               const referenceMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -633,8 +701,7 @@ export default function RentalsPage() {
             contracts={rentalContracts}
             payments={payments}
             onCreateRenter={() => setIsRenterModalOpen(true)}
-            onViewRenter={(renter) => toast({ title: "Em breve", description: "Detalhes do inquilino" })}
-            onEditRenter={(renter) => toast({ title: "Em breve", description: "Editar inquilino" })}
+            onEditRenter={openEditRenter}
             onSendCollection={(renter) => {
               setAiContext({ renter });
               setAiMessage(RENTAL_AI_PROMPTS[0].template({
@@ -846,10 +913,6 @@ export default function RentalsPage() {
                                     Marcar como Pago
                                   </DropdownMenuItem>
                                 )}
-                                <DropdownMenuItem onClick={() => toast({ title: "Em breve", description: "Gerar 2a via" })}>
-                                  <FileText className="h-4 w-4 mr-2" />
-                                  Gerar 2a Via
-                                </DropdownMenuItem>
                                 {payment.status === "pending" && getDaysOverdue(payment.dueDate) > 0 && (
                                   <DropdownMenuItem onClick={() => {
                                     const contract = rentalContracts.find(c => c.id === payment.rentalContractId);
@@ -982,8 +1045,8 @@ export default function RentalsPage() {
             owners={owners}
             onGenerateTransfers={handleGenerateTransfers}
             onMarkAsPaid={handleMarkTransferAsPaid}
-            onViewTransfer={(transfer) => toast({ title: "Em breve", description: "Detalhes do repasse" })}
-            onExportTransfer={(transfer) => toast({ title: "Em breve", description: "Exportar repasse" })}
+            onViewTransfer={(transfer) => setViewingTransfer(transfer)}
+            onExportTransfer={handleExportTransfer}
             loading={loading}
           />
         </TabsContent>
@@ -1058,13 +1121,24 @@ export default function RentalsPage() {
       </Tabs>
 
       {/* Owner Modal */}
-      <Dialog open={isOwnerModalOpen} onOpenChange={setIsOwnerModalOpen}>
+      <Dialog
+        open={isOwnerModalOpen}
+        onOpenChange={(open) => {
+          setIsOwnerModalOpen(open);
+          if (!open) {
+            setEditingOwner(null);
+            setOwnerForm(EMPTY_OWNER_FORM);
+          }
+        }}
+      >
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Novo Locador</DialogTitle>
-            <DialogDescription>Cadastre um novo locador (proprietario)</DialogDescription>
+            <DialogTitle>{editingOwner ? "Editar Locador" : "Novo Locador"}</DialogTitle>
+            <DialogDescription>
+              {editingOwner ? "Atualize os dados do locador" : "Cadastre um novo locador (proprietario)"}
+            </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleCreateOwner} className="space-y-4">
+          <form onSubmit={handleSubmitOwner} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 space-y-2">
                 <Label>Nome *</Label>
@@ -1121,13 +1195,24 @@ export default function RentalsPage() {
       </Dialog>
 
       {/* Renter Modal */}
-      <Dialog open={isRenterModalOpen} onOpenChange={setIsRenterModalOpen}>
+      <Dialog
+        open={isRenterModalOpen}
+        onOpenChange={(open) => {
+          setIsRenterModalOpen(open);
+          if (!open) {
+            setEditingRenter(null);
+            setRenterForm(EMPTY_RENTER_FORM);
+          }
+        }}
+      >
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Novo Inquilino</DialogTitle>
-            <DialogDescription>Cadastre um novo inquilino</DialogDescription>
+            <DialogTitle>{editingRenter ? "Editar Inquilino" : "Novo Inquilino"}</DialogTitle>
+            <DialogDescription>
+              {editingRenter ? "Atualize os dados do inquilino" : "Cadastre um novo inquilino"}
+            </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleCreateRenter} className="space-y-4">
+          <form onSubmit={handleSubmitRenter} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 space-y-2">
                 <Label>Nome *</Label>
@@ -1181,6 +1266,76 @@ export default function RentalsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transfer Details Modal */}
+      <Dialog open={Boolean(viewingTransfer)} onOpenChange={(open) => { if (!open) setViewingTransfer(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Detalhes do Repasse</DialogTitle>
+            <DialogDescription>
+              {viewingTransfer ? `Referência: ${formatMonth(viewingTransfer.referenceMonth)}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {viewingTransfer && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Locador</span>
+                <span className="text-sm font-medium">
+                  {owners.find((o) => o.id === viewingTransfer.ownerId)?.name || "-"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Status</span>
+                <Badge className={getStatusColor(viewingTransfer.status)}>
+                  {getStatusLabel(viewingTransfer.status)}
+                </Badge>
+              </div>
+              <div className="border-t pt-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Valor Bruto</span>
+                  <span className="text-sm font-medium">{formatPrice(Number(viewingTransfer.grossAmount || 0))}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Taxa de Administração</span>
+                  <span className="text-sm text-red-600">- {formatPrice(Number(viewingTransfer.administrationFee || 0))}</span>
+                </div>
+                {Number(viewingTransfer.maintenanceDeductions || 0) > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Deduções de Manutenção</span>
+                    <span className="text-sm text-red-600">- {formatPrice(Number(viewingTransfer.maintenanceDeductions || 0))}</span>
+                  </div>
+                )}
+                {Number(viewingTransfer.otherDeductions || 0) > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Outras Deduções</span>
+                    <span className="text-sm text-red-600">- {formatPrice(Number(viewingTransfer.otherDeductions || 0))}</span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between border-t pt-2">
+                  <span className="text-sm font-semibold">Valor Líquido</span>
+                  <span className="text-base font-bold text-green-600">{formatPrice(Number(viewingTransfer.netAmount || 0))}</span>
+                </div>
+              </div>
+              {viewingTransfer.paidDate && (
+                <div className="flex items-center justify-between border-t pt-3">
+                  <span className="text-sm text-muted-foreground">Pago em</span>
+                  <span className="text-sm font-medium">{formatDate(viewingTransfer.paidDate)}</span>
+                </div>
+              )}
+              {viewingTransfer.notes && (
+                <p className="text-xs text-muted-foreground border-t pt-3">{viewingTransfer.notes}</p>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewingTransfer(null)}>Fechar</Button>
+            <Button onClick={() => viewingTransfer && handleExportTransfer(viewingTransfer)}>
+              <Download className="h-4 w-4 mr-2" />
+              Exportar CSV
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

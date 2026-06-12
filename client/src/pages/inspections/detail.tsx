@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { useImobi } from "@/lib/imobi-context";
@@ -6,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -104,8 +106,10 @@ const conditionLabels: Record<string, string> = {
 };
 
 export default function InspectionDetailPage() {
+  usePageTitle("Detalhes da Vistoria");
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
+  const { confirm: confirmDialog, dialog: confirmDialogElement } = useConfirmDialog();
   const { properties } = useImobi();
   const [inspection, setInspection] = useState<Inspection | null>(null);
   const [loading, setLoading] = useState(true);
@@ -275,7 +279,14 @@ export default function InspectionDetailPage() {
   };
 
   const deleteRoom = async (roomId: string) => {
-    if (!inspection || !confirm("Remover este comodo e todos os itens?")) return;
+    if (!inspection) return;
+    const confirmed = await confirmDialog({
+      title: "Remover cômodo?",
+      description: "O cômodo e todos os itens dele serão removidos. Esta ação não pode ser desfeita.",
+      confirmText: "Remover",
+      variant: "destructive",
+    });
+    if (!confirmed) return;
 
     try {
       await fetch(`/api/inspections/${inspection.id}/rooms/${roomId}`, {
@@ -296,7 +307,12 @@ export default function InspectionDetailPage() {
 
   const completeInspection = async () => {
     if (!inspection) return;
-    if (!confirm("Concluir a vistoria? Apos a conclusao nao sera possivel editar os itens.")) return;
+    const confirmed = await confirmDialog({
+      title: "Concluir vistoria?",
+      description: "Após a conclusão não será possível editar os itens.",
+      confirmText: "Concluir",
+    });
+    if (!confirmed) return;
 
     setSaving(true);
     try {
@@ -461,6 +477,7 @@ export default function InspectionDetailPage() {
 
   return (
     <div className="space-y-4 pb-24 lg:pb-6">
+      {confirmDialogElement}
       {/* Header */}
       <div className="flex items-center gap-3">
         <Button

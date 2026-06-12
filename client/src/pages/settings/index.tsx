@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useEffect, useState } from "react";
 import { useImobi } from "@/lib/imobi-context";
 import { useToast } from "@/hooks/use-toast";
@@ -161,6 +162,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export default function SettingsPage() {
+  usePageTitle("Configurações");
   const { tenant } = useImobi();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<TabId>("profile");

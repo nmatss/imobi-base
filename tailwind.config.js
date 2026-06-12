@@ -91,6 +91,20 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
 
+        // Feedback semântico (vars definidas em index.css; sem isso text-success etc. não geram classe)
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+        },
+
         // Status Colors - WCAG AA Compliant (4.5:1+ contrast on white bg)
         status: {
           new: "#047857",        // Green-700 for "Novo"

@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Bot,
@@ -1291,6 +1292,7 @@ function TestTab({ onPlanBlocked }: { onPlanBlocked: () => void }) {
 // ==================== MAIN PAGE ====================
 
 export default function IsaPage() {
+  usePageTitle("ISA Virtual");
   const [featureBlocked, setFeatureBlocked] = useState(false);
   const handlePlanBlocked = useCallback(() => {
     setFeatureBlocked(true);

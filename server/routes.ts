@@ -53,6 +53,7 @@ import {
   isLeadLimitReachedForTenant,
 } from "./middleware/plan-limits";
 import { registerSecurityRoutes } from "./routes-security";
+import { sendEmail as sendContactEmail } from "./auth/email-service";
 import {
   checkAccountLock,
   handleFailedLogin,
@@ -203,6 +204,7 @@ const csrfExcludedPaths = [
   "/api/auth/register",
   "/api/leads/public",
   "/api/newsletter/subscribe",
+  "/api/public/contact",
   "/api/webhooks/stripe",
   "/api/webhooks/mercadopago",
   "/api/webhooks/whatsapp",
@@ -2060,6 +2062,37 @@ export async function registerRoutes(
     }
   });
 
+  // ===== CONTATO PÚBLICO (form da landing) =====
+  app.post("/api/public/contact", publicLimiter, async (req, res) => {
+    try {
+      const { name, email, company, message } = (req.body ?? {}) as Record<string, unknown>;
+      if (typeof name !== "string" || name.trim().length < 2 || name.length > 120) {
+        return res.status(400).json({ error: "Informe seu nome" });
+      }
+      if (typeof email !== "string" || !isValidEmail(email)) {
+        return res.status(400).json({ error: "Email inválido" });
+      }
+      if (typeof message !== "string" || message.trim().length < 10 || message.length > 5000) {
+        return res.status(400).json({ error: "Escreva uma mensagem com pelo menos 10 caracteres" });
+      }
+      const companyName = typeof company === "string" ? company.slice(0, 160) : "";
+      const esc = (s: string) =>
+        s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      const html = `
+        <h2>Novo contato pelo site</h2>
+        <p><strong>Nome:</strong> ${esc(name.trim())}</p>
+        <p><strong>Email:</strong> ${esc(email)}</p>
+        ${companyName ? `<p><strong>Empresa:</strong> ${esc(companyName)}</p>` : ""}
+        <p><strong>Mensagem:</strong></p>
+        <p style="white-space:pre-wrap">${esc(message.trim())}</p>`;
+      await sendContactEmail("contato@imobibase.com", `Novo contato pelo site — ${name.trim().slice(0, 80)}`, html);
+      res.status(202).json({ success: true });
+    } catch (error: unknown) {
+      console.error("Erro ao enviar contato público", error);
+      res.status(500).json({ error: "Não foi possível enviar sua mensagem. Tente novamente." });
+    }
+  });
+
   // ===== DASHBOARD STATS =====
   app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
     try {
@@ -2957,6 +2990,10 @@ export async function registerRoutes(
     try {
       const data = insertFinanceEntrySchema.parse({
         ...req.body,
+        // JSON serializa datas como string; coage antes do parse zod (z.date)
+        ...(req.body.entryDate
+          ? { entryDate: new Date(req.body.entryDate) }
+          : {}),
         tenantId: req.user!.tenantId,
       });
       const entry = await storage.createFinanceEntry(data);
@@ -2981,6 +3018,10 @@ export async function registerRoutes(
         createdAt: _c,
         ...allowedFields
       } = req.body;
+      // JSON serializa datas como string; coage para Date antes do Drizzle
+      if (allowedFields.entryDate) {
+        allowedFields.entryDate = new Date(allowedFields.entryDate);
+      }
       const entry = await storage.updateFinanceEntry(
         req.params.id,
         allowedFields,

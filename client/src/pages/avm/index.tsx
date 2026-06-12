@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -53,6 +54,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { FeatureUpgradeState } from "@/components/FeatureUpgradeState";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { fetchPlanGatedJson, isPlanBlockedError } from "@/lib/plan-blocked";
 import {
   BarChart,
@@ -214,7 +216,9 @@ const defaultForm: ValuationForm = {
 };
 
 export default function AVMPage() {
+  usePageTitle("Avaliação de Imóveis");
   const queryClient = useQueryClient();
+  const { confirm: confirmDialog, dialog: confirmDialogElement } = useConfirmDialog();
   const [activeTab, setActiveTab] = useState("avaliar");
   const [form, setForm] = useState<ValuationForm>(defaultForm);
   const [result, setResult] = useState<any>(null);
@@ -450,6 +454,7 @@ export default function AVMPage() {
 
   return (
     <div className="space-y-6">
+      {confirmDialogElement}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -856,8 +861,14 @@ export default function AVMPage() {
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 text-destructive"
-                                  onClick={() => {
-                                    if (confirm("Excluir esta avaliacao?")) {
+                                  onClick={async () => {
+                                    const confirmed = await confirmDialog({
+                                      title: "Excluir avaliação?",
+                                      description: "Esta ação não pode ser desfeita.",
+                                      confirmText: "Excluir",
+                                      variant: "destructive",
+                                    });
+                                    if (confirmed) {
                                       deleteMutation.mutate(item.id);
                                     }
                                   }}
