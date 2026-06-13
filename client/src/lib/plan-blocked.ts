@@ -3,6 +3,8 @@
 // contrato do 403 de plano; as páginas gateadas (AVM, ISA, Marketing IA)
 // importam daqui em vez de duplicar a heurística.
 
+import { csrfHeaders } from "@/lib/queryClient";
+
 export class PlanBlockedError extends Error {
   constructor() {
     super("PLAN_BLOCKED");
@@ -58,7 +60,13 @@ export async function fetchPlanGatedJson<T>(
   options?: RequestInit,
   fallbackMessage?: string,
 ): Promise<T> {
-  const res = await fetch(url, { credentials: "include", ...options });
+  // Injeta X-CSRF-Token (rotas de mutação gateadas por plano não passam por
+  // apiRequest; sem o header dariam 403). Safe methods ignoram o header no server.
+  const res = await fetch(url, {
+    credentials: "include",
+    ...options,
+    headers: csrfHeaders((options?.headers as Record<string, string>) || {}),
+  });
   const payload = await readJsonSafely(res);
 
   if (isPlanBlockedResponse(res, payload)) {

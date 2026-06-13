@@ -23,6 +23,14 @@ export function clearCSRFToken() {
   csrfToken = null;
 }
 
+/**
+ * Mescla o header X-CSRF-Token aos headers fornecidos quando há token em memória.
+ * Use em chamadas que NÃO passam por apiRequest (XHR, wrappers, fluxos plan-gated).
+ */
+export function csrfHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  return csrfToken ? { ...extra, "X-CSRF-Token": csrfToken } : { ...extra };
+}
+
 // ==================== API REQUEST WITH CSRF ====================
 export async function apiRequest(
   method: string,

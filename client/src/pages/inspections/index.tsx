@@ -1,5 +1,6 @@
 import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState, useEffect, useCallback } from "react";
+import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 import { useImobi } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -165,30 +166,23 @@ export default function InspectionsPage() {
       // Find property type
       const property = properties.find((p: Property) => p.id === newInspection.propertyId);
 
-      const res = await fetch("/api/inspections", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          ...newInspection,
-          propertyType: property?.type || "apartment",
-        }),
+      const res = await apiRequest("POST", "/api/inspections", {
+        ...newInspection,
+        propertyType: property?.type || "apartment",
       });
 
-      if (res.ok) {
-        const created = await res.json();
-        setShowCreateDialog(false);
-        setNewInspection({
-          propertyId: "",
-          type: "entry",
-          inspectorName: "",
-          renterName: "",
-          scheduledDate: "",
-          propertyType: "",
-          previousInspectionId: "",
-        });
-        setLocation(`/vistorias/${created.id}`);
-      }
+      const created = await res.json();
+      setShowCreateDialog(false);
+      setNewInspection({
+        propertyId: "",
+        type: "entry",
+        inspectorName: "",
+        renterName: "",
+        scheduledDate: "",
+        propertyType: "",
+        previousInspectionId: "",
+      });
+      setLocation(`/vistorias/${created.id}`);
     } catch (e) {
       console.error("Failed to create inspection", e);
     } finally {
@@ -206,13 +200,8 @@ export default function InspectionsPage() {
     if (!confirmed) return;
 
     try {
-      const res = await fetch(`/api/inspections/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      if (res.ok) {
-        fetchInspections();
-      }
+      await apiRequest("DELETE", `/api/inspections/${id}`);
+      fetchInspections();
     } catch (e) {
       console.error("Failed to delete inspection", e);
     }

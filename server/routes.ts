@@ -215,9 +215,18 @@ const csrfExcludedPaths = [
   "/api/live",
   "/api/portal/login",
   "/api/portal/forgot-password",
+  "/api/portal/reset-password",
   "/api/portal/logout",
   "/api/cron/",
   "/api/admin/bootstrap",
+  // Fluxos pré-autenticação do app principal: o usuário ainda não tem sessão
+  // nem token CSRF em memória, então não há como enviar o header. Protegidos por
+  // rate limit + token de uso único no corpo (reset/verify).
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
+  "/api/auth/verify-email",
+  "/api/auth/resend-verification",
+  "/api/auth/security/validate-password",
 ];
 
 /**
@@ -1493,7 +1502,23 @@ export async function registerRoutes(
         return apiError(res, 404, "Tenant não encontrado", "TENANT_NOT_FOUND");
       }
 
-      apiResponse(res, { user, tenant });
+      // Repõe o token CSRF no restore de sessão (refresh/nova aba): o token vive
+      // só em memória no client e se perde no reload. Sem isto, toda mutação
+      // pós-refresh falha com 403 (cookie presente, header ausente).
+      // REUSA o cookie existente (não rotaciona) para não invalidar requisições
+      // em voo nem o token de outras abas; só gera quando ausente/expirado.
+      let csrfToken = req.cookies?.["csrf-token"];
+      if (!csrfToken) {
+        csrfToken = generateCSRFToken();
+        res.cookie("csrf-token", csrfToken, {
+          httpOnly: true,
+          secure: !isDev,
+          sameSite: "strict",
+          maxAge: 24 * 60 * 60 * 1000,
+        });
+      }
+
+      apiResponse(res, { user, tenant, csrfToken });
     } catch (error: unknown) {
       console.error("Error in /api/auth/me:", error);
       apiError(res, 500, "Erro ao buscar dados do usuário", "INTERNAL_ERROR");

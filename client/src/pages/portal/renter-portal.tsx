@@ -21,15 +21,16 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { csrfHeaders, setCSRFToken } from "@/lib/queryClient";
 
 function portalFetch(url: string, options?: RequestInit) {
   return fetch(url, {
     ...options,
     credentials: "include",
-    headers: {
-      ...(options?.headers || {}),
+    headers: csrfHeaders({
+      ...(options?.headers as Record<string, string> || {}),
       ...(options?.body ? { "Content-Type": "application/json" } : {}),
-    },
+    }),
   }).then(res => {
     if (res.status === 401) {
       localStorage.removeItem("portal_user");
@@ -78,6 +79,8 @@ export default function RenterPortal() {
         return res.json();
       })
       .then(data => {
+        // Repõe o token CSRF no refresh para as mutações do portal (portalFetch).
+        if (data?.csrfToken) setCSRFToken(data.csrfToken);
         if (data?.tenant) {
           setBrand(data.tenant);
           try {

@@ -3,6 +3,8 @@
  * Fornece métodos convenientes para comunicação com o backend
  */
 
+import { csrfHeaders } from "@/lib/queryClient";
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -41,7 +43,7 @@ export const apiClient = {
   async post<T>(url: string, data?: unknown): Promise<T> {
     const res = await fetch(url, {
       method: 'POST',
-      headers: data ? { 'Content-Type': 'application/json' } : {},
+      headers: csrfHeaders(data ? { 'Content-Type': 'application/json' } : {}),
       body: data ? JSON.stringify(data) : undefined,
       credentials: 'include',
     });
@@ -55,7 +57,7 @@ export const apiClient = {
   async put<T>(url: string, data?: unknown): Promise<T> {
     const res = await fetch(url, {
       method: 'PUT',
-      headers: data ? { 'Content-Type': 'application/json' } : {},
+      headers: csrfHeaders(data ? { 'Content-Type': 'application/json' } : {}),
       body: data ? JSON.stringify(data) : undefined,
       credentials: 'include',
     });
@@ -69,7 +71,7 @@ export const apiClient = {
   async patch<T>(url: string, data?: unknown): Promise<T> {
     const res = await fetch(url, {
       method: 'PATCH',
-      headers: data ? { 'Content-Type': 'application/json' } : {},
+      headers: csrfHeaders(data ? { 'Content-Type': 'application/json' } : {}),
       body: data ? JSON.stringify(data) : undefined,
       credentials: 'include',
     });
@@ -83,6 +85,7 @@ export const apiClient = {
   async delete<T>(url: string): Promise<T> {
     const res = await fetch(url, {
       method: 'DELETE',
+      headers: csrfHeaders(),
       credentials: 'include',
     });
     await throwIfResNotOk(res);
