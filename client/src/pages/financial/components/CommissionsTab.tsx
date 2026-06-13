@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -105,26 +106,17 @@ export default function CommissionsTab({ period = 'currentMonth' }: Props) {
 
   const handleStatusChange = async (commissionId: string, newStatus: 'pending' | 'approved' | 'paid') => {
     try {
-      const res = await fetch(`/api/commissions/${commissionId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status: newStatus }),
+      await apiRequest('PATCH', `/api/commissions/${commissionId}/status`, { status: newStatus });
+
+      toast({
+        title: "Status atualizado",
+        description: `Comissão marcada como ${newStatus === 'paid' ? 'paga' : newStatus === 'approved' ? 'aprovada' : 'pendente'}.`,
       });
 
-      if (res.ok) {
-        toast({
-          title: "Status atualizado",
-          description: `Comissão marcada como ${newStatus === 'paid' ? 'paga' : newStatus === 'approved' ? 'aprovada' : 'pendente'}.`,
-        });
-
-        // Refresh data
-        setCommissions(prev =>
-          prev.map(c => c.id === commissionId ? { ...c, status: newStatus } : c)
-        );
-      } else {
-        throw new Error('Failed to update status');
-      }
+      // Refresh data
+      setCommissions(prev =>
+        prev.map(c => c.id === commissionId ? { ...c, status: newStatus } : c)
+      );
     } catch (error) {
       console.error('Error updating commission status:', error);
       toast({

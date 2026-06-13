@@ -279,9 +279,15 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
       });
 
       if (res.ok) {
-        const data = unwrapData<{ user: User; tenant: Tenant }>(await res.json());
+        const data = unwrapData<{ user: User; tenant: Tenant; csrfToken?: string }>(await res.json());
         setUser(data.user);
         setTenant(data.tenant);
+
+        // Restaura o token CSRF no boot/refresh (vive só em memória e se perde
+        // no reload); sem isto toda mutação pós-refresh falharia com 403.
+        if (data.csrfToken) {
+          setCSRFToken(data.csrfToken);
+        }
 
         // Fetch all tenants
         const tenantsRes = await fetch("/api/tenants", {

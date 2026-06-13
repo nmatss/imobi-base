@@ -86,6 +86,26 @@ function tokensMatch(a: string, b: string): boolean {
   return timingSafeEqual(bufA, bufB);
 }
 
+/**
+ * Emite o token CSRF do portal (Double Submit Cookie): seta o cookie csrf-token
+ * escopado ao portal e devolve o valor para o client guardar em memória e enviar
+ * no header X-CSRF-Token. Sem isto, mutações do portal (não-excluídas) dão 403.
+ */
+function issuePortalCSRF(res: Response, existing?: string): string {
+  // Reusa o cookie existente quando houver (refresh/multi-aba); só emite novo
+  // quando ausente. Evita rotacionar e invalidar requisições/abas em voo.
+  if (existing) return existing;
+  const csrfToken = randomBytes(32).toString("base64url");
+  res.cookie("csrf-token", csrfToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+    maxAge: 24 * 60 * 60 * 1000,
+    path: "/api/portal",
+  });
+  return csrfToken;
+}
+
 // Extend Request to include portal user
 interface PortalUser {
   id: string;
@@ -209,6 +229,8 @@ export function registerPortalRoutes(app: Express): void {
         path: '/api/portal',
       });
 
+      const csrfToken = issuePortalCSRF(res);
+
       res.json({
         user: {
           id: access.id,
@@ -219,6 +241,7 @@ export function registerPortalRoutes(app: Express): void {
           tenantId: access.tenantId,
         },
         tenant: await buildPortalBrand(tenant),
+        csrfToken,
       });
     } catch (err) {
       console.error("Portal login error:", err);
@@ -368,6 +391,8 @@ export function registerPortalRoutes(app: Express): void {
         clientPhone = renter?.phone || "";
       }
 
+      const csrfToken = issuePortalCSRF(res, req.cookies?.["csrf-token"]);
+
       res.json({
         user: {
           id: access.id,
@@ -379,6 +404,7 @@ export function registerPortalRoutes(app: Express): void {
           lastLogin: access.lastLogin,
         },
         tenant: await buildPortalBrand(tenant, true),
+        csrfToken,
       });
     } catch (err) {
       console.error("Portal me error:", err);

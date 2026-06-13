@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { setCSRFToken } from "@/lib/queryClient";
 
 export default function PortalLogin() {
   usePageTitle("Portal do Cliente");
@@ -26,6 +27,8 @@ export default function PortalLogin() {
         throw new Error("Not authenticated");
       })
       .then(data => {
+        // Já autenticado por cookie: repõe o token CSRF para mutações do portal.
+        if (data.csrfToken) setCSRFToken(data.csrfToken);
         if (data.user?.clientType === "owner") {
           setLocation("/portal/owner");
         } else if (data.user?.clientType === "renter") {
@@ -59,6 +62,8 @@ export default function PortalLogin() {
 
       localStorage.setItem("portal_user", JSON.stringify(data.user));
       localStorage.setItem("portal_tenant", JSON.stringify(data.tenant));
+      // Guarda o token CSRF do portal em memória para o portalFetch enviar.
+      if (data.csrfToken) setCSRFToken(data.csrfToken);
 
       if (data.user.clientType === "owner") {
         setLocation("/portal/owner");

@@ -1,9 +1,14 @@
 import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "./lib/queryClient";
+import { installCSRFFetchInterceptor } from "./lib/csrf-fetch";
 import App from "./App";
 import "./index.css";
 import React from "react";
+
+// Injeta X-CSRF-Token em todo fetch state-changing same-origin (cobre call sites
+// que usam fetch cru sem o header). Antes de qualquer requisição da aplicação.
+installCSRFFetchInterceptor();
 
 // Import monitoring and analytics
 import { initializeSentryClient } from "./lib/monitoring/sentry-client";

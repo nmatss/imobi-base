@@ -10,6 +10,7 @@ import { Upload, X, File, Image as ImageIcon, AlertCircle, CheckCircle } from 'l
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { cn } from '@/lib/utils';
+import { getCSRFToken } from '@/lib/queryClient';
 
 export interface FileUploadProps {
   accept?: string;
@@ -231,6 +232,11 @@ export function FileUpload({
           });
 
           xhr.open('POST', endpoint);
+          // Cookies de sessão + header CSRF (upload não passa por apiRequest).
+          // NÃO setar Content-Type: o browser define o boundary do multipart.
+          xhr.withCredentials = true;
+          const token = getCSRFToken();
+          if (token) xhr.setRequestHeader('X-CSRF-Token', token);
           xhr.send(formData);
         });
 

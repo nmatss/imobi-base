@@ -20,7 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, setCSRFToken } from "@/lib/queryClient";
 
 function portalFetch(url: string) {
   return fetch(url, {
@@ -68,6 +68,8 @@ export default function OwnerPortal() {
         return res.json();
       })
       .then(data => {
+        // Repõe o token CSRF no refresh para a mutação de aprovação (apiRequest).
+        if (data?.csrfToken) setCSRFToken(data.csrfToken);
         if (data?.tenant) {
           setBrand(data.tenant);
           try {

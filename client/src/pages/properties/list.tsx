@@ -1,5 +1,6 @@
 import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { apiRequest } from "@/lib/queryClient";
 import { Link, useLocation } from "wouter";
 import { useImobi, Property } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -494,11 +495,7 @@ export default function PropertiesList() {
   const handleDelete = async (id: string) => {
     setIsDeleting(true);
     try {
-      const res = await fetch(`/api/properties/${id}`, { method: "DELETE", credentials: "include" });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Erro ao excluir imóvel");
-      }
+      await apiRequest("DELETE", `/api/properties/${id}`);
       toast.crud.deleted("Imóvel");
       setDeleteConfirmId(null);
       await refetchProperties();
@@ -512,20 +509,13 @@ export default function PropertiesList() {
   const handleToggleFeatured = async (property: Property) => {
     setTogglingFeatured(property.id);
     try {
-      const res = await fetch(`/api/properties/${property.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ featured: !property.featured }),
-      });
-      if (res.ok) {
-        if (property.featured) {
-          toast.success("Removido dos destaques", "O imóvel não aparece mais em destaque.");
-        } else {
-          toast.action.favorited("Imóvel");
-        }
-        await refetchProperties();
+      await apiRequest("PATCH", `/api/properties/${property.id}`, { featured: !property.featured });
+      if (property.featured) {
+        toast.success("Removido dos destaques", "O imóvel não aparece mais em destaque.");
+      } else {
+        toast.action.favorited("Imóvel");
       }
+      await refetchProperties();
     } catch (error) {
       toast.errors.operation("alterar o destaque");
     } finally {

@@ -39,6 +39,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { FeatureUpgradeState } from "@/components/FeatureUpgradeState";
 import { isPlanBlockedResponse, readJsonSafely } from "@/lib/plan-blocked";
+import { csrfHeaders } from "@/lib/queryClient";
 
 type Property = {
   id: string;
@@ -284,7 +285,7 @@ export default function AutoMarketingPage() {
       setGenerating(true);
       const res = await fetch(`/api/auto-marketing/generate/${selectedProperty.id}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders({ "Content-Type": "application/json" }),
         credentials: "include",
         body: JSON.stringify({ tone: selectedTone }),
       });
@@ -324,7 +325,7 @@ export default function AutoMarketingPage() {
       setSaving(true);
       const res = await fetch(`/api/auto-marketing/${selectedContent.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders({ "Content-Type": "application/json" }),
         credentials: "include",
         body: JSON.stringify({
           description: editDescription,
@@ -358,6 +359,7 @@ export default function AutoMarketingPage() {
     try {
       const res = await fetch(`/api/auto-marketing/${selectedContent.id}/publish`, {
         method: "POST",
+        headers: csrfHeaders(),
         credentials: "include",
       });
 
@@ -384,6 +386,7 @@ export default function AutoMarketingPage() {
     try {
       const res = await fetch(`/api/auto-marketing/${selectedContent.id}`, {
         method: "DELETE",
+        headers: csrfHeaders(),
         credentials: "include",
       });
 
@@ -419,7 +422,7 @@ export default function AutoMarketingPage() {
       setSendingEmail(true);
       const res = await fetch(`/api/auto-marketing/${selectedContent.id}/send-email`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: csrfHeaders({ "Content-Type": "application/json" }),
         credentials: "include",
         body: JSON.stringify({}),
       });
