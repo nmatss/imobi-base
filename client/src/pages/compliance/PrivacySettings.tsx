@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { apiRequest } from "@/lib/queryClient";
 import { Download, Trash2, FileText, Shield, AlertTriangle, CheckCircle, Clock } from "lucide-react";
 
 export default function PrivacySettings() {
@@ -10,6 +12,7 @@ export default function PrivacySettings() {
   const [deletionStatus, setDeletionStatus] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { confirm: confirmDialog, dialog: confirmDialogElement } = useConfirmDialog();
 
   useEffect(() => {
     loadConsents();
@@ -56,22 +59,16 @@ export default function PrivacySettings() {
   const handleExportData = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/compliance/export-data", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ format: "json", includeRelated: true }),
+      const res = await apiRequest("POST", "/api/compliance/export-data", {
+        format: "json",
+        includeRelated: true,
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        toast({
-          title: "Exportação Solicitada",
-          description: "Você receberá um e-mail quando a exportação estiver pronta.",
-        });
-        setExportStatus(data);
-      } else {
-        throw new Error("Falha ao solicitar exportação");
-      }
+      const data = await res.json();
+      toast({
+        title: "Exportação Solicitada",
+        description: "Você receberá um e-mail quando a exportação estiver pronta.",
+      });
+      setExportStatus(data);
     } catch (error) {
       toast({
         title: "Erro",
@@ -84,33 +81,27 @@ export default function PrivacySettings() {
   };
 
   const handleDeleteAccount = async () => {
-    if (!confirm(
-      "ATENÇÃO: Esta ação é irreversível. Seus dados serão anonimizados e você não poderá mais acessar sua conta. Tem certeza que deseja continuar?"
-    )) {
-      return;
-    }
+    const confirmed = await confirmDialog({
+      title: "Excluir conta permanentemente?",
+      description:
+        "ATENÇÃO: esta ação é irreversível. Seus dados serão anonimizados e você não poderá mais acessar sua conta.",
+      confirmText: "Excluir minha conta",
+      variant: "destructive",
+    });
+    if (!confirmed) return;
 
     setLoading(true);
     try {
-      const res = await fetch("/api/compliance/delete-account", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reason: "User requested account deletion",
-          deletionType: "anonymize",
-        }),
+      const res = await apiRequest("POST", "/api/compliance/delete-account", {
+        reason: "User requested account deletion",
+        deletionType: "anonymize",
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        toast({
-          title: "Exclusão Solicitada",
-          description: "Verifique seu e-mail para confirmar a exclusão da conta.",
-        });
-        setDeletionStatus(data);
-      } else {
-        throw new Error("Falha ao solicitar exclusão");
-      }
+      const data = await res.json();
+      toast({
+        title: "Exclusão Solicitada",
+        description: "Verifique seu e-mail para confirmar a exclusão da conta.",
+      });
+      setDeletionStatus(data);
     } catch (error) {
       toast({
         title: "Erro",
@@ -124,17 +115,12 @@ export default function PrivacySettings() {
 
   const handleWithdrawConsent = async (consentType: string) => {
     try {
-      const res = await fetch(`/api/compliance/consents/${consentType}`, {
-        method: "DELETE",
+      await apiRequest("DELETE", `/api/compliance/consents/${consentType}`);
+      toast({
+        title: "Consentimento Retirado",
+        description: `Seu consentimento para ${consentType} foi retirado com sucesso.`,
       });
-
-      if (res.ok) {
-        toast({
-          title: "Consentimento Retirado",
-          description: `Seu consentimento para ${consentType} foi retirado com sucesso.`,
-        });
-        loadConsents();
-      }
+      loadConsents();
     } catch (error) {
       toast({
         title: "Erro",
@@ -146,6 +132,7 @@ export default function PrivacySettings() {
 
   return (
     <div className="container max-w-4xl mx-auto py-8 px-4">
+      {confirmDialogElement}
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Configurações de Privacidade</h1>
         <p className="text-gray-600">

@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,7 @@ type UsageLog = {
 type ActionFilter = "all" | "login" | "logout" | "create" | "update" | "delete";
 
 export default function LogsPage() {
+  usePageTitle("Logs de Uso");
   const [logs, setLogs] = useState<UsageLog[]>([]);
   const [filteredLogs, setFilteredLogs] = useState<UsageLog[]>([]);
   const [loading, setLoading] = useState(true);

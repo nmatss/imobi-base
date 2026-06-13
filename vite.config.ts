@@ -24,19 +24,33 @@ export default defineConfig(({ mode }) => ({
     }),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico"],
+      includeAssets: ["favicon.ico", "apple-touch-icon.png", "brand/favicon.svg"],
       manifest: {
-        name: "ImobiBase",
+        name: "ImobiBase — Gestão Imobiliária Inteligente",
         short_name: "ImobiBase",
-        description: "Sistema de gestão imobiliária completo",
-        theme_color: "#1E7BE8",
-        background_color: "#ffffff",
+        description:
+          "Sistema completo para gestão de imobiliárias: CRM, imóveis, financeiro e site público.",
+        lang: "pt-BR",
+        theme_color: "#0066CC",
+        background_color: "#F9FAFB",
         display: "standalone",
+        orientation: "portrait-primary",
         icons: [
           {
-            src: "/favicon.ico",
-            sizes: "any",
-            type: "image/x-icon",
+            src: "/icon-192.png",
+            sizes: "192x192",
+            type: "image/png",
+          },
+          {
+            src: "/icon-512.png",
+            sizes: "512x512",
+            type: "image/png",
+          },
+          {
+            src: "/icon-maskable-512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
           },
         ],
       },

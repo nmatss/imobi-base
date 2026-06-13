@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, Users, TrendingUp, DollarSign, AlertCircle, Clock } from "lucide-react";
@@ -43,6 +44,7 @@ type ChartData = {
 };
 
 export default function AdminDashboard() {
+  usePageTitle("Admin Global");
   const [, setLocation] = useLocation();
   const [stats, setStats] = useState<AdminStats>({
     totalTenants: 0,

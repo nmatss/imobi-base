@@ -55,9 +55,9 @@ export class TemplateRenderer {
     const mergedData = {
       ...data,
       branding: {
-        logo: branding?.logo || '',
-        primaryColor: branding?.primaryColor || '#3B82F6',
-        secondaryColor: branding?.secondaryColor || '#1E40AF',
+        logo: branding?.logo || 'https://imobibase.com/brand/logo-email.png',
+        primaryColor: branding?.primaryColor || '#0066CC',
+        secondaryColor: branding?.secondaryColor || '#0052AA',
         companyName: branding?.companyName || 'ImobiBase',
         address: branding?.address || '',
         phone: branding?.phone || '',

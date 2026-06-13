@@ -9,8 +9,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Logo } from "@/components/brand/logo";
 import {
-  Building2,
   CheckCircle2,
   ArrowRight,
   Globe,
@@ -94,14 +94,7 @@ export default function PricingPage() {
       <header className="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-md border-b py-3 shadow-sm">
         <div className="container mx-auto px-4 flex items-center justify-between">
           <Link href="/">
-            <div className="flex items-center gap-2 font-heading font-bold text-xl tracking-tight cursor-pointer">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center text-white shadow-lg shadow-primary/20">
-                <Building2 className="w-5 h-5" />
-              </div>
-              <span className="bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
-                ImobiBase
-              </span>
-            </div>
+            <Logo className="cursor-pointer" wordmarkClassName="text-xl" iconClassName="h-9 w-9 drop-shadow-md" />
           </Link>
 
           <nav className="hidden md:flex gap-8 text-sm font-medium text-muted-foreground">

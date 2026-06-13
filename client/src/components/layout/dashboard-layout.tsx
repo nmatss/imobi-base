@@ -28,7 +28,8 @@ import {
   Calculator,
   Bot,
   ClipboardCheck,
-  Activity
+  Activity,
+  HelpCircle
 } from "lucide-react";
 import { format, isToday, isPast } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -52,6 +53,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import { Logo, LogoIcon } from "@/components/brand/logo";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -198,6 +200,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       group: "Configurações",
       items: [
         { href: "/settings", label: "Configurações", icon: Settings },
+        { href: "/ajuda", label: "Ajuda", icon: HelpCircle },
       ]
     }
   ];
@@ -274,10 +277,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const SidebarContent = ({ collapsed = false }: { collapsed?: boolean }) => (
     <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
       <div className={`p-6 flex items-center ${collapsed ? 'justify-center' : 'gap-2'}`}>
-        <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center text-sidebar-primary-foreground font-bold text-xl">
-          I
-        </div>
-        {!collapsed && <span className="font-heading font-bold text-lg tracking-tight">ImobiBase</span>}
+        <LogoIcon className="w-8 h-8" />
+        {!collapsed && (
+          <span className="font-heading font-extrabold text-lg tracking-tight">
+            Imobi<span className="text-[#3D9BFF]">Base</span>
+          </span>
+        )}
       </div>
 
       {!collapsed && (
@@ -454,7 +459,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               <Menu {...iconA11yProps} className="h-5 w-5 sm:h-5 sm:w-5" />
             </Button>
-            <span className="font-heading font-bold text-base sm:text-lg">ImobiBase</span>
+            <Logo wordmarkClassName="text-base sm:text-lg" iconClassName="h-7 w-7" />
           </div>
 
           {/* Breadcrumb Navigation */}

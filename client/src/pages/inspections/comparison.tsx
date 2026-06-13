@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,6 +60,7 @@ const conditionColors: Record<string, string> = {
 };
 
 export default function InspectionComparisonPage() {
+  usePageTitle("Comparação de Vistorias");
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);

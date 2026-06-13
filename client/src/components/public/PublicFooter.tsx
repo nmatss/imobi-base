@@ -1,5 +1,6 @@
 import { Link } from "wouter";
-import { Building2, Instagram, Linkedin, Youtube } from "lucide-react";
+import { Instagram, Linkedin, Youtube } from "lucide-react";
+import { Logo } from "@/components/brand/logo";
 
 export interface PublicFooterProps {
   variant?: "full" | "compact";
@@ -14,12 +15,7 @@ export function PublicFooter({ variant = "compact" }: PublicFooterProps) {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6 text-sm text-muted-foreground">
             <Link href="/">
-              <div className="flex items-center gap-2 font-heading font-bold text-lg cursor-pointer">
-                <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center text-primary-foreground text-xs">
-                  I
-                </div>
-                ImobiBase
-              </div>
+              <Logo className="cursor-pointer" wordmarkClassName="text-lg" iconClassName="h-7 w-7" />
             </Link>
 
             <div className="flex gap-3">
@@ -53,6 +49,12 @@ export function PublicFooter({ variant = "compact" }: PublicFooterProps) {
             </div>
 
             <div className="flex items-center gap-6">
+              <Link href="/contato" className="hover:text-foreground">
+                Contato
+              </Link>
+              <Link href="/novidades" className="hover:text-foreground">
+                Novidades
+              </Link>
               <Link href="/termos" className="hover:text-foreground">
                 Termos
               </Link>
@@ -75,12 +77,7 @@ export function PublicFooter({ variant = "compact" }: PublicFooterProps) {
       <div className="container mx-auto px-4">
         <div className="grid md:grid-cols-3 gap-12 mb-16">
           <div>
-            <div className="flex items-center gap-2 font-heading font-bold text-2xl mb-6">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground">
-                <Building2 className="w-4 h-4" />
-              </div>
-              ImobiBase
-            </div>
+            <Logo className="mb-6" wordmarkClassName="text-2xl" iconClassName="h-9 w-9" />
             <p className="text-muted-foreground leading-relaxed mb-6">
               Transformando a maneira como imobiliárias e corretores fazem
               negócios no Brasil.
@@ -144,12 +141,22 @@ export function PublicFooter({ variant = "compact" }: PublicFooterProps) {
                   Privacidade
                 </Link>
               </li>
+              <li>
+                <Link href="/novidades" className="hover:text-primary transition-colors">
+                  Novidades
+                </Link>
+              </li>
             </ul>
           </div>
 
           <div>
             <h4 className="font-bold text-foreground mb-6">Contato</h4>
             <ul className="space-y-4 text-sm text-muted-foreground">
+              <li>
+                <Link href="/contato" className="hover:text-primary transition-colors">
+                  Fale conosco
+                </Link>
+              </li>
               <li>
                 <a
                   href="mailto:contato@imobibase.com"

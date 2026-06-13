@@ -285,6 +285,44 @@ export function registerEmailRoutes(app: Express) {
   });
 
   /**
+   * GET /api/email/preview/:templateName (somente dev)
+   * Renderiza o template direto no navegador com dados fake — facilita
+   * iterar no design dos 15 templates sem montar payload manualmente.
+   */
+  if (process.env.NODE_ENV !== 'production') {
+    app.get('/api/email/preview/:templateName', validateParams(templateNameParamSchema), async (req: Request, res: Response) => {
+      try {
+        const sampleData = {
+          userName: 'Maria Silva',
+          tenantName: 'Imobiliária Exemplo',
+          propertyTitle: '[Exemplo] Apartamento 3 quartos — Vila Mariana',
+          propertyUrl: 'https://imobibase.com',
+          leadName: 'João Souza',
+          leadEmail: 'joao@example.com',
+          leadPhone: '(11) 99999-0000',
+          visitDate: '20/06/2026 às 14h',
+          amount: 'R$ 199,00',
+          invoiceNumber: 'INV-2026-0042',
+          dueDate: '25/06/2026',
+          planName: 'Profissional',
+          resetUrl: 'https://imobibase.com/auth/reset-password?token=exemplo',
+          verificationUrl: 'https://imobibase.com/auth/verify?token=exemplo',
+          loginUrl: 'https://imobibase.com/login',
+          inviteUrl: 'https://imobibase.com/signup?invite=exemplo',
+          contractTitle: 'Contrato de locação — [Exemplo]',
+          month: 'Junho de 2026',
+          unsubscribeUrl: '#',
+        };
+        const html = await emailService.previewTemplate(req.params.templateName, sampleData);
+        res.type('html').send(html);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to preview template';
+        res.status(500).json({ error: errorMessage });
+      }
+    });
+  }
+
+  /**
    * GET /api/email/queue/stats
    * Get email queue statistics
    */

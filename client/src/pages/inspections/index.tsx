@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useImobi } from "@/lib/imobi-context";
@@ -16,6 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { FeatureUpgradeState } from "@/components/FeatureUpgradeState";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { isPlanBlockedResponse, readJsonSafely } from "@/lib/plan-blocked";
 import {
   ClipboardCheck,
@@ -90,8 +92,10 @@ const conditionConfig: Record<string, { label: string; color: string }> = {
 };
 
 export default function InspectionsPage() {
+  usePageTitle("Vistorias");
   const { properties } = useImobi();
   const [, setLocation] = useLocation();
+  const { confirm: confirmDialog, dialog: confirmDialogElement } = useConfirmDialog();
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [loading, setLoading] = useState(true);
   const [featureBlocked, setFeatureBlocked] = useState(false);
@@ -193,7 +197,13 @@ export default function InspectionsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta vistoria?")) return;
+    const confirmed = await confirmDialog({
+      title: "Excluir vistoria?",
+      description: "Esta ação não pode ser desfeita. A vistoria e todos os seus itens serão removidos.",
+      confirmText: "Excluir",
+      variant: "destructive",
+    });
+    if (!confirmed) return;
 
     try {
       const res = await fetch(`/api/inspections/${id}`, {
@@ -261,6 +271,7 @@ export default function InspectionsPage() {
 
   return (
     <div className="space-y-6">
+      {confirmDialogElement}
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

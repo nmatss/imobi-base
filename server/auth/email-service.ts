@@ -114,7 +114,7 @@ export async function sendPasswordResetEmail(email: string, name: string, token:
           <tr>
             <td style="background-color: #f8f8f8; padding: 20px 30px; text-align: center;">
               <p style="color: #999999; font-size: 12px; margin: 0;">
-                © 2024 ImobiBase. Todos os direitos reservados.
+                © ${new Date().getFullYear()} ImobiBase. Todos os direitos reservados.
               </p>
             </td>
           </tr>
@@ -183,7 +183,7 @@ export async function sendVerificationEmail(email: string, name: string, token: 
           <tr>
             <td style="background-color: #f8f8f8; padding: 20px 30px; text-align: center;">
               <p style="color: #999999; font-size: 12px; margin: 0;">
-                © 2024 ImobiBase. Todos os direitos reservados.
+                © ${new Date().getFullYear()} ImobiBase. Todos os direitos reservados.
               </p>
             </td>
           </tr>
@@ -249,7 +249,7 @@ export async function sendPasswordChangedEmail(email: string, name: string): Pro
           <tr>
             <td style="background-color: #f8f8f8; padding: 20px 30px; text-align: center;">
               <p style="color: #999999; font-size: 12px; margin: 0;">
-                © 2024 ImobiBase. Todos os direitos reservados.
+                © ${new Date().getFullYear()} ImobiBase. Todos os direitos reservados.
               </p>
             </td>
           </tr>
@@ -315,7 +315,7 @@ export async function sendSecurityAlertEmail(
           <tr>
             <td style="background-color: #f8f8f8; padding: 20px 30px; text-align: center;">
               <p style="color: #999999; font-size: 12px; margin: 0;">
-                © 2024 ImobiBase. Todos os direitos reservados.
+                © ${new Date().getFullYear()} ImobiBase. Todos os direitos reservados.
               </p>
             </td>
           </tr>
@@ -381,7 +381,7 @@ export async function sendNewLoginEmail(
           <tr>
             <td style="background-color: #f8f8f8; padding: 20px 30px; text-align: center;">
               <p style="color: #999999; font-size: 12px; margin: 0;">
-                © 2024 ImobiBase. Todos os direitos reservados.
+                © ${new Date().getFullYear()} ImobiBase. Todos os direitos reservados.
               </p>
             </td>
           </tr>

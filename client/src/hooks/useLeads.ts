@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast-enhanced";
 import type { Lead, LeadStatus } from "@/lib/imobi-context";
 import { unwrapList } from "@/lib/api-envelope";
+import { apiRequest } from "@/lib/queryClient";
 
 // ==================== TYPES ====================
 
@@ -87,63 +88,22 @@ async function fetchLeadById(id: string): Promise<Lead> {
 }
 
 async function createLead(data: CreateLeadData): Promise<Lead> {
-  const response = await fetch("/api/leads", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to create lead");
-  }
-
+  const response = await apiRequest("POST", "/api/leads", data);
   return response.json();
 }
 
 async function updateLead({ id, ...data }: UpdateLeadData): Promise<Lead> {
-  const response = await fetch(`/api/leads/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to update lead");
-  }
-
+  const response = await apiRequest("PATCH", `/api/leads/${id}`, data);
   return response.json();
 }
 
 async function updateLeadStatus({ id, status }: UpdateLeadStatusData): Promise<Lead> {
-  const response = await fetch(`/api/leads/${id}/status`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status }),
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to update lead status");
-  }
-
+  const response = await apiRequest("PATCH", `/api/leads/${id}/status`, { status });
   return response.json();
 }
 
 async function deleteLead(id: string): Promise<void> {
-  const response = await fetch(`/api/leads/${id}`, {
-    method: "DELETE",
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to delete lead");
-  }
+  await apiRequest("DELETE", `/api/leads/${id}`);
 }
 
 // ==================== QUERY KEYS ====================

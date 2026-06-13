@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import type { Property } from "@/lib/imobi-context";
 
 export function usePropertyActions(refetchProperties: () => Promise<void>) {
@@ -7,14 +8,7 @@ export function usePropertyActions(refetchProperties: () => Promise<void>) {
 
   const deleteProperty = useCallback(async (id: string) => {
     try {
-      const response = await fetch(`/api/properties/${id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete property");
-      }
+      await apiRequest("DELETE", `/api/properties/${id}`);
 
       toast({
         title: "Sucesso",
@@ -35,16 +29,10 @@ export function usePropertyActions(refetchProperties: () => Promise<void>) {
 
   const toggleFeatured = useCallback(async (property: Property) => {
     try {
-      const response = await fetch(`/api/properties/${property.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...property, featured: !property.featured }),
-        credentials: "include",
+      await apiRequest("PUT", `/api/properties/${property.id}`, {
+        ...property,
+        featured: !property.featured,
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to update property");
-      }
 
       toast({
         title: "Sucesso",

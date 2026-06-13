@@ -3,6 +3,7 @@ import { AlertTriangle, RefreshCcw, Home, Bug } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { categorizeError, errorLogger, ErrorDetails, ErrorType } from "@/lib/error-handling";
+import { Logo } from "@/components/brand/logo";
 import * as Sentry from "@sentry/react";
 
 interface Props {
@@ -159,7 +160,8 @@ export class ErrorBoundary extends Component<Props, State> {
       const showDebugInfo = import.meta.env.VITE_SHOW_ERROR_DEBUG === "true";
 
       return (
-        <div className="min-h-screen flex items-center justify-center p-4 bg-muted/30">
+        <div className="min-h-screen flex flex-col items-center justify-center gap-8 p-4 bg-muted/30">
+          <Logo wordmarkClassName="text-2xl" iconClassName="h-10 w-10" />
           <Card className="max-w-2xl w-full">
             <CardHeader className="text-center">
               <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">

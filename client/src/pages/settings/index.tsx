@@ -1,5 +1,7 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useEffect, useState } from "react";
 import { useImobi } from "@/lib/imobi-context";
+import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -161,6 +163,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export default function SettingsPage() {
+  usePageTitle("Configurações");
   const { tenant } = useImobi();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<TabId>("profile");
@@ -250,54 +253,21 @@ export default function SettingsPage() {
   };
 
   const handleSaveGeneral = async (data: Partial<TenantSettings>) => {
-    const response = await fetch("/api/settings/general", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Erro ao salvar configurações");
-    }
-
+    const response = await apiRequest("PUT", "/api/settings/general", data);
     const updated = await response.json();
     setGeneralSettings(updated);
     return updated;
   };
 
   const handleSaveBrand = async (data: Partial<BrandSettings>) => {
-    const response = await fetch("/api/settings/brand", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Erro ao salvar configurações de marca");
-    }
-
+    const response = await apiRequest("PUT", "/api/settings/brand", data);
     const updated = await response.json();
     setBrandSettings(updated);
     return updated;
   };
 
   const handleSaveAI = async (data: Partial<AISettings>) => {
-    const response = await fetch("/api/settings/ai", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Erro ao salvar configurações de IA");
-    }
-
+    const response = await apiRequest("PUT", "/api/settings/ai", data);
     const updated = await response.json();
     setAISettings(updated);
     return updated;

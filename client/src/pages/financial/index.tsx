@@ -1,10 +1,13 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
+import { apiRequest } from "@/lib/queryClient";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, startOfDay, endOfDay } from "date-fns";
 import FinancialDashboard from "./components/FinancialDashboard";
 import FinancialTabs from "./components/FinancialTabs";
 import FinancialCharts from "./components/FinancialCharts";
-import FinancialAI from "./components/FinancialAI";
+import TransactionFormDialog from "./components/TransactionFormDialog";
 import { FinancialChartsSkeleton } from "@/components/ui/skeleton-loaders";
 import type {
   FinancialMetrics,
@@ -14,13 +17,17 @@ import type {
 } from "./types";
 
 export default function FinanceiroPage() {
+  usePageTitle("Financeiro");
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [period, setPeriod] = useState<PeriodOption>('currentMonth');
   const [activeTab, setActiveTab] = useState('general');
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(true);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   const [isLoadingCharts, setIsLoadingCharts] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<FinanceTransaction | null>(null);
 
   const [metrics, setMetrics] = useState<FinancialMetrics>({
     commissionsReceived: 0,
@@ -218,33 +225,29 @@ export default function FinanceiroPage() {
     };
   }, [period, toast]);
 
+  const refreshTransactions = useCallback(async () => {
+    const params = new URLSearchParams({
+      startDate: dateRange.startDate.toISOString(),
+      endDate: dateRange.endDate.toISOString(),
+    });
+    const refreshRes = await fetch(`/api/financial/transactions?${params.toString()}`, {
+      credentials: "include",
+    });
+    if (refreshRes.ok) {
+      const data = await refreshRes.json();
+      setTransactions(data);
+    }
+  }, [dateRange]);
+
   const handleMarkAsPaid = async (id: string) => {
     try {
-      const res = await fetch(`/api/finance-entries/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status: 'completed' }),
-      });
+      await apiRequest('PATCH', `/api/finance-entries/${id}`, { status: 'completed' });
 
-      if (res.ok) {
-        toast({
-          title: "Transação atualizada",
-          description: "A transação foi marcada como paga.",
-        });
-        // Refresh transactions
-        const params = new URLSearchParams({
-          startDate: dateRange.startDate.toISOString(),
-          endDate: dateRange.endDate.toISOString(),
-        });
-        const refreshRes = await fetch(`/api/financial/transactions?${params.toString()}`, {
-          credentials: "include",
-        });
-        if (refreshRes.ok) {
-          const data = await refreshRes.json();
-          setTransactions(data);
-        }
-      }
+      toast({
+        title: "Transação atualizada",
+        description: "A transação foi marcada como paga.",
+      });
+      await refreshTransactions();
     } catch (error) {
       console.error('Error marking as paid:', error);
       toast({
@@ -256,39 +259,75 @@ export default function FinanceiroPage() {
   };
 
   const handleEdit = (transaction: FinanceTransaction) => {
-    // TODO: Open edit modal
-    if (import.meta.env.DEV) console.log('Edit transaction:', transaction);
-    toast({
-      title: "Em desenvolvimento",
-      description: "A edição de transações será implementada em breve.",
-    });
+    setEditingTransaction(transaction);
+    setIsTransactionDialogOpen(true);
   };
 
-  const handleDuplicate = (transaction: FinanceTransaction) => {
-    // TODO: Duplicate transaction
-    if (import.meta.env.DEV) console.log('Duplicate transaction:', transaction);
-    toast({
-      title: "Em desenvolvimento",
-      description: "A duplicação de transações será implementada em breve.",
-    });
+  const handleDuplicate = async (transaction: FinanceTransaction) => {
+    try {
+      try {
+        await apiRequest('POST', '/api/finance-entries', {
+          description: `${transaction.description} (cópia)`,
+          amount: transaction.amount,
+          flow: transaction.flow,
+          entryDate: transaction.entryDate,
+          status: 'scheduled',
+          categoryId: transaction.categoryId,
+          notes: transaction.notes,
+          originType: 'manual',
+        });
+      } catch (reqError) {
+        // Preserva a mensagem específica de erro do servidor (campo `error` do corpo).
+        // apiRequest lança com formato "<status>: <texto>"; extrai o JSON para recuperar body.error.
+        const raw = reqError instanceof Error ? reqError.message.replace(/^\d+:\s*/, '') : '';
+        let serverError: string | null = null;
+        try {
+          serverError = JSON.parse(raw)?.error ?? null;
+        } catch {
+          serverError = null;
+        }
+        throw new Error(serverError || 'Não foi possível duplicar a transação.');
+      }
+
+      toast({
+        title: "Transação duplicada",
+        description: "Uma cópia foi criada com status previsto.",
+      });
+      await refreshTransactions();
+    } catch (error) {
+      console.error('Error duplicating transaction:', error);
+      toast({
+        title: "Erro ao duplicar",
+        description: error instanceof Error ? error.message : "Tente novamente.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleViewOrigin = (transaction: FinanceTransaction) => {
-    // TODO: Navigate to origin
-    if (import.meta.env.DEV) console.log('View origin:', transaction);
-    toast({
-      title: "Em desenvolvimento",
-      description: "A visualização da origem será implementada em breve.",
-    });
-  };
+    // Navega para a entidade vinculada quando houver referência direta
+    if (transaction.relatedEntityType === 'property' && transaction.relatedEntityId) {
+      navigate(`/properties/${transaction.relatedEntityId}`);
+      return;
+    }
 
-  const handleAIPrompt = (promptId: string) => {
-    // TODO: Handle AI prompt
-    if (import.meta.env.DEV) console.log('AI Prompt:', promptId);
-    toast({
-      title: "Assistente AI",
-      description: "A funcionalidade de AI será implementada em breve.",
-    });
+    switch (transaction.originType) {
+      case 'sale':
+        navigate('/vendas');
+        break;
+      case 'rental':
+      case 'transfer':
+        navigate('/rentals');
+        break;
+      case 'commission':
+        setActiveTab('broker-commissions');
+        break;
+      default:
+        toast({
+          title: "Transação manual",
+          description: "Esta transação foi criada manualmente e não possui origem vinculada.",
+        });
+    }
   };
 
   const handleRefresh = async () => {
@@ -337,10 +376,8 @@ export default function FinanceiroPage() {
   };
 
   const handleAddTransaction = () => {
-    toast({
-      title: "Em desenvolvimento",
-      description: "A criação de transações manuais será implementada em breve.",
-    });
+    setEditingTransaction(null);
+    setIsTransactionDialogOpen(true);
   };
 
   return (
@@ -379,8 +416,18 @@ export default function FinanceiroPage() {
         period={period}
       />
 
-      {/* AI Assistant */}
-      <FinancialAI onPromptSelect={handleAIPrompt} />
+      {/* Create/Edit Transaction Dialog */}
+      <TransactionFormDialog
+        open={isTransactionDialogOpen}
+        onOpenChange={(open) => {
+          setIsTransactionDialogOpen(open);
+          if (!open) setEditingTransaction(null);
+        }}
+        transaction={editingTransaction}
+        onSaved={async () => {
+          await refreshTransactions();
+        }}
+      />
     </section>
   );
 }

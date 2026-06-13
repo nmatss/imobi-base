@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -173,6 +174,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function AutoMarketingPage() {
+  usePageTitle("Marketing IA");
   const [properties, setProperties] = useState<Property[]>([]);
   const [contents, setContents] = useState<MarketingContent[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);

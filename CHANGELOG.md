@@ -4,6 +4,31 @@ All notable changes to ImobiBase are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.3.0] - 2026-06-12 — Nova identidade visual & polimento profissional
+
+### Added
+
+- **Identidade visual nova** — logo "pin predial" (pin de localização com fachada de prédio, janela verde de destaque). SVGs master em `client/public/brand/` (logo-icon, logo-full, logo-full-white, favicon simplificado). Componente React `<Logo>`/`<LogoIcon>` em `client/src/components/brand/logo.tsx` aplicado em sidebar, login, signup, landing, pricing, terms, privacy, footers, 404 e ErrorBoundary.
+- **Favicon/ícones completos** — `favicon.svg` + `favicon.ico` (16/32/48) + `apple-touch-icon.png` (180) + `icon-192/512.png` + `icon-maskable-512.png` (safe zone PWA). Gerados por `npm run brand:assets` (`scripts/generate-brand-assets.mjs`, sharp + png-to-ico).
+- **manifest.webmanifest** fonte em `client/public/` com `lang: pt-BR`, theme_color #0066CC e ícones novos; `theme-color` meta (light/dark) no index.html.
+- **Open Graph novo** — `opengraph.png` 1200x630 (padrão correto; o anterior era 1280x720) com a marca nova; URLs absolutas nas meta tags.
+- **Títulos de página** — hook `usePageTitle` aplicado em 30 páginas internas que não tinham título de aba.
+- **Página pública de contato** (`/contato`) com form + `POST /api/public/contact` (rate-limited, email para contato@imobibase.com).
+- **Changelog público** (`/novidades`) com releases curados em linguagem de usuário.
+- **Central de Ajuda in-app** (`/ajuda`) — 11 artigos em 6 categorias com busca client-side; item "Ajuda" no sidebar.
+- **Dados de exemplo pós-onboarding** — `POST/DELETE /api/onboarding/demo-data` (6 imóveis, 8 leads, 2 visitas, 4 lançamentos, prefixo `[Exemplo] `); opção "Explorar com dados de exemplo" no wizard e "Limpar dados de exemplo" em Configurações.
+- **Checklist de primeiros passos** no dashboard (estado derivado dos dados reais, dispensável).
+- **Tour de primeiro acesso** (driver.js) destacando navegação principal — uma vez por usuário, desktop.
+- **Preview de templates de email em dev** — `GET /api/email/preview/:templateName` renderiza os 15 templates com dados fake no navegador.
+
+### Fixed
+
+- Copyright "© 2024" hardcoded atualizado para ano dinâmico (client + 5 templates de email).
+- `confirm()`/`alert()` nativos substituídos por `ConfirmDialog`/toast em vistorias, AVM, privacidade (LGPD) e página pública de imóvel.
+- Botão "Simular financiamento" que só mostrava "em breve" removido da página pública de imóvel.
+- Cores semânticas `success`/`warning`/`info` mapeadas no tailwind.config (classes `text-success` etc. não eram geradas no Tailwind 3).
+- Emails transacionais sem branding de tenant agora usam o logo padrão da plataforma (antes ficavam sem logo).
+
 ## [2.2.0] - 2026-04-21 — Pre-launch hardening & Stripe checkout
 
 ### Added

@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState, useCallback, useEffect } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import { useImobi } from "@/lib/imobi-context";
@@ -81,6 +82,7 @@ function getStatusConfig(status: string) {
 // ==================== MAIN COMPONENT ====================
 
 export default function PropertyDetailsPage() {
+  usePageTitle("Detalhes do Imóvel");
   const [match, params] = useRoute("/properties/:id");
   const [, setLocation] = useLocation();
   const { properties, leads, visits, loading: contextLoading } = useImobi();

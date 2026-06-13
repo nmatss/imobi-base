@@ -1,6 +1,8 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState } from "react";
 import { useLocation } from "wouter";
 import { useImobi } from "@/lib/imobi-context";
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -57,6 +59,7 @@ type BrandFormData = {
 };
 
 export default function OnboardingPage() {
+  usePageTitle("Bem-vindo");
   const { user, tenant } = useImobi();
   const [, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState(1);
@@ -78,6 +81,7 @@ export default function OnboardingPage() {
     area: "",
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isSeedingDemo, setIsSeedingDemo] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(tenant?.logo || null);
   const [selectedPlan, setSelectedPlan] = useState<string>("free");
@@ -105,15 +109,10 @@ export default function OnboardingPage() {
   const handleSaveBrand = async () => {
     setIsSaving(true);
     try {
-      await fetch("/api/settings/brand", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          primaryColor: brandData.primaryColor,
-          phone: brandData.phone,
-          address: brandData.address,
-        }),
-        credentials: "include",
+      await apiRequest("PUT", "/api/settings/brand", {
+        primaryColor: brandData.primaryColor,
+        phone: brandData.phone,
+        address: brandData.address,
       });
     } catch {
       // silently continue
@@ -126,23 +125,18 @@ export default function OnboardingPage() {
   const handleCreateProperty = async () => {
     setIsSaving(true);
     try {
-      await fetch("/api/properties", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: propertyData.title,
-          type: propertyData.type,
-          category: propertyData.category,
-          price: propertyData.price,
-          address: propertyData.address,
-          city: propertyData.city,
-          state: propertyData.state,
-          bedrooms: propertyData.bedrooms ? parseInt(propertyData.bedrooms) : null,
-          bathrooms: propertyData.bathrooms ? parseInt(propertyData.bathrooms) : null,
-          area: propertyData.area ? parseInt(propertyData.area) : null,
-          status: "active",
-        }),
-        credentials: "include",
+      await apiRequest("POST", "/api/properties", {
+        title: propertyData.title,
+        type: propertyData.type,
+        category: propertyData.category,
+        price: propertyData.price,
+        address: propertyData.address,
+        city: propertyData.city,
+        state: propertyData.state,
+        bedrooms: propertyData.bedrooms ? parseInt(propertyData.bedrooms) : null,
+        bathrooms: propertyData.bathrooms ? parseInt(propertyData.bathrooms) : null,
+        area: propertyData.area ? parseInt(propertyData.area) : null,
+        status: "active",
       });
     } catch {
       // silently continue
@@ -153,6 +147,21 @@ export default function OnboardingPage() {
   };
 
   const handleFinish = () => {
+    setLocation("/dashboard");
+  };
+
+  const handleExploreWithDemoData = async () => {
+    setIsSeedingDemo(true);
+    try {
+      // 409 = dados de exemplo já existem; apiRequest lança nesse caso, mas o
+      // catch abaixo absorve o erro e seguimos para o dashboard de qualquer
+      // forma — o painel estará populado nos dois cenários.
+      await apiRequest("POST", "/api/onboarding/demo-data");
+    } catch {
+      // silently continue — fluxo de onboarding não deve travar
+    } finally {
+      setIsSeedingDemo(false);
+    }
     setLocation("/dashboard");
   };
 
@@ -588,16 +597,34 @@ export default function OnboardingPage() {
       </div>
       <h1 className="text-3xl md:text-4xl font-heading font-bold mb-4">Tudo pronto!</h1>
       <p className="text-lg text-muted-foreground max-w-lg mb-8">
-        Sua imobiliaria esta configurada e pronta para uso. Comece a explorar o painel agora.
+        Sua imobiliaria esta configurada e pronta para uso. Quer ver o painel
+        ja funcionando com imoveis, leads e visitas de exemplo?
       </p>
 
-      <Button
-        size="lg"
-        className="h-14 px-10 text-lg rounded-full shadow-lg shadow-primary/20 mb-8"
-        onClick={handleFinish}
-      >
-        Ir para o Dashboard <ArrowRight className="ml-2 w-5 h-5" />
-      </Button>
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4">
+        <Button
+          size="lg"
+          className="h-14 px-8 text-lg rounded-full shadow-lg shadow-primary/20"
+          onClick={handleExploreWithDemoData}
+          isLoading={isSeedingDemo}
+        >
+          <Sparkles className="mr-2 w-5 h-5" />
+          Explorar com dados de exemplo
+        </Button>
+        <Button
+          size="lg"
+          variant="outline"
+          className="h-14 px-8 text-lg rounded-full"
+          onClick={handleFinish}
+          disabled={isSeedingDemo}
+        >
+          Comecar do zero <ArrowRight className="ml-2 w-5 h-5" />
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground mb-8 max-w-md">
+        Os dados de exemplo sao marcados com o prefixo [Exemplo] e podem ser
+        removidos a qualquer momento em Configuracoes.
+      </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-2xl">
         <button

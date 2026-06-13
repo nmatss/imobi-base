@@ -14,6 +14,7 @@ import { registerAutoMarketingRoutes } from "./routes-auto-marketing";
 import { registerAVMRoutes as registerAvmRoutes } from "./routes-avm";
 import { registerIsaRoutes } from "./routes-isa";
 import { registerInspectionRoutes } from "./routes-inspections";
+import { registerOnboardingRoutes } from "./routes-onboarding";
 import { registerPortalRoutes } from "./routes-portal";
 import { registerExtensionRoutes } from "./routes-extensions";
 import { registerDocsRoutes } from "./routes-docs";
@@ -126,6 +127,9 @@ app.use((req, res, next) => {
 
   // Register inspection routes (vistoria digital)
   registerInspectionRoutes(app);
+
+  // Register onboarding routes (dados de exemplo pós-onboarding)
+  registerOnboardingRoutes(app);
 
   // Register portal routes (owner/renter self-service)
   registerPortalRoutes(app);

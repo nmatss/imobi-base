@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiRequest } from "@/lib/queryClient";
 import {
   Bell,
   Mail,
@@ -219,19 +220,14 @@ export function NotificationsTab() {
       // Save each notification preference
       await Promise.all(
         notifications.map(async (notif) => {
-          const response = await fetch(`/api/notification-preferences/${notif.eventType}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({
+          try {
+            await apiRequest("PUT", `/api/notification-preferences/${notif.eventType}`, {
               email: notif.email,
               whatsapp: notif.whatsapp,
               appPush: notif.appPush,
               recipients: notif.recipients,
-            }),
-          });
-
-          if (!response.ok) {
+            });
+          } catch {
             throw new Error(`Erro ao salvar preferência para ${notif.label}`);
           }
         })

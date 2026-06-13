@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast-enhanced";
+import { apiRequest } from "@/lib/queryClient";
 import type { Contract } from "@/lib/imobi-context";
 
 // ==================== TYPES ====================
@@ -72,47 +73,17 @@ async function fetchContractById(id: string): Promise<Contract> {
 }
 
 async function createContract(data: CreateContractData): Promise<Contract> {
-  const response = await fetch("/api/contracts", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to create contract");
-  }
-
+  const response = await apiRequest("POST", "/api/contracts", data);
   return response.json();
 }
 
 async function updateContract({ id, ...data }: UpdateContractData): Promise<Contract> {
-  const response = await fetch(`/api/contracts/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to update contract");
-  }
-
+  const response = await apiRequest("PATCH", `/api/contracts/${id}`, data);
   return response.json();
 }
 
 async function deleteContract(id: string): Promise<void> {
-  const response = await fetch(`/api/contracts/${id}`, {
-    method: "DELETE",
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to delete contract");
-  }
+  await apiRequest("DELETE", `/api/contracts/${id}`);
 }
 
 // ==================== QUERY KEYS ====================

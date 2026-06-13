@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useImobi, Property } from "@/lib/imobi-context";
@@ -269,6 +270,7 @@ function PropertyGridVirtualized({
 }
 
 export default function PropertiesList() {
+  usePageTitle("Imóveis");
   const { properties, tenant, visits, leads, refetchProperties, loading } = useImobi();
   const [, setLocation] = useLocation();
 

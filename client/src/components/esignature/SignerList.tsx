@@ -54,10 +54,10 @@ export function SignerList({ listKey, signers }: SignerListProps) {
 
   const resendMutation = useMutation({
     mutationFn: async (signerKey: string) => {
+      // O backend deriva o tenantId do usuário autenticado (req.user.tenantId)
       const res = await fetch(`/api/esignature/resend/${listKey}/${signerKey}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId: 'tenant_1' }), // TODO: Get from context
+        credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed to resend invitation');
       return res.json();

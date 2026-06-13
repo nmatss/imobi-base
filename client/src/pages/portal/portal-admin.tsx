@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -28,6 +29,7 @@ import { toast } from "sonner";
 import { useImobi } from "@/lib/imobi-context";
 
 export default function PortalAdmin() {
+  usePageTitle("Portal Self-Service");
   const { user } = useImobi();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("access");

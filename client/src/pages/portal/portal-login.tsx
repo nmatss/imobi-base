@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Building2, Mail, Lock, Eye, EyeOff } from "lucide-react";
@@ -7,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function PortalLogin() {
+  usePageTitle("Portal do Cliente");
   const [, setLocation] = useLocation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useImobi, Visit, Lead, Property } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -80,6 +81,7 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 // Status colors and labels
 const STATUS_CONFIG = {
@@ -211,6 +213,7 @@ const TIME_SLOTS = [
 ];
 
 export default function CalendarPage() {
+  usePageTitle("Agenda de Visitas");
   const { visits, leads, properties, user, refetchVisits } = useImobi();
   const { toast } = useToast();
 
@@ -564,17 +567,7 @@ export default function CalendarPage() {
         assignedTo: user?.id || null,
       };
 
-      const res = await fetch("/api/visits", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Erro ao criar evento");
-      }
+      await apiRequest("POST", "/api/visits", payload);
 
       toast({
         title: "Evento criado",
@@ -618,17 +611,7 @@ export default function CalendarPage() {
       const url = editingVisit ? `/api/visits/${editingVisit.id}` : "/api/visits";
       const method = editingVisit ? "PATCH" : "POST";
 
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Erro ao salvar visita");
-      }
+      await apiRequest(method, url, payload);
 
       toast({
         title: editingVisit ? "Visita atualizada" : "Visita agendada",
@@ -653,14 +636,11 @@ export default function CalendarPage() {
   // Update visit status
   const handleUpdateVisitStatus = async (visitId: string, status: string, additionalData?: any) => {
     try {
-      const res = await fetch(`/api/visits/${visitId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status, ...additionalData }),
-      });
-
-      if (!res.ok) throw new Error("Erro ao atualizar visita");
+      try {
+        await apiRequest("PATCH", `/api/visits/${visitId}`, { status, ...additionalData });
+      } catch {
+        throw new Error("Erro ao atualizar visita");
+      }
 
       const statusLabels: Record<string, string> = {
         completed: "Visita marcada como realizada",
@@ -693,14 +673,11 @@ export default function CalendarPage() {
       const feedbackTag = `[FEEDBACK:${feedbackValue}] ${feedbackNotes}`.trim();
       const updatedNotes = `${currentNotes} ${feedbackTag}`.trim();
 
-      const res = await fetch(`/api/visits/${feedbackVisit.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ notes: updatedNotes }),
-      });
-
-      if (!res.ok) throw new Error("Erro ao registrar feedback");
+      try {
+        await apiRequest("PATCH", `/api/visits/${feedbackVisit.id}`, { notes: updatedNotes });
+      } catch {
+        throw new Error("Erro ao registrar feedback");
+      }
 
       toast({
         title: "Feedback registrado",
@@ -754,14 +731,11 @@ export default function CalendarPage() {
     const newScheduledFor = new Date(`${format(newDate, "yyyy-MM-dd")}T${originalTime}:00`);
 
     try {
-      const res = await fetch(`/api/visits/${visit.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ scheduledFor: newScheduledFor.toISOString() }),
-      });
-
-      if (!res.ok) throw new Error("Erro ao reagendar visita");
+      try {
+        await apiRequest("PATCH", `/api/visits/${visit.id}`, { scheduledFor: newScheduledFor.toISOString() });
+      } catch {
+        throw new Error("Erro ao reagendar visita");
+      }
 
       toast({
         title: "Visita reagendada",

@@ -53,6 +53,7 @@ import {
   UserX,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import type { User } from "../types";
 
 interface UsersTabProps {
@@ -121,17 +122,7 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
   const handleInviteUser = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/users/invite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(inviteForm),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Erro ao convidar usuário");
-      }
+      await apiRequest("POST", "/api/users/invite", inviteForm);
 
       toast({
         title: "Convite enviado",
@@ -157,17 +148,7 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
 
     setLoading(true);
     try {
-      const response = await fetch(`/api/users/${selectedUser.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(editForm),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Erro ao editar usuário");
-      }
+      await apiRequest("PATCH", `/api/users/${selectedUser.id}`, editForm);
 
       toast({
         title: "Usuário atualizado",
@@ -193,15 +174,7 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
 
     setLoading(true);
     try {
-      const response = await fetch(`/api/users/${selectedUser.id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Erro ao remover usuário");
-      }
+      await apiRequest("DELETE", `/api/users/${selectedUser.id}`);
 
       toast({
         title: "Usuário removido",
@@ -225,17 +198,7 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
   const handleToggleStatus = async (user: User) => {
     const newStatus = user.status === "active" || !user.status ? "inactive" : "active";
     try {
-      const response = await fetch(`/api/users/${user.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Erro ao alterar status");
-      }
+      await apiRequest("PATCH", `/api/users/${user.id}`, { status: newStatus });
 
       toast({
         title: newStatus === "active" ? "Usuário ativado" : "Usuário desativado",
@@ -254,15 +217,7 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
 
   const handleResendInvite = async (user: User) => {
     try {
-      const response = await fetch(`/api/users/${user.id}/resend-invite`, {
-        method: "POST",
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Erro ao reenviar convite");
-      }
+      await apiRequest("POST", `/api/users/${user.id}/resend-invite`);
 
       toast({
         title: "Convite reenviado",

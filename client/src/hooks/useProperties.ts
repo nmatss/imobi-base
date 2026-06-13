@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast-enhanced";
 import type { Property } from "@/lib/imobi-context";
 import { unwrapList } from "@/lib/api-envelope";
+import { apiRequest } from "@/lib/queryClient";
 
 // ==================== TYPES ====================
 
@@ -90,47 +91,17 @@ async function fetchPropertyById(id: string): Promise<Property> {
 }
 
 async function createProperty(data: CreatePropertyData): Promise<Property> {
-  const response = await fetch("/api/properties", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to create property");
-  }
-
+  const response = await apiRequest("POST", "/api/properties", data);
   return response.json();
 }
 
 async function updateProperty({ id, ...data }: UpdatePropertyData): Promise<Property> {
-  const response = await fetch(`/api/properties/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to update property");
-  }
-
+  const response = await apiRequest("PATCH", `/api/properties/${id}`, data);
   return response.json();
 }
 
 async function deleteProperty(id: string): Promise<void> {
-  const response = await fetch(`/api/properties/${id}`, {
-    method: "DELETE",
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to delete property");
-  }
+  await apiRequest("DELETE", `/api/properties/${id}`);
 }
 
 // ==================== QUERY KEYS ====================

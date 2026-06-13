@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { apiRequest } from "@/lib/queryClient";
 
 function portalFetch(url: string) {
   return fetch(url, {
@@ -140,21 +141,10 @@ export default function OwnerPortal() {
   const handleApproveTicket = async (approved: boolean) => {
     if (!selectedTicket) return;
     try {
-      const res = await fetch(`/api/portal/owner/maintenance/${selectedTicket.id}/approve`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({ approved, notes: approveNotes }),
+      await apiRequest("PUT", `/api/portal/owner/maintenance/${selectedTicket.id}/approve`, {
+        approved,
+        notes: approveNotes,
       });
-
-      if (!res.ok) {
-        // Falha não fecha o dialog — o proprietário pode tentar de novo
-        const payload = await res.json().catch(() => null);
-        toast.error(payload?.error || payload?.message || "Erro ao registrar a aprovação. Tente novamente.");
-        return;
-      }
 
       toast.success(approved ? "Manutenção aprovada com sucesso!" : "Manutenção recusada.");
       // Atualiza a lista de chamados para refletir o novo status
@@ -163,8 +153,19 @@ export default function OwnerPortal() {
       setSelectedTicket(null);
       setApproveNotes("");
     } catch (err) {
+      // apiRequest lança em !res.ok (HTTP) e também em falha de rede.
+      // O dialog NÃO fecha — o proprietário pode tentar de novo.
       console.error("Error approving ticket:", err);
-      toast.error("Erro de conexão ao registrar a aprovação. Tente novamente.");
+      const raw = err instanceof Error ? err.message : "";
+      // throwIfResNotOk monta "<status>: <body>"; tenta extrair error/message do corpo JSON.
+      let friendly = "";
+      const sepIndex = raw.indexOf(": ");
+      const body = sepIndex >= 0 ? raw.slice(sepIndex + 2) : raw;
+      try {
+        const payload = JSON.parse(body);
+        friendly = payload?.error || payload?.message || "";
+      } catch { /* corpo não-JSON (ex.: erro de rede) */ }
+      toast.error(friendly || "Erro ao registrar a aprovação. Tente novamente.");
     }
   };
 

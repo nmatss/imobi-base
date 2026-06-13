@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Building2, Lock, Eye, EyeOff, CheckCircle } from "lucide-react";
@@ -13,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
  * /api/portal/reset-password.
  */
 export default function PortalResetPassword() {
+  usePageTitle("Criar Nova Senha");
   const [, setLocation] = useLocation();
   const [token, setToken] = useState("");
   const [email, setEmail] = useState("");

@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Card } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 
 export default function VerifyEmail() {
+  usePageTitle("Verificação de E-mail");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   // wouter não expõe a query string no hook de rota — lê direto da URL.

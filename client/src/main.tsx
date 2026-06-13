@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "./lib/queryClient";
+import { queryClient, apiRequest } from "./lib/queryClient";
 import App from "./App";
 import "./index.css";
 import React from "react";
@@ -24,12 +24,7 @@ if (import.meta.env.PROD) {
 
       // Send to analytics endpoint (if configured)
       if (window.location.hostname !== 'localhost') {
-        fetch('/api/analytics/vitals', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, value, id, rating }),
-          keepalive: true,
-        }).catch(() => {
+        apiRequest('POST', '/api/analytics/vitals', { name, value, id, rating }).catch(() => {
           // Silently fail - analytics shouldn't break the app
         });
       }

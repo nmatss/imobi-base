@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState, useCallback, useMemo, useEffect } from "react";
 import { useImobi, Contract, Lead, Property } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -87,6 +88,7 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 // Format price to BRL
 function formatPrice(price: string | number) {
@@ -175,6 +177,7 @@ const WIZARD_STEPS = [
 ];
 
 export default function ContractsPage() {
+  usePageTitle("Propostas e Contratos");
   const { contracts, leads, properties, tenant, user, refetchContracts } = useImobi();
   const { toast } = useToast();
 
@@ -466,16 +469,17 @@ export default function ContractsPage() {
         signedAt: wizardType === "contract" ? new Date().toISOString() : null,
       };
 
-      const res = await fetch("/api/contracts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Erro ao criar registro");
+      try {
+        await apiRequest("POST", "/api/contracts", payload);
+      } catch (err: any) {
+        let message = "Erro ao criar registro";
+        try {
+          const parsed = JSON.parse(err?.message?.replace(/^\d+:\s*/, "") || "{}");
+          if (parsed?.error) message = parsed.error;
+        } catch {
+          // keep default message
+        }
+        throw new Error(message);
       }
 
       toast({
@@ -504,14 +508,11 @@ export default function ContractsPage() {
         payload.signedAt = new Date().toISOString();
       }
 
-      const res = await fetch(`/api/contracts/${contractId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) throw new Error("Erro ao atualizar");
+      try {
+        await apiRequest("PATCH", `/api/contracts/${contractId}`, payload);
+      } catch {
+        throw new Error("Erro ao atualizar");
+      }
 
       const statusLabels: Record<string, string> = {
         sent: "enviada",
@@ -549,14 +550,11 @@ export default function ContractsPage() {
         status: "draft",
       };
 
-      const res = await fetch("/api/contracts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) throw new Error("Erro ao duplicar");
+      try {
+        await apiRequest("POST", "/api/contracts", payload);
+      } catch {
+        throw new Error("Erro ao duplicar");
+      }
 
       toast({
         title: "Proposta duplicada",

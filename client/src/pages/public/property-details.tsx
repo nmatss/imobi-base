@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import InterestForm from "@/components/public/InterestForm";
+import { toast } from "sonner";
 import { unwrapList } from "@/lib/api-envelope";
 import {
   MapPin,
@@ -29,7 +30,6 @@ import {
   Wifi,
   Dumbbell,
   TreePine,
-  Calculator,
 } from "lucide-react";
 
 type Tenant = {
@@ -186,7 +186,7 @@ export default function PropertyDetails() {
     } else {
       // Fallback: copy to clipboard
       navigator.clipboard.writeText(window.location.href);
-      alert("Link copiado para a área de transferência!");
+      toast.success("Link copiado para a área de transferência!");
     }
   };
 
@@ -507,23 +507,6 @@ export default function PropertyDetails() {
                     </div>
                   )}
 
-                  {/* Financing Calculator Link */}
-                  {property.category === "sale" && (
-                    <Button
-                      variant="link"
-                      className="h-auto p-0 text-primary"
-                      asChild
-                    >
-                      <button
-                        onClick={() => {
-                          alert("Calculadora de financiamento em breve!");
-                        }}
-                      >
-                        <Calculator className="h-4 w-4 mr-1" />
-                        Simular financiamento
-                      </button>
-                    </Button>
-                  )}
                 </div>
               </div>
 

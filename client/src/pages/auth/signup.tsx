@@ -5,7 +5,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Building2, Eye, EyeOff, CheckCircle2 } from "lucide-react";
+import { Eye, EyeOff, CheckCircle2 } from "lucide-react";
+import { Logo, LogoIcon } from "@/components/brand/logo";
 import { SeoHead } from "@/components/seo/SeoHead";
 
 function slugify(text: string): string {
@@ -141,10 +142,10 @@ export default function SignupPage() {
 
         <div className="relative z-10">
           <div className="flex items-center gap-3 text-white">
-            <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-              <Building2 className="h-7 w-7" />
+            <div className="w-12 h-12 rounded-xl bg-white/95 shadow-lg flex items-center justify-center">
+              <LogoIcon className="h-8 w-8" />
             </div>
-            <span className="font-heading font-bold text-2xl">ImobiBase</span>
+            <span className="font-heading font-extrabold text-2xl tracking-tight">ImobiBase</span>
           </div>
         </div>
 
@@ -172,18 +173,15 @@ export default function SignupPage() {
         </div>
 
         <div className="relative z-10 text-white/60 text-sm">
-          &copy; 2024 ImobiBase. Todos os direitos reservados.
+          &copy; {new Date().getFullYear()} ImobiBase. Todos os direitos reservados.
         </div>
       </div>
 
       {/* Right Side - Signup Form */}
       <div className="flex-1 flex items-center justify-center p-8 bg-background">
         <div className="w-full max-w-md space-y-6">
-          <div className="lg:hidden flex items-center justify-center gap-2 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white">
-              <Building2 className="h-6 w-6" />
-            </div>
-            <span className="font-heading font-bold text-xl">ImobiBase</span>
+          <div className="lg:hidden flex items-center justify-center mb-6">
+            <Logo wordmarkClassName="text-xl" iconClassName="h-10 w-10" />
           </div>
 
           <div className="text-center lg:text-left">

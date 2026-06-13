@@ -29,7 +29,6 @@ import {
   MoreVertical,
   Phone,
   Mail,
-  FileText,
   MessageCircle,
   History,
   User,
@@ -46,7 +45,6 @@ interface InquilinosTabProps {
   contracts: RentalContract[];
   payments: RentalPayment[];
   onCreateRenter: () => void;
-  onViewRenter: (renter: Renter) => void;
   onEditRenter: (renter: Renter) => void;
   onSendCollection: (renter: Renter) => void;
   loading?: boolean;
@@ -57,7 +55,6 @@ export function InquilinosTab({
   contracts,
   payments,
   onCreateRenter,
-  onViewRenter,
   onEditRenter,
   onSendCollection,
   loading,
@@ -215,10 +212,6 @@ export function InquilinosTab({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => onViewRenter(renter)}>
-                            <FileText className="h-4 w-4 mr-2" />
-                            Ver Detalhes
-                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => onEditRenter(renter)}>
                             <User className="h-4 w-4 mr-2" />
                             Editar
@@ -286,10 +279,6 @@ export function InquilinosTab({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onViewRenter(renter)}>
-                        <FileText className="h-4 w-4 mr-2" />
-                        Ver Detalhes
-                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onEditRenter(renter)}>
                         <User className="h-4 w-4 mr-2" />
                         Editar
@@ -371,15 +360,71 @@ export function InquilinosTab({
 
       {/* History Sheet */}
       <Sheet open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-        <SheetContent side="right" className="w-full sm:w-[500px]">
+        <SheetContent side="right" className="w-full sm:w-[500px] overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Histórico - {selectedRenter?.name}</SheetTitle>
           </SheetHeader>
-          <div className="mt-4">
-            <p className="text-sm text-muted-foreground">
-              Funcionalidade de histórico será implementada em breve.
-            </p>
-          </div>
+          {selectedRenter && (() => {
+            const renterContractIds = contracts
+              .filter((c) => c.renterId === selectedRenter.id)
+              .map((c) => c.id);
+            const renterPayments = payments
+              .filter((p) => renterContractIds.includes(p.rentalContractId))
+              .sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime());
+            const now = new Date();
+
+            return (
+              <div className="mt-4 space-y-2">
+                {renterPayments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Nenhum pagamento registrado para este inquilino.
+                  </p>
+                ) : (
+                  renterPayments.map((payment) => {
+                    const isOverdue =
+                      payment.status === "pending" && new Date(payment.dueDate) < now;
+                    return (
+                      <div
+                        key={payment.id}
+                        className="flex items-center justify-between p-3 rounded-lg border"
+                      >
+                        <div>
+                          <p className="text-sm font-medium">
+                            Vencimento: {new Date(payment.dueDate).toLocaleDateString("pt-BR")}
+                          </p>
+                          {payment.paidDate && (
+                            <p className="text-xs text-muted-foreground">
+                              Pago em {new Date(payment.paidDate).toLocaleDateString("pt-BR")}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold">
+                            {formatPrice(Number(payment.totalValue || 0))}
+                          </p>
+                          {payment.status === "paid" ? (
+                            <Badge className="bg-green-100 text-green-700 border-green-200 text-[10px]">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Pago
+                            </Badge>
+                          ) : isOverdue ? (
+                            <Badge className="bg-red-100 text-red-700 border-red-200 text-[10px]">
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              Atrasado
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 text-[10px]">
+                              Pendente
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            );
+          })()}
         </SheetContent>
       </Sheet>
     </div>

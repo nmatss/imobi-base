@@ -1,3 +1,4 @@
+import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -83,6 +84,7 @@ const vitalDescription = (name: string) => {
 };
 
 export default function AnalyticsPage() {
+  usePageTitle("Analytics");
   const [period, setPeriod] = useState<string>("month");
 
   const { data, isLoading, error } = useQuery<AnalyticsDashboardData>({

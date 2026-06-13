@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { apiRequest } from "@/lib/queryClient";
 
 interface UsageResource {
   current: number;
@@ -195,17 +196,9 @@ export function PlansTab() {
   async function handleCancelSubscription() {
     setCancelling(true);
     try {
-      const res = await fetch("/api/payments/stripe/cancel-subscription", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ immediate: false }),
+      await apiRequest("POST", "/api/payments/stripe/cancel-subscription", {
+        immediate: false,
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Erro ao cancelar assinatura");
-      }
 
       toast.success(
         "Assinatura cancelada. Ela permanecerá ativa até o final do período atual.",
@@ -222,16 +215,12 @@ export function PlansTab() {
 
   async function handleManageBilling() {
     try {
-      const res = await fetch(
+      const res = await apiRequest(
+        "POST",
         "/api/payments/stripe/create-portal-session",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-        },
       );
       const data = await res.json();
-      if (!res.ok || !data.url) {
+      if (!data.url) {
         throw new Error(data.error || "Não foi possível abrir o portal");
       }
       window.location.href = data.url;
@@ -251,19 +240,9 @@ export function PlansTab() {
       return;
     }
     try {
-      const res = await fetch(
-        "/api/payments/stripe/reactivate-subscription",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ subscriptionId }),
-        },
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Erro ao reativar assinatura");
-      }
+      await apiRequest("POST", "/api/payments/stripe/reactivate-subscription", {
+        subscriptionId,
+      });
       toast.success("Assinatura reativada com sucesso!");
       fetchSubscription();
     } catch (err) {
