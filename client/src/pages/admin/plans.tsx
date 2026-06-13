@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Check, Edit, DollarSign, Users, Building2, Plug } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
+import { apiRequest } from "@/lib/queryClient";
 
 type Plan = {
   id: string;
@@ -67,25 +68,26 @@ export default function PlansPage() {
     if (!selectedPlan) return;
 
     try {
-      const res = await fetch(`/api/admin/plans/${selectedPlan.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(formData),
-      });
-
-      if (res.ok) {
-        toast.success("Plano atualizado com sucesso!");
-        setEditModalOpen(false);
-        setSelectedPlan(null);
-        resetForm();
-        fetchPlans();
-      } else {
-        const error = await res.json();
-        toast.error(error.error || "Erro ao atualizar plano");
-      }
+      await apiRequest("PATCH", `/api/admin/plans/${selectedPlan.id}`, formData);
+      toast.success("Plano atualizado com sucesso!");
+      setEditModalOpen(false);
+      setSelectedPlan(null);
+      resetForm();
+      fetchPlans();
     } catch (error) {
-      toast.error("Erro ao atualizar plano");
+      let message = "Erro ao atualizar plano";
+      // apiRequest throws Error("<status>: <body>"); try to surface the
+      // server-provided message (JSON { error } or plain text) as before.
+      if (error instanceof Error) {
+        const body = error.message.replace(/^\d+:\s*/, "");
+        try {
+          const parsed = JSON.parse(body);
+          if (parsed?.error) message = parsed.error;
+        } catch {
+          /* body was not JSON; keep generic message */
+        }
+      }
+      toast.error(message);
     }
   }
 

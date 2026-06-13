@@ -42,6 +42,7 @@ import { LeadCard as LeadCardComponent } from "@/components/leads/LeadCard";
 import type { LeadSource } from "@/components/leads/LeadCard";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
+import { apiRequest } from "@/lib/queryClient";
 
 // ==================== TYPES ====================
 
@@ -634,25 +635,15 @@ export default function LeadsKanban() {
     }
 
     try {
-      const res = await fetch(`/api/leads/${draggedLead.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status: newStatus }),
-      });
+      await apiRequest("PATCH", `/api/leads/${draggedLead.id}`, { status: newStatus });
 
-      if (res.ok) {
-        const statusLabel = COLUMNS.find((c) => c.id === newStatus)?.label || newStatus;
-        toast.success("Lead movido", `Lead movido para "${statusLabel}".`);
-        await refetchLeads();
-      } else {
-        const payload = await res.json().catch(() => null);
-        toast.error("Erro ao mover lead", payload?.error || payload?.message || "Não foi possível mover o lead.");
-        // Re-sincroniza o quadro com o servidor para o card voltar à coluna original
-        await refetchLeads();
-      }
+      const statusLabel = COLUMNS.find((c) => c.id === newStatus)?.label || newStatus;
+      toast.success("Lead movido", `Lead movido para "${statusLabel}".`);
+      await refetchLeads();
     } catch (error) {
-      toast.error("Erro", "Não foi possível mover o lead.");
+      toast.error("Erro ao mover lead", "Não foi possível mover o lead.");
+      // Re-sincroniza o quadro com o servidor para o card voltar à coluna original
+      await refetchLeads();
     }
 
     setDraggedLead(null);
@@ -661,24 +652,14 @@ export default function LeadsKanban() {
   const handleMoveToStatus = async (leadId: string, newStatus: LeadStatus) => {
     setMovingLead(leadId);
     try {
-      const res = await fetch(`/api/leads/${leadId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status: newStatus }),
-      });
+      await apiRequest("PATCH", `/api/leads/${leadId}`, { status: newStatus });
 
-      if (res.ok) {
-        toast.success("Lead movido");
-        await refetchLeads();
-      } else {
-        const payload = await res.json().catch(() => null);
-        toast.error("Erro ao mover lead", payload?.error || payload?.message || "Não foi possível mover o lead.");
-        // Re-sincroniza o quadro com o servidor para o card voltar à coluna original
-        await refetchLeads();
-      }
+      toast.success("Lead movido");
+      await refetchLeads();
     } catch (error) {
-      toast.error("Erro", "Não foi possível mover o lead.");
+      toast.error("Erro ao mover lead", "Não foi possível mover o lead.");
+      // Re-sincroniza o quadro com o servidor para o card voltar à coluna original
+      await refetchLeads();
     } finally {
       setMovingLead(null);
     }
@@ -708,14 +689,7 @@ export default function LeadsKanban() {
       const url = selectedLead ? `/api/leads/${selectedLead.id}` : "/api/leads";
       const method = selectedLead ? "PATCH" : "POST";
 
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) throw new Error("Erro ao salvar lead");
+      await apiRequest(method, url, payload);
 
       if (selectedLead) {
         toast.crud.updated("Lead");
@@ -737,22 +711,15 @@ export default function LeadsKanban() {
 
     setIsAddingInteraction(true);
     try {
-      const res = await fetch("/api/interactions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          leadId: selectedLead.id,
-          type: newInteractionType,
-          content: newInteractionContent,
-        }),
+      await apiRequest("POST", "/api/interactions", {
+        leadId: selectedLead.id,
+        type: newInteractionType,
+        content: newInteractionContent,
       });
 
-      if (res.ok) {
-        toast.crud.created("Interação");
-        setNewInteractionContent("");
-        await loadLeadDetails(selectedLead.id);
-      }
+      toast.crud.created("Interação");
+      setNewInteractionContent("");
+      await loadLeadDetails(selectedLead.id);
     } catch (error) {
       toast.errors.operation("registrar a interação");
     } finally {
@@ -764,26 +731,19 @@ export default function LeadsKanban() {
     if (!selectedLead || !newFollowUpDate) return;
     setIsCreatingFollowUp(true);
     try {
-      const res = await fetch("/api/follow-ups", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          leadId: selectedLead.id,
-          type: newFollowUpType,
-          dueAt: new Date(newFollowUpDate).toISOString(),
-          notes: newFollowUpNotes || null,
-          status: "pending",
-        }),
+      await apiRequest("POST", "/api/follow-ups", {
+        leadId: selectedLead.id,
+        type: newFollowUpType,
+        dueAt: new Date(newFollowUpDate).toISOString(),
+        notes: newFollowUpNotes || null,
+        status: "pending",
       });
-      if (res.ok) {
-        toast.crud.created("Lembrete");
-        setNewFollowUpDate("");
-        setNewFollowUpNotes("");
-        setIsFollowUpModalOpen(false);
-        await loadLeadDetails(selectedLead.id);
-        await fetchAllFollowUps();
-      }
+      toast.crud.created("Lembrete");
+      setNewFollowUpDate("");
+      setNewFollowUpNotes("");
+      setIsFollowUpModalOpen(false);
+      await loadLeadDetails(selectedLead.id);
+      await fetchAllFollowUps();
     } catch (error) {
       toast.errors.operation("criar o lembrete");
     } finally {
@@ -794,12 +754,7 @@ export default function LeadsKanban() {
   const handleCompleteFollowUp = async (followUpId: string) => {
     setCompletingFollowUp(followUpId);
     try {
-      await fetch(`/api/follow-ups/${followUpId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status: "completed", completedAt: new Date().toISOString() }),
-      });
+      await apiRequest("PATCH", `/api/follow-ups/${followUpId}`, { status: "completed", completedAt: new Date().toISOString() });
       toast.success("Lembrete concluído");
       if (selectedLead) await loadLeadDetails(selectedLead.id);
       await fetchAllFollowUps();
@@ -814,14 +769,9 @@ export default function LeadsKanban() {
     if (!selectedLead) return;
     try {
       if (isAssigned) {
-        await fetch(`/api/leads/${selectedLead.id}/tags/${tagId}`, { method: "DELETE", credentials: "include" });
+        await apiRequest("DELETE", `/api/leads/${selectedLead.id}/tags/${tagId}`);
       } else {
-        await fetch(`/api/leads/${selectedLead.id}/tags`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ tagId }),
-        });
+        await apiRequest("POST", `/api/leads/${selectedLead.id}/tags`, { tagId });
       }
       await loadLeadDetails(selectedLead.id);
       await fetchAllLeadTags();
@@ -834,17 +784,10 @@ export default function LeadsKanban() {
     if (!newTagName.trim()) return;
     setIsCreatingTag(true);
     try {
-      const res = await fetch("/api/lead-tags", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ name: newTagName, color: newTagColor }),
-      });
-      if (res.ok) {
-        toast.success("Tag criada");
-        setNewTagName("");
-        await fetchAllTags();
-      }
+      await apiRequest("POST", "/api/lead-tags", { name: newTagName, color: newTagColor });
+      toast.success("Tag criada");
+      setNewTagName("");
+      await fetchAllTags();
     } catch (error) {
       toast.error("Erro");
     } finally {
@@ -855,7 +798,7 @@ export default function LeadsKanban() {
   const handleArchive = async (leadId: string) => {
     setArchivingLead(true);
     try {
-      await fetch(`/api/leads/${leadId}`, { method: "DELETE", credentials: "include" });
+      await apiRequest("DELETE", `/api/leads/${leadId}`);
       toast.success("Lead arquivado");
       setIsDetailOpen(false);
       setSelectedLead(null);
@@ -928,12 +871,7 @@ export default function LeadsKanban() {
     setBulkActionLoading(true);
     try {
       const promises = Array.from(selectedLeads).map((leadId) =>
-        fetch(`/api/leads/${leadId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ status }),
-        })
+        apiRequest("PATCH", `/api/leads/${leadId}`, { status })
       );
       await Promise.all(promises);
       toast.success("Leads movidos", `${selectedLeads.size} lead(s) movido(s) para ${COLUMNS.find((c) => c.id === status)?.label}`);
@@ -952,12 +890,7 @@ export default function LeadsKanban() {
     setBulkActionLoading(true);
     try {
       const promises = Array.from(selectedLeads).map((leadId) =>
-        fetch(`/api/leads/${leadId}/tags`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ tagId }),
-        })
+        apiRequest("POST", `/api/leads/${leadId}/tags`, { tagId })
       );
       await Promise.all(promises);
       toast.success("Tags adicionadas", `Tag adicionada a ${selectedLeads.size} lead(s)`);
@@ -974,10 +907,7 @@ export default function LeadsKanban() {
     setBulkActionLoading(true);
     try {
       const promises = Array.from(selectedLeads).map((leadId) =>
-        fetch(`/api/leads/${leadId}/tags/${tagId}`, {
-          method: "DELETE",
-          credentials: "include",
-        })
+        apiRequest("DELETE", `/api/leads/${leadId}/tags/${tagId}`)
       );
       await Promise.all(promises);
       toast.success("Tags removidas", `Tag removida de ${selectedLeads.size} lead(s)`);
@@ -994,10 +924,7 @@ export default function LeadsKanban() {
     setBulkActionLoading(true);
     try {
       const promises = Array.from(selectedLeads).map((leadId) =>
-        fetch(`/api/leads/${leadId}`, {
-          method: "DELETE",
-          credentials: "include",
-        })
+        apiRequest("DELETE", `/api/leads/${leadId}`)
       );
       await Promise.all(promises);
       toast.success("Leads arquivados", `${selectedLeads.size} lead(s) arquivado(s)`);

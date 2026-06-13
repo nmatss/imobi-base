@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast-enhanced";
-import { cacheStrategies } from "@/lib/queryClient";
+import { cacheStrategies, apiRequest } from "@/lib/queryClient";
 
 // ==================== TYPES ====================
 
@@ -88,63 +88,22 @@ async function fetchFollowUpById(id: string): Promise<FollowUp> {
 }
 
 async function createFollowUp(data: CreateFollowUpData): Promise<FollowUp> {
-  const response = await fetch("/api/follow-ups", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to create follow-up");
-  }
-
+  const response = await apiRequest("POST", "/api/follow-ups", data);
   return response.json();
 }
 
 async function updateFollowUp({ id, ...data }: UpdateFollowUpData): Promise<FollowUp> {
-  const response = await fetch(`/api/follow-ups/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to update follow-up");
-  }
-
+  const response = await apiRequest("PATCH", `/api/follow-ups/${id}`, data);
   return response.json();
 }
 
 async function completeFollowUp({ id, notes }: CompleteFollowUpData): Promise<FollowUp> {
-  const response = await fetch(`/api/follow-ups/${id}/complete`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ notes }),
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to complete follow-up");
-  }
-
+  const response = await apiRequest("POST", `/api/follow-ups/${id}/complete`, { notes });
   return response.json();
 }
 
 async function deleteFollowUp(id: string): Promise<void> {
-  const response = await fetch(`/api/follow-ups/${id}`, {
-    method: "DELETE",
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || "Failed to delete follow-up");
-  }
+  await apiRequest("DELETE", `/api/follow-ups/${id}`);
 }
 
 // ==================== QUERY KEYS ====================

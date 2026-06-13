@@ -11,6 +11,7 @@ import { Globe, MessageSquare, Mail, FileText, BarChart3, Settings, Loader2, Che
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { apiRequest } from "@/lib/queryClient";
 
 interface IntegrationConfig {
   name: string;
@@ -149,20 +150,10 @@ export function IntegrationsTab() {
 
     setSaving(true);
     try {
-      const response = await fetch(`/api/integrations/${selectedIntegration.name}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          enabled: true,
-          config: configForm,
-        }),
+      await apiRequest("PUT", `/api/integrations/${selectedIntegration.name}`, {
+        enabled: true,
+        config: configForm,
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Erro ao salvar configuração");
-      }
 
       toast({
         title: "Integração configurada",
@@ -184,17 +175,7 @@ export function IntegrationsTab() {
 
   const handleToggleIntegration = async (integrationName: string, currentStatus: boolean) => {
     try {
-      const response = await fetch(`/api/integrations/${integrationName}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ enabled: !currentStatus }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Erro ao alterar status");
-      }
+      await apiRequest("PUT", `/api/integrations/${integrationName}`, { enabled: !currentStatus });
 
       toast({
         title: currentStatus ? "Integração desconectada" : "Integração conectada",

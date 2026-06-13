@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { apiRequest } from "@/lib/queryClient";
 import { Download, Trash2, FileText, Shield, AlertTriangle, CheckCircle, Clock } from "lucide-react";
 
 export default function PrivacySettings() {
@@ -58,22 +59,16 @@ export default function PrivacySettings() {
   const handleExportData = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/compliance/export-data", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ format: "json", includeRelated: true }),
+      const res = await apiRequest("POST", "/api/compliance/export-data", {
+        format: "json",
+        includeRelated: true,
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        toast({
-          title: "Exportação Solicitada",
-          description: "Você receberá um e-mail quando a exportação estiver pronta.",
-        });
-        setExportStatus(data);
-      } else {
-        throw new Error("Falha ao solicitar exportação");
-      }
+      const data = await res.json();
+      toast({
+        title: "Exportação Solicitada",
+        description: "Você receberá um e-mail quando a exportação estiver pronta.",
+      });
+      setExportStatus(data);
     } catch (error) {
       toast({
         title: "Erro",
@@ -97,25 +92,16 @@ export default function PrivacySettings() {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/compliance/delete-account", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reason: "User requested account deletion",
-          deletionType: "anonymize",
-        }),
+      const res = await apiRequest("POST", "/api/compliance/delete-account", {
+        reason: "User requested account deletion",
+        deletionType: "anonymize",
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        toast({
-          title: "Exclusão Solicitada",
-          description: "Verifique seu e-mail para confirmar a exclusão da conta.",
-        });
-        setDeletionStatus(data);
-      } else {
-        throw new Error("Falha ao solicitar exclusão");
-      }
+      const data = await res.json();
+      toast({
+        title: "Exclusão Solicitada",
+        description: "Verifique seu e-mail para confirmar a exclusão da conta.",
+      });
+      setDeletionStatus(data);
     } catch (error) {
       toast({
         title: "Erro",
@@ -129,17 +115,12 @@ export default function PrivacySettings() {
 
   const handleWithdrawConsent = async (consentType: string) => {
     try {
-      const res = await fetch(`/api/compliance/consents/${consentType}`, {
-        method: "DELETE",
+      await apiRequest("DELETE", `/api/compliance/consents/${consentType}`);
+      toast({
+        title: "Consentimento Retirado",
+        description: `Seu consentimento para ${consentType} foi retirado com sucesso.`,
       });
-
-      if (res.ok) {
-        toast({
-          title: "Consentimento Retirado",
-          description: `Seu consentimento para ${consentType} foi retirado com sucesso.`,
-        });
-        loadConsents();
-      }
+      loadConsents();
     } catch (error) {
       toast({
         title: "Erro",

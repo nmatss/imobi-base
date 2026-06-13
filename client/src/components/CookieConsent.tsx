@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { X, Settings } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
 interface CookiePreferences {
   essential: boolean;
@@ -50,14 +51,10 @@ export function CookieConsent() {
     // Send to backend
     try {
       const sessionId = getOrCreateSessionId();
-      await fetch("/api/compliance/cookie-consent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId,
-          preferences: prefs,
-          consentVersion: COOKIE_VERSION,
-        }),
+      await apiRequest("POST", "/api/compliance/cookie-consent", {
+        sessionId,
+        preferences: prefs,
+        consentVersion: COOKIE_VERSION,
       });
     } catch (error) {
       console.error("Failed to save cookie consent:", error);

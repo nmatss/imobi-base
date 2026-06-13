@@ -29,6 +29,7 @@ import { DashboardPipeline } from "@/components/dashboard/DashboardPipeline";
 import { DashboardCardSkeleton } from "@/components/ui/skeleton-loaders";
 import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { Spinner } from "@/components/ui/spinner";
+import { apiRequest } from "@/lib/queryClient";
 
 // Lazy load Recharts components to reduce initial bundle size
 const Bar = lazy(() => import("recharts").then(m => ({ default: m.Bar as unknown as React.ComponentType<any> })));
@@ -89,6 +90,23 @@ function parseCurrencyValue(value: string | null | undefined): number {
   return isNaN(parsed) ? 0 : parsed;
 }
 
+// apiRequest lança Error no formato "${status}: ${body}". Extrai a mensagem
+// amigável do corpo (error/message) quando ele é JSON, preservando o
+// comportamento anterior que lia payload.error || payload.message.
+function extractApiErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error) {
+    const colonIdx = error.message.indexOf(": ");
+    const body = colonIdx >= 0 ? error.message.slice(colonIdx + 2) : error.message;
+    try {
+      const payload = JSON.parse(body);
+      return payload?.error || payload?.message || fallback;
+    } catch {
+      // corpo não-JSON: usa fallback genérico
+    }
+  }
+  return fallback;
+}
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -129,25 +147,18 @@ export default function Dashboard() {
   const handleCompleteFollowUp = async (id: string) => {
     setCompletingFollowUp(id);
     try {
-      const res = await fetch(`/api/follow-ups/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status: "completed", completedAt: new Date().toISOString() }),
+      await apiRequest("PATCH", `/api/follow-ups/${id}`, {
+        status: "completed",
+        completedAt: new Date().toISOString(),
       });
-      if (res.ok) {
-        toast({ title: "Lembrete concluído", description: "O lembrete foi marcado como concluído." });
-        refetchFollowUps();
-      } else {
-        const payload = await res.json().catch(() => null);
-        toast({
-          title: "Erro",
-          description: payload?.error || payload?.message || "Não foi possível concluir o lembrete.",
-          variant: "destructive",
-        });
-      }
+      toast({ title: "Lembrete concluído", description: "O lembrete foi marcado como concluído." });
+      refetchFollowUps();
     } catch (error) {
-      toast({ title: "Erro", description: "Não foi possível concluir o lembrete.", variant: "destructive" });
+      toast({
+        title: "Erro",
+        description: extractApiErrorMessage(error, "Não foi possível concluir o lembrete."),
+        variant: "destructive",
+      });
     } finally {
       setCompletingFollowUp(null);
     }
@@ -186,35 +197,25 @@ export default function Dashboard() {
 
     setIsSubmitting(true);
     try {
-      const res = await fetch("/api/leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          name: newLeadForm.name,
-          email: newLeadForm.email,
-          phone: newLeadForm.phone,
-          source: newLeadForm.source,
-          status: "new",
-        }),
+      await apiRequest("POST", "/api/leads", {
+        name: newLeadForm.name,
+        email: newLeadForm.email,
+        phone: newLeadForm.phone,
+        source: newLeadForm.source,
+        status: "new",
       });
 
-      if (res.ok) {
-        setNewLeadOpen(false);
-        setNewLeadForm({ name: "", email: "", phone: "", source: "website" });
-        await refetchLeads();
-        toast({ title: "Lead criado", description: "O lead foi cadastrado com sucesso." });
-      } else {
-        const payload = await res.json().catch(() => null);
-        toast({
-          title: "Erro ao criar lead",
-          description: payload?.error || payload?.message || "Não foi possível criar o lead.",
-          variant: "destructive",
-        });
-      }
+      setNewLeadOpen(false);
+      setNewLeadForm({ name: "", email: "", phone: "", source: "website" });
+      await refetchLeads();
+      toast({ title: "Lead criado", description: "O lead foi cadastrado com sucesso." });
     } catch (error) {
       console.error("Failed to create lead:", error);
-      toast({ title: "Erro", description: "Não foi possível criar o lead.", variant: "destructive" });
+      toast({
+        title: "Erro ao criar lead",
+        description: extractApiErrorMessage(error, "Não foi possível criar o lead."),
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }

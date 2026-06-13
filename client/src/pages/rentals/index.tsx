@@ -1,6 +1,7 @@
 import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useCallback, useEffect, useState } from "react";
 import { useImobi } from "@/lib/imobi-context";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -363,13 +364,11 @@ export default function RentalsPage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const res = await fetch(editingOwner ? `/api/owners/${editingOwner.id}` : "/api/owners", {
-        method: editingOwner ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(ownerForm),
-      });
-      if (!res.ok) throw new Error(editingOwner ? "Erro ao atualizar locador" : "Erro ao criar locador");
+      try {
+        await apiRequest(editingOwner ? "PATCH" : "POST", editingOwner ? `/api/owners/${editingOwner.id}` : "/api/owners", ownerForm);
+      } catch {
+        throw new Error(editingOwner ? "Erro ao atualizar locador" : "Erro ao criar locador");
+      }
       toast({ title: "Sucesso", description: editingOwner ? "Locador atualizado com sucesso" : "Locador criado com sucesso" });
       setIsOwnerModalOpen(false);
       setEditingOwner(null);
@@ -386,13 +385,11 @@ export default function RentalsPage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const res = await fetch(editingRenter ? `/api/renters/${editingRenter.id}` : "/api/renters", {
-        method: editingRenter ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(renterForm),
-      });
-      if (!res.ok) throw new Error(editingRenter ? "Erro ao atualizar inquilino" : "Erro ao criar inquilino");
+      try {
+        await apiRequest(editingRenter ? "PATCH" : "POST", editingRenter ? `/api/renters/${editingRenter.id}` : "/api/renters", renterForm);
+      } catch {
+        throw new Error(editingRenter ? "Erro ao atualizar inquilino" : "Erro ao criar inquilino");
+      }
       toast({ title: "Sucesso", description: editingRenter ? "Inquilino atualizado com sucesso" : "Inquilino criado com sucesso" });
       setIsRenterModalOpen(false);
       setEditingRenter(null);
@@ -433,13 +430,11 @@ export default function RentalsPage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const res = await fetch("/api/rental-contracts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(contractForm),
-      });
-      if (!res.ok) throw new Error("Erro ao criar contrato");
+      try {
+        await apiRequest("POST", "/api/rental-contracts", contractForm);
+      } catch {
+        throw new Error("Erro ao criar contrato");
+      }
       toast({ title: "Sucesso", description: "Contrato criado com sucesso" });
       setIsContractModalOpen(false);
       setContractForm({ propertyId: "", ownerId: "", renterId: "", rentValue: "", condoFee: "", iptuValue: "", dueDay: "10", startDate: "", endDate: "", adjustmentIndex: "IGPM", depositValue: "", administrationFee: "10", notes: "" });
@@ -455,13 +450,11 @@ export default function RentalsPage() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const res = await fetch("/api/rental-payments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(paymentForm),
-      });
-      if (!res.ok) throw new Error("Erro ao criar pagamento");
+      try {
+        await apiRequest("POST", "/api/rental-payments", paymentForm);
+      } catch {
+        throw new Error("Erro ao criar pagamento");
+      }
       toast({ title: "Sucesso", description: "Pagamento criado com sucesso" });
       setIsPaymentModalOpen(false);
       setPaymentForm({ rentalContractId: "", referenceMonth: "", dueDate: "", rentValue: "", condoFee: "", iptuValue: "", extraCharges: "", discounts: "", totalValue: "", notes: "" });
@@ -475,13 +468,11 @@ export default function RentalsPage() {
 
   const handleMarkPaymentAsPaid = async (payment: RentalPayment) => {
     try {
-      const res = await fetch(`/api/rental-payments/${payment.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status: "paid", paidValue: payment.totalValue, paidDate: new Date().toISOString() }),
-      });
-      if (!res.ok) throw new Error("Erro ao atualizar pagamento");
+      try {
+        await apiRequest("PATCH", `/api/rental-payments/${payment.id}`, { status: "paid", paidValue: payment.totalValue, paidDate: new Date().toISOString() });
+      } catch {
+        throw new Error("Erro ao atualizar pagamento");
+      }
       toast({ title: "Sucesso", description: "Pagamento marcado como pago" });
       fetchData();
     } catch (error: any) {
@@ -491,13 +482,12 @@ export default function RentalsPage() {
 
   const handleGenerateTransfers = async (referenceMonth: string) => {
     try {
-      const res = await fetch("/api/rental-transfers/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ referenceMonth }),
-      });
-      if (!res.ok) throw new Error("Erro ao gerar repasses");
+      let res: Response;
+      try {
+        res = await apiRequest("POST", "/api/rental-transfers/generate", { referenceMonth });
+      } catch {
+        throw new Error("Erro ao gerar repasses");
+      }
       const newTransfers = await res.json();
       toast({ title: "Sucesso", description: `${newTransfers.length} repasses gerados` });
       fetchData();
@@ -508,13 +498,11 @@ export default function RentalsPage() {
 
   const handleMarkTransferAsPaid = async (transfer: RentalTransfer) => {
     try {
-      const res = await fetch(`/api/rental-transfers/${transfer.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status: "paid", paidDate: new Date().toISOString() }),
-      });
-      if (!res.ok) throw new Error("Erro ao atualizar repasse");
+      try {
+        await apiRequest("PATCH", `/api/rental-transfers/${transfer.id}`, { status: "paid", paidDate: new Date().toISOString() });
+      } catch {
+        throw new Error("Erro ao atualizar repasse");
+      }
       toast({ title: "Sucesso", description: "Repasse marcado como pago" });
       fetchData();
     } catch (error: any) {

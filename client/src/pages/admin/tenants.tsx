@@ -11,6 +11,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Search, Edit, Trash2, Play, Pause, Eye } from "lucide-react";
 import { toast } from "sonner";
+import { apiRequest } from "@/lib/queryClient";
+
+// Extrai a mensagem especifica do servidor (campo `error` do corpo JSON)
+// da Error lancada por apiRequest (formato "<status>: <corpo>"), com fallback.
+function extractApiError(error: unknown, fallback: string): string {
+  if (error instanceof Error) {
+    const match = error.message.match(/^\d+:\s*(.*)$/s);
+    const body = match ? match[1] : error.message;
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed && typeof parsed.error === "string") return parsed.error;
+    } catch {
+      /* corpo nao e JSON */
+    }
+  }
+  return fallback;
+}
 
 type TenantWithStats = {
   id: string;
@@ -116,24 +133,13 @@ export default function TenantsPage() {
 
   async function handleCreate() {
     try {
-      const res = await fetch("/api/admin/tenants", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(formData),
-      });
-
-      if (res.ok) {
-        toast.success("Tenant criado com sucesso!");
-        setCreateModalOpen(false);
-        resetForm();
-        fetchData();
-      } else {
-        const error = await res.json();
-        toast.error(error.error || "Erro ao criar tenant");
-      }
+      await apiRequest("POST", "/api/admin/tenants", formData);
+      toast.success("Tenant criado com sucesso!");
+      setCreateModalOpen(false);
+      resetForm();
+      fetchData();
     } catch (error) {
-      toast.error("Erro ao criar tenant");
+      toast.error(extractApiError(error, "Erro ao criar tenant"));
     }
   }
 
@@ -141,25 +147,14 @@ export default function TenantsPage() {
     if (!selectedTenant) return;
 
     try {
-      const res = await fetch(`/api/admin/tenants/${selectedTenant.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(formData),
-      });
-
-      if (res.ok) {
-        toast.success("Tenant atualizado com sucesso!");
-        setEditModalOpen(false);
-        setSelectedTenant(null);
-        resetForm();
-        fetchData();
-      } else {
-        const error = await res.json();
-        toast.error(error.error || "Erro ao atualizar tenant");
-      }
+      await apiRequest("PATCH", `/api/admin/tenants/${selectedTenant.id}`, formData);
+      toast.success("Tenant atualizado com sucesso!");
+      setEditModalOpen(false);
+      setSelectedTenant(null);
+      resetForm();
+      fetchData();
     } catch (error) {
-      toast.error("Erro ao atualizar tenant");
+      toast.error(extractApiError(error, "Erro ao atualizar tenant"));
     }
   }
 
@@ -167,22 +162,13 @@ export default function TenantsPage() {
     if (!selectedTenant) return;
 
     try {
-      const res = await fetch(`/api/admin/tenants/${selectedTenant.id}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-
-      if (res.ok) {
-        toast.success("Tenant excluído com sucesso!");
-        setDeleteDialogOpen(false);
-        setSelectedTenant(null);
-        fetchData();
-      } else {
-        const error = await res.json();
-        toast.error(error.error || "Erro ao excluir tenant");
-      }
+      await apiRequest("DELETE", `/api/admin/tenants/${selectedTenant.id}`);
+      toast.success("Tenant excluído com sucesso!");
+      setDeleteDialogOpen(false);
+      setSelectedTenant(null);
+      fetchData();
     } catch (error) {
-      toast.error("Erro ao excluir tenant");
+      toast.error(extractApiError(error, "Erro ao excluir tenant"));
     }
   }
 
@@ -190,21 +176,11 @@ export default function TenantsPage() {
     const newStatus = tenant.status === "active" ? "suspended" : "active";
 
     try {
-      const res = await fetch(`/api/admin/tenants/${tenant.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (res.ok) {
-        toast.success(
-          newStatus === "active" ? "Tenant ativado!" : "Tenant suspenso!"
-        );
-        fetchData();
-      } else {
-        toast.error("Erro ao alterar status");
-      }
+      await apiRequest("PATCH", `/api/admin/tenants/${tenant.id}`, { status: newStatus });
+      toast.success(
+        newStatus === "active" ? "Tenant ativado!" : "Tenant suspenso!"
+      );
+      fetchData();
     } catch (error) {
       toast.error("Erro ao alterar status");
     }

@@ -2,7 +2,7 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState } from "react";
 import { useLocation } from "wouter";
 import { useImobi } from "@/lib/imobi-context";
-import { getCSRFToken } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -109,15 +109,10 @@ export default function OnboardingPage() {
   const handleSaveBrand = async () => {
     setIsSaving(true);
     try {
-      await fetch("/api/settings/brand", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          primaryColor: brandData.primaryColor,
-          phone: brandData.phone,
-          address: brandData.address,
-        }),
-        credentials: "include",
+      await apiRequest("PUT", "/api/settings/brand", {
+        primaryColor: brandData.primaryColor,
+        phone: brandData.phone,
+        address: brandData.address,
       });
     } catch {
       // silently continue
@@ -130,23 +125,18 @@ export default function OnboardingPage() {
   const handleCreateProperty = async () => {
     setIsSaving(true);
     try {
-      await fetch("/api/properties", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: propertyData.title,
-          type: propertyData.type,
-          category: propertyData.category,
-          price: propertyData.price,
-          address: propertyData.address,
-          city: propertyData.city,
-          state: propertyData.state,
-          bedrooms: propertyData.bedrooms ? parseInt(propertyData.bedrooms) : null,
-          bathrooms: propertyData.bathrooms ? parseInt(propertyData.bathrooms) : null,
-          area: propertyData.area ? parseInt(propertyData.area) : null,
-          status: "active",
-        }),
-        credentials: "include",
+      await apiRequest("POST", "/api/properties", {
+        title: propertyData.title,
+        type: propertyData.type,
+        category: propertyData.category,
+        price: propertyData.price,
+        address: propertyData.address,
+        city: propertyData.city,
+        state: propertyData.state,
+        bedrooms: propertyData.bedrooms ? parseInt(propertyData.bedrooms) : null,
+        bathrooms: propertyData.bathrooms ? parseInt(propertyData.bathrooms) : null,
+        area: propertyData.area ? parseInt(propertyData.area) : null,
+        status: "active",
       });
     } catch {
       // silently continue
@@ -163,17 +153,10 @@ export default function OnboardingPage() {
   const handleExploreWithDemoData = async () => {
     setIsSeedingDemo(true);
     try {
-      // 409 = dados de exemplo já existem; nos dois casos o dashboard estará
-      // populado, então seguimos para ele de qualquer forma.
-      const csrfToken = getCSRFToken();
-      await fetch("/api/onboarding/demo-data", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
-        },
-        credentials: "include",
-      });
+      // 409 = dados de exemplo já existem; apiRequest lança nesse caso, mas o
+      // catch abaixo absorve o erro e seguimos para o dashboard de qualquer
+      // forma — o painel estará populado nos dois cenários.
+      await apiRequest("POST", "/api/onboarding/demo-data");
     } catch {
       // silently continue — fluxo de onboarding não deve travar
     } finally {

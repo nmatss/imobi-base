@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Building2, Check, CreditCard, Lock, Shield, ArrowLeft, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
+import { apiRequest } from "@/lib/queryClient";
 
 interface Plan {
   id: string;
@@ -71,18 +72,14 @@ export default function CheckoutPage() {
     try {
       // Cria uma Stripe Checkout Session e redireciona. Cartão é coletado
       // na página hospedada do Stripe (PCI-compliant, sem Stripe Elements).
-      const res = await fetch(
+      const res = await apiRequest(
+        "POST",
         "/api/payments/stripe/create-checkout-session",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ priceId: plan.stripePriceId }),
-        },
+        { priceId: plan.stripePriceId },
       );
 
       const data = await res.json();
-      if (!res.ok || !data.url) {
+      if (!data.url) {
         throw new Error(data.error || "Não foi possível iniciar o checkout");
       }
 

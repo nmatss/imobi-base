@@ -4,6 +4,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiRequest } from "@/lib/queryClient";
 import type { Permission, UserRole } from "../types";
 
 const PERMISSIONS: Permission[] = [
@@ -147,14 +148,11 @@ export function PermissionsTab() {
         roles.map(async (role) => {
           const updatedPermissions = permissions[role.name];
           if (updatedPermissions) {
-            const response = await fetch(`/api/user-roles/${role.id}`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify({ permissions: updatedPermissions }),
-            });
-
-            if (!response.ok) {
+            try {
+              await apiRequest("PATCH", `/api/user-roles/${role.id}`, {
+                permissions: updatedPermissions,
+              });
+            } catch {
               throw new Error(`Erro ao atualizar permissões de ${role.name}`);
             }
           }

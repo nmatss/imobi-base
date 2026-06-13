@@ -1,4 +1,5 @@
 import { usePageTitle } from "@/hooks/use-page-title";
+import { apiRequest } from "@/lib/queryClient";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
@@ -240,20 +241,13 @@ export default function FinanceiroPage() {
 
   const handleMarkAsPaid = async (id: string) => {
     try {
-      const res = await fetch(`/api/finance-entries/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ status: 'completed' }),
-      });
+      await apiRequest('PATCH', `/api/finance-entries/${id}`, { status: 'completed' });
 
-      if (res.ok) {
-        toast({
-          title: "Transação atualizada",
-          description: "A transação foi marcada como paga.",
-        });
-        await refreshTransactions();
-      }
+      toast({
+        title: "Transação atualizada",
+        description: "A transação foi marcada como paga.",
+      });
+      await refreshTransactions();
     } catch (error) {
       console.error('Error marking as paid:', error);
       toast({
@@ -271,11 +265,8 @@ export default function FinanceiroPage() {
 
   const handleDuplicate = async (transaction: FinanceTransaction) => {
     try {
-      const res = await fetch('/api/finance-entries', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
+      try {
+        await apiRequest('POST', '/api/finance-entries', {
           description: `${transaction.description} (cópia)`,
           amount: transaction.amount,
           flow: transaction.flow,
@@ -284,12 +275,18 @@ export default function FinanceiroPage() {
           categoryId: transaction.categoryId,
           notes: transaction.notes,
           originType: 'manual',
-        }),
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => null);
-        throw new Error(body?.error || 'Não foi possível duplicar a transação.');
+        });
+      } catch (reqError) {
+        // Preserva a mensagem específica de erro do servidor (campo `error` do corpo).
+        // apiRequest lança com formato "<status>: <texto>"; extrai o JSON para recuperar body.error.
+        const raw = reqError instanceof Error ? reqError.message.replace(/^\d+:\s*/, '') : '';
+        let serverError: string | null = null;
+        try {
+          serverError = JSON.parse(raw)?.error ?? null;
+        } catch {
+          serverError = null;
+        }
+        throw new Error(serverError || 'Não foi possível duplicar a transação.');
       }
 
       toast({

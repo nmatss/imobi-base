@@ -94,6 +94,7 @@ import {
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { apiRequest } from "@/lib/queryClient";
 import { SalesDashboard, SalesCharts } from "./components";
 
 // Types
@@ -653,17 +654,7 @@ export default function VendasPage() {
         status: "pending",
       };
 
-      const res = await fetch("/api/sale-proposals", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Erro ao criar proposta");
-      }
+      await apiRequest("POST", "/api/sale-proposals", payload);
 
       toast({
         title: "Proposta criada",
@@ -705,26 +696,11 @@ export default function VendasPage() {
         status: "completed",
       };
 
-      const res = await fetch("/api/property-sales", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Erro ao registrar venda");
-      }
+      await apiRequest("POST", "/api/property-sales", payload);
 
       // Update proposal status if from proposal
       if (saleForm.sourceType === "proposal" && saleForm.proposalId) {
-        await fetch(`/api/sale-proposals/${saleForm.proposalId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ status: "accepted" }),
-        });
+        await apiRequest("PATCH", `/api/sale-proposals/${saleForm.proposalId}`, { status: "accepted" });
       }
 
       toast({
@@ -765,14 +741,7 @@ export default function VendasPage() {
   // Update proposal status
   const handleUpdateProposalStatus = async (id: string, status: string) => {
     try {
-      const res = await fetch(`/api/sale-proposals/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ status }),
-      });
-
-      if (!res.ok) throw new Error("Erro ao atualizar proposta");
+      await apiRequest("PATCH", `/api/sale-proposals/${id}`, { status });
 
       const statusLabels: Record<string, string> = {
         sent: "enviada",
