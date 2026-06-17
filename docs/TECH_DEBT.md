@@ -16,7 +16,7 @@ Atualizado em: 17/06/2026
 
 - Consolidar estrategia oficial de jobs longos: crons HTTP da Vercel estao manifestados e possuem lock/status via Redis; BullMQ/worker persistente pode ser habilitado por `ENABLE_BACKGROUND_JOBS=true`.
 - Concluir rollout operacional de CORS: `server/config/cors.ts` ja centraliza runtime e defaults de producao sao seguros; falta remover `ALLOWED_ORIGINS` dos ambientes depois de migrar para `CORS_ORIGINS`.
-- Revisar rotas antigas para garantir tenant ownership e ausencia de IDOR. Vistorias foram reforcadas em 17/06/2026; ainda falta aplicar o mesmo padrao de FK ownership em contratos, locacoes, pagamentos, repasses, propostas, vendas, lancamentos financeiros e AVM.
+- Revisar rotas antigas para garantir tenant ownership e ausencia de IDOR. Vistorias e fluxos centrais de contratos, locacoes, pagamentos, repasses, propostas, vendas, lancamentos financeiros e AVM foram reforcados em 17/06/2026; ainda falta prova dinamica multi-tenant em staging/producao e auditoria de rotas legadas/integracoes.
 - Distribuir rate limit/lockout de 2FA em Redis para ambiente serverless; QR Code TOTP ja deixou de depender de servico externo.
 - Fortalecer anti-SSRF com resolucao DNS, bloqueio de redirects para redes privadas e aplicacao do guard no dispatcher generico de webhooks.
 - Reduzir risco de DoS autenticado em upload de imagens, substituindo `memoryStorage`/limites altos por streaming, limites menores ou processamento assinado.

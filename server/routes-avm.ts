@@ -45,6 +45,13 @@ export function registerAVMRoutes(app: Express) {
         });
       }
 
+      if (body.propertyId) {
+        const property = await storage.getProperty(body.propertyId);
+        if (!property || property.tenantId !== tenantId) {
+          return res.status(404).json({ error: "Imovel nao encontrado" });
+        }
+      }
+
       const input: ValuationInput = {
         propertyType: body.propertyType,
         category: body.category,

@@ -25,11 +25,12 @@ Atualizado em: 17/06/2026
   - Artefatos Playwright (`test-results/`, `playwright-report/`) foram removidos do versionamento e ignorados.
   - Vistorias validam `propertyId`, `rentalContractId` e `renterId` contra o tenant antes de criar relatorio/registro.
   - Setup TOTP gera QR Code localmente com `qrcode`, sem vazar `otpauth://...secret=...` para API externa.
+  - FK ownership cross-tenant reforcado em contratos, locacoes, pagamentos, repasses, propostas, vendas, lancamentos financeiros e AVM.
 - Em aberto:
   - Executar RLS apply/verify em staging/producao com role nao-owner e sem `BYPASSRLS`.
   - Aplicar e validar migration `20260617_001_webhook_events.sql` em staging/producao.
   - Estender ledger persistente para webhook oficial do WhatsApp.
-  - Revisar FK ownership cross-tenant em contratos, locacoes, pagamentos, repasses, propostas, vendas, financeiro e AVM.
+  - Provar dinamicamente isolamento multi-tenant das rotas com FK ownership em staging/producao.
   - Fortalecer anti-SSRF e upload de imagens antes de Go Live enterprise.
   - Persistir/distribuir rate limit e lockout de 2FA para ambiente serverless.
   - Elevar cobertura de testes de 11,1% statements para >= 80%.

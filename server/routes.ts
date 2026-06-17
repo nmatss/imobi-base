@@ -225,8 +225,76 @@ async function validateLeadReference(tenantId: string, leadId?: string | null): 
   await validateResourceTenant(lead, tenantId, "Lead");
 }
 
+async function validatePropertyReference(tenantId: string, propertyId?: string | null): Promise<void> {
+  if (!propertyId) return;
+  const property = await storage.getProperty(propertyId);
+  await validateResourceTenant(property, tenantId, "Imóvel");
+}
+
+async function validateOwnerReference(tenantId: string, ownerId?: string | null): Promise<void> {
+  if (!ownerId) return;
+  const owner = await storage.getOwner(ownerId);
+  await validateResourceTenant(owner, tenantId, "Locador");
+}
+
+async function validateRenterReference(tenantId: string, renterId?: string | null): Promise<void> {
+  if (!renterId) return;
+  const renter = await storage.getRenter(renterId);
+  await validateResourceTenant(renter, tenantId, "Inquilino");
+}
+
+async function validateRentalContractReference(
+  tenantId: string,
+  rentalContractId?: string | null,
+): Promise<void> {
+  if (!rentalContractId) return;
+  const contract = await storage.getRentalContract(rentalContractId);
+  await validateResourceTenant(contract, tenantId, "Contrato de aluguel");
+}
+
+async function validateFinanceCategoryReference(
+  tenantId: string,
+  categoryId?: string | null,
+): Promise<void> {
+  if (!categoryId) return;
+  const category = await storage.getFinanceCategory(categoryId);
+  await validateResourceTenant(category, tenantId, "Categoria financeira");
+}
+
 async function validateLeadAssignment(tenantId: string, assignedTo?: string | null): Promise<void> {
   await validateTenantUserReference(tenantId, assignedTo, "Corretor");
+}
+
+async function validateContractReferences(
+  tenantId: string,
+  contract: { propertyId?: string | null; leadId?: string | null },
+): Promise<void> {
+  await validatePropertyReference(tenantId, contract.propertyId);
+  await validateLeadReference(tenantId, contract.leadId);
+}
+
+async function validateRentalContractReferences(
+  tenantId: string,
+  contract: { propertyId?: string | null; ownerId?: string | null; renterId?: string | null },
+): Promise<void> {
+  await validatePropertyReference(tenantId, contract.propertyId);
+  await validateOwnerReference(tenantId, contract.ownerId);
+  await validateRenterReference(tenantId, contract.renterId);
+}
+
+async function validatePropertySaleReferences(
+  tenantId: string,
+  sale: {
+    propertyId?: string | null;
+    buyerLeadId?: string | null;
+    sellerId?: string | null;
+    brokerId?: string | null;
+  },
+): Promise<void> {
+  await validatePropertyReference(tenantId, sale.propertyId);
+  await validateLeadReference(tenantId, sale.buyerLeadId);
+  await validateOwnerReference(tenantId, sale.sellerId);
+  await validateTenantUserReference(tenantId, sale.brokerId, "Corretor");
 }
 
 async function validateFollowUpReferences(
@@ -2200,12 +2268,13 @@ export async function registerRoutes(
         ...req.body,
         tenantId: req.user!.tenantId,
       });
+      await validateContractReferences(req.user!.tenantId, data);
       const contract = await storage.createContract(data);
       res.status(201).json(contract);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error ? error.message : "Erro ao criar contrato",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao criar contrato",
       });
     }
   });
@@ -2223,6 +2292,7 @@ export async function registerRoutes(
         createdAt: _c,
         ...safe
       } = req.body;
+      await validateContractReferences(req.user!.tenantId, safe);
       const contract = await storage.updateContract(req.params.id, safe);
       if (!contract)
         return res.status(404).json({ error: "Contrato não encontrado" });
@@ -2499,14 +2569,13 @@ export async function registerRoutes(
         ...req.body,
         tenantId: req.user!.tenantId,
       });
+      await validateRentalContractReferences(req.user!.tenantId, data);
       const contract = await storage.createRentalContract(data);
       res.status(201).json(contract);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro ao criar contrato de aluguel",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao criar contrato de aluguel",
       });
     }
   });
@@ -2527,6 +2596,7 @@ export async function registerRoutes(
         createdAt: _c,
         ...allowedFields
       } = req.body;
+      await validateRentalContractReferences(req.user!.tenantId, allowedFields);
       const contract = await storage.updateRentalContract(
         req.params.id,
         allowedFields,
@@ -2603,12 +2673,13 @@ export async function registerRoutes(
         ...req.body,
         tenantId: req.user!.tenantId,
       });
+      await validateRentalContractReference(req.user!.tenantId, data.rentalContractId);
       const payment = await storage.createRentalPayment(data);
       res.status(201).json(payment);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error ? error.message : "Erro ao criar pagamento",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao criar pagamento",
       });
     }
   });
@@ -2627,17 +2698,16 @@ export async function registerRoutes(
         createdAt: _c,
         ...allowedFields
       } = req.body;
+      await validateRentalContractReference(req.user!.tenantId, allowedFields.rentalContractId);
       const payment = await storage.updateRentalPayment(
         req.params.id,
         allowedFields,
       );
       res.json(payment);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro ao atualizar pagamento",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao atualizar pagamento",
       });
     }
   });
@@ -2789,11 +2859,13 @@ export async function registerRoutes(
           .json({ error: "Valor líquido não pode ser negativo" });
       }
 
+      await validateOwnerReference(req.user!.tenantId, data.ownerId);
       const transfer = await storage.createRentalTransfer(data);
       res.status(201).json(transfer);
     } catch (error: unknown) {
-      res.status(400).json({
-        error: error instanceof Error ? error.message : "Erro ao criar repasse",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao criar repasse",
       });
     }
   });
@@ -2812,15 +2884,16 @@ export async function registerRoutes(
         createdAt: _c,
         ...allowedFields
       } = req.body;
+      await validateOwnerReference(req.user!.tenantId, allowedFields.ownerId);
       const transfer = await storage.updateRentalTransfer(
         req.params.id,
         allowedFields,
       );
       res.json(transfer);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error ? error.message : "Erro ao atualizar repasse",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao atualizar repasse",
       });
     }
   });
@@ -2960,12 +3033,13 @@ export async function registerRoutes(
         ...req.body,
         tenantId: req.user!.tenantId,
       });
+      await validateContractReferences(req.user!.tenantId, data);
       const proposal = await storage.createSaleProposal(data);
       res.status(201).json(proposal);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error ? error.message : "Erro ao criar proposta",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao criar proposta",
       });
     }
   });
@@ -2982,6 +3056,7 @@ export async function registerRoutes(
         createdAt: _c,
         ...allowedFields
       } = req.body;
+      await validateContractReferences(req.user!.tenantId, allowedFields);
       const proposal = await storage.updateSaleProposal(
         req.params.id,
         allowedFields,
@@ -3037,12 +3112,13 @@ export async function registerRoutes(
         ...req.body,
         tenantId: req.user!.tenantId,
       });
+      await validatePropertySaleReferences(req.user!.tenantId, data);
       const sale = await storage.createPropertySale(data);
       res.status(201).json(sale);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error ? error.message : "Erro ao registrar venda",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao registrar venda",
       });
     }
   });
@@ -3061,15 +3137,16 @@ export async function registerRoutes(
         createdAt: _c,
         ...allowedFields
       } = req.body;
+      await validatePropertySaleReferences(req.user!.tenantId, allowedFields);
       const sale = await storage.updatePropertySale(
         req.params.id,
         allowedFields,
       );
       res.json(sale);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error ? error.message : "Erro ao atualizar venda",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao atualizar venda",
       });
     }
   });
@@ -3188,12 +3265,13 @@ export async function registerRoutes(
           : {}),
         tenantId: req.user!.tenantId,
       });
+      await validateFinanceCategoryReference(req.user!.tenantId, data.categoryId);
       const entry = await storage.createFinanceEntry(data);
       res.status(201).json(entry);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error ? error.message : "Erro ao criar lançamento",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao criar lançamento",
       });
     }
   });
@@ -3214,6 +3292,7 @@ export async function registerRoutes(
       if (allowedFields.entryDate) {
         allowedFields.entryDate = new Date(allowedFields.entryDate);
       }
+      await validateFinanceCategoryReference(req.user!.tenantId, allowedFields.categoryId);
       const entry = await storage.updateFinanceEntry(
         req.params.id,
         allowedFields,

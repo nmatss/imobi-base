@@ -38,6 +38,7 @@
 - Gerador de HTML estatico publico em `script/generate-static-public-html.ts`.
 - Rota `/sitemap-dynamic.xml` para o sitemap dinamico.
 - Testes unitarios `cron-runtime-guards`, `backup-pitr-readiness`, `deploy-workflow-policy` e `security-go-live-guards`.
+- Teste unitario `tenant-fk-ownership-guards` para travar validacao de FKs por tenant em rotas core.
 
 ### Changed
 
@@ -81,6 +82,7 @@
 - Artefatos Playwright (`test-results/`, `playwright-report/`) foram removidos do versionamento e ignorados.
 - Vistorias passaram a validar ownership por tenant de `propertyId`, `rentalContractId` e `renterId` antes da criacao e do relatorio.
 - Setup TOTP/2FA passou a gerar QR Code localmente com `qrcode`, sem enviar segredo para API externa.
+- Contratos, contratos de aluguel, pagamentos, repasses, propostas, vendas, lancamentos financeiros e AVM passaram a validar FKs sensiveis contra o tenant antes de criar/atualizar.
 
 ### Validated
 
@@ -112,6 +114,10 @@
 - `npm run test`: 87 arquivos, 1410 testes aprovados, 1 ignorado apos a rodada Go Live operacional/seguranca.
 - `npm run build`: aprovado apos a rodada Go Live operacional/seguranca.
 - `npm run test:smoke:e2e`: 8 testes Chromium aprovados.
+- Testes focados `tenant-fk-ownership-guards` e `security-go-live-guards`: 4 testes aprovados.
+- `npm run lint -- --quiet`: aprovado apos hardening de FK ownership.
+- `npm run test`: 88 arquivos, 1412 testes aprovados, 1 ignorado apos hardening de FK ownership.
+- `npm run build`: aprovado apos hardening de FK ownership.
 - `npm run lint -- --format json`: 5166 warnings, 0 errors apos a rodada P0/P2 de continuidade.
 - Checks Playwright de meta/canonical/JSON-LD/overflow.
 - Playwright em preview local: `/contato`, `/novidades`, `/termos`, `/privacidade` sem overflow horizontal em 320px e 390px.

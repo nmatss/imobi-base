@@ -91,6 +91,11 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
   - `POST /api/inspections` valida `propertyId`, `rentalContractId` e `renterId` contra o tenant, e o relatorio de vistoria revalida o imovel antes de renderizar;
   - setup TOTP/2FA gera QR Code localmente via pacote `qrcode` e nao envia mais `otpauth://...secret=...` para API externa;
   - adicionados testes `cron-runtime-guards`, `backup-pitr-readiness`, `deploy-workflow-policy` e `security-go-live-guards`.
+- Continuacao do plano rumo a 10/10 em 17/06/2026:
+  - `server/routes.ts` ganhou helpers de referencia por tenant para imovel, locador, inquilino, contrato de aluguel e categoria financeira;
+  - criacao/edicao de contratos, contratos de aluguel, pagamentos, repasses, propostas, vendas e lancamentos financeiros validam FKs contra o tenant antes de persistir;
+  - `POST /api/avm/evaluate` valida `propertyId` opcional contra o tenant antes de gravar avaliacao;
+  - adicionado teste `tests/unit/tenant-fk-ownership-guards.test.ts`.
 
 ## Validacoes executadas
 
@@ -143,6 +148,12 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
   - `npm run ops:cron:verify`: passou, 11 jobs alinhados com `vercel.json`.
   - `DATABASE_URL=postgresql://user:pass@localhost:5432/db BACKUP_OPTIONAL=true SUPABASE_PITR_ENABLED=true npm run ops:backup:verify`: passou.
   - `npm run test:smoke:e2e`: 8 testes passaram em Chromium.
+- Validacao focada da continuacao rumo a 10/10 em 17/06/2026:
+  - `npm run check`: passou.
+  - Testes focados `tenant-fk-ownership-guards` e `security-go-live-guards`: 4 testes passaram.
+  - `npm run lint -- --quiet`: passou, sem erros bloqueantes.
+  - `npm run test`: 88 arquivos passaram; 1412 testes passaram, 1 ignorado.
+  - `npm run build`: passou e gerou HTML estatico para 11 rotas publicas.
 
 ## Pendencias relevantes
 
@@ -152,7 +163,7 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
 - Pentest externo/manual.
 - Execucao real de restore drill e registro de RPO/RTO.
 - Validar locks/status de cron no deploy real com `REDIS_URL` e `CRON_SECRET`.
-- Revisar FK ownership cross-tenant em contratos, locacoes, pagamentos, repasses, propostas, vendas, financeiro e AVM.
+- Provar dinamicamente FK ownership cross-tenant em staging/producao e ampliar testes de isolamento multi-tenant.
 - Fortalecer anti-SSRF, upload de imagens e rate limit/lockout distribuido de 2FA.
 - Reducao adicional de LCP e bundle inicial.
 - SEO de rotas publicas conhecidas ja possui HTML estatico no build; ainda faltam prerender/SSR ou geracao estatica para vitrines dinamicas de tenant/imovel/cidade/bairro.
