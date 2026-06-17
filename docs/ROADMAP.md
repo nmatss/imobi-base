@@ -11,21 +11,31 @@ Atualizado em: 17/06/2026
   - CORS padronizado entre serverless e Express via `server/config/cors.ts`.
   - Wrapper serverless `api/index.mjs` deixou de expor erro interno/stack em producao.
   - Manifesto unico de crons (`server/jobs/cron-manifest.ts`) alinhado com `vercel.json`, status HTTP e fallback `node-cron`.
+  - Crons HTTP possuem lock distribuido via Redis e status de ultima execucao em `/api/cron/status`.
   - Backup diario voltou ao `vercel.json` e `npm run ops:cron:verify` valida divergencias.
-  - Backup aceita upload duravel por `BACKUP_UPLOAD_URL_TEMPLATE`; `npm run ops:backup:verify` valida prontidao.
+  - Backup aceita upload duravel por `BACKUP_UPLOAD_URL_TEMPLATE`; quando Supabase PITR e a estrategia oficial, `BACKUP_OPTIONAL=true` + `SUPABASE_PITR_ENABLED=true` evitam `pg_dump` no serverless; `npm run ops:backup:verify` valida prontidao.
   - Restore drill seguro adicionado em `npm run ops:restore:drill`.
   - Pentest automatico exposto em `npm run security:pentest`.
   - Ledger persistente `webhook_events` criado para idempotencia de webhooks criticos.
   - Webhooks Stripe, Mercado Pago e ClickSign migrados para ledger persistente.
   - ClickSign valida HMAC sobre `rawBody` com comparacao timing-safe.
   - IPN legado do Mercado Pago e webhook legado da ISA ficaram desabilitados por padrao.
+  - Handler serverless registra `cookie-parser`, preservando CSRF/portal por cookie em Vercel.
+  - Workflow de producao deixou de rodar `npm run db:migrate` cego apos deploy e passou a validar manifesto de crons.
+  - Artefatos Playwright (`test-results/`, `playwright-report/`) foram removidos do versionamento e ignorados.
+  - Vistorias validam `propertyId`, `rentalContractId` e `renterId` contra o tenant antes de criar relatorio/registro.
+  - Setup TOTP gera QR Code localmente com `qrcode`, sem vazar `otpauth://...secret=...` para API externa.
 - Em aberto:
   - Executar RLS apply/verify em staging/producao com role nao-owner e sem `BYPASSRLS`.
   - Aplicar e validar migration `20260617_001_webhook_events.sql` em staging/producao.
   - Estender ledger persistente para webhook oficial do WhatsApp.
+  - Revisar FK ownership cross-tenant em contratos, locacoes, pagamentos, repasses, propostas, vendas, financeiro e AVM.
+  - Fortalecer anti-SSRF e upload de imagens antes de Go Live enterprise.
+  - Persistir/distribuir rate limit e lockout de 2FA para ambiente serverless.
   - Elevar cobertura de testes de 11,1% statements para >= 80%.
   - Reduzir 5166 warnings de lint.
   - Executar restore drill contra banco isolado real e registrar RPO/RTO.
+  - Validar locks/status de cron no deploy real com `REDIS_URL` e `CRON_SECRET`.
   - Executar pentest externo/manual antes de venda enterprise.
   - Resolver latencia de producao por co-localizacao de banco/cache ou ajuste de deploy.
 

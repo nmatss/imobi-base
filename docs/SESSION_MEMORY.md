@@ -81,6 +81,16 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
   - criado `script/generate-static-public-html.ts` e o build agora gera HTML estatico por rota publica conhecida com title, description, canonical, OG/Twitter e JSON-LD sem depender de JS;
   - `/sitemap-dynamic.xml` foi exposto para o sitemap dinamico, mantendo `/sitemap.xml` como arquivo estatico do build;
   - `robots.txt` passou a anunciar os dois sitemaps.
+- Rodada Go Live operacional/seguranca em 17/06/2026:
+  - defaults de CORS em producao nao permitem mais localhost nem dominio legado `.com`;
+  - `server/api-handler.ts` registra `cookie-parser` e inclui `Authorization` no preflight serverless, preservando CSRF e portal por cookie em Vercel;
+  - `/api/cron/*` ganhou lock distribuido via Redis, skip de duplicata e status de ultima execucao em `/api/cron/status`;
+  - `backup-processor` suporta modo Supabase PITR explicito sem exigir `pg_dump` em serverless;
+  - workflow de producao deixou de rodar `npm run db:migrate` cego apos deploy e passou a validar `npm run ops:cron:verify`;
+  - artefatos Playwright (`test-results/`, `playwright-report/`) foram removidos do versionamento e adicionados ao `.gitignore`;
+  - `POST /api/inspections` valida `propertyId`, `rentalContractId` e `renterId` contra o tenant, e o relatorio de vistoria revalida o imovel antes de renderizar;
+  - setup TOTP/2FA gera QR Code localmente via pacote `qrcode` e nao envia mais `otpauth://...secret=...` para API externa;
+  - adicionados testes `cron-runtime-guards`, `backup-pitr-readiness`, `deploy-workflow-policy` e `security-go-live-guards`.
 
 ## Validacoes executadas
 
@@ -119,6 +129,20 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
   - `npm run lint -- --format json`: 5166 warnings, 0 errors.
   - `npm run seo:sitemap`: passou.
   - Verificacao de HTML gerado confirmou title/description/canonical corretos, apenas uma meta description e preload do hero somente na home.
+- Validacao focada da rodada Go Live operacional/seguranca em 17/06/2026:
+  - `npm run check`: passou.
+  - Testes focados `security-go-live-guards`, `cors-config`, `cron-runtime-guards` e `backup-pitr-readiness`: 12 testes passaram.
+  - `DATABASE_URL=postgresql://user:pass@localhost:5432/db BACKUP_OPTIONAL=true SUPABASE_PITR_ENABLED=true npm run ops:backup:verify`: passou.
+  - `npm run ops:cron:verify`: passou.
+- Validacao final da rodada Go Live operacional/seguranca em 17/06/2026:
+  - `npm run check`: passou.
+  - `npm run lint -- --quiet`: passou, sem erros bloqueantes.
+  - `npm run test`: 87 arquivos passaram; 1410 testes passaram, 1 ignorado.
+  - `npm run build`: passou e gerou HTML estatico para 11 rotas publicas.
+  - `npm run seo:sitemap`: passou.
+  - `npm run ops:cron:verify`: passou, 11 jobs alinhados com `vercel.json`.
+  - `DATABASE_URL=postgresql://user:pass@localhost:5432/db BACKUP_OPTIONAL=true SUPABASE_PITR_ENABLED=true npm run ops:backup:verify`: passou.
+  - `npm run test:smoke:e2e`: 8 testes passaram em Chromium.
 
 ## Pendencias relevantes
 
@@ -127,6 +151,9 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
 - Reducao de warnings de lint.
 - Pentest externo/manual.
 - Execucao real de restore drill e registro de RPO/RTO.
+- Validar locks/status de cron no deploy real com `REDIS_URL` e `CRON_SECRET`.
+- Revisar FK ownership cross-tenant em contratos, locacoes, pagamentos, repasses, propostas, vendas, financeiro e AVM.
+- Fortalecer anti-SSRF, upload de imagens e rate limit/lockout distribuido de 2FA.
 - Reducao adicional de LCP e bundle inicial.
 - SEO de rotas publicas conhecidas ja possui HTML estatico no build; ainda faltam prerender/SSR ou geracao estatica para vitrines dinamicas de tenant/imovel/cidade/bairro.
 - `/sitemap-dynamic.xml` foi roteado para o backend; ainda precisa ser validado no deploy Vercel real.

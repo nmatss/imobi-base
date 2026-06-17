@@ -7,6 +7,7 @@
 import type { Express, Request, Response } from "express";
 import { randomBytes, createHash, timingSafeEqual } from "crypto";
 import { nanoid } from "nanoid";
+import QRCode from "qrcode";
 import { db } from "./db";
 import { twoFactorAuth, auditLogs } from "@shared/schema-sqlite";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -353,12 +354,18 @@ export function registerSecurityRoutes(app: Express) {
       const issuer = 'ImobiBase';
       const accountName = req.user!.email;
       const otpauthUrl = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(accountName)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+      const qrCodeData = await QRCode.toDataURL(otpauthUrl, {
+        errorCorrectionLevel: "M",
+        margin: 2,
+        width: 200,
+      });
 
       res.json({
         secret,
         otpauthUrl,
         backupCodes, // Show only once during setup
-        qrCodeData: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpauthUrl)}`,
+        qrCode: qrCodeData,
+        qrCodeData,
       });
 
       await createAuditLog(req.user!.tenantId, userId, 'setup_2fa', 'user', userId, null, { enabled: false }, req);

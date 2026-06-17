@@ -37,6 +37,7 @@
 - Manifesto SEO publico em `script/public-seo-manifest.ts`.
 - Gerador de HTML estatico publico em `script/generate-static-public-html.ts`.
 - Rota `/sitemap-dynamic.xml` para o sitemap dinamico.
+- Testes unitarios `cron-runtime-guards`, `backup-pitr-readiness`, `deploy-workflow-policy` e `security-go-live-guards`.
 
 ### Changed
 
@@ -72,6 +73,14 @@
 - `script/build.ts` passou a gerar HTML estatico para 11 rotas publicas conhecidas apos o build Vite.
 - `sitemap.xml` estatico passou a vir do manifesto publico, enquanto `/sitemap-dynamic.xml` atende URLs dinamicas.
 - `robots.txt` passou a declarar os sitemaps estatico e dinamico.
+- `server/api-handler.ts` passou a registrar `cookie-parser` e aceitar `Authorization` no preflight serverless.
+- CORS de producao passou a usar defaults seguros sem localhost e sem dominio legado `.com`.
+- `/api/cron/*` passou a usar lock distribuido Redis, skip de duplicata e status de ultima execucao.
+- `backup-processor` passou a aceitar Supabase PITR como estrategia DR explicita sem exigir `pg_dump` no serverless.
+- Workflow de producao deixou de rodar `npm run db:migrate` cego apos deploy e passou a validar o manifesto de crons.
+- Artefatos Playwright (`test-results/`, `playwright-report/`) foram removidos do versionamento e ignorados.
+- Vistorias passaram a validar ownership por tenant de `propertyId`, `rentalContractId` e `renterId` antes da criacao e do relatorio.
+- Setup TOTP/2FA passou a gerar QR Code localmente com `qrcode`, sem enviar segredo para API externa.
 
 ### Validated
 
@@ -95,6 +104,14 @@
 - `npm run test`: 83 arquivos, 1398 testes aprovados, 1 ignorado apos a rodada P0/P2 de continuidade.
 - `npm run build`: aprovado e gerou HTML estatico para 11 rotas publicas.
 - `npm run seo:sitemap`: aprovado.
+- Testes focados `security-go-live-guards`, `cors-config`, `cron-runtime-guards` e `backup-pitr-readiness`: 12 testes aprovados.
+- `npm run ops:backup:verify`: aprovado em modo Supabase PITR explicito.
+- `npm run ops:cron:verify`: aprovado apos hardening operacional.
+- `npm run check`: aprovado apos a rodada Go Live operacional/seguranca.
+- `npm run lint -- --quiet`: aprovado sem erros bloqueantes.
+- `npm run test`: 87 arquivos, 1410 testes aprovados, 1 ignorado apos a rodada Go Live operacional/seguranca.
+- `npm run build`: aprovado apos a rodada Go Live operacional/seguranca.
+- `npm run test:smoke:e2e`: 8 testes Chromium aprovados.
 - `npm run lint -- --format json`: 5166 warnings, 0 errors apos a rodada P0/P2 de continuidade.
 - Checks Playwright de meta/canonical/JSON-LD/overflow.
 - Playwright em preview local: `/contato`, `/novidades`, `/termos`, `/privacidade` sem overflow horizontal em 320px e 390px.

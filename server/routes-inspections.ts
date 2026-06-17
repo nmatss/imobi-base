@@ -51,6 +51,30 @@ async function getItemScopedToInspection(
   return item;
 }
 
+async function getPropertyScopedToTenant(propertyId: string, tenantId: string) {
+  const property = await storage.getProperty(propertyId);
+  if (!property || property.tenantId !== tenantId) {
+    throw new NotFoundError("Property");
+  }
+  return property;
+}
+
+async function getRenterScopedToTenant(renterId: string, tenantId: string) {
+  const renter = await storage.getRenter(renterId);
+  if (!renter || renter.tenantId !== tenantId) {
+    throw new NotFoundError("Renter");
+  }
+  return renter;
+}
+
+async function getRentalContractScopedToTenant(contractId: string, tenantId: string) {
+  const contract = await storage.getRentalContract(contractId);
+  if (!contract || contract.tenantId !== tenantId) {
+    throw new NotFoundError("Rental contract");
+  }
+  return contract;
+}
+
 export function registerInspectionRoutes(app: Express) {
   // Auth + gate de plano: digital_inspections é feature do plano Business
   // (server/seed-plans.ts). Sem o gate, qualquer plano acessava o módulo.
@@ -127,6 +151,22 @@ export function registerInspectionRoutes(app: Express) {
 
       if (!propertyId || !type || !inspectorName) {
         throw new BadRequestError("propertyId, type, and inspectorName are required");
+      }
+
+      await getPropertyScopedToTenant(propertyId, tenantId);
+
+      if (renterId) {
+        await getRenterScopedToTenant(renterId, tenantId);
+      }
+
+      if (rentalContractId) {
+        const contract = await getRentalContractScopedToTenant(rentalContractId, tenantId);
+        if (contract.propertyId !== propertyId) {
+          throw new BadRequestError("rentalContractId does not match propertyId");
+        }
+        if (renterId && contract.renterId !== renterId) {
+          throw new BadRequestError("renterId does not match rentalContractId");
+        }
       }
 
       // Anti-IDOR: previousInspectionId vem do body — valida que a vistoria
@@ -574,8 +614,9 @@ export function registerInspectionRoutes(app: Express) {
         throw new NotFoundError("Inspection");
       }
 
-      // Load property
-      const property = await storage.getProperty(inspection.propertyId);
+      // Load property scoped to the tenant. storage.getProperty filters only by
+      // id, so report generation must re-check ownership before rendering data.
+      const property = await getPropertyScopedToTenant(inspection.propertyId, tenantId);
 
       // Load rooms and items
       const rooms = await storage.getInspectionRoomsByInspection(inspection.id);

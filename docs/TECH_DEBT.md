@@ -14,9 +14,12 @@ Atualizado em: 17/06/2026
 
 ## Backend
 
-- Consolidar estrategia oficial de jobs longos: crons HTTP da Vercel estao manifestados; BullMQ/worker persistente pode ser habilitado por `ENABLE_BACKGROUND_JOBS=true`.
-- Concluir rollout operacional de CORS: `server/config/cors.ts` ja centraliza runtime; falta remover `ALLOWED_ORIGINS` dos ambientes depois de migrar para `CORS_ORIGINS`.
-- Revisar rotas antigas para garantir tenant ownership e ausencia de IDOR.
+- Consolidar estrategia oficial de jobs longos: crons HTTP da Vercel estao manifestados e possuem lock/status via Redis; BullMQ/worker persistente pode ser habilitado por `ENABLE_BACKGROUND_JOBS=true`.
+- Concluir rollout operacional de CORS: `server/config/cors.ts` ja centraliza runtime e defaults de producao sao seguros; falta remover `ALLOWED_ORIGINS` dos ambientes depois de migrar para `CORS_ORIGINS`.
+- Revisar rotas antigas para garantir tenant ownership e ausencia de IDOR. Vistorias foram reforcadas em 17/06/2026; ainda falta aplicar o mesmo padrao de FK ownership em contratos, locacoes, pagamentos, repasses, propostas, vendas, lancamentos financeiros e AVM.
+- Distribuir rate limit/lockout de 2FA em Redis para ambiente serverless; QR Code TOTP ja deixou de depender de servico externo.
+- Fortalecer anti-SSRF com resolucao DNS, bloqueio de redirects para redes privadas e aplicacao do guard no dispatcher generico de webhooks.
+- Reduzir risco de DoS autenticado em upload de imagens, substituindo `memoryStorage`/limites altos por streaming, limites menores ou processamento assinado.
 - Estender o ledger persistente para webhook oficial do WhatsApp e remover fluxos legados quando nao forem mais necessarios.
 - Manifesto de crons ja unifica `vercel.json`, status HTTP e fallback `node-cron`; manter `npm run ops:cron:verify` no CI.
 - Persistir opt-out/unsubscribe real e exigir token forte em todos os fluxos publicos de descadastro.
@@ -25,7 +28,7 @@ Atualizado em: 17/06/2026
 
 - Habilitar e validar RLS para tabelas multi-tenant.
 - Revisar indices de consultas por `tenantId`, status, datas e relatorios.
-- Executar `npm run ops:restore:drill` contra banco isolado real e registrar RPO/RTO.
+- Executar `npm run ops:restore:drill` contra banco isolado real e registrar RPO/RTO. Quando Supabase PITR for a estrategia oficial, manter `BACKUP_OPTIONAL=true` e `SUPABASE_PITR_ENABLED=true` validados em staging/producao.
 - Avaliar regiao do banco em relacao ao deploy.
 
 ## Qualidade

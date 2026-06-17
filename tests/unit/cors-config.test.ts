@@ -47,6 +47,18 @@ describe("CORS configuration", () => {
       "Localhost origins are allowed in production.",
     ]);
   });
+
+  it("does not allow localhost or legacy .com origins by default in production", () => {
+    const origins = getCorsOrigins({ NODE_ENV: "production" });
+
+    expect(origins).toEqual([
+      "https://imobibase.com.br",
+      "https://www.imobibase.com.br",
+      "https://*.imobibase.com.br",
+    ]);
+    expect(isCorsOriginAllowed("http://localhost:5000", origins)).toBe(false);
+    expect(isCorsOriginAllowed("https://imobibase.com", origins)).toBe(false);
+  });
 });
 
 describe("Vercel API handler error envelope", () => {
@@ -104,5 +116,17 @@ describe("Vercel API handler error envelope", () => {
     expect(result.body).toEqual({
       message: "Service temporarily unavailable",
     });
+  });
+});
+
+describe("Vercel API handler middleware parity", () => {
+  it("registers cookie parsing and authorization preflight headers in serverless runtime", () => {
+    const source = execFileSync("sed", ["-n", "1,120p", "server/api-handler.ts"], {
+      encoding: "utf8",
+    });
+
+    expect(source).toContain('import cookieParser from "cookie-parser"');
+    expect(source).toContain("app.use(cookieParser())");
+    expect(source).toContain("Authorization, X-CSRF-Token");
   });
 });

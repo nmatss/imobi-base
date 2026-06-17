@@ -4,7 +4,11 @@ Atualizado em: 17/06/2026
 
 ## CRITICO
 
-- Nao ha mais pendencia critica puramente local sem gate: RLS, backup/restore, cron e pentest possuem scripts de verificacao. Ainda nao e correto declarar producao enterprise ate executar esses gates em staging/producao real:
+- RLS multi-tenant ainda nao foi aplicado/validado em staging/producao real. Os artefatos existem, mas ainda nao e correto declarar isolamento enterprise ate executar:
+  - apply controlado de `migrations/RLS_enable.sql`;
+  - `npm run db:rls:verify` com role runtime nao-owner;
+  - confirmacao de que a role da aplicacao nao possui `BYPASSRLS`.
+- Gated operacionais ainda precisam de evidencia em staging/producao real antes de Go Live enterprise:
   - `npm run db:rls:verify`;
   - `npm run ops:backup:verify`;
   - `npm run ops:restore:drill`;
@@ -21,13 +25,18 @@ Atualizado em: 17/06/2026
 - Webhook legado da ISA foi desabilitado por padrao em producao; se for mantido, ainda deve derivar tenant da configuracao do numero/WABA e usar assinatura/idempotencia propria.
 - Stripe, Mercado Pago e ClickSign ja usam ledger persistente; falta validar a migration em staging/producao e estender o ledger para o webhook oficial do WhatsApp.
 - Pentest externo manual ainda e recomendado antes de contrato enterprise, mesmo com `security:pentest` automatizado.
+- O IDOR critico de vistorias foi corrigido localmente em 17/06/2026: `POST /api/inspections` valida `propertyId`, `rentalContractId` e `renterId` contra o tenant, e o relatorio revalida o imovel antes de renderizar. Ainda falta revisar o mesmo padrao de FK ownership em contratos, locacoes, pagamentos, repasses, propostas, vendas, lancamentos financeiros e AVM.
+- Setup de 2FA nao usa mais QR Code externo (`api.qrserver.com`) e gera QR localmente via `qrcode`; ainda falta distribuir rate limit/lockout de 2FA em Redis para ambiente serverless.
+- Upload de imagens de imovel ainda usa `memoryStorage` com limite alto; reduzir limite, paginação/processamento e/ou streaming antes de Go Live enterprise.
+- Validacao anti-SSRF ainda nao resolve DNS nem controla redirects antes de `fetch`; aplicar guard forte no dispatcher generico de security webhooks e integracoes que aceitam URL externa.
 
 ## MEDIO
 
 - Performance da home melhorou, mas Lighthouse ainda ficou em 74; LCP final em preview local foi 5,1s.
 - Bundle inicial ainda carrega JavaScript relevante para a landing.
-- CORS foi padronizado no runtime, mas producao ainda precisa garantir `CORS_ORIGINS` sem localhost e aposentar `ALLOWED_ORIGINS`.
-- Workers BullMQ existem, mas e preciso decidir operacao oficial fora da Vercel ou via crons HTTP.
+- CORS foi padronizado no runtime e defaults de producao nao incluem localhost; producao ainda deve configurar `CORS_ORIGINS` explicitamente e aposentar `ALLOWED_ORIGINS`.
+- Handler serverless agora registra `cookie-parser` e alinha preflight com `Authorization`; validar em deploy real com login, CSRF e portal por cookie.
+- Workers BullMQ existem, mas e preciso decidir operacao oficial fora da Vercel ou via crons HTTP. Crons HTTP agora possuem lock distribuido via Redis quando `REDIS_URL` esta configurado; ainda falta provar execucao no deploy real e observar duracao/timeout dos jobs longos.
 - Unsubscribe/opt-out ainda precisa persistir bloqueio real de envio e aposentar qualquer fluxo legado sem token forte.
 - Portal de atendimento comprador/lead ainda nao existe como fluxo funcional de selecao, aceite/recusa, comentario e pedido de visita.
 - Acoes de IA ainda nao sao auditaveis/aprovaveis em tabela propria.

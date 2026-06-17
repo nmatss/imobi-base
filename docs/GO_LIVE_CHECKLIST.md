@@ -1,11 +1,16 @@
 # Go-Live Checklist — ImobiBase
 
-Última atualização: 2026-06-10 (pós-hardening P0/P1/P2)
+Última atualização: 2026-06-17 (pós-hardening P0/P1/P2 e revisão Go Live)
 
 Checklist executável antes de apontar tráfego real para `imobibase.com.br`.
 Detalhes operacionais (comandos, IDs, rotação) estão no
 [DEPLOYMENT_RUNBOOK.md](./DEPLOYMENT_RUNBOOK.md) — este documento é o gate de
 decisão: **todos os itens "Bloqueante" precisam estar marcados**.
+
+> Status em 17/06/2026: **não liberar como enterprise Go Live ainda**. A base
+> local melhorou, mas os gates abaixo precisam ser executados contra
+> staging/producao real e as pendencias P0 de seguranca em
+> `docs/KNOWN_ISSUES.md` precisam ter aceite formal ou correcao.
 
 ---
 
@@ -23,6 +28,8 @@ Em dev/test os mesmos problemas viram apenas warning.
       + `STRIPE_WEBHOOK_SECRET` em modo **live** (sk_live_/pk_live_/whsec_).
 - [ ] `APP_URL` / `VITE_APP_URL` / `SITE_URL` = `https://imobibase.com.br`.
 - [ ] `CRON_SECRET` definido (os `/api/cron/*` exigem `Authorization: Bearer`).
+- [ ] `REDIS_URL` definido em producao; os `/api/cron/*` exigem lock
+      distribuido para evitar execucao duplicada de jobs longos.
 - [ ] `ADMIN_BOOTSTRAP_SECRET` e `ADMIN_PASSWORD` **removidos** do Vercel após
       criar o primeiro super_admin.
 - [ ] Nenhum `.env*` com segredo real versionado (`git ls-files | grep -i env`).
@@ -55,6 +62,9 @@ com aviso no log. Marcar cada uma como "ativa" ou "aceito lançar sem":
 - [ ] Catálogo de planos hidratado (`server/seed-plans.ts` via fluxo do
       runbook, seção 3.5) — `GET /api/plans` retorna os 5 planos.
 - [ ] Backup automático Supabase habilitado + teste de restore documentado.
+- [ ] RLS aplicado e validado com `npm run db:rls:verify` usando role runtime
+      nao-owner e sem `BYPASSRLS`.
+- [ ] Migration `20260617_001_webhook_events.sql` aplicada em staging/producao.
 
 ## 4. Validação técnica pré-deploy (Bloqueante)
 
@@ -66,6 +76,9 @@ Rodar na branch/commit exato que vai ao ar:
 - [x] `npx playwright test tests/e2e/smoke.spec.ts --project=chromium` —
       8/8 ✅ 2026-06-10 (local e no CI do GitHub).
 - [x] Lint verde (`npm run lint`). ✅ 2026-06-10
+- [ ] Baseline 17/06/2026: cobertura ainda em ~11% e lint ainda tem 5166
+      warnings. Para Go Live enterprise, elevar cobertura/gates ou registrar
+      aceite formal de risco para MVP controlado.
 
 ## 5. Smoke pós-deploy (Bloqueante)
 
@@ -80,9 +93,15 @@ Imediatamente após o deploy de produção:
 - [ ] Checkout Stripe em modo live com cartão de teste do radar desativado
       (ou transação real de R$1 estornada).
 - [ ] Webhook Stripe entregue com 200 (dashboard Stripe → webhook attempts).
+- [ ] Webhooks Stripe/MercadoPago/ClickSign usando ledger persistente no banco
+      real (`webhook_events`) e sem erro de migration.
 - [ ] Evento de teste chega no Sentry (se ativado).
 - [ ] Disparar um `/api/cron/*` manualmente com `CRON_SECRET` → 200; sem o
       header → 401.
+- [ ] `GET /api/cron/status` retorna `lockMode=redis` e `lastRun` depois de
+      trigger manual em producao.
+- [ ] Login, mutacao com CSRF e portal por cookie funcionam no handler Vercel
+      serverless.
 
 ## 6. Riscos conhecidos aceitos (não-bloqueantes)
 
@@ -100,9 +119,13 @@ Registrados para a primeira sprint pós-launch (ver memória/backlog):
   maps (45 kB gz) já são lazy por rota.
 - `npm audit` com vulnerabilidades em dev-deps (sem caminho de exploração em
   runtime de produção).
-- 2FA, handlers de refund e dashboard MRR ficam para pós-launch.
-- Sem cron de `database-backup` na Vercel (o runtime não tem `pg_dump` — o
-  cron falharia diariamente); o DR real do banco é o backup/PITR gerenciado do
-  Supabase.
+- Handlers de refund e dashboard MRR ficam para pós-launch. 2FA ja nao usa QR
+  externo, mas rate limit/lockout distribuido ainda fica para hardening P0/P1.
+- Cron de `database-backup` pode rodar na Vercel somente com uma estrategia
+  explicita: upload duravel de `pg_dump` via `BACKUP_UPLOAD_URL_TEMPLATE` ou
+  Supabase PITR como DR oficial (`BACKUP_OPTIONAL=true` e
+  `SUPABASE_PITR_ENABLED=true`). Sem isso, o gate `ops:backup:verify` falha.
+- Vistorias tiveram IDOR critico corrigido localmente; demais fluxos com FKs
+  sensiveis ainda precisam de revisao sistematica de ownership por tenant.
 - Flake raro de timeout no Vitest sob paralelismo alto — mitigado com
   `testTimeout: 20000`; se reaparecer, rodar o arquivo isolado para confirmar.

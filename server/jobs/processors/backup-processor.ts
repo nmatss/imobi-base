@@ -56,9 +56,11 @@ export interface BackupResult {
  * commented out — i.e. it produced ZERO real backups while reporting success.
  *
  * Behaviour now:
- *   1. pg_dump must exist and succeed, or the job throws.
- *   2. The dump file must be uploaded to durable object storage. Since no
- *      durable upload target is configured, the job throws because a dump that
+ *   1. If Supabase PITR is explicitly configured as the official DR strategy
+ *      and no dump upload target exists, the job records that managed backup
+ *      posture and does not call pg_dump in serverless.
+ *   2. Otherwise pg_dump must exist and succeed, or the job throws.
+ *   3. The dump file must be uploaded to durable object storage. A dump that
  *      only lives in the ephemeral /tmp of a serverless function is NOT a
  *      backup.
  *
@@ -80,6 +82,20 @@ export async function runBackup(data: BackupJobData): Promise<BackupResult> {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupName = `backup-${type}-${timestamp}`;
   const backupPath = path.join(os.tmpdir(), `imobibase-${backupName}.sql`);
+  const bucket = process.env.BACKUP_BUCKET;
+  const uploadUrlTemplate = process.env.BACKUP_UPLOAD_URL_TEMPLATE ?? process.env.BACKUP_UPLOAD_URL;
+  const usesManagedPitr = process.env.BACKUP_OPTIONAL === 'true' && process.env.SUPABASE_PITR_ENABLED === 'true';
+
+  if (!bucket && !uploadUrlTemplate && usesManagedPitr) {
+    console.log(
+      '[BackupProcessor] Skipping pg_dump because Supabase PITR is explicitly configured as the official DR strategy.',
+    );
+    return {
+      backupName: `supabase-pitr-${timestamp}`,
+      sizeBytes: 0,
+      storageUrl: 'supabase-pitr',
+    };
+  }
 
   const pgDumpArgs = [
     '-h',
@@ -113,8 +129,6 @@ export async function runBackup(data: BackupJobData): Promise<BackupResult> {
 
   // 2) Persist the dump to durable storage. A dump left in ephemeral /tmp is
   //    not a backup, so we refuse to report success without it.
-  const bucket = process.env.BACKUP_BUCKET;
-  const uploadUrlTemplate = process.env.BACKUP_UPLOAD_URL_TEMPLATE ?? process.env.BACKUP_UPLOAD_URL;
   const backupOptional = process.env.BACKUP_OPTIONAL === 'true';
 
   if (!bucket && !uploadUrlTemplate) {

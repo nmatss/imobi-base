@@ -1,4 +1,4 @@
-const DEFAULT_CORS_ORIGINS = [
+const DEVELOPMENT_DEFAULT_CORS_ORIGINS = [
   "http://localhost:3000",
   "http://127.0.0.1:3000",
   "http://localhost:5000",
@@ -8,9 +8,12 @@ const DEFAULT_CORS_ORIGINS = [
   "https://imobibase.com.br",
   "https://www.imobibase.com.br",
   "https://*.imobibase.com.br",
-  "https://imobibase.com",
-  "https://www.imobibase.com",
-  "https://*.imobibase.com",
+];
+
+const PRODUCTION_DEFAULT_CORS_ORIGINS = [
+  "https://imobibase.com.br",
+  "https://www.imobibase.com.br",
+  "https://*.imobibase.com.br",
 ];
 
 interface CorsEnv {
@@ -34,7 +37,11 @@ export function getCorsOrigins(
     ...splitOrigins(env.ALLOWED_ORIGINS),
   ];
 
-  const origins = configuredOrigins.length > 0 ? configuredOrigins : DEFAULT_CORS_ORIGINS;
+  const origins = configuredOrigins.length > 0
+    ? configuredOrigins
+    : env.NODE_ENV === "production"
+      ? PRODUCTION_DEFAULT_CORS_ORIGINS
+      : DEVELOPMENT_DEFAULT_CORS_ORIGINS;
   return [...new Set(origins)];
 }
 
@@ -66,7 +73,7 @@ export function getCorsProductionWarnings(
   }
 
   if (!env.CORS_ORIGINS && !env.ALLOWED_ORIGINS) {
-    warnings.push("CORS_ORIGINS is not configured; runtime is using built-in defaults.");
+    warnings.push("CORS_ORIGINS is not configured; runtime is using production-safe built-in defaults.");
   }
 
   if (origins.some((origin) => origin.includes("localhost") || origin.includes("127.0.0.1"))) {

@@ -48,11 +48,11 @@ if (hasUploadTarget && !(process.env.BACKUP_UPLOAD_URL_TEMPLATE ?? process.env.B
   warnings.push("BACKUP upload URL does not contain {backupName}; ensure the target creates a unique object per run.");
 }
 
-if (!(await commandExists("pg_dump"))) {
+if (!usesPitr && !(await commandExists("pg_dump"))) {
   failures.push("pg_dump is not available on PATH.");
 }
 
-if (!(await commandExists("pg_restore"))) {
+if (!usesPitr && !(await commandExists("pg_restore"))) {
   failures.push("pg_restore is not available on PATH for restore drills.");
 }
 
