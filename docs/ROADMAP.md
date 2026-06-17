@@ -31,6 +31,7 @@ Atualizado em: 17/06/2026
   - Upload de imagens de imovel passou a limitar 10 arquivos de ate 10MB, teto de lote de 50MB e validacao de tenant do `propertyId`.
   - Rate limit/lockout de 2FA passou a usar Redis quando `REDIS_URL` existe, mantendo fallback local apenas para dev/test ou indisponibilidade explicita.
   - Webhook oficial do WhatsApp passou a reservar/processar/falhar changes no ledger persistente `webhook_events`.
+  - Gate unificado `npm run ops:go-live:verify` criado; workflow de producao agora usa `ops:go-live:verify:strict` antes do deploy para exigir Redis, DB, RLS, backup, restore drill e pentest.
 - Em aberto:
   - Executar RLS apply/verify em staging/producao com role nao-owner e sem `BYPASSRLS`.
   - Aplicar e validar migration `20260617_001_webhook_events.sql` em staging/producao.
@@ -43,6 +44,7 @@ Atualizado em: 17/06/2026
   - Executar restore drill contra banco isolado real e registrar RPO/RTO.
   - Validar locks/status de cron no deploy real com `REDIS_URL` e `CRON_SECRET`.
   - Executar pentest externo/manual antes de venda enterprise.
+  - Rodar `npm run ops:go-live:verify:strict` contra staging/producao com evidencias reais.
   - Resolver latencia de producao por co-localizacao de banco/cache ou ajuste de deploy.
 
 ## P1 - Produto competitivo

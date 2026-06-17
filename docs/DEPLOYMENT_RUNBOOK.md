@@ -1,8 +1,7 @@
 # Deployment Runbook — ImobiBase
 
-Última atualização: 2026-06-10 (pós-hardening completo: ondas 0-4 + auditoria
-1000% + migrations 20260610 aplicadas + deploy `d136db5` — ver
-`reports/EXECUCAO_TIMES_2026-06-10.md`)
+Última atualização: 2026-06-17 (gate Go Live strict, ledger persistente de
+webhooks e hardening de RLS/Redis/backup/restore/pentest)
 
 Este documento é o guia operacional para operar ImobiBase em produção. Leitura obrigatória antes de qualquer mudança em `imobibase.com.br`.
 
@@ -23,7 +22,8 @@ imobibase.com.br  (Vercel Edge Network)
    ├── Rotas /api/*  → Vercel Serverless Function (api/index.mjs)
    │                   │
    │                   ├── Drizzle ORM → Supabase Postgres (pooler us-east-1)
-   │                   ├── Redis (cache, rate limit, idempotency)
+   │                   ├── Redis (cache, rate limit, 2FA lockout, cron locks)
+   │                   ├── Postgres `webhook_events` (idempotencia persistente)
    │                   ├── Stripe API
    │                   └── Sentry (errors)
    │
@@ -46,12 +46,15 @@ imobibase.com.br  (Vercel Edge Network)
 | Variável | Uso |
 | --- | --- |
 | `DATABASE_URL` | Supabase pooler connection string |
-| `REDIS_URL` | Redis connection string (cache + rate limit + idempotency) |
+| `REDIS_URL` | Redis connection string (cache + rate limit + 2FA lockout + cron locks) |
 | `SESSION_SECRET` | Assinatura de sessão (rotacionar em incidentes) |
+| `CRON_SECRET` | Header `Authorization: Bearer` nos `/api/cron/*` |
 | `STRIPE_SECRET_KEY` | sk_test_ em staging, sk_live_ em produção real |
 | `STRIPE_PUBLISHABLE_KEY` | pk_test_/pk_live_ |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | Mesmo valor — bundled no client no build |
 | `STRIPE_WEBHOOK_SECRET` | whsec_ do webhook endpoint |
+| `WHATSAPP_APP_SECRET` | Secret do app Meta para validar HMAC do webhook oficial |
+| `WHATSAPP_VERIFY_TOKEN` | Token de handshake do webhook oficial Meta |
 | `APP_URL` / `VITE_APP_URL` / `SITE_URL` | `https://imobibase.com.br` |
 
 ### Admin bootstrap (one-shot)
@@ -70,7 +73,6 @@ Após criar o primeiro super_admin, **remover** `ADMIN_BOOTSTRAP_SECRET`, `ADMIN
 | Variável | Uso |
 | --- | --- |
 | `SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN` | Error tracking + source maps |
-| `CRON_SECRET` | Header `Authorization: Bearer` nos `/api/cron/*` |
 | `PG_POOL_MAX`, `PG_POOL_MIN`, `PG_POOL_IDLE_TIMEOUT_MS`, `PG_POOL_CONN_TIMEOUT_MS` | Override do pool Postgres |
 | `HEALTH_DEBUG_TOKEN` | `?debug=TOKEN` em `/api/health` expõe erro de DB completo |
 | `ADMIN_TENANT_SLUG` | Slug do tenant de operação (default `imobibase-ops`) |
@@ -178,6 +180,42 @@ Supabase faz backup automático diário no free tier (7 dias retention).
 > não fala com o servidor v17 — use backup lógico via SQL ou
 > `postgresql-client-17`.
 
+### 4.2.1 Gate Go Live automatizado
+
+Antes do deploy, rode o gate em modo estatico no commit candidato:
+
+```bash
+npm run ops:go-live:verify:static
+```
+
+Apos `vercel pull --environment=production`, o workflow de producao roda o
+gate estrito antes de publicar:
+
+```bash
+npm run ops:go-live:verify:strict
+```
+
+Para liberar Go Live enterprise manualmente, o operador deve usar o mesmo modo
+estrito contra ambiente real:
+
+```bash
+GO_LIVE_RESTORE_DRILL_VERIFIED=true \
+GO_LIVE_PENTEST_VERIFIED=true \
+npm run ops:go-live:verify:strict
+```
+
+Alternativamente, execute os gates destrutivos/controlados no proprio comando:
+
+```bash
+GO_LIVE_RUN_RESTORE_DRILL=true \
+RESTORE_DRILL_CONFIRM=restore-drill \
+RESTORE_DRILL_DATABASE_URL='postgresql://...scratch...' \
+RESTORE_DRILL_BACKUP_FILE='/path/backup.dump' \
+GO_LIVE_RUN_PENTEST=true \
+TEST_URL='https://staging.imobibase.com.br' \
+npm run ops:go-live:verify:strict
+```
+
 ### 4.3 Criar super_admin adicional
 
 Via API com super_admin existente logado, OU:
@@ -215,20 +253,20 @@ npm run admin:seed
 
 ## 5. Webhook Stripe — eventos tratados
 
-`POST /api/webhooks/stripe` (CSRF-bypass, assinatura obrigatória, idempotente via Redis SETNX 24h)
+`POST /api/webhooks/stripe` (CSRF-bypass, assinatura obrigatória, idempotente via ledger persistente `webhook_events`)
 
 | Evento | Handler | O que faz |
 | --- | --- | --- |
 | `checkout.session.completed` | `handleCheckoutSessionCompleted` | Persiste `stripeCustomerId` em metadata (antes do subscription.created chegar) |
 | `customer.subscription.created` | `handleSubscriptionCreated` | Ativa subscription, mapeia priceId→planId, preserva metadata |
-| `customer.subscription.updated` | `handleSubscriptionUpdated` | Atualiza status (active/trial/cancelled/suspended), dispara `enforceAllPlanLimits` |
+| `customer.subscription.updated` | `handleSubscriptionUpdated` | Atualiza status (active/trial/cancelled/past_due), dispara `enforceAllPlanLimits` |
 | `customer.subscription.deleted` | `handleSubscriptionDeleted` | Marca status=cancelled, cancelledAt=now |
 | `customer.subscription.trial_will_end` | `handleTrialWillEnd` | Envia email com dias restantes + link de billing |
 | `invoice.payment_succeeded` | `handleInvoicePaymentSucceeded` | Loga + envia email de confirmação |
-| `invoice.payment_failed` | `handleInvoicePaymentFailed` | status=suspended + email de falha |
+| `invoice.payment_failed` | `handleInvoicePaymentFailed` | status=past_due + email de falha |
 | Outros (`customer.created`, `payment_method.attached`, `invoice.upcoming`) | Logged apenas | — |
 
-**Retry behavior**: em falha, limpa chave Redis de idempotência e responde 500. Stripe retenta com backoff exponencial até 72h.
+**Retry behavior**: em falha, marca o evento como `failed` no ledger persistente e responde 500. Stripe retenta com backoff exponencial até 72h.
 
 ### Eventos ainda não tratados (backlog)
 

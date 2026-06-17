@@ -108,6 +108,12 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
   - verificacao, validacao e desativacao de 2FA agora aguardam o rate limit distribuido e limpam a chave Redis em sucesso;
   - webhook oficial do WhatsApp em `server/routes-whatsapp.ts` passou a gerar ID estavel por change, reservar no ledger persistente, ignorar duplicatas e marcar sucesso/falha em `webhook_events`;
   - adicionados testes `two-factor-redis-rate-limit-source` e `whatsapp-webhook-ledger-source`.
+- Bloco gate Go Live em 17/06/2026:
+  - criado `script/verify-go-live-readiness.ts` com modos `static`, `deploy` e `strict`;
+  - adicionados scripts `ops:go-live:verify`, `ops:go-live:verify:static` e `ops:go-live:verify:strict`;
+  - workflow de producao passou a rodar `npm run ops:go-live:verify:strict` apos `vercel pull`/build e antes do deploy, com `VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` no ambiente do job;
+  - `docs/GO_LIVE_CHECKLIST.md`, `docs/RUNBOOK.md` e `docs/DEPLOYMENT_RUNBOOK.md` passaram a documentar o gate unificado;
+  - adicionado teste `tests/unit/go-live-readiness-gate.test.ts`.
 
 ## Validacoes executadas
 
@@ -178,6 +184,8 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
   - `npm run lint -- --quiet`: passou, sem erros bloqueantes.
   - `npm run test`: 92 arquivos passaram; 1430 testes passaram, 1 ignorado.
   - `npm run build`: passou e gerou HTML estatico para 11 rotas publicas.
+- Validacao focada do bloco gate Go Live em 17/06/2026:
+  - `npm run ops:go-live:verify:static`: passou, 11 checks aprovados.
 
 ## Pendencias relevantes
 
@@ -187,6 +195,7 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
 - Pentest externo/manual.
 - Execucao real de restore drill e registro de RPO/RTO.
 - Validar locks/status de cron no deploy real com `REDIS_URL` e `CRON_SECRET`.
+- Rodar `npm run ops:go-live:verify:strict` contra staging/producao com evidencias reais.
 - Provar dinamicamente FK ownership cross-tenant em staging/producao e ampliar testes de isolamento multi-tenant.
 - Provar anti-SSRF/upload, Redis 2FA e ledger WhatsApp em staging/producao; evoluir upload para streaming/upload assinado.
 - Reducao adicional de LCP e bundle inicial.

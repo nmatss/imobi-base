@@ -41,6 +41,8 @@
 - Teste unitario `tenant-fk-ownership-guards` para travar validacao de FKs por tenant em rotas core.
 - Testes focados `upload-hardening-source` e `ssrf-fetch-adoption-source`.
 - Testes focados `two-factor-redis-rate-limit-source` e `whatsapp-webhook-ledger-source`.
+- Script `script/verify-go-live-readiness.ts` e teste `go-live-readiness-gate`.
+- Scripts `ops:go-live:verify`, `ops:go-live:verify:static` e `ops:go-live:verify:strict`.
 
 ### Changed
 
@@ -91,6 +93,8 @@
 - Upload de imagens de imovel passou a limitar 10 arquivos de ate 10MB, lote maximo de 50MB e validar ownership do `propertyId`.
 - Rate limit/lockout de 2FA passou a usar Redis quando `REDIS_URL` esta configurado, mantendo fallback local para dev/test.
 - Webhook oficial do WhatsApp passou a usar ledger persistente por change, ignorando duplicatas e marcando falhas para retry.
+- Workflow de producao passou a rodar o gate `npm run ops:go-live:verify:strict` antes do deploy e a configurar `VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` no job.
+- Checklist/runbooks de Go Live passaram a apontar para o gate unificado em modo estatico/deploy/strict.
 
 ### Validated
 
@@ -136,6 +140,7 @@
 - `npm run lint -- --quiet`: aprovado apos hardening 2FA/WhatsApp ledger.
 - `npm run test`: 92 arquivos, 1430 testes aprovados, 1 ignorado apos hardening 2FA/WhatsApp ledger.
 - `npm run build`: aprovado apos hardening 2FA/WhatsApp ledger.
+- `npm run ops:go-live:verify:static`: aprovado, 11 checks.
 - `npm run lint -- --format json`: 5166 warnings, 0 errors apos a rodada P0/P2 de continuidade.
 - Checks Playwright de meta/canonical/JSON-LD/overflow.
 - Playwright em preview local: `/contato`, `/novidades`, `/termos`, `/privacidade` sem overflow horizontal em 320px e 390px.

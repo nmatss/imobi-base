@@ -9,6 +9,7 @@ Atualizado em: 17/06/2026
   - `npm run db:rls:verify` com role runtime nao-owner;
   - confirmacao de que a role da aplicacao nao possui `BYPASSRLS`.
 - Gated operacionais ainda precisam de evidencia em staging/producao real antes de Go Live enterprise:
+  - `npm run ops:go-live:verify:strict`;
   - `npm run db:rls:verify`;
   - `npm run ops:backup:verify`;
   - `npm run ops:restore:drill`;
@@ -26,7 +27,7 @@ Atualizado em: 17/06/2026
 - Stripe, Mercado Pago, ClickSign e webhook oficial do WhatsApp ja usam ledger persistente; falta validar a migration em staging/producao.
 - Pentest externo manual ainda e recomendado antes de contrato enterprise, mesmo com `security:pentest` automatizado.
 - IDOR/FK ownership: vistorias e fluxos centrais de contratos, locacoes, pagamentos, repasses, propostas, vendas, lancamentos financeiros e AVM foram reforcados localmente em 17/06/2026. Ainda falta prova dinamica multi-tenant em staging/producao e auditoria de rotas legadas/integracoes fora desse nucleo.
-- Setup de 2FA nao usa mais QR Code externo (`api.qrserver.com`) e gera QR localmente via `qrcode`; rate limit/lockout de 2FA usa Redis quando `REDIS_URL` existe e degrada para memoria em dev/test. Ainda falta validar Redis real no deploy serverless.
+- Setup de 2FA nao usa mais QR Code externo (`api.qrserver.com`) e gera QR localmente via `qrcode`; rate limit/lockout de 2FA usa Redis quando `REDIS_URL` existe e degrada para memoria em dev/test ou se o Redis configurado ficar indisponivel. Ainda falta validar Redis real no deploy serverless.
 - Upload de imagens de imovel foi reduzido localmente para 10 arquivos de ate 10MB cada, com teto de lote de 50MB e validacao de ownership do imovel. Ainda falta substituir `memoryStorage` por streaming/upload assinado para maturidade 10/10.
 - Validacao anti-SSRF agora resolve DNS, bloqueia redirects para alvos privados e foi aplicada a security webhooks/WhatsApp. Ainda falta prova em staging/producao e pentest externo/manual antes de Go Live enterprise.
 

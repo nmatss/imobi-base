@@ -22,6 +22,7 @@ Atualizado em: 17/06/2026
 - Reduzir risco residual de DoS autenticado em upload de imagens substituindo `memoryStorage` por streaming/upload assinado; limites locais ja foram reduzidos para 10 arquivos de 10MB e lote maximo de 50MB.
 - Validar ledger persistente do webhook oficial do WhatsApp em staging/producao e remover fluxos legados quando nao forem mais necessarios.
 - Manifesto de crons ja unifica `vercel.json`, status HTTP e fallback `node-cron`; manter `npm run ops:cron:verify` no CI.
+- Manter `npm run ops:go-live:verify:strict` como gate de producao pre-deploy; qualquer alteracao em RLS, Redis, webhooks, cron, backup ou restore deve passar por esse gate.
 - Persistir opt-out/unsubscribe real e exigir token forte em todos os fluxos publicos de descadastro.
 
 ## Banco

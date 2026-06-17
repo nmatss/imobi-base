@@ -17,6 +17,23 @@ npm run test:smoke
 npm run test:smoke:e2e
 ```
 
+## Gate Go Live
+
+```bash
+npm run ops:go-live:verify:static
+npm run ops:go-live:verify
+npm run ops:go-live:verify:strict
+```
+
+- `static`: valida wiring do repositorio, scripts, workflow, migration
+  `webhook_events`, RLS e manifesto de crons sem exigir secrets.
+- `deploy`: modo padrao; deve rodar apos `vercel pull --environment=production`
+  para validar variaveis obrigatorias antes do deploy.
+- `strict`: gate enterprise; conecta em Redis/banco, roda backup/RLS e exige
+  evidencia ou execucao real de restore drill e pentest.
+- O workflow de producao usa `ops:go-live:verify:strict`; se falhar, nao ha
+  deploy enterprise.
+
 ## SEO
 
 ```bash
