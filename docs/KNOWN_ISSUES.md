@@ -27,8 +27,8 @@ Atualizado em: 17/06/2026
 - Pentest externo manual ainda e recomendado antes de contrato enterprise, mesmo com `security:pentest` automatizado.
 - IDOR/FK ownership: vistorias e fluxos centrais de contratos, locacoes, pagamentos, repasses, propostas, vendas, lancamentos financeiros e AVM foram reforcados localmente em 17/06/2026. Ainda falta prova dinamica multi-tenant em staging/producao e auditoria de rotas legadas/integracoes fora desse nucleo.
 - Setup de 2FA nao usa mais QR Code externo (`api.qrserver.com`) e gera QR localmente via `qrcode`; ainda falta distribuir rate limit/lockout de 2FA em Redis para ambiente serverless.
-- Upload de imagens de imovel ainda usa `memoryStorage` com limite alto; reduzir limite, paginação/processamento e/ou streaming antes de Go Live enterprise.
-- Validacao anti-SSRF ainda nao resolve DNS nem controla redirects antes de `fetch`; aplicar guard forte no dispatcher generico de security webhooks e integracoes que aceitam URL externa.
+- Upload de imagens de imovel foi reduzido localmente para 10 arquivos de ate 10MB cada, com teto de lote de 50MB e validacao de ownership do imovel. Ainda falta substituir `memoryStorage` por streaming/upload assinado para maturidade 10/10.
+- Validacao anti-SSRF agora resolve DNS, bloqueia redirects para alvos privados e foi aplicada a security webhooks/WhatsApp. Ainda falta prova em staging/producao e pentest externo/manual antes de Go Live enterprise.
 
 ## MEDIO
 

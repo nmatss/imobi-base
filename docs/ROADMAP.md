@@ -26,12 +26,16 @@ Atualizado em: 17/06/2026
   - Vistorias validam `propertyId`, `rentalContractId` e `renterId` contra o tenant antes de criar relatorio/registro.
   - Setup TOTP gera QR Code localmente com `qrcode`, sem vazar `otpauth://...secret=...` para API externa.
   - FK ownership cross-tenant reforcado em contratos, locacoes, pagamentos, repasses, propostas, vendas, lancamentos financeiros e AVM.
+  - Guard anti-SSRF central passou a resolver DNS, bloquear IPs privados em respostas DNS e controlar redirects manualmente antes de `fetch`.
+  - Security webhooks e WhatsApp passaram a usar o fetch externo seguro; WhatsApp media URL tambem resolve DNS antes de enfileirar.
+  - Upload de imagens de imovel passou a limitar 10 arquivos de ate 10MB, teto de lote de 50MB e validacao de tenant do `propertyId`.
 - Em aberto:
   - Executar RLS apply/verify em staging/producao com role nao-owner e sem `BYPASSRLS`.
   - Aplicar e validar migration `20260617_001_webhook_events.sql` em staging/producao.
   - Estender ledger persistente para webhook oficial do WhatsApp.
   - Provar dinamicamente isolamento multi-tenant das rotas com FK ownership em staging/producao.
-  - Fortalecer anti-SSRF e upload de imagens antes de Go Live enterprise.
+  - Validar anti-SSRF/upload em staging/producao e executar pentest externo/manual.
+  - Evoluir upload de imagens para streaming/upload assinado para maturidade 10/10.
   - Persistir/distribuir rate limit e lockout de 2FA para ambiente serverless.
   - Elevar cobertura de testes de 11,1% statements para >= 80%.
   - Reduzir 5166 warnings de lint.

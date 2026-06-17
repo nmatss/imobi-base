@@ -6,7 +6,7 @@
  */
 
 import { log } from "../../utils/log";
-import { validateExternalUrl } from "../../security/url-validator";
+import { fetchExternalUrl } from "../../security/url-validator";
 
 interface WhatsAppConfig {
   apiToken: string;
@@ -393,16 +393,12 @@ export class WhatsAppBusinessAPI {
    * Download media
    */
   async downloadMedia(mediaUrl: string): Promise<Buffer> {
-    // Validar URL antes de fazer download para prevenir SSRF
-    const validation = validateExternalUrl(mediaUrl);
-    if (!validation.valid) {
-      throw new Error(`Invalid media URL: ${validation.error}`);
-    }
-
-    const response = await fetch(mediaUrl, {
+    const response = await fetchExternalUrl(mediaUrl, {
       headers: {
         "Authorization": `Bearer ${this.config.apiToken}`,
       },
+      timeoutMs: 10000,
+      maxRedirects: 3,
     });
 
     if (!response.ok) {

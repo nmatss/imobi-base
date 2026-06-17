@@ -72,6 +72,12 @@ O diferencial recomendado e posicionar o produto como o sistema que nao perde vi
 - Redis de producao identificado como Redis Cloud em `us-east-1`.
 - Risco: latencia por banco/Redis fora da regiao do deploy.
 
+## Guardrails de seguranca confirmados
+
+- Fetch de URL externa deve passar por `server/security/url-validator.ts` via `fetchExternalUrl`, que valida protocolo/host/IP, resolve DNS, bloqueia IP privado em respostas DNS e controla redirects manualmente.
+- Upload generico deve resolver bucket por `fileType`; cliente nao deve escolher bucket publico arbitrario.
+- Upload de imagens de imovel esta limitado localmente a 10 arquivos de ate 10MB, lote maximo de 50MB e validacao de tenant do `propertyId`; maturidade 10/10 ainda pede streaming/upload assinado.
+
 ## Documentacao importante
 
 - `README.md`

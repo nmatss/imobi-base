@@ -17,7 +17,7 @@ import { autoResponder } from "./integrations/whatsapp/auto-responder";
 import { messageQueue } from "./integrations/whatsapp/message-queue";
 import { webhookHandler } from "./integrations/whatsapp/webhook-handler";
 import { log } from "./utils/log";
-import { validateExternalUrl } from "./security/url-validator";
+import { validateExternalUrlResolved } from "./security/url-validator";
 import { generateRateLimitKey } from "./middleware/rate-limit-key-generator";
 import { checkFeatureAccess } from "./middleware/plan-limits";
 import { requireAuth } from "./middleware/auth";
@@ -187,8 +187,8 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(400).json({ error: "Phone number and media URL are required" });
       }
 
-      // Validar mediaUrl para prevenir SSRF
-      const validation = validateExternalUrl(mediaUrl);
+      // Validar mediaUrl com DNS antes de enfileirar para prevenir SSRF.
+      const validation = await validateExternalUrlResolved(mediaUrl);
       if (!validation.valid) {
         return res.status(400).json({
           error: `Invalid media URL: ${validation.error}`,

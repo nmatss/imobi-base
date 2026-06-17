@@ -39,6 +39,7 @@
 - Rota `/sitemap-dynamic.xml` para o sitemap dinamico.
 - Testes unitarios `cron-runtime-guards`, `backup-pitr-readiness`, `deploy-workflow-policy` e `security-go-live-guards`.
 - Teste unitario `tenant-fk-ownership-guards` para travar validacao de FKs por tenant em rotas core.
+- Testes focados `upload-hardening-source` e `ssrf-fetch-adoption-source`.
 
 ### Changed
 
@@ -83,6 +84,10 @@
 - Vistorias passaram a validar ownership por tenant de `propertyId`, `rentalContractId` e `renterId` antes da criacao e do relatorio.
 - Setup TOTP/2FA passou a gerar QR Code localmente com `qrcode`, sem enviar segredo para API externa.
 - Contratos, contratos de aluguel, pagamentos, repasses, propostas, vendas, lancamentos financeiros e AVM passaram a validar FKs sensiveis contra o tenant antes de criar/atualizar.
+- Guard anti-SSRF passou a resolver DNS, bloquear respostas DNS privadas e seguir redirects manualmente com revalidacao de destino.
+- Security webhooks e download de midia do WhatsApp passaram a usar `fetchExternalUrl`; envio de midia WhatsApp resolve DNS antes de enfileirar URL.
+- Upload generico passou a bloquear bucket arbitrario incompativel com o `fileType`.
+- Upload de imagens de imovel passou a limitar 10 arquivos de ate 10MB, lote maximo de 50MB e validar ownership do `propertyId`.
 
 ### Validated
 
@@ -118,6 +123,11 @@
 - `npm run lint -- --quiet`: aprovado apos hardening de FK ownership.
 - `npm run test`: 88 arquivos, 1412 testes aprovados, 1 ignorado apos hardening de FK ownership.
 - `npm run build`: aprovado apos hardening de FK ownership.
+- Testes focados `url-validator`, `ssrf-protection`, `upload-hardening-source` e `ssrf-fetch-adoption-source`: 75 testes aprovados.
+- `npm run check`: aprovado apos hardening anti-SSRF/upload.
+- `npm run lint -- --quiet`: aprovado apos hardening anti-SSRF/upload.
+- `npm run test`: 90 arquivos, 1423 testes aprovados, 1 ignorado apos hardening anti-SSRF/upload.
+- `npm run build`: aprovado apos hardening anti-SSRF/upload.
 - `npm run lint -- --format json`: 5166 warnings, 0 errors apos a rodada P0/P2 de continuidade.
 - Checks Playwright de meta/canonical/JSON-LD/overflow.
 - Playwright em preview local: `/contato`, `/novidades`, `/termos`, `/privacidade` sem overflow horizontal em 320px e 390px.

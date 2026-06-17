@@ -96,6 +96,13 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
   - criacao/edicao de contratos, contratos de aluguel, pagamentos, repasses, propostas, vendas e lancamentos financeiros validam FKs contra o tenant antes de persistir;
   - `POST /api/avm/evaluate` valida `propertyId` opcional contra o tenant antes de gravar avaliacao;
   - adicionado teste `tests/unit/tenant-fk-ownership-guards.test.ts`.
+- Bloco anti-SSRF/upload em 17/06/2026:
+  - `server/security/url-validator.ts` ganhou `validateExternalUrlResolved` e `fetchExternalUrl`, com resolucao DNS, bloqueio de IP privado em respostas DNS, redirect manual e timeout;
+  - security webhooks passaram a usar `fetchExternalUrl` com redirect bloqueado para POST;
+  - download de midia do WhatsApp passou a usar `fetchExternalUrl`, e `/api/whatsapp/send-media` passou a resolver DNS antes de enfileirar URL de midia;
+  - upload generico deixou de aceitar bucket arbitrario incompatível com o `fileType`;
+  - upload de imagens de imovel passou a limitar 10 arquivos de ate 10MB, lote maximo de 50MB e validar que `propertyId` pertence ao tenant;
+  - adicionados testes `url-validator`, `ssrf-protection`, `upload-hardening-source` e `ssrf-fetch-adoption-source` para as novas garantias.
 
 ## Validacoes executadas
 
@@ -154,6 +161,12 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
   - `npm run lint -- --quiet`: passou, sem erros bloqueantes.
   - `npm run test`: 88 arquivos passaram; 1412 testes passaram, 1 ignorado.
   - `npm run build`: passou e gerou HTML estatico para 11 rotas publicas.
+- Validacao focada do bloco anti-SSRF/upload em 17/06/2026:
+  - `npm run check`: passou.
+  - Testes focados `url-validator`, `ssrf-protection`, `upload-hardening-source` e `ssrf-fetch-adoption-source`: 75 testes passaram.
+  - `npm run lint -- --quiet`: passou, sem erros bloqueantes.
+  - `npm run test`: 90 arquivos passaram; 1423 testes passaram, 1 ignorado.
+  - `npm run build`: passou e gerou HTML estatico para 11 rotas publicas.
 
 ## Pendencias relevantes
 
@@ -164,7 +177,7 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
 - Execucao real de restore drill e registro de RPO/RTO.
 - Validar locks/status de cron no deploy real com `REDIS_URL` e `CRON_SECRET`.
 - Provar dinamicamente FK ownership cross-tenant em staging/producao e ampliar testes de isolamento multi-tenant.
-- Fortalecer anti-SSRF, upload de imagens e rate limit/lockout distribuido de 2FA.
+- Provar anti-SSRF/upload em staging/producao, evoluir upload para streaming/upload assinado e distribuir rate limit/lockout de 2FA.
 - Reducao adicional de LCP e bundle inicial.
 - SEO de rotas publicas conhecidas ja possui HTML estatico no build; ainda faltam prerender/SSR ou geracao estatica para vitrines dinamicas de tenant/imovel/cidade/bairro.
 - `/sitemap-dynamic.xml` foi roteado para o backend; ainda precisa ser validado no deploy Vercel real.
