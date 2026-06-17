@@ -107,7 +107,7 @@ type ImobiContextType = {
   leads: Lead[];
   visits: Visit[];
   contracts: Contract[];
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, options?: LoginOptions) => Promise<void>;
   logout: () => Promise<void>;
   switchTenant: (tenantId: string) => Promise<void>;
   loading: boolean;
@@ -119,21 +119,45 @@ type ImobiContextType = {
 
 const ImobiContext = createContext<ImobiContextType | undefined>(undefined);
 
+export type LoginOptions = {
+  twoFactorToken?: string;
+  backupCode?: string;
+};
+
+export class TwoFactorRequiredError extends Error {
+  constructor(message = "Código de autenticação necessário") {
+    super(message);
+    this.name = "TwoFactorRequiredError";
+  }
+}
+
+const AUTH_OPTIONAL_PUBLIC_PATHS = new Set([
+  "/",
+  "/login",
+  "/pricing",
+  "/signup",
+  "/contato",
+  "/novidades",
+  "/termos",
+  "/privacidade",
+  "/crm-imobiliario",
+  "/software-de-agendamento-imobiliario",
+  "/sistema-imobiliario-completo",
+  "/site-para-imobiliaria",
+  "/crm-imobiliario-com-ia",
+]);
+
+const AUTH_OPTIONAL_PUBLIC_PREFIXES = [
+  "/e/",
+  "/portal/login",
+  "/portal/reset-password",
+  "/auth/forgot-password",
+  "/auth/reset-password",
+  "/auth/verify-email",
+];
+
 function isPublicAuthOptionalPath(path: string): boolean {
-  return (
-    path === "/" ||
-    path === "/login" ||
-    path === "/pricing" ||
-    path === "/signup" ||
-    path === "/termos" ||
-    path === "/privacidade" ||
-    path.startsWith("/e/") ||
-    path.startsWith("/portal/login") ||
-    path.startsWith("/portal/reset-password") ||
-    path.startsWith("/auth/forgot-password") ||
-    path.startsWith("/auth/reset-password") ||
-    path.startsWith("/auth/verify-email")
-  );
+  return AUTH_OPTIONAL_PUBLIC_PATHS.has(path) || AUTH_OPTIONAL_PUBLIC_PREFIXES.some((prefix) => path.startsWith(prefix));
 }
 
 // As rotas autenticadas /api/properties e /api/leads são paginadas no servidor
@@ -349,20 +373,28 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
     }
   }, [user, tenant, fetchAllData]);
 
-  async function login(email: string, password: string) {
+  async function login(email: string, password: string, options?: LoginOptions) {
     const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({
+        email,
+        password,
+        ...(options?.twoFactorToken ? { twoFactorToken: options.twoFactorToken } : {}),
+        ...(options?.backupCode ? { backupCode: options.backupCode } : {}),
+      }),
       credentials: "include",
     });
 
-    if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.error || "Login failed");
+    const data = await res.json();
+
+    if (data.twoFactorRequired && res.ok) {
+      throw new TwoFactorRequiredError(data.message);
     }
 
-    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Login failed");
+    }
     setUser(data.user);
     setTenant(data.tenant);
     // Login responde o estado da sessão — não precisa do /api/auth/me adiado.

@@ -76,6 +76,27 @@ type FollowUp = {
   createdAt: string;
 };
 
+type LeadSlaSummary = {
+  items: Array<{
+    leadId: string;
+    firstResponseStatus: "pending" | "met" | "late";
+    firstResponseMinutes: number | null;
+    stale: boolean;
+    staleHours: number;
+    priority: "urgent" | "high" | "normal" | "low";
+    nextAction: string;
+  }>;
+  totals: {
+    total: number;
+    pendingFirstResponse: number;
+    lateFirstResponse: number;
+    stale: number;
+    urgent: number;
+    unassigned: number;
+  };
+  limit: number;
+};
+
 type MatchedProperty = {
   property: {
     id: string;
@@ -322,6 +343,7 @@ export default function LeadsKanban() {
   const [leadTagsMap, setLeadTagsMap] = useState<Record<string, LeadTag[]>>({});
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
   const [allInteractions, setAllInteractions] = useState<Interaction[]>([]);
+  const [leadSlaSummary, setLeadSlaSummary] = useState<LeadSlaSummary | null>(null);
 
   // Detail Panel State
   const [leadInteractions, setLeadInteractions] = useState<Interaction[]>([]);
@@ -388,6 +410,9 @@ export default function LeadsKanban() {
 
     if (leads.length > 0) {
       fetchAllLeadTags(abortController.signal);
+      fetchLeadSlaSummary(abortController.signal);
+    } else {
+      setLeadSlaSummary(null);
     }
 
     return () => {
@@ -443,6 +468,21 @@ export default function LeadsKanban() {
     } catch (error) {
       if (error instanceof Error && error.name !== 'AbortError') {
         console.error("Failed to fetch follow-ups:", error);
+      }
+    }
+  };
+
+  const fetchLeadSlaSummary = async (signal?: AbortSignal) => {
+    try {
+      const res = await fetch("/api/leads/sla/summary?limit=2000", { credentials: "include", signal });
+      if (res.ok && !signal?.aborted) {
+        setLeadSlaSummary(await res.json());
+      } else if (!signal?.aborted) {
+        setLeadSlaSummary(null);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error("Failed to fetch lead SLA summary:", error);
       }
     }
   };
@@ -554,6 +594,28 @@ export default function LeadsKanban() {
       .slice(0, 5), [filteredLeads, followUps, allInteractions]);
 
   const slaAlerts = useMemo(() => {
+    const overdueFollowUps = followUps.filter((f) => f.status === "pending" && isPast(new Date(f.dueAt)) && !isToday(new Date(f.dueAt)));
+
+    if (leadSlaSummary) {
+      const visibleLeadIds = new Set(filteredLeads.map((lead) => lead.id));
+      const visibleSlaItems = leadSlaSummary.items.filter((item) => visibleLeadIds.has(item.leadId));
+      const pendingFirstResponse = visibleSlaItems.filter((item) => item.firstResponseStatus === "pending").length;
+      const lateFirstResponse = visibleSlaItems.filter((item) => item.firstResponseStatus === "late").length;
+      const stale = visibleSlaItems.filter((item) => item.stale).length;
+      const urgent = visibleSlaItems.filter((item) => item.priority === "urgent").length;
+      const unassigned = filteredLeads.filter((lead) => !lead.assignedTo && lead.status !== "contract").length;
+
+      return {
+        newLeadsNoContact: pendingFirstResponse,
+        lateFirstResponse,
+        leadsWithoutUpdate: stale,
+        urgent,
+        unassigned,
+        overdueFollowUps: overdueFollowUps.length,
+        total: pendingFirstResponse + lateFirstResponse + stale + urgent + unassigned + overdueFollowUps.length,
+      };
+    }
+
     const newLeadsNoContact = filteredLeads.filter((l) => {
       if (l.status !== "new") return false;
       const hours = differenceInHours(new Date(), new Date(l.createdAt));
@@ -566,15 +628,16 @@ export default function LeadsKanban() {
       return days >= 3;
     });
 
-    const overdueFollowUps = followUps.filter((f) => f.status === "pending" && isPast(new Date(f.dueAt)) && !isToday(new Date(f.dueAt)));
-
     return {
       newLeadsNoContact: newLeadsNoContact.length,
+      lateFirstResponse: 0,
       leadsWithoutUpdate: leadsWithoutUpdate.length,
+      urgent: 0,
+      unassigned: 0,
       overdueFollowUps: overdueFollowUps.length,
       total: newLeadsNoContact.length + leadsWithoutUpdate.length + overdueFollowUps.length,
     };
-  }, [filteredLeads, followUps]);
+  }, [filteredLeads, followUps, leadSlaSummary]);
 
   const columnStats = useMemo(() => 
     // Calculate week-over-week change (simplified - just shows current count)
@@ -1322,13 +1385,31 @@ export default function LeadsKanban() {
             {slaAlerts.newLeadsNoContact > 0 && (
               <Badge variant="destructive" className="shrink-0 gap-1 py-0.5 px-2 text-[10px] sm:text-xs">
                 <AlertCircle className="h-3 w-3" />
-                <span>{slaAlerts.newLeadsNoContact} sem contato</span>
+                <span>{slaAlerts.newLeadsNoContact} sem 1º atendimento</span>
+              </Badge>
+            )}
+            {slaAlerts.lateFirstResponse > 0 && (
+              <Badge variant="destructive" className="shrink-0 gap-1 py-0.5 px-2 text-[10px] sm:text-xs">
+                <Clock className="h-3 w-3" />
+                <span>{slaAlerts.lateFirstResponse} fora do SLA</span>
               </Badge>
             )}
             {slaAlerts.leadsWithoutUpdate > 0 && (
               <Badge variant="outline" className="shrink-0 gap-1 py-0.5 px-2 text-[10px] sm:text-xs text-amber-600 border-amber-300">
                 <Timer className="h-3 w-3" />
                 <span>{slaAlerts.leadsWithoutUpdate} parados</span>
+              </Badge>
+            )}
+            {slaAlerts.urgent > 0 && (
+              <Badge variant="outline" className="shrink-0 gap-1 py-0.5 px-2 text-[10px] sm:text-xs text-orange-600 border-orange-300">
+                <Flame className="h-3 w-3" />
+                <span>{slaAlerts.urgent} urgentes</span>
+              </Badge>
+            )}
+            {slaAlerts.unassigned > 0 && (
+              <Badge variant="outline" className="shrink-0 gap-1 py-0.5 px-2 text-[10px] sm:text-xs text-sky-600 border-sky-300">
+                <Users className="h-3 w-3" />
+                <span>{slaAlerts.unassigned} sem corretor</span>
               </Badge>
             )}
             {slaAlerts.overdueFollowUps > 0 && (

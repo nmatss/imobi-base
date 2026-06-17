@@ -10,13 +10,24 @@ export interface SeoHeadProps {
   siteName?: string;
   twitterSite?: string;
   canonical?: string;
+  imageAlt?: string;
   structuredData?: Record<string, unknown> | Array<Record<string, unknown>>;
 }
 
-const DEFAULT_SITE =
-  (typeof window !== "undefined" && window.location?.origin) ||
-  "https://imobibase.com";
+export const SITE_URL = (
+  import.meta.env.VITE_SITE_URL || "https://imobibase.com.br"
+).replace(/\/$/, "");
 const DEFAULT_IMAGE = "/opengraph.png";
+
+export function siteUrl(path = "/"): string {
+  if (path.startsWith("http")) return path;
+  return `${SITE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+export function absoluteUrl(url: string): string {
+  if (url.startsWith("http")) return url;
+  return siteUrl(url);
+}
 
 export function SeoHead({
   title,
@@ -28,11 +39,11 @@ export function SeoHead({
   siteName = "ImobiBase",
   twitterSite = "@imobibase",
   canonical,
+  imageAlt,
   structuredData,
 }: SeoHeadProps) {
-  const origin = DEFAULT_SITE.replace(/\/$/, "");
-  const fullUrl = canonical || `${origin}${path}`;
-  const fullImage = image.startsWith("http") ? image : `${origin}${image}`;
+  const fullUrl = canonical || siteUrl(path);
+  const fullImage = absoluteUrl(image);
 
   return (
     <Helmet>
@@ -47,11 +58,13 @@ export function SeoHead({
       <meta property="og:type" content={type} />
       <meta property="og:url" content={fullUrl} />
       <meta property="og:image" content={fullImage} />
+      {imageAlt && <meta property="og:image:alt" content={imageAlt} />}
       <meta property="og:site_name" content={siteName} />
       <meta property="og:locale" content="pt_BR" />
 
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:site" content={twitterSite} />
+      <meta name="twitter:url" content={fullUrl} />
       <meta name="twitter:title" content={title} />
       <meta name="twitter:description" content={description} />
       <meta name="twitter:image" content={fullImage} />
@@ -79,8 +92,8 @@ export function SeoHead({
 export const OrganizationSchema = {
   "@type": "Organization",
   name: "ImobiBase",
-  url: "https://imobibase.com",
-  logo: "https://imobibase.com/icon-512.png",
+  url: SITE_URL,
+  logo: siteUrl("/icon-512.png"),
   sameAs: [
     "https://instagram.com/imobibase",
     "https://linkedin.com/company/imobibase",
@@ -88,7 +101,7 @@ export const OrganizationSchema = {
   ],
   contactPoint: {
     "@type": "ContactPoint",
-    email: "contato@imobibase.com",
+    email: "contato@imobibase.com.br",
     contactType: "customer support",
     areaServed: "BR",
     availableLanguage: ["Portuguese"],
@@ -100,7 +113,7 @@ export const OrganizationSchema = {
  */
 export function breadcrumbSchema(
   items: Array<{ name: string; path: string }>,
-  origin = "https://imobibase.com",
+  origin = SITE_URL,
 ): Record<string, unknown> {
   return {
     "@type": "BreadcrumbList",

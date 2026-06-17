@@ -132,7 +132,7 @@ export const placeIdParamSchema = z.object({
  * Properties map query schema
  */
 export const propertiesMapQuerySchema = z.object({
-  tenantId: z.string().uuid('Invalid tenant ID'),
+  tenantId: z.string().optional(),
 });
 
 /**
@@ -157,7 +157,7 @@ export const nearbyPropertiesQuerySchema = z.object({
     if (num < 1 || num > 50000) throw new Error('Radius must be between 1 and 50000 meters');
     return num;
   }).optional(),
-  tenantId: z.string().uuid('Invalid tenant ID').optional(),
+  tenantId: z.string().optional(),
 });
 
 /**

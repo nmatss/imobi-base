@@ -202,12 +202,12 @@ export default function PrivacyPage() {
           </section>
         </div>
 
-        <div className="mt-12 pt-8 border-t flex gap-4">
-          <Link href="/termos">
-            <Button variant="outline">Termos de Uso</Button>
+        <div className="mt-12 pt-8 border-t flex flex-col gap-3 sm:flex-row sm:gap-4">
+          <Link href="/termos" className="w-full sm:w-auto">
+            <Button variant="outline" className="w-full sm:w-auto">Termos de Uso</Button>
           </Link>
-          <Link href="/">
-            <Button variant="ghost">Voltar ao início</Button>
+          <Link href="/" className="w-full sm:w-auto">
+            <Button variant="ghost" className="w-full sm:w-auto">Voltar ao início</Button>
           </Link>
         </div>
       </main>

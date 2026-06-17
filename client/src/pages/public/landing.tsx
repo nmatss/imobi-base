@@ -5,8 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { MapPin, Phone, Mail, ArrowRight, BedDouble, Bath, Ruler, Check, Building, Loader2, Search, Filter, Menu, X, MessageCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Helmet } from "react-helmet";
 import { unwrapList } from "@/lib/api-envelope";
+import { breadcrumbSchema, SeoHead, siteUrl } from "@/components/seo/SeoHead";
 
 type Tenant = {
   id: string;
@@ -171,15 +171,44 @@ export default function TenantLanding() {
       '--primary': tenant.primaryColor,
       '--secondary': tenant.secondaryColor
     } as any}>
-      {/* SEO Meta Tags */}
-      <Helmet>
-        <title>{tenant.name} - Imóveis de qualidade</title>
-        <meta name="description" content={`Encontre o imóvel perfeito com ${tenant.name}. Apartamentos, casas, terrenos e imóveis comerciais.`} />
-        <meta property="og:title" content={`${tenant.name} - Imóveis de qualidade`} />
-        <meta property="og:description" content={`Encontre o imóvel perfeito com ${tenant.name}.`} />
-        <meta property="og:type" content="website" />
-        {tenant.logo && <meta property="og:image" content={tenant.logo} />}
-      </Helmet>
+      <SeoHead
+        title={`${tenant.name} | Imóveis para comprar e alugar`}
+        description={`Encontre imóveis com a ${tenant.name}: casas, apartamentos, terrenos e imóveis comerciais para compra ou aluguel.`}
+        path={`/e/${tenantSlug}`}
+        image={tenant.logo || "/opengraph.png"}
+        imageAlt={`Logo da ${tenant.name}`}
+        structuredData={[
+          {
+            "@type": "RealEstateAgent",
+            name: tenant.name,
+            url: siteUrl(`/e/${tenantSlug}`),
+            image: tenant.logo || undefined,
+            telephone: tenant.phone || undefined,
+            email: tenant.email || undefined,
+            address: tenant.address
+              ? {
+                  "@type": "PostalAddress",
+                  streetAddress: tenant.address,
+                }
+              : undefined,
+          },
+          breadcrumbSchema([
+            { name: "Inicio", path: "/" },
+            { name: tenant.name, path: `/e/${tenantSlug}` },
+          ]),
+          {
+            "@type": "ItemList",
+            name: `Imoveis em destaque - ${tenant.name}`,
+            numberOfItems: filteredProperties.length,
+            itemListElement: filteredProperties.slice(0, 10).map((property, index) => ({
+              "@type": "ListItem",
+              position: index + 1,
+              url: siteUrl(`/e/${tenantSlug}/imovel/${property.id}`),
+              name: property.title,
+            })),
+          },
+        ]}
+      />
 
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">

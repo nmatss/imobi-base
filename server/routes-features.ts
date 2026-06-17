@@ -21,6 +21,14 @@ import {
 } from "@shared/schema-sqlite";
 import { eq, desc, and, inArray, sql } from "drizzle-orm";
 import { createAuditLog } from "./routes-security";
+import {
+  runWithDigitalSignatureTokenRlsContext,
+  runWithPropertyComparisonRlsContext,
+  runWithPublicPropertyIdsRlsContext,
+  runWithTenantRlsContext,
+} from "./db-rls";
+
+const MAX_PUBLIC_COMPARISON_PROPERTIES = 20;
 
 // Lead Score Calculator
 function calculateLeadScore(lead: any, interactions: any[], followUps: any[]): {
@@ -123,7 +131,36 @@ export function registerFeatureRoutes(app: Express) {
     if (!req.isAuthenticated?.() || !req.user) {
       return res.status(401).json({ error: "Não autenticado" });
     }
-    next();
+    if (!req.user.tenantId) {
+      return res.status(403).json({ error: "Sessão inválida" });
+    }
+    runWithTenantRlsContext(req.user.tenantId, () => next());
+  };
+
+  const getTenantProperty = async (
+    propertyId: string,
+    tenantId: string,
+  ): Promise<{ id: string; tenantId: string } | null> => {
+    const rows = await db
+      .select({ id: properties.id, tenantId: properties.tenantId })
+      .from(properties)
+      .where(and(eq(properties.id, propertyId), eq(properties.tenantId, tenantId)))
+      .limit(1);
+
+    return rows[0] ?? null;
+  };
+
+  const getTenantContract = async (
+    contractId: string,
+    tenantId: string,
+  ): Promise<{ id: string; tenantId: string } | null> => {
+    const rows = await db
+      .select({ id: contracts.id, tenantId: contracts.tenantId })
+      .from(contracts)
+      .where(and(eq(contracts.id, contractId), eq(contracts.tenantId, tenantId)))
+      .limit(1);
+
+    return rows[0] ?? null;
   };
 
   // ==================== LEAD SCORING ====================
@@ -313,6 +350,11 @@ export function registerFeatureRoutes(app: Express) {
         return res.status(400).json({ error: "Latitude e longitude são obrigatórios" });
       }
 
+      const property = await getTenantProperty(propertyId, req.user!.tenantId);
+      if (!property) {
+        return res.status(404).json({ error: "Imóvel não encontrado" });
+      }
+
       const existing = await db.select().from(propertyCoordinates).where(eq(propertyCoordinates.propertyId, propertyId));
 
       if (existing.length > 0) {
@@ -344,9 +386,14 @@ export function registerFeatureRoutes(app: Express) {
   });
 
   // Get property coordinates
-  app.get("/api/properties/:propertyId/coordinates", async (req, res) => {
+  app.get("/api/properties/:propertyId/coordinates", requireAuth, async (req, res) => {
     try {
       const { propertyId } = req.params;
+
+      const property = await getTenantProperty(propertyId, req.user!.tenantId);
+      if (!property) {
+        return res.status(404).json({ error: "Imóvel não encontrado" });
+      }
 
       const coords = await db.select().from(propertyCoordinates).where(eq(propertyCoordinates.propertyId, propertyId));
 
@@ -362,13 +409,9 @@ export function registerFeatureRoutes(app: Express) {
   });
 
   // Get all properties with coordinates (for map)
-  app.get("/api/properties/map", async (req, res) => {
+  app.get("/api/properties/map", requireAuth, async (req, res) => {
     try {
-      const { tenantId } = req.query;
-
-      if (!tenantId) {
-        return res.status(400).json({ error: "tenantId obrigatório" });
-      }
+      const tenantId = req.user!.tenantId;
 
       const propertiesWithCoords = await db.select({
         id: properties.id,
@@ -389,7 +432,7 @@ export function registerFeatureRoutes(app: Express) {
         .from(properties)
         .innerJoin(propertyCoordinates, eq(properties.id, propertyCoordinates.propertyId))
         .where(and(
-          eq(properties.tenantId, tenantId as string),
+          eq(properties.tenantId, tenantId),
           eq(properties.status, 'available')
         ));
 
@@ -449,10 +492,13 @@ export function registerFeatureRoutes(app: Express) {
       const { propertyId } = req.params;
 
       // Rota pública (site do tenant exibe tours), mas valida que a property
-      // existe — 404 em vez de lista vazia para id inexistente.
+      // existe e está disponível — evita expor tours de imóveis privados/arquivados.
       const property = await db.select({ id: properties.id })
         .from(properties)
-        .where(eq(properties.id, propertyId));
+        .where(and(
+          eq(properties.id, propertyId),
+          eq(properties.status, 'available')
+        ));
       if (property.length === 0) {
         return res.status(404).json({ error: "Imóvel não encontrado" });
       }
@@ -528,31 +574,69 @@ export function registerFeatureRoutes(app: Express) {
       if (!Array.isArray(propertyIds) || propertyIds.length < 2) {
         return res.status(400).json({ error: "Selecione pelo menos 2 imóveis" });
       }
+      if (propertyIds.length > MAX_PUBLIC_COMPARISON_PROPERTIES) {
+        return res.status(400).json({ error: "Selecione no máximo 20 imóveis" });
+      }
+      if (
+        !propertyIds.every(
+          (id): id is string => typeof id === "string" && id.trim() !== "" && !id.includes(","),
+        )
+      ) {
+        return res.status(400).json({ error: "Lista de imóveis inválida" });
+      }
 
       // Segurança: NÃO aceitamos tenantId do body (permitiria gravar
       // comparações em nome de outro tenant). O tenant é derivado das
       // properties: todas precisam existir e pertencer ao MESMO tenant.
-      const comparisonProps = await db.select({ id: properties.id, tenantId: properties.tenantId })
-        .from(properties)
-        .where(inArray(properties.id, propertyIds));
+      const comparisonProps = await runWithPublicPropertyIdsRlsContext(propertyIds, () =>
+        db.select({ id: properties.id, tenantId: properties.tenantId })
+          .from(properties)
+          .where(and(
+            inArray(properties.id, propertyIds),
+            eq(properties.status, 'available'),
+          )),
+      );
       if (comparisonProps.length !== propertyIds.length) {
-        return res.status(400).json({ error: "Um ou mais imóveis são inválidos" });
+        return res.status(400).json({ error: "Um ou mais imóveis são inválidos ou indisponíveis" });
       }
       const tenantIds = new Set(comparisonProps.map((p: { tenantId: string }) => p.tenantId));
       if (tenantIds.size !== 1) {
         return res.status(400).json({ error: "Todos os imóveis devem pertencer à mesma imobiliária" });
       }
       const tenantId = comparisonProps[0].tenantId;
+      const safeUserId =
+        req.isAuthenticated?.() &&
+        req.user?.tenantId === tenantId &&
+        userId === req.user.id
+          ? req.user.id
+          : undefined;
+      let safeLeadId: string | undefined;
 
-      const comparison = await db.insert(propertyComparisons).values({
-        id: nanoid(),
-        tenantId,
-        propertyIds: JSON.stringify(propertyIds),
-        userId,
-        leadId,
-        sessionId,
-        notes,
-      }).returning();
+      if (typeof leadId === "string" && leadId) {
+        const leadRows = await runWithTenantRlsContext(tenantId, () =>
+          db
+            .select({ id: leads.id })
+            .from(leads)
+            .where(and(eq(leads.id, leadId), eq(leads.tenantId, tenantId)))
+            .limit(1),
+        );
+        if (leadRows.length === 0) {
+          return res.status(400).json({ error: "Lead inválido para esta imobiliária" });
+        }
+        safeLeadId = leadId;
+      }
+
+      const comparison = await runWithTenantRlsContext(tenantId, () =>
+        db.insert(propertyComparisons).values({
+          id: nanoid(),
+          tenantId,
+          propertyIds: JSON.stringify(propertyIds),
+          userId: safeUserId,
+          leadId: safeLeadId,
+          sessionId,
+          notes,
+        }).returning(),
+      );
 
       res.json(comparison[0]);
     } catch (error: any) {
@@ -566,16 +650,24 @@ export function registerFeatureRoutes(app: Express) {
     try {
       const { comparisonId } = req.params;
 
-      const comparison = await db.select().from(propertyComparisons).where(eq(propertyComparisons.id, comparisonId));
+      const comparison = await runWithPropertyComparisonRlsContext(comparisonId, () =>
+        db.select().from(propertyComparisons).where(eq(propertyComparisons.id, comparisonId)),
+      );
 
       if (comparison.length === 0) {
         return res.status(404).json({ error: "Comparação não encontrada" });
       }
 
       const propertyIds = JSON.parse(comparison[0].propertyIds);
-      const comparisonProperties = await db.select()
-        .from(properties)
-        .where(inArray(properties.id, propertyIds));
+      const comparisonProperties = await runWithTenantRlsContext(comparison[0].tenantId, () =>
+        db.select()
+          .from(properties)
+          .where(and(
+            inArray(properties.id, propertyIds),
+            eq(properties.tenantId, comparison[0].tenantId),
+            eq(properties.status, 'available'),
+          )),
+      );
 
       res.json({
         ...comparison[0],
@@ -592,13 +684,37 @@ export function registerFeatureRoutes(app: Express) {
     try {
       const { propertyIds } = req.body;
 
-      if (!propertyIds || propertyIds.length < 2) {
+      if (!Array.isArray(propertyIds) || propertyIds.length < 2) {
         return res.status(400).json({ error: "Selecione pelo menos 2 imóveis" });
       }
+      if (propertyIds.length > MAX_PUBLIC_COMPARISON_PROPERTIES) {
+        return res.status(400).json({ error: "Selecione no máximo 20 imóveis" });
+      }
+      if (
+        !propertyIds.every(
+          (id): id is string => typeof id === "string" && id.trim() !== "" && !id.includes(","),
+        )
+      ) {
+        return res.status(400).json({ error: "Lista de imóveis inválida" });
+      }
 
-      const comparisonProperties = await db.select()
-        .from(properties)
-        .where(inArray(properties.id, propertyIds));
+      const comparisonProperties = await runWithPublicPropertyIdsRlsContext(propertyIds, () =>
+        db.select()
+          .from(properties)
+          .where(and(
+            inArray(properties.id, propertyIds),
+            eq(properties.status, 'available'),
+          )),
+      );
+
+      if (comparisonProperties.length !== propertyIds.length) {
+        return res.status(400).json({ error: "Um ou mais imóveis são inválidos ou indisponíveis" });
+      }
+
+      const tenantIds = new Set(comparisonProperties.map((p: typeof comparisonProperties[number]) => p.tenantId));
+      if (tenantIds.size !== 1) {
+        return res.status(400).json({ error: "Todos os imóveis devem pertencer à mesma imobiliária" });
+      }
 
       // Calculate comparison metrics
       type PropertyType = typeof comparisonProperties[number];
@@ -608,10 +724,15 @@ export function registerFeatureRoutes(app: Express) {
           max: Math.max(...comparisonProperties.map((p: PropertyType) => parseFloat(p.price))),
           avg: comparisonProperties.reduce((sum: number, p: PropertyType) => sum + parseFloat(p.price), 0) / comparisonProperties.length,
         },
-        areaRange: {
-          min: Math.min(...comparisonProperties.filter((p: PropertyType) => p.area).map((p: PropertyType) => p.area!)),
-          max: Math.max(...comparisonProperties.filter((p: PropertyType) => p.area).map((p: PropertyType) => p.area!)),
-        },
+        areaRange: (() => {
+          const areas = comparisonProperties
+            .filter((p: PropertyType) => p.area)
+            .map((p: PropertyType) => p.area!);
+          return {
+            min: areas.length > 0 ? Math.min(...areas) : null,
+            max: areas.length > 0 ? Math.max(...areas) : null,
+          };
+        })(),
         pricePerSqm: comparisonProperties.map((p: PropertyType) => ({
           id: p.id,
           pricePerSqm: p.area ? parseFloat(p.price) / p.area : null,
@@ -638,6 +759,11 @@ export function registerFeatureRoutes(app: Express) {
 
       if (!signers || signers.length === 0) {
         return res.status(400).json({ error: "Adicione pelo menos um assinante" });
+      }
+
+      const contract = await getTenantContract(contractId, req.user!.tenantId);
+      if (!contract) {
+        return res.status(404).json({ error: "Contrato não encontrado" });
       }
 
       const createdSignatures = [];
@@ -689,7 +815,9 @@ export function registerFeatureRoutes(app: Express) {
       }
 
       // Get contract details
-      const contract = await db.select().from(contracts).where(eq(contracts.id, signature[0].contractId));
+      const contract = await runWithDigitalSignatureTokenRlsContext(token, () =>
+        db.select().from(contracts).where(eq(contracts.id, signature[0].contractId)),
+      );
 
       res.json({
         signature: signature[0],
@@ -747,9 +875,11 @@ export function registerFeatureRoutes(app: Express) {
       const allSigned = allSignatures.every((s: SignatureType) => s.status === 'signed');
 
       if (allSigned) {
-        await db.update(contracts)
-          .set({ status: 'signed', signedAt: new Date().toISOString() })
-          .where(eq(contracts.id, signature[0].contractId));
+        await runWithDigitalSignatureTokenRlsContext(token, () =>
+          db.update(contracts)
+            .set({ status: 'signed', signedAt: new Date().toISOString() })
+            .where(eq(contracts.id, signature[0].contractId)),
+        );
       }
 
       res.json({ success: true, allSigned });
@@ -763,6 +893,11 @@ export function registerFeatureRoutes(app: Express) {
   app.get("/api/contracts/:contractId/signatures", requireAuth, async (req, res) => {
     try {
       const { contractId } = req.params;
+
+      const contract = await getTenantContract(contractId, req.user!.tenantId);
+      if (!contract) {
+        return res.status(404).json({ error: "Contrato não encontrado" });
+      }
 
       const signatures = await db.select()
         .from(digitalSignatures)

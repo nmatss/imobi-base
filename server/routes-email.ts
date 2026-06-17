@@ -13,6 +13,25 @@ import {
 } from './schemas/email';
 import { generateRateLimitKey } from "./middleware/rate-limit-key-generator";
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (char) => {
+    switch (char) {
+      case '&':
+        return '&amp;';
+      case '<':
+        return '&lt;';
+      case '>':
+        return '&gt;';
+      case '"':
+        return '&quot;';
+      case "'":
+        return '&#39;';
+      default:
+        return char;
+    }
+  });
+}
+
 // ==================== RATE LIMITERS ====================
 
 /**
@@ -395,6 +414,7 @@ export function registerEmailRoutes(app: Express) {
 
       // Here you would update the user's email preferences in your database
       // For now, we'll just show a success message
+      const escapedEmail = escapeHtml(tokenData.email);
 
       res.send(`
         <!DOCTYPE html>
@@ -424,7 +444,7 @@ export function registerEmailRoutes(app: Express) {
           <div class="container">
             <h1>✓ Unsubscribed Successfully</h1>
             <p>You have been unsubscribed from our email list.</p>
-            <p>Email: <strong>${tokenData.email}</strong></p>
+            <p>Email: <strong>${escapedEmail}</strong></p>
             <p>You will no longer receive marketing emails from us.</p>
           </div>
         </body>

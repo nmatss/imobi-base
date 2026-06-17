@@ -267,7 +267,7 @@ export class MessageQueue {
       });
 
       // Update conversation
-      await conversationManager.updateConversation(conversation.id, {
+      await conversationManager.updateConversation(conversation.id, queueItem.tenantId, {
         lastMessageAt: new Date(),
         lastMessageFrom: "user",
       });

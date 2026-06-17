@@ -199,6 +199,7 @@ describe("schema parity: schema.ts (Postgres) vs schema-sqlite.ts (SQLite)", () 
       "contract_documents",
       "dashboard_layouts",
       "widget_types",
+      "files",
       // Novas tabelas de módulos (AVM/ISA/Marketing/Vistorias), criadas já em
       // paridade nos dois schemas (2026-06-10):
       "property_inspections",

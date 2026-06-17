@@ -20,6 +20,8 @@ import { log } from "./utils/log";
 import { validateExternalUrl } from "./security/url-validator";
 import { generateRateLimitKey } from "./middleware/rate-limit-key-generator";
 import { checkFeatureAccess } from "./middleware/plan-limits";
+import { requireAuth } from "./middleware/auth";
+import { runWithTenantRlsContext, runWithWhatsAppPhoneNumberRlsContext } from "./db-rls";
 
 // ==================== RATE LIMITERS ====================
 
@@ -78,8 +80,8 @@ const bulkWhatsAppLimiter = rateLimit({
 
 export function registerWhatsAppRoutes(app: Express) {
   // Gate all WhatsApp routes behind feature flag (webhooks use /api/webhooks/ prefix, unaffected)
-  // Individual routes already use requireAuth; this gates feature access for all WhatsApp API routes
-  app.use("/api/whatsapp", checkFeatureAccess('whatsapp'));
+  // Webhooks are under /api/webhooks and remain outside this authenticated prefix.
+  app.use("/api/whatsapp", requireAuth, checkFeatureAccess('whatsapp'));
 
   // ==================== MESSAGES ====================
 
@@ -418,7 +420,10 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      await conversationManager.markAsRead(req.params.id);
+      const updated = await conversationManager.markAsRead(req.params.id, req.user.tenantId);
+      if (!updated) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
 
       res.json({ success: true });
     } catch (error: any) {
@@ -443,7 +448,10 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(400).json({ error: "User ID is required" });
       }
 
-      const conversation = await conversationManager.assignToUser(req.params.id, userId);
+      const conversation = await conversationManager.assignToUser(req.params.id, req.user.tenantId, userId);
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation or assignee not found" });
+      }
 
       res.json({ conversation });
     } catch (error: any) {
@@ -462,7 +470,10 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      await conversationManager.closeConversation(req.params.id);
+      const updated = await conversationManager.closeConversation(req.params.id, req.user.tenantId);
+      if (!updated) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
 
       res.json({ success: true });
     } catch (error: any) {
@@ -669,7 +680,9 @@ export function registerWhatsAppRoutes(app: Express) {
             continue;
           }
 
-          const tenantId = await webhookHandler.resolveTenantId(phoneNumberId);
+          const tenantId = await runWithWhatsAppPhoneNumberRlsContext(phoneNumberId, () =>
+            webhookHandler.resolveTenantId(phoneNumberId),
+          );
 
           if (!tenantId) {
             // FAIL-CLOSED: sem mapeamento, nao gravamos nada.
@@ -681,9 +694,11 @@ export function registerWhatsAppRoutes(app: Express) {
           }
 
           // Processa apenas este change, ja resolvido para o tenant correto.
-          await webhookHandler.processWebhook(
-            { object: req.body.object, entry: [{ id: entry.id, changes: [change] }] },
-            tenantId
+          await runWithTenantRlsContext(tenantId, () =>
+            webhookHandler.processWebhook(
+              { object: req.body.object, entry: [{ id: entry.id, changes: [change] }] },
+              tenantId
+            ),
           );
           routed++;
         }

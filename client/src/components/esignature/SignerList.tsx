@@ -29,6 +29,7 @@ interface Signer {
 
 interface SignerListProps {
   listKey: string;
+  documentKey: string;
   signers: Signer[];
 }
 
@@ -48,7 +49,7 @@ const statusColors = {
   refused: 'text-red-500',
 };
 
-export function SignerList({ listKey, signers }: SignerListProps) {
+export function SignerList({ listKey, documentKey, signers }: SignerListProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -57,7 +58,9 @@ export function SignerList({ listKey, signers }: SignerListProps) {
       // O backend deriva o tenantId do usuário autenticado (req.user.tenantId)
       const res = await fetch(`/api/esignature/resend/${listKey}/${signerKey}`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
+        body: JSON.stringify({ documentKey }),
       });
       if (!res.ok) throw new Error('Failed to resend invitation');
       return res.json();

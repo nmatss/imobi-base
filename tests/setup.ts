@@ -1,9 +1,28 @@
-import { afterEach, beforeAll, afterAll, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, afterAll, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
+function resetViewport() {
+  vi.useRealTimers();
+  Object.defineProperty(window, 'innerWidth', {
+    configurable: true,
+    writable: true,
+    value: 1024,
+  });
+  Object.defineProperty(window, 'innerHeight', {
+    configurable: true,
+    writable: true,
+    value: 768,
+  });
+}
+
+beforeEach(() => {
+  resetViewport();
+});
+
 // Cleanup after each test
 afterEach(() => {
+  resetViewport();
   cleanup();
   vi.clearAllMocks();
 });

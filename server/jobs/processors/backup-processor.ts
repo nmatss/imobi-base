@@ -41,7 +41,7 @@ function spawnAsync(
 
 export interface BackupResult {
   backupName: string;
-  localPath: string;
+  localPath?: string;
   sizeBytes: number;
   storageUrl?: string;
 }
@@ -58,9 +58,9 @@ export interface BackupResult {
  * Behaviour now:
  *   1. pg_dump must exist and succeed, or the job throws.
  *   2. The dump file must be uploaded to durable object storage. Since no
- *      storage SDK is wired in this environment, the job throws unless a
- *      BACKUP_BUCKET + uploader are configured, because a dump that only lives
- *      in the ephemeral /tmp of a serverless function is NOT a backup.
+ *      durable upload target is configured, the job throws because a dump that
+ *      only lives in the ephemeral /tmp of a serverless function is NOT a
+ *      backup.
  *
  * The officially supported disaster-recovery mechanism for production is the
  * Supabase Point-In-Time Recovery (PITR). Set BACKUP_OPTIONAL=true to treat a
@@ -114,11 +114,12 @@ export async function runBackup(data: BackupJobData): Promise<BackupResult> {
   // 2) Persist the dump to durable storage. A dump left in ephemeral /tmp is
   //    not a backup, so we refuse to report success without it.
   const bucket = process.env.BACKUP_BUCKET;
+  const uploadUrlTemplate = process.env.BACKUP_UPLOAD_URL_TEMPLATE ?? process.env.BACKUP_UPLOAD_URL;
   const backupOptional = process.env.BACKUP_OPTIONAL === 'true';
 
-  if (!bucket) {
+  if (!bucket && !uploadUrlTemplate) {
     const message =
-      'BACKUP_BUCKET is not configured. The pg_dump file lives only in ephemeral storage and is NOT a durable backup. ' +
+      'No durable backup target is configured. The pg_dump file lives only in ephemeral storage and is NOT a durable backup. ' +
       'Configure object storage, or rely on Supabase PITR as the official DR (set BACKUP_OPTIONAL=true to silence this).';
 
     // Clean up the orphaned dump regardless of outcome.
@@ -126,18 +127,90 @@ export async function runBackup(data: BackupJobData): Promise<BackupResult> {
 
     if (backupOptional) {
       console.warn(`[BackupProcessor] ${message}`);
-      return { backupName, localPath: backupPath, sizeBytes: stats.size };
+      return { backupName, sizeBytes: stats.size };
     }
     throw new Error(message);
   }
 
-  // Object-storage upload SDK is not wired in this codebase. Fail honestly
-  // instead of pretending the upload happened.
+  if (!uploadUrlTemplate) {
+    await fs.unlink(backupPath).catch(() => undefined);
+    throw new Error(
+      `BACKUP_BUCKET=${bucket} is set but BACKUP_UPLOAD_URL_TEMPLATE is missing. ` +
+        'Configure a presigned PUT URL template containing {backupName} before enabling automated off-site backups.',
+    );
+  }
+
+  const storageUrl = await uploadBackupFile({
+    backupPath,
+    backupName,
+    bucket,
+    uploadUrlTemplate,
+  });
+
   await fs.unlink(backupPath).catch(() => undefined);
-  throw new Error(
-    `BACKUP_BUCKET=${bucket} is set but no object-storage uploader is implemented in this build. ` +
-      'Wire an S3/GCS client before enabling automated off-site backups.',
-  );
+  return { backupName, sizeBytes: stats.size, storageUrl };
+}
+
+async function uploadBackupFile(input: {
+  backupPath: string;
+  backupName: string;
+  bucket?: string;
+  uploadUrlTemplate: string;
+}): Promise<string> {
+  const uploadUrl = resolveBackupTemplate(input.uploadUrlTemplate, input.backupName);
+  const file = await fs.readFile(input.backupPath);
+  const headers = parseBackupUploadHeaders();
+
+  const response = await fetch(uploadUrl, {
+    method: 'PUT',
+    body: file,
+    headers: {
+      'content-type': 'application/octet-stream',
+      ...headers,
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`Backup upload failed with HTTP ${response.status}: ${body.slice(0, 500)}`);
+  }
+
+  const storageUrlTemplate = process.env.BACKUP_STORAGE_URL_TEMPLATE;
+  if (storageUrlTemplate) {
+    return resolveBackupTemplate(storageUrlTemplate, input.backupName);
+  }
+
+  if (input.bucket) {
+    return `${input.bucket}/${input.backupName}.dump`;
+  }
+
+  return uploadUrl.replace(/[?].*$/, '');
+}
+
+function resolveBackupTemplate(template: string, backupName: string): string {
+  return template
+    .split('{backupName}').join(encodeURIComponent(backupName))
+    .split('{backupFile}').join(encodeURIComponent(`${backupName}.dump`));
+}
+
+function parseBackupUploadHeaders(): Record<string, string> {
+  const rawHeaders = process.env.BACKUP_UPLOAD_HEADERS;
+  if (!rawHeaders) return {};
+
+  try {
+    const parsed = JSON.parse(rawHeaders) as Record<string, unknown>;
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .filter(([, value]) => typeof value === 'string')
+        .map(([key, value]) => [key, value as string]),
+    );
+  } catch (error) {
+    throw new Error(
+      `BACKUP_UPLOAD_HEADERS must be a JSON object with string values: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
 }
 
 /**

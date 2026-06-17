@@ -659,6 +659,31 @@ export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 
 /**
+ * WEBHOOK EVENTS
+ * Persistent idempotency ledger for provider callbacks.
+ */
+export const webhookEvents = sqliteTable("webhook_events", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").references(() => tenants.id),
+  provider: text("provider").notNull(),
+  eventId: text("event_id").notNull(),
+  eventType: text("event_type"),
+  status: text("status").notNull().default("processing"),
+  attempts: integer("attempts").notNull().default(1),
+  payloadDigest: text("payload_digest"),
+  signatureDigest: text("signature_digest"),
+  lastError: text("last_error"),
+  receivedAt: text("received_at").notNull().default(now()),
+  processedAt: text("processed_at"),
+  failedAt: text("failed_at"),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertWebhookEventSchema = createInsertSchema(webhookEvents).omit({ id: true, receivedAt: true, updatedAt: true });
+export type InsertWebhookEvent = z.infer<typeof insertWebhookEventSchema>;
+export type WebhookEvent = typeof webhookEvents.$inferSelect;
+
+/**
  * USER SESSIONS
  * Track active user sessions for security
  */

@@ -35,6 +35,7 @@ import {
   generateBlurhash,
 } from './storage/image-processor';
 import { storage } from './storage';
+import { runWithTenantRlsContext } from './db-rls';
 
 // Configure Multer for memory storage - default 10MB limit
 const upload = multer({
@@ -56,10 +57,13 @@ const uploadPropertyImages = multer({
  * Authentication middleware - ensures user is logged in
  */
 function requireAuth(req: Request, res: Response, next: Function) {
-  if (!req.isAuthenticated || !req.isAuthenticated()) {
+  if (!req.isAuthenticated || !req.isAuthenticated() || !req.user) {
     return res.status(401).json({ error: 'Authentication required' });
   }
-  next();
+  if (!req.user.tenantId) {
+    return res.status(403).json({ error: 'Sessão inválida' });
+  }
+  runWithTenantRlsContext(req.user.tenantId, () => next());
 }
 
 /**

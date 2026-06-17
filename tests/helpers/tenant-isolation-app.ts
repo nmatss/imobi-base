@@ -86,6 +86,7 @@ export function setupFreshDatabase(): void {
   if (fs.existsSync(DEV_DB_PATH)) {
     // Preferencial: clona o schema atualizado do db de dev e zera os dados.
     fs.copyFileSync(DEV_DB_PATH, workDbPath);
+    ensureWebhookEventsTable(workDbPath);
     wipeAllTables(workDbPath);
   } else {
     // Fallback: recria a partir da migration (schema possivelmente parcial).
@@ -98,10 +99,43 @@ export function setupFreshDatabase(): void {
     try {
       client.pragma("foreign_keys = OFF");
       for (const stmt of statements) client.exec(stmt);
+      createWebhookEventsTable(client);
     } finally {
       client.close();
     }
   }
+}
+
+function ensureWebhookEventsTable(dbPath: string): void {
+  const client = new Database(dbPath);
+  try {
+    createWebhookEventsTable(client);
+  } finally {
+    client.close();
+  }
+}
+
+function createWebhookEventsTable(client: Database.Database): void {
+  client.exec(`
+    CREATE TABLE IF NOT EXISTS webhook_events (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT REFERENCES tenants(id),
+      provider TEXT NOT NULL,
+      event_id TEXT NOT NULL,
+      event_type TEXT,
+      status TEXT NOT NULL DEFAULT 'processing',
+      attempts INTEGER NOT NULL DEFAULT 1,
+      payload_digest TEXT,
+      signature_digest TEXT,
+      last_error TEXT,
+      received_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      processed_at TEXT,
+      failed_at TEXT,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_webhook_events_provider_event
+      ON webhook_events(provider, event_id);
+  `);
 }
 
 /**

@@ -944,6 +944,31 @@ export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 
 /**
+ * WEBHOOK EVENTS
+ * Persistent idempotency ledger for provider callbacks.
+ */
+export const webhookEvents = pgTable("webhook_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id),
+  provider: text("provider").notNull(),
+  eventId: text("event_id").notNull(),
+  eventType: text("event_type"),
+  status: text("status").notNull().default("processing"), // processing, processed, failed
+  attempts: integer("attempts").notNull().default(1),
+  payloadDigest: text("payload_digest"),
+  signatureDigest: text("signature_digest"),
+  lastError: text("last_error"),
+  receivedAt: timestamp("received_at").notNull().defaultNow(),
+  processedAt: timestamp("processed_at"),
+  failedAt: timestamp("failed_at"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertWebhookEventSchema = createInsertSchema(webhookEvents).omit({ id: true, receivedAt: true, updatedAt: true });
+export type InsertWebhookEvent = z.infer<typeof insertWebhookEventSchema>;
+export type WebhookEvent = typeof webhookEvents.$inferSelect;
+
+/**
  * TWO FACTOR AUTHENTICATION
  * 2FA via TOTP (paridade com schema-sqlite; consumidor: server/routes-security.ts)
  */
@@ -1218,15 +1243,15 @@ export const files = pgTable("files", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
   userId: varchar("user_id").references(() => users.id),
-  filename: text("filename").notNull(),
-  originalName: text("original_name").notNull(),
+  bucket: text("bucket").notNull(), // Storage bucket name
+  filePath: text("file_path").notNull(), // Full path in storage
+  fileName: text("file_name").notNull(), // Original filename
+  fileSize: integer("file_size").notNull(), // Size in bytes
   mimeType: text("mime_type").notNull(),
-  size: integer("size").notNull(),
-  path: text("path").notNull(),
-  url: text("url"),
-  category: text("category"), // document, image, video, etc.
-  relatedTo: text("related_to"), // property, lead, contract, etc.
-  relatedId: varchar("related_id"),
+  category: text("category").notNull(), // property-image, document, avatar, logo, invoice, export
+  entityType: text("entity_type"), // property, lead, contract, user, tenant
+  entityId: varchar("entity_id"),
+  isPublic: boolean("is_public").default(false),
   metadata: json("metadata"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

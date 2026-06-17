@@ -15,6 +15,7 @@ export function useFirstAccessTour() {
     if (!user) return;
     if (typeof window === "undefined") return;
     if (window.innerWidth < 1024) return;
+    if (localStorage.getItem("imobibase:disable-tour") === "1") return;
     const storageKey = `imobibase:tour-done:${user.id}`;
     if (localStorage.getItem(storageKey) === "1") return;
 

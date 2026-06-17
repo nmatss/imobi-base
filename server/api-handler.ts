@@ -21,6 +21,7 @@ import { initializeRedis } from "./cache/redis-client";
 import { sanitizeResponse, shouldSkipDetailedLogging } from "./utils/log-sanitizer";
 import { secretManager } from "./security/secret-manager";
 import { captureException } from "./monitoring/sentry";
+import { getCorsOrigins, isCorsOriginAllowed } from "./config/cors";
 
 const app = express();
 const httpServer = createServer(app);
@@ -78,11 +79,10 @@ app.use((_req, res, next) => {
 // CORS for Vercel
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Credentials", "true");
-  const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',');
-  const origin = req.headers.origin || '';
-  const corsOrigin = allowedOrigins.includes(origin) ? origin : '';
-  if (corsOrigin) {
-    res.setHeader("Access-Control-Allow-Origin", corsOrigin);
+  const origin = req.headers.origin;
+  const allowedOrigins = getCorsOrigins();
+  if (isCorsOriginAllowed(origin, allowedOrigins) && origin) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
   }
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS,PATCH,DELETE,POST,PUT");
   res.setHeader(

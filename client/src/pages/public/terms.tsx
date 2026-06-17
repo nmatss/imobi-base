@@ -158,13 +158,9 @@ export default function TermsPage() {
           </section>
         </div>
 
-        <div className="mt-12 pt-8 border-t flex gap-4">
-          <Link href="/privacidade">
-            <Button variant="outline">Política de Privacidade</Button>
-          </Link>
-          <Link href="/">
-            <Button variant="ghost">Voltar ao início</Button>
-          </Link>
+        <div className="mt-12 pt-8 border-t flex flex-col gap-3 sm:flex-row sm:gap-4">
+          <Link href="/privacidade" className="w-full sm:w-auto"><Button variant="outline" className="w-full sm:w-auto">Política de Privacidade</Button></Link>
+          <Link href="/" className="w-full sm:w-auto"><Button variant="ghost" className="w-full sm:w-auto">Voltar ao início</Button></Link>
         </div>
       </main>
       <PublicFooter variant="compact" />

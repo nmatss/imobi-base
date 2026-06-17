@@ -10,6 +10,7 @@ import { nanoid } from "nanoid";
 import { db } from "./db";
 import { twoFactorAuth, auditLogs } from "@shared/schema-sqlite";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
+import { runWithTenantRlsContext } from "./db-rls";
 
 // TOTP implementation (RFC 6238)
 const BASE32_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -218,13 +219,95 @@ function resetRateLimit(key: string): void {
   rateLimitStore.delete(key);
 }
 
+export async function isTwoFactorEnabledForUser(userId: string): Promise<boolean> {
+  const tfa = await db.select().from(twoFactorAuth).where(eq(twoFactorAuth.userId, userId));
+  return tfa.length > 0 && Boolean(tfa[0].isEnabled);
+}
+
+export async function verifyTwoFactorChallenge(
+  userId: string,
+  input: { token?: unknown; backupCode?: unknown },
+  rateLimitPrefix = "2fa_validate",
+): Promise<
+  | { ok: true; required: boolean }
+  | {
+      ok: false;
+      status: number;
+      error: string;
+      remainingAttempts?: number;
+      retryAfter?: number;
+    }
+> {
+  const tfa = await db.select().from(twoFactorAuth).where(eq(twoFactorAuth.userId, userId));
+  if (tfa.length === 0 || !tfa[0].isEnabled) {
+    return { ok: true, required: false };
+  }
+
+  const token = typeof input.token === "string" ? input.token.trim() : "";
+  const backupCode = typeof input.backupCode === "string" ? input.backupCode.trim() : "";
+
+  if (!token && !backupCode) {
+    return { ok: false, status: 400, error: "Código de 2FA obrigatório" };
+  }
+
+  if (token && !isValidToken(token)) {
+    return { ok: false, status: 400, error: "Token inválido. Deve conter 6 dígitos." };
+  }
+
+  if (backupCode && !isValidBackupCode(backupCode)) {
+    return { ok: false, status: 400, error: "Código de backup inválido" };
+  }
+
+  const rateLimitKey = `${rateLimitPrefix}:${userId}`;
+  const rateLimit = checkRateLimit(rateLimitKey);
+  if (!rateLimit.allowed) {
+    return {
+      ok: false,
+      status: 429,
+      error: "Muitas tentativas. Tente novamente mais tarde.",
+      retryAfter: Math.ceil(rateLimit.resetIn / 1000),
+    };
+  }
+
+  let isValid = false;
+  if (token) {
+    isValid = verifyTOTP(tfa[0].secret, token);
+  } else if (backupCode) {
+    const hashedCode = hashBackupCode(backupCode);
+    const storedCodes = JSON.parse(tfa[0].backupCodes || "[]");
+    isValid = storedCodes.some((c: string) => timingSafeCompare(c, hashedCode));
+
+    if (isValid) {
+      const newCodes = storedCodes.filter((c: string) => !timingSafeCompare(c, hashedCode));
+      await db.update(twoFactorAuth)
+        .set({ backupCodes: JSON.stringify(newCodes), updatedAt: new Date().toISOString() })
+        .where(eq(twoFactorAuth.userId, userId));
+    }
+  }
+
+  if (!isValid) {
+    return {
+      ok: false,
+      status: 401,
+      error: "Código inválido",
+      remainingAttempts: rateLimit.remainingAttempts,
+    };
+  }
+
+  resetRateLimit(rateLimitKey);
+  return { ok: true, required: true };
+}
+
 export function registerSecurityRoutes(app: Express) {
   // Middleware to check authentication
   const requireAuth = (req: Request, res: Response, next: Function) => {
     if (!req.isAuthenticated?.() || !req.user) {
       return res.status(401).json({ error: "Não autenticado" });
     }
-    next();
+    if (!req.user.tenantId) {
+      return res.status(403).json({ error: "Sessão inválida" });
+    }
+    runWithTenantRlsContext(req.user.tenantId, () => next());
   };
 
   // ==================== 2FA ROUTES ====================
@@ -444,41 +527,24 @@ export function registerSecurityRoutes(app: Express) {
     }
   });
 
-  // Validate 2FA token (for login flow)
-  app.post("/api/auth/2fa/validate", async (req, res) => {
+  // Validate 2FA token for an already-authenticated session.
+  // Login challenges are handled by POST /api/auth/login to avoid public userId oracles.
+  app.post("/api/auth/2fa/validate", requireAuth, async (req, res) => {
     try {
-      const { userId, token, backupCode } = req.body;
-
-      if (!userId) {
-        return res.status(400).json({ error: "Usuário não informado" });
+      const { token, backupCode } = req.body;
+      const result = await verifyTwoFactorChallenge(req.user!.id, { token, backupCode });
+      if (!result.ok) {
+        return res.status(result.status).json({
+          error: result.error,
+          remainingAttempts: result.remainingAttempts,
+          retryAfter: result.retryAfter,
+        });
       }
-
-      const tfa = await db.select().from(twoFactorAuth).where(eq(twoFactorAuth.userId, userId));
-      if (tfa.length === 0 || !tfa[0].isEnabled) {
+      if (!result.required) {
         return res.json({ required: false });
       }
 
-      if (!token && !backupCode) {
-        return res.json({ required: true });
-      }
-
-      let isValid = false;
-      if (token) {
-        isValid = verifyTOTP(tfa[0].secret, token);
-      } else if (backupCode) {
-        const hashedCode = hashBackupCode(backupCode);
-        const storedCodes = JSON.parse(tfa[0].backupCodes || '[]');
-        isValid = storedCodes.includes(hashedCode);
-
-        if (isValid) {
-          const newCodes = storedCodes.filter((c: string) => c !== hashedCode);
-          await db.update(twoFactorAuth)
-            .set({ backupCodes: JSON.stringify(newCodes) })
-            .where(eq(twoFactorAuth.userId, userId));
-        }
-      }
-
-      res.json({ valid: isValid, required: true });
+      res.json({ valid: true, required: true });
     } catch (error: any) {
       console.error('2FA validate error:', error);
       res.status(500).json({ error: "Erro ao validar 2FA" });

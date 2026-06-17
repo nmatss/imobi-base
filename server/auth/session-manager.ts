@@ -11,6 +11,7 @@ import { userSessions } from "@shared/schema-sqlite";
 import { eq, and, desc, lt } from "drizzle-orm";
 import { createAuditLog } from "../routes-security";
 import { UAParser } from "ua-parser-js";
+import { runWithTenantRlsContext } from "../db-rls";
 
 // Session expiration time (30 days)
 const SESSION_EXPIRY_DAYS = 30;
@@ -142,7 +143,10 @@ export function registerSessionManagementRoutes(app: Express) {
     if (!req.isAuthenticated?.() || !req.user) {
       return res.status(401).json({ error: "Não autenticado" });
     }
-    next();
+    if (!req.user.tenantId) {
+      return res.status(403).json({ error: "Sessão inválida" });
+    }
+    runWithTenantRlsContext(req.user.tenantId, () => next());
   };
 
   // Get all active sessions for current user

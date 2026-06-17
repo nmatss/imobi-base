@@ -16,6 +16,11 @@ import {
 } from "./services/ai-service";
 import { isSqlite } from "./db";
 import {
+  runWithAuthEmailRlsContext,
+  runWithTenantRlsContext,
+  runWithUserRlsContext,
+} from "./db-rls";
+import {
   insertUserSchema,
   insertPropertySchema,
   insertLeadSchema,
@@ -45,6 +50,11 @@ import rateLimit from "express-rate-limit";
 import RedisStore from "rate-limit-redis";
 import helmet from "helmet";
 import cors from "cors";
+import {
+  getCorsOrigins,
+  getCorsProductionWarnings,
+  isCorsOriginAllowed,
+} from "./config/cors";
 import { apiResponse, apiError, apiPaginated } from "./utils/api-response";
 import {
   checkFeatureAccess,
@@ -52,7 +62,11 @@ import {
   checkLeadLimit,
   isLeadLimitReachedForTenant,
 } from "./middleware/plan-limits";
-import { registerSecurityRoutes } from "./routes-security";
+import {
+  isTwoFactorEnabledForUser,
+  registerSecurityRoutes,
+  verifyTwoFactorChallenge,
+} from "./routes-security";
 import { sendEmail as sendContactEmail } from "./auth/email-service";
 import {
   checkAccountLock,
@@ -70,6 +84,8 @@ const { Pool } = pkg;
 import { generateRateLimitKey } from "./middleware/rate-limit-key-generator";
 import { subscriptionGuard } from "./middleware/subscription-guard";
 import { validateResourceTenant } from "./middleware/tenant-resource";
+import { assertVisitSchedulePolicy } from "./services/visit-scheduling";
+import { summarizeLeadSla } from "./services/lead-sla";
 
 // ===== ERROR HELPER =====
 function toHttpError(error: unknown): { status: number; message: string } {
@@ -78,6 +94,12 @@ function toHttpError(error: unknown): { status: number; message: string } {
     status: err?.status || 500,
     message: err?.message || "Erro interno do servidor",
   };
+}
+
+function createHttpError(status: number, message: string): Error & { status: number } {
+  const error = new Error(message) as Error & { status: number };
+  error.status = status;
+  return error;
 }
 
 // ===== VALIDATION HELPERS =====
@@ -186,6 +208,34 @@ async function safeHandleSuccessfulLogin(
 // Mantido import acima para preservar os ~11 call-sites existentes sem quebrar.
 // Novas rotas devem preferir `withTenantResource` (mesmo modulo) que combina
 // carregamento, validacao e anexacao a req.resource em uma unica middleware.
+
+async function validateTenantUserReference(
+  tenantId: string,
+  userId?: string | null,
+  resourceName = "Usuário",
+): Promise<void> {
+  if (!userId) return;
+  const user = await storage.getUser(userId);
+  await validateResourceTenant(user, tenantId, resourceName);
+}
+
+async function validateLeadReference(tenantId: string, leadId?: string | null): Promise<void> {
+  if (!leadId) return;
+  const lead = await storage.getLead(leadId);
+  await validateResourceTenant(lead, tenantId, "Lead");
+}
+
+async function validateLeadAssignment(tenantId: string, assignedTo?: string | null): Promise<void> {
+  await validateTenantUserReference(tenantId, assignedTo, "Corretor");
+}
+
+async function validateFollowUpReferences(
+  tenantId: string,
+  followUp: { leadId?: string | null; assignedTo?: string | null },
+): Promise<void> {
+  await validateLeadReference(tenantId, followUp.leadId);
+  await validateTenantUserReference(tenantId, followUp.assignedTo, "Responsável");
+}
 
 // ===== CSRF PROTECTION (Double Submit Cookie Pattern) =====
 /**
@@ -317,14 +367,7 @@ export async function registerRoutes(
 
   // ===== CORS CONFIGURATION WITH WHITELIST =====
   // IMPORTANT: CORS must be configured BEFORE helmet to ensure proper header handling
-  const allowedOrigins = process.env.CORS_ORIGINS?.split(",") || [
-    "http://localhost:5000",
-    "http://127.0.0.1:5000", // Localhost IP
-    "http://localhost:5173", // Vite dev server
-    "http://127.0.0.1:5173", // Vite dev server IP
-    "https://imobibase.com",
-    "https://www.imobibase.com",
-  ];
+  const allowedOrigins = getCorsOrigins();
 
   app.use(
     cors({
@@ -335,19 +378,7 @@ export async function registerRoutes(
           return callback(null, true);
         }
 
-        // Check if origin is in allowed list or matches wildcard
-        const isAllowed = allowedOrigins.some((allowed) => {
-          if (allowed.includes("*")) {
-            // Convert wildcard to regex: https://*.example.com -> /^https:\/\/.*\.example\.com$/
-            const regex = new RegExp(
-              `^${allowed.replace(/\./g, "\\.").replace(/\*/g, ".*")}$`,
-            );
-            return regex.test(origin);
-          }
-          return allowed === origin;
-        });
-
-        if (isAllowed) {
+        if (isCorsOriginAllowed(origin, allowedOrigins)) {
           callback(null, true);
         } else {
           console.warn("[CORS] Blocked request from origin:", origin);
@@ -744,7 +775,9 @@ export async function registerRoutes(
       { usernameField: "email", passReqToCallback: true },
       async (req, email, password, done) => {
         try {
-          const user = await storage.getUserByEmail(email);
+          const user = await runWithAuthEmailRlsContext(email, () =>
+            storage.getUserByEmail(email),
+          );
           if (!user) {
             // Não revela existência da conta; registra tentativa best-effort.
             await safeHandleFailedLogin(
@@ -757,7 +790,9 @@ export async function registerRoutes(
           }
 
           // 1) Antes de validar a senha, checar bloqueio de conta (fail-safe).
-          const lockStatus = await safeCheckAccountLock(user.id);
+          const lockStatus = await runWithTenantRlsContext(user.tenantId, () =>
+            safeCheckAccountLock(user.id),
+          );
           if (lockStatus.locked) {
             return done(null, false, {
               message: "Conta bloqueada temporariamente. Tente novamente mais tarde.",
@@ -766,17 +801,21 @@ export async function registerRoutes(
 
           // 2) Validar senha.
           if (!(await comparePassword(password, user.password))) {
-            await safeHandleFailedLogin(
-              user.id,
-              email,
-              "invalid_password",
-              req,
+            await runWithTenantRlsContext(user.tenantId, () =>
+              safeHandleFailedLogin(
+                user.id,
+                email,
+                "invalid_password",
+                req,
+              ),
             );
             return done(null, false, { message: "Email ou senha incorretos" });
           }
 
           // 3) Sucesso: resetar contadores / registrar login (best-effort).
-          await safeHandleSuccessfulLogin(user.id, email, req);
+          await runWithTenantRlsContext(user.tenantId, () =>
+            safeHandleSuccessfulLogin(user.id, email, req),
+          );
           return done(null, user);
         } catch (err) {
           return done(err);
@@ -791,7 +830,7 @@ export async function registerRoutes(
 
   passport.deserializeUser(async (id: string, done) => {
     try {
-      const user = await storage.getUser(id);
+      const user = await runWithUserRlsContext(id, () => storage.getUser(id));
       if (!user) {
         console.log(`User not found during deserialization: ${id}`);
         return done(null, false);
@@ -831,7 +870,14 @@ export async function registerRoutes(
       req.session.touch();
     }
 
-    next();
+    if (!req.user.tenantId) {
+      return res.status(403).json({
+        error: "Sessão inválida",
+        code: "INVALID_SESSION",
+      });
+    }
+
+    runWithTenantRlsContext(req.user.tenantId, () => next());
   };
 
   // SuperAdmin middleware
@@ -1216,7 +1262,9 @@ export async function registerRoutes(
         }
 
         // Check email uniqueness
-        const existingUser = await storage.getUserByEmail(email);
+        const existingUser = await runWithAuthEmailRlsContext(email, () =>
+          storage.getUserByEmail(email),
+        );
         if (existingUser) {
           res.status(409).json({ error: "Este email já está em uso" });
           return;
@@ -1239,32 +1287,34 @@ export async function registerRoutes(
           email,
         });
 
-        // Setup default roles, categories, settings
-        const { setupNewTenant } = await import("./seed-defaults");
-        await setupNewTenant(storage, tenant);
+        const user = await runWithTenantRlsContext(tenant.id, async () => {
+          // Setup default roles, categories, settings
+          const { setupNewTenant } = await import("./seed-defaults");
+          await setupNewTenant(storage, tenant);
 
-        // Create free plan subscription for new tenant
-        try {
-          const freePlan = await storage.getPlanBySlug("free");
-          if (freePlan) {
-            await storage.createTenantSubscription({
-              tenantId: tenant.id,
-              planId: freePlan.id,
-              status: "active",
-            });
+          // Create free plan subscription for new tenant
+          try {
+            const freePlan = await storage.getPlanBySlug("free");
+            if (freePlan) {
+              await storage.createTenantSubscription({
+                tenantId: tenant.id,
+                planId: freePlan.id,
+                status: "active",
+              });
+            }
+          } catch (subError) {
+            console.error("Failed to create free subscription:", subError);
           }
-        } catch (subError) {
-          console.error("Failed to create free subscription:", subError);
-        }
 
-        // Create admin user
-        const hashedPwd = await hashPassword(password);
-        const user = await storage.createUser({
-          tenantId: tenant.id,
-          name,
-          email,
-          password: hashedPwd,
-          role: "admin",
+          // Create admin user
+          const hashedPwd = await hashPassword(password);
+          return storage.createUser({
+            tenantId: tenant.id,
+            name,
+            email,
+            password: hashedPwd,
+            role: "admin",
+          });
         });
 
         // Send verification email (non-blocking - don't fail registration if email fails)
@@ -1293,7 +1343,7 @@ export async function registerRoutes(
   app.post("/api/auth/login", authLimiter, (req, res, next) => {
     passport.authenticate(
       "local",
-      (
+      async (
         err: unknown,
         user: User | false,
         info: { message?: string } | undefined,
@@ -1313,6 +1363,41 @@ export async function registerRoutes(
           });
         }
 
+        try {
+          if (
+            await runWithTenantRlsContext(user.tenantId, () =>
+              isTwoFactorEnabledForUser(user.id),
+            )
+          ) {
+            const twoFactorToken = req.body?.twoFactorToken ?? req.body?.token;
+            const backupCode = req.body?.backupCode;
+            if (!twoFactorToken && !backupCode) {
+              return res.status(200).json({
+                twoFactorRequired: true,
+                message: "Código de autenticação necessário",
+              });
+            }
+
+            const challenge = await runWithTenantRlsContext(user.tenantId, () =>
+              verifyTwoFactorChallenge(
+                user.id,
+                { token: twoFactorToken, backupCode },
+                "2fa_login",
+              ),
+            );
+            if (!challenge.ok) {
+              return res.status(challenge.status).json({
+                error: challenge.error,
+                twoFactorRequired: true,
+                remainingAttempts: challenge.remainingAttempts,
+                retryAfter: challenge.retryAfter,
+              });
+            }
+          }
+        } catch (error) {
+          return next(error);
+        }
+
         req.login(user, async (err) => {
           if (err) return next(err);
 
@@ -1327,7 +1412,9 @@ export async function registerRoutes(
             req.login(user, async (loginErr) => {
               if (loginErr) return next(loginErr);
 
-              const tenant = await storage.getTenant(user.tenantId);
+              const tenant = await runWithTenantRlsContext(user.tenantId, () =>
+                storage.getTenant(user.tenantId),
+              );
 
               // Generate CSRF token and set cookie for Double Submit Cookie pattern
               const csrfToken = generateCSRFToken();
@@ -1567,7 +1654,9 @@ export async function registerRoutes(
   // ===== TENANT ROUTES =====
   app.get("/api/tenants", requireAuth, async (req, res) => {
     try {
-      const tenants = await storage.getAllTenants();
+      const tenants = isSuperAdminRole(req.user!.role)
+        ? await storage.getAllTenants()
+        : [await storage.getTenant(req.user!.tenantId)].filter(Boolean);
       res.json(tenants);
     } catch (error: unknown) {
       res.status(500).json({ error: "Erro ao buscar empresas" });
@@ -1654,6 +1743,7 @@ export async function registerRoutes(
 
   app.get("/api/properties/public/:tenantId", async (req, res) => {
     try {
+      const tenantId = req.params.tenantId;
       const { page, limit } = req.query;
       const { page: p, limit: l } = sanitizePagination(
         page as string,
@@ -1661,13 +1751,15 @@ export async function registerRoutes(
       );
       const offset = (p - 1) * l;
       const filters = { status: "available" };
-      const [rows, total] = await Promise.all([
-        storage.getPropertiesByTenant(req.params.tenantId, filters, {
-          limit: l,
-          offset,
-        }),
-        storage.countPropertiesByTenant(req.params.tenantId, filters),
-      ]);
+      const [rows, total] = await runWithTenantRlsContext(tenantId, () =>
+        Promise.all([
+          storage.getPropertiesByTenant(tenantId, filters, {
+            limit: l,
+            offset,
+          }),
+          storage.countPropertiesByTenant(tenantId, filters),
+        ]),
+      );
       res.json({ data: rows, pagination: { page: p, limit: l, total } });
     } catch (error: unknown) {
       res.status(500).json({ error: "Erro ao buscar imóveis" });
@@ -1676,10 +1768,13 @@ export async function registerRoutes(
 
   app.get("/api/properties/public/:tenantId/:propertyId", async (req, res) => {
     try {
-      const property = await storage.getProperty(req.params.propertyId);
+      const { tenantId, propertyId } = req.params;
+      const property = await runWithTenantRlsContext(tenantId, () =>
+        storage.getProperty(propertyId),
+      );
       if (!property)
         return res.status(404).json({ error: "Imóvel não encontrado" });
-      if (property.tenantId !== req.params.tenantId)
+      if (property.tenantId !== tenantId)
         return res.status(404).json({ error: "Imóvel não encontrado" });
       if (property.status !== "available")
         return res.status(404).json({ error: "Imóvel não disponível" });
@@ -1777,7 +1872,15 @@ export async function registerRoutes(
       const data = insertLeadSchema.parse(req.body);
       // Lead publico conta contra o limite mensal do tenant dono do site.
       // Sem req.user aqui, entao a checagem usa o tenantId do proprio lead.
-      if (await isLeadLimitReachedForTenant(data.tenantId)) {
+      const lead = await runWithTenantRlsContext(data.tenantId, async () => {
+        if (await isLeadLimitReachedForTenant(data.tenantId)) {
+          return null;
+        }
+
+        return storage.createLead(data);
+      });
+
+      if (!lead) {
         return res.status(403).json({
           error: "Lead limit reached",
           upgradeRequired: true,
@@ -1785,7 +1888,7 @@ export async function registerRoutes(
             "O limite de leads/mês do plano desta imobiliária foi atingido. Faça upgrade para continuar recebendo leads.",
         });
       }
-      const lead = await storage.createLead(data);
+
       res.status(201).json({ success: true, lead });
     } catch (error: unknown) {
       res.status(400).json({
@@ -1812,6 +1915,32 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/leads/sla/summary", requireAuth, async (req, res) => {
+    try {
+      const requestedLimit = parseInt(String(req.query.limit ?? "500"), 10);
+      const limit = Math.min(Math.max(Number.isNaN(requestedLimit) ? 500 : requestedLimit, 1), 2000);
+      const leads = await storage.getLeadsByTenant(req.user!.tenantId, { limit, offset: 0 });
+      const interactionEntries = await Promise.all(
+        leads.map(async (lead) => [
+          lead.id,
+          await storage.getInteractionsByLead(lead.id),
+        ] as const),
+      );
+      const interactionsByLeadId = new Map(interactionEntries);
+
+      res.json({
+        ...summarizeLeadSla(leads, interactionsByLeadId),
+        limit,
+      });
+    } catch (error: unknown) {
+      const httpErr = toHttpError(error);
+      const status = httpErr.status === 500 ? 400 : httpErr.status;
+      res.status(status).json({
+        error: httpErr.message || "Erro ao calcular SLA dos leads",
+      });
+    }
+  });
+
   app.get("/api/leads/:id", requireAuth, async (req, res) => {
     try {
       const lead = await storage.getLead(req.params.id);
@@ -1832,6 +1961,7 @@ export async function registerRoutes(
         ...req.body,
         tenantId: req.user!.tenantId,
       });
+      await validateLeadAssignment(req.user!.tenantId, data.assignedTo);
       const lead = await storage.createLead(data);
       apiResponse(res, lead, undefined, 201);
     } catch (error: unknown) {
@@ -1856,6 +1986,9 @@ export async function registerRoutes(
         createdAt: _c,
         ...safe
       } = req.body;
+      if ("assignedTo" in safe) {
+        await validateLeadAssignment(req.user!.tenantId, safe.assignedTo);
+      }
       const lead = await storage.updateLead(req.params.id, safe);
       if (!lead) return res.status(404).json({ error: "Lead não encontrado" });
       res.json(lead);
@@ -1928,6 +2061,7 @@ export async function registerRoutes(
       const lead = await storage.getLead(data.leadId);
       await validateResourceTenant(lead, req.user!.tenantId, "Lead");
       const interaction = await storage.createInteraction(data);
+      await storage.touchLead(data.leadId);
       res.status(201).json(interaction);
     } catch (error: unknown) {
       const httpErr = toHttpError(error);
@@ -1954,11 +2088,20 @@ export async function registerRoutes(
         ...req.body,
         tenantId: req.user!.tenantId,
       });
+      await assertVisitSchedulePolicy(req.user!.tenantId, {
+        propertyId: data.propertyId,
+        leadId: data.leadId,
+        assignedTo: data.assignedTo,
+        scheduledFor: data.scheduledFor,
+        status: data.status,
+      }, storage);
       const visit = await storage.createVisit(data);
       res.status(201).json(visit);
     } catch (error: unknown) {
-      res.status(400).json({
-        error: error instanceof Error ? error.message : "Erro ao criar visita",
+      const httpErr = toHttpError(error);
+      const status = httpErr.status === 500 ? 400 : httpErr.status;
+      res.status(status).json({
+        error: httpErr.message || "Erro ao criar visita",
       });
     }
   });
@@ -1968,6 +2111,9 @@ export async function registerRoutes(
       // IDOR Protection: Validate tenant ownership before updating
       const existing = await storage.getVisit(req.params.id);
       await validateResourceTenant(existing, req.user!.tenantId, "Visita");
+      if (!existing) {
+        throw createHttpError(404, "Visita não encontrada");
+      }
 
       // Mass-assignment guard: strip immutable fields before update.
       const {
@@ -1976,7 +2122,28 @@ export async function registerRoutes(
         createdAt: _c,
         ...safe
       } = req.body;
-      const visit = await storage.updateVisit(req.params.id, safe);
+      const updateData = insertVisitSchema.partial().parse(safe);
+      const candidate = {
+        propertyId: updateData.propertyId ?? existing.propertyId,
+        leadId: updateData.leadId === undefined ? existing.leadId : updateData.leadId,
+        assignedTo: updateData.assignedTo === undefined ? existing.assignedTo : updateData.assignedTo,
+        scheduledFor: updateData.scheduledFor ?? existing.scheduledFor,
+        status: updateData.status ?? existing.status,
+      };
+      await assertVisitSchedulePolicy(
+        req.user!.tenantId,
+        {
+          propertyId: candidate.propertyId,
+          leadId: candidate.leadId,
+          assignedTo: candidate.assignedTo,
+          scheduledFor: candidate.scheduledFor,
+          status: candidate.status,
+        },
+        storage,
+        existing.id,
+      );
+
+      const visit = await storage.updateVisit(req.params.id, updateData);
       if (!visit)
         return res.status(404).json({ error: "Visita não encontrada" });
       res.json(visit);
@@ -3318,6 +3485,7 @@ export async function registerRoutes(
         ...req.body,
         tenantId: req.user!.tenantId,
       });
+      await validateFollowUpReferences(req.user!.tenantId, data);
       const followUp = await storage.createFollowUp(data);
       res.status(201).json(followUp);
     } catch (error: unknown) {
@@ -3340,6 +3508,12 @@ export async function registerRoutes(
         createdAt: _c,
         ...allowedFields
       } = req.body;
+      if ("leadId" in allowedFields || "assignedTo" in allowedFields) {
+        await validateFollowUpReferences(req.user!.tenantId, {
+          leadId: allowedFields.leadId,
+          assignedTo: allowedFields.assignedTo,
+        });
+      }
       const followUp = await storage.updateFollowUp(
         req.params.id,
         allowedFields,
@@ -4188,18 +4362,16 @@ export async function registerRoutes(
   // ===== PRODUCTION CORS VALIDATION =====
   // Validate CORS configuration in production
   if (process.env.NODE_ENV === "production") {
-    const origins = process.env.CORS_ORIGINS;
-    if (!origins || origins.includes("localhost")) {
-      console.error(
-        "⚠️  WARNING: CORS_ORIGINS not properly configured for production!",
-      );
-      console.error("   Current value:", origins);
-      console.error(
-        "   Localhost origins should not be allowed in production.",
-      );
+    const warnings = getCorsProductionWarnings();
+    if (warnings.length > 0) {
+      console.error("⚠️  WARNING: CORS not properly configured for production!");
+      for (const warning of warnings) {
+        console.error(`   ${warning}`);
+      }
+      console.error("   Allowed origins:", allowedOrigins.join(","));
     } else {
       console.log("✓ CORS properly configured for production");
-      console.log("  Allowed origins:", origins);
+      console.log("  Allowed origins:", allowedOrigins.join(","));
     }
   }
 

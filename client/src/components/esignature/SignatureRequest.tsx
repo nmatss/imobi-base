@@ -90,12 +90,13 @@ export function SignatureRequest({ tenantId, contractId, onSuccess }: SignatureR
   });
 
   const sendMutation = useMutation({
-    mutationFn: async (listKey: string) => {
+    mutationFn: async ({ listKey, documentKey }: { listKey: string; documentKey: string }) => {
       const res = await fetch('/api/esignature/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tenantId,
+          documentKey,
           listKey,
           message: customMessage,
         }),
@@ -137,7 +138,7 @@ export function SignatureRequest({ tenantId, contractId, onSuccess }: SignatureR
       const listKey = requestResult.list.key;
 
       // Step 3: Send invitations
-      await sendMutation.mutateAsync(listKey);
+      await sendMutation.mutateAsync({ listKey, documentKey });
 
       toast({
         title: 'Sucesso!',

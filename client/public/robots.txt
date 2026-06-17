@@ -1,22 +1,42 @@
 # ImobiBase - Robots.txt
-# Sistema de Gestão Imobiliária
-# Última atualização: 25/12/2024
+# Sistema imobiliário completo
+# Última atualização: 17/06/2026
 
 User-agent: *
 Allow: /
-Allow: /properties
-Allow: /properties/*
-Allow: /sobre
+Allow: /pricing
 Allow: /contato
+Allow: /novidades
+Allow: /crm-imobiliario
+Allow: /sistema-imobiliario-completo
+Allow: /software-de-agendamento-imobiliario
+Allow: /site-para-imobiliaria
+Allow: /crm-imobiliario-com-ia
+Allow: /e/
 
 # Bloquear rotas privadas
 Disallow: /dashboard
+Disallow: /properties
+Disallow: /properties/
 Disallow: /leads
 Disallow: /calendar
-Disallow: /financial
+Disallow: /contracts
+Disallow: /financeiro
 Disallow: /rentals
 Disallow: /vendas
+Disallow: /reports
+Disallow: /marketing
+Disallow: /avaliacoes
+Disallow: /isa
+Disallow: /analytics
+Disallow: /vistorias
 Disallow: /settings
+Disallow: /onboarding
+Disallow: /checkout
+Disallow: /portal/
+Disallow: /login
+Disallow: /signup
+Disallow: /auth/
 Disallow: /api/
 Disallow: /admin/
 
@@ -28,6 +48,7 @@ Disallow: /assets/*.map
 
 # Sitemap
 Sitemap: https://imobibase.com.br/sitemap.xml
+Sitemap: https://imobibase.com.br/sitemap-dynamic.xml
 
 # Crawl delay para bots agressivos
 User-agent: AhrefsBot

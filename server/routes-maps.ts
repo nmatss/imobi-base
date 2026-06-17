@@ -394,7 +394,7 @@ router.get("/place/:placeId", validateParams(placeIdParamSchema), async (req: Re
 router.get("/properties/map", validateQuery(propertiesMapQuerySchema), async (req: Request, res: Response) => {
   try {
     // req.query is already validated and typed by Zod
-    const { tenantId } = req.query;
+    const tenantId = req.user!.tenantId;
 
     const properties = await propertyLocationService.getPropertiesWithCoordinates(tenantId);
     res.json(properties);
@@ -412,7 +412,8 @@ router.get("/properties/map", validateQuery(propertiesMapQuerySchema), async (re
 router.get("/properties/nearby", validateQuery(nearbyPropertiesQuerySchema), async (req: Request, res: Response) => {
   try {
     // req.query is already validated and typed by Zod
-    const { latitude, longitude, radius, tenantId } = req.query;
+    const { latitude, longitude, radius } = req.query;
+    const tenantId = req.user!.tenantId;
 
     const properties = await propertyLocationService.findNearbyProperties(
       latitude,

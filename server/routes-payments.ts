@@ -9,6 +9,7 @@ import { StripeService } from './payments/stripe/stripe-service';
 import { handleStripeWebhook } from './payments/stripe/stripe-webhooks';
 import { MercadoPagoService } from './payments/mercadopago/mercadopago-service';
 import { handleMercadoPagoWebhook, handleMercadoPagoIPN } from './payments/mercadopago/mercadopago-webhooks';
+import { isMercadoPagoPaymentOwnedByTenant } from './payments/mercadopago/tenant-ownership';
 import { storage } from './storage';
 import * as Sentry from '@sentry/node';
 import { asyncHandler, AuthError } from './middleware/error-handler';
@@ -473,7 +474,13 @@ export function registerPaymentRoutes(app: Express): void {
       }
 
       const { paymentId } = req.params;
+      const tenantId = req.user.tenantId;
       const status = await MercadoPagoService.getPaymentStatus(paymentId);
+
+      if (!isMercadoPagoPaymentOwnedByTenant(status, tenantId)) {
+        res.status(404).json({ error: 'Payment not found' });
+        return;
+      }
 
       res.json(status);
     } catch (error) {

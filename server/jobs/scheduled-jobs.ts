@@ -7,6 +7,7 @@ import { runReport, type ReportContext } from "./processors/report-processor";
 import { runCleanupTarget } from "./processors/cleanup-processor";
 import { runIntegrationSyncProvider } from "./processors/integration-sync-processor";
 import { runBackup } from "./processors/backup-processor";
+import { CRON_JOB_MANIFEST, type CronJobName } from "./cron-manifest";
 
 // ===================================================================
 // EXPORTED JOB FUNCTIONS
@@ -442,64 +443,27 @@ export function initializeScheduledJobs(): void {
     "[ScheduledJobs] Initializing node-cron scheduled jobs (persistent server mode)...",
   );
 
-  const jobs: Array<{
-    name: string;
-    schedule: string;
-    fn: () => Promise<void>;
-    options?: { timezone?: string };
-  }> = [
-    {
-      name: "payment-reminders",
-      schedule: "0 9 * * *",
-      fn: runPaymentReminders,
-      options: { timezone: "America/Sao_Paulo" },
-    },
-    {
-      name: "daily-reports",
-      schedule: "0 0 * * *",
-      fn: runDailyReports,
-      options: { timezone: "America/Sao_Paulo" },
-    },
-    {
-      name: "weekly-reports",
-      schedule: "0 8 * * 1",
-      fn: runWeeklyReports,
-      options: { timezone: "America/Sao_Paulo" },
-    },
-    {
-      name: "monthly-reports",
-      schedule: "0 8 1 * *",
-      fn: runMonthlyReports,
-      options: { timezone: "America/Sao_Paulo" },
-    },
-    { name: "cleanup-sessions", schedule: "0 * * * *", fn: runCleanupSessions },
-    { name: "cleanup-logs", schedule: "0 */6 * * *", fn: runCleanupLogs },
-    {
-      name: "integration-sync",
-      schedule: "0 */6 * * *",
-      fn: runIntegrationSync,
-    },
-    {
-      name: "database-backup",
-      schedule: "0 2 * * *",
-      fn: runDatabaseBackup,
-      options: { timezone: "America/Sao_Paulo" },
-    },
-    {
-      name: "cleanup-temp-files",
-      schedule: "0 3 * * 0",
-      fn: runCleanupTempFiles,
-      options: { timezone: "America/Sao_Paulo" },
-    },
-  ];
+  const jobHandlers: Record<CronJobName, () => Promise<void>> = {
+    "payment-reminders": runPaymentReminders,
+    "daily-reports": runDailyReports,
+    "weekly-reports": runWeeklyReports,
+    "monthly-reports": runMonthlyReports,
+    "cleanup-sessions": runCleanupSessions,
+    "cleanup-logs": runCleanupLogs,
+    "integration-sync": runIntegrationSync,
+    "database-backup": runDatabaseBackup,
+    "cleanup-temp-files": runCleanupTempFiles,
+    "cleanup-soft-deletes": runCleanupSoftDeletes,
+    "enforce-plan-limits": runEnforcePlanLimits,
+  };
 
-  for (const job of jobs) {
+  for (const job of CRON_JOB_MANIFEST) {
     const task = cron.schedule(
-      job.schedule,
+      job.localSchedule,
       async () => {
         console.log(`[ScheduledJobs] Running ${job.name}...`);
         try {
-          await job.fn();
+          await jobHandlers[job.name]();
         } catch (error) {
           console.error(`[ScheduledJobs] ${job.name} failed:`, error);
           Sentry.captureException(error, {
@@ -507,7 +471,7 @@ export function initializeScheduledJobs(): void {
           });
         }
       },
-      job.options || {},
+      job.timezone ? { timezone: job.timezone } : {},
     );
 
     scheduledTasks.push(task);
@@ -539,28 +503,16 @@ export function getScheduledJobsStatus(): Array<{
   name: string;
   running: boolean;
 }> {
-  const jobNames = [
-    "Payment Reminders (Daily 9 AM)",
-    "Daily Reports (Midnight)",
-    "Weekly Reports (Monday 8 AM)",
-    "Monthly Reports (1st day 8 AM)",
-    "Session Cleanup (Hourly)",
-    "Log Cleanup (Every 6 hours)",
-    "Integration Sync (Every 6 hours)",
-    "Database Backup (Daily 2 AM)",
-    "Temp Files Cleanup (Sunday 3 AM)",
-  ];
-
   // On Vercel, there are no node-cron tasks; report status from cron config
   if (process.env.VERCEL || scheduledTasks.length === 0) {
-    return jobNames.map((name) => ({
-      name,
+    return CRON_JOB_MANIFEST.map((job) => ({
+      name: job.label,
       running: !!process.env.VERCEL, // On Vercel, cron jobs are always "running" via HTTP triggers
     }));
   }
 
   return scheduledTasks.map((task, index) => ({
-    name: jobNames[index] || `Unknown Job ${index}`,
+    name: CRON_JOB_MANIFEST[index]?.label || `Unknown Job ${index}`,
     running: task.getStatus() === "scheduled",
   }));
 }

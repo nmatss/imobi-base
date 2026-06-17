@@ -219,6 +219,7 @@ export interface IStorage {
   countLeadsByTenant(tenantId: string): Promise<number>;
   createLead(lead: InsertLead): Promise<Lead>;
   updateLead(id: string, lead: Partial<InsertLead>): Promise<Lead | undefined>;
+  touchLead(id: string): Promise<Lead | undefined>;
   deleteLead(id: string): Promise<boolean>;
   getInteractionsByLead(leadId: string): Promise<Interaction[]>;
   createInteraction(interaction: InsertInteraction): Promise<Interaction>;
@@ -719,6 +720,11 @@ export class DbStorage implements IStorage {
       updatedAt: now(),
     };
     const [updated] = await db.update(schema.leads).set(data as any).where(eq(schema.leads.id, id)).returning();
+    return updated;
+  }
+
+  async touchLead(id: string): Promise<Lead | undefined> {
+    const [updated] = await db.update(schema.leads).set({ updatedAt: now() }).where(eq(schema.leads.id, id)).returning();
     return updated;
   }
 
@@ -3602,7 +3608,7 @@ export class DbStorage implements IStorage {
 
   // File management methods
   async createFile(file: any): Promise<any> {
-    const id = generateId();
+    const id = file.id || generateId();
     const [created] = await db.insert(schema.files).values({ ...file, id, createdAt: now(), updatedAt: now() }).returning();
     return created;
   }
@@ -3612,12 +3618,17 @@ export class DbStorage implements IStorage {
     return file;
   }
 
-  async getFilesByTenant(tenantId: string): Promise<any[]> {
-    return db.select().from(schema.files).where(eq(schema.files.tenantId, tenantId));
+  async getFilesByTenant(tenantId: string, bucket?: string, category?: string): Promise<any[]> {
+    const conditions: any[] = [eq(schema.files.tenantId, tenantId)];
+    if (bucket) conditions.push(eq(schema.files.bucket, bucket));
+    if (category) conditions.push(eq(schema.files.category, category));
+    return db.select().from(schema.files).where(and(...conditions));
   }
 
-  async getFilesByUser(userId: string): Promise<any[]> {
-    return db.select().from(schema.files).where(eq(schema.files.userId, userId));
+  async getFilesByUser(userId: string, bucket?: string): Promise<any[]> {
+    const conditions: any[] = [eq(schema.files.userId, userId)];
+    if (bucket) conditions.push(eq(schema.files.bucket, bucket));
+    return db.select().from(schema.files).where(and(...conditions));
   }
 
   async deleteFile(id: string): Promise<boolean> {
@@ -3629,14 +3640,16 @@ export class DbStorage implements IStorage {
    * Get properties for sitemap generation (SEO)
    * Returns public properties (available for sale/rent) with minimal data
    */
-  async getPropertiesForSitemap(): Promise<Array<{ id: string; createdAt: Date; updatedAt: Date | null }>> {
+  async getPropertiesForSitemap(): Promise<Array<{ id: string; tenantSlug: string; createdAt: Date | string; updatedAt: Date | string | null }>> {
     const properties = await db
       .select({
         id: schema.properties.id,
+        tenantSlug: schema.tenants.slug,
         createdAt: schema.properties.createdAt,
         updatedAt: schema.properties.updatedAt,
       })
       .from(schema.properties)
+      .innerJoin(schema.tenants, eq(schema.properties.tenantId, schema.tenants.id))
       .where(eq(schema.properties.status, 'available'))
       .orderBy(desc(schema.properties.updatedAt));
 

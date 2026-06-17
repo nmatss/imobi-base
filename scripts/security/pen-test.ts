@@ -53,7 +53,7 @@ async function testSqlInjectionLogin(): Promise<void> {
   ];
 
   for (const payload of sqlPayloads) {
-    const response = await request('/api/login', {
+    const response = await request('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({
         email: payload,
@@ -88,7 +88,7 @@ async function testXssInjection(): Promise<void> {
   ];
 
   for (const payload of xssPayloads) {
-    const response = await request('/api/public/newsletter', {
+    const response = await request('/api/newsletter/subscribe', {
       method: 'POST',
       body: JSON.stringify({
         email: `test+${Date.now()}@example.com`,
@@ -212,7 +212,7 @@ async function testBruteForceProtection(): Promise<void> {
 
   // Try multiple failed login attempts
   for (let i = 0; i < 10; i++) {
-    const response = await request('/api/login', {
+    const response = await request('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({
         email,
@@ -248,15 +248,15 @@ async function testSecurityHeaders(): Promise<void> {
 
   const response = await request('/');
 
-  const requiredHeaders = {
-    'x-frame-options': 'SAMEORIGIN',
-    'x-content-type-options': 'nosniff',
-    'strict-transport-security': 'max-age=',
+  const requiredHeaders: Record<string, string[]> = {
+    'x-frame-options': ['SAMEORIGIN', 'DENY'],
+    'x-content-type-options': ['nosniff'],
+    ...(process.env.NODE_ENV === 'production' ? { 'strict-transport-security': ['max-age='] } : {}),
   };
 
   for (const [header, expectedValue] of Object.entries(requiredHeaders)) {
     const value = response.headers.get(header);
-    const passed = value?.includes(expectedValue) || false;
+    const passed = expectedValue.some((allowed) => value?.includes(allowed));
 
     results.push({
       test: `Security Header: ${header}`,
@@ -265,7 +265,7 @@ async function testSecurityHeaders(): Promise<void> {
       message: passed
         ? `Header present: ${header}`
         : `WARNING: Missing or incorrect header: ${header}`,
-      details: { header, value, expected: expectedValue },
+      details: { header, value, expected: expectedValue.join(' or ') },
     });
   }
 }
@@ -323,7 +323,7 @@ async function testSessionSecurity(): Promise<void> {
 async function testSensitiveDataExposure(): Promise<void> {
   console.log('\n[TEST] Sensitive Data Exposure');
 
-  const response = await request('/api/login', {
+  const response = await request('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({
       email: 'invalid@example.com',
@@ -360,7 +360,7 @@ async function testRateLimiting(): Promise<void> {
 
   // Make many requests quickly
   for (let i = 0; i < 100; i++) {
-    const response = await request('/api/public/properties', {
+    const response = await request('/api/properties', {
       method: 'GET',
     });
 

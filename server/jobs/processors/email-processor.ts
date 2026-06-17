@@ -40,9 +40,6 @@ export async function processEmail(job: Job<EmailJobData>): Promise<void> {
     await sgMail.send(msg);
     */
 
-    // Simulate email sending delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
     await job.updateProgress(50);
 
     // For now, just log the email details

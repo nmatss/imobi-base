@@ -4,6 +4,7 @@
  */
 
 import type { Request, Response, NextFunction } from 'express';
+import { runWithTenantRlsContext } from '../db-rls';
 
 /**
  * Require authentication middleware
@@ -34,7 +35,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     return;
   }
 
-  next();
+  runWithTenantRlsContext(req.user.tenantId, () => next());
 }
 
 /**
@@ -60,6 +61,11 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
       error: 'Admin privileges required',
       code: 'FORBIDDEN'
     });
+    return;
+  }
+
+  if (req.user.tenantId) {
+    runWithTenantRlsContext(req.user.tenantId, () => next());
     return;
   }
 
@@ -89,6 +95,11 @@ export function requireSuperAdmin(req: Request, res: Response, next: NextFunctio
       error: 'Super admin privileges required',
       code: 'FORBIDDEN'
     });
+    return;
+  }
+
+  if (req.user.tenantId) {
+    runWithTenantRlsContext(req.user.tenantId, () => next());
     return;
   }
 

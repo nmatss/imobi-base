@@ -23,6 +23,7 @@ import {
   runCleanupSoftDeletes,
   runEnforcePlanLimits,
 } from "./jobs/scheduled-jobs";
+import { CRON_JOB_MANIFEST, type CronJobName } from "./jobs/cron-manifest";
 
 /**
  * Verify the Vercel Cron secret from the Authorization header.
@@ -104,71 +105,23 @@ function createCronHandler(
 export function registerCronRoutes(app: Express): void {
   console.log("[Cron] Registering Vercel Cron endpoints...");
 
-  // Daily at 9 AM (Brazil) - Send payment reminders
-  app.get(
-    "/api/cron/payment-reminders",
-    createCronHandler("payment-reminders", runPaymentReminders)
-  );
+  const jobHandlers: Record<CronJobName, () => Promise<void>> = {
+    "payment-reminders": runPaymentReminders,
+    "daily-reports": runDailyReports,
+    "weekly-reports": runWeeklyReports,
+    "monthly-reports": runMonthlyReports,
+    "cleanup-sessions": runCleanupSessions,
+    "cleanup-logs": runCleanupLogs,
+    "integration-sync": runIntegrationSync,
+    "database-backup": runDatabaseBackup,
+    "cleanup-temp-files": runCleanupTempFiles,
+    "cleanup-soft-deletes": runCleanupSoftDeletes,
+    "enforce-plan-limits": runEnforcePlanLimits,
+  };
 
-  // Daily at midnight (Brazil) - Generate daily reports
-  app.get(
-    "/api/cron/daily-reports",
-    createCronHandler("daily-reports", runDailyReports)
-  );
-
-  // Weekly on Monday at 8 AM (Brazil) - Generate weekly reports
-  app.get(
-    "/api/cron/weekly-reports",
-    createCronHandler("weekly-reports", runWeeklyReports)
-  );
-
-  // Monthly on 1st day at 8 AM (Brazil) - Generate monthly reports
-  app.get(
-    "/api/cron/monthly-reports",
-    createCronHandler("monthly-reports", runMonthlyReports)
-  );
-
-  // Hourly - Cleanup old sessions
-  app.get(
-    "/api/cron/cleanup-sessions",
-    createCronHandler("cleanup-sessions", runCleanupSessions)
-  );
-
-  // Every 6 hours - Cleanup logs
-  app.get(
-    "/api/cron/cleanup-logs",
-    createCronHandler("cleanup-logs", runCleanupLogs)
-  );
-
-  // Every 6 hours - Sync with external APIs
-  app.get(
-    "/api/cron/integration-sync",
-    createCronHandler("integration-sync", runIntegrationSync)
-  );
-
-  // Daily at 2 AM (Brazil) - Database backup
-  app.get(
-    "/api/cron/database-backup",
-    createCronHandler("database-backup", runDatabaseBackup)
-  );
-
-  // Weekly on Sunday at 3 AM (Brazil) - Cleanup temp files
-  app.get(
-    "/api/cron/cleanup-temp-files",
-    createCronHandler("cleanup-temp-files", runCleanupTempFiles)
-  );
-
-  // Daily at 3 AM (Brazil) - Cleanup soft-deleted records older than 90 days
-  app.get(
-    "/api/cron/cleanup-soft-deletes",
-    createCronHandler("cleanup-soft-deletes", runCleanupSoftDeletes)
-  );
-
-  // Daily at 3:30 AM (Brazil) - Enforce plan limits (revoke integrations over limit)
-  app.get(
-    "/api/cron/enforce-plan-limits",
-    createCronHandler("enforce-plan-limits", runEnforcePlanLimits)
-  );
+  for (const job of CRON_JOB_MANIFEST) {
+    app.get(job.path, createCronHandler(job.name, jobHandlers[job.name]));
+  }
 
   // Health check / status endpoint for all cron jobs
   app.get("/api/cron/status", (req: Request, res: Response) => {
@@ -176,20 +129,16 @@ export function registerCronRoutes(app: Express): void {
 
     res.status(200).json({
       ok: true,
-      jobs: [
-        { name: "payment-reminders", schedule: "0 9 * * *", path: "/api/cron/payment-reminders" },
-        { name: "daily-reports", schedule: "0 0 * * *", path: "/api/cron/daily-reports" },
-        { name: "weekly-reports", schedule: "0 8 * * 1", path: "/api/cron/weekly-reports" },
-        { name: "monthly-reports", schedule: "0 8 1 * *", path: "/api/cron/monthly-reports" },
-        { name: "cleanup-sessions", schedule: "0 * * * *", path: "/api/cron/cleanup-sessions" },
-        { name: "cleanup-logs", schedule: "0 */6 * * *", path: "/api/cron/cleanup-logs" },
-        { name: "integration-sync", schedule: "0 */6 * * *", path: "/api/cron/integration-sync" },
-        { name: "database-backup", schedule: "0 2 * * *", path: "/api/cron/database-backup" },
-        { name: "cleanup-temp-files", schedule: "0 3 * * 0", path: "/api/cron/cleanup-temp-files" },
-        { name: "cleanup-soft-deletes", schedule: "0 3 * * *", path: "/api/cron/cleanup-soft-deletes" },
-      ],
+      jobs: CRON_JOB_MANIFEST.map((job) => ({
+        name: job.name,
+        label: job.label,
+        path: job.path,
+        schedule: job.localSchedule,
+        vercelSchedule: job.vercelSchedule,
+        timezone: job.timezone,
+      })),
     });
   });
 
-  console.log("[Cron] 10 cron endpoints registered under /api/cron/*");
+  console.log(`[Cron] ${CRON_JOB_MANIFEST.length} cron endpoints registered under /api/cron/*`);
 }

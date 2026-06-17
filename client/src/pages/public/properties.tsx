@@ -28,8 +28,8 @@ import {
   Home,
 } from "lucide-react";
 import React, { useState, useEffect, useMemo } from "react";
-import { Helmet } from "react-helmet";
 import { unwrapList, getPaginationTotal } from "@/lib/api-envelope";
+import { breadcrumbSchema, SeoHead, siteUrl } from "@/components/seo/SeoHead";
 
 type Tenant = {
   id: string;
@@ -454,15 +454,45 @@ export default function PublicProperties() {
       '--primary': tenant.primaryColor,
       '--secondary': tenant.secondaryColor
     } as any}>
-      {/* SEO Meta Tags */}
-      <Helmet>
-        <title>{tenant.name} - Imóveis para Venda e Aluguel</title>
-        <meta name="description" content={`Navegue por todos os imóveis disponíveis na ${tenant.name}. Apartamentos, casas, terrenos e imóveis comerciais.`} />
-        <meta property="og:title" content={`${tenant.name} - Catálogo de Imóveis`} />
-        <meta property="og:description" content={`Encontre o imóvel perfeito entre ${properties.length} opções disponíveis.`} />
-        <meta property="og:type" content="website" />
-        {tenant.logo && <meta property="og:image" content={tenant.logo} />}
-      </Helmet>
+      <SeoHead
+        title={`${tenant.name} | Imóveis para venda e aluguel`}
+        description={`Veja ${properties.length} imóveis disponíveis na ${tenant.name}: apartamentos, casas, terrenos e imóveis comerciais para comprar ou alugar.`}
+        path={`/e/${tenantSlug}/imoveis`}
+        image={tenant.logo || "/opengraph.png"}
+        imageAlt={`Logo da ${tenant.name}`}
+        structuredData={[
+          {
+            "@type": "RealEstateAgent",
+            name: tenant.name,
+            url: siteUrl(`/e/${tenantSlug}`),
+            image: tenant.logo || undefined,
+            telephone: tenant.phone || undefined,
+            email: tenant.email || undefined,
+            address: tenant.address
+              ? {
+                  "@type": "PostalAddress",
+                  streetAddress: tenant.address,
+                }
+              : undefined,
+          },
+          breadcrumbSchema([
+            { name: "Inicio", path: "/" },
+            { name: tenant.name, path: `/e/${tenantSlug}` },
+            { name: "Imoveis", path: `/e/${tenantSlug}/imoveis` },
+          ]),
+          {
+            "@type": "ItemList",
+            name: `Catalogo de imoveis - ${tenant.name}`,
+            numberOfItems: filteredAndSortedProperties.length,
+            itemListElement: paginatedProperties.map((property, index) => ({
+              "@type": "ListItem",
+              position: (currentPage - 1) * itemsPerPage + index + 1,
+              url: siteUrl(`/e/${tenantSlug}/imovel/${property.id}`),
+              name: property.title,
+            })),
+          },
+        ]}
+      />
 
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -699,16 +729,20 @@ export default function PublicProperties() {
                         size="sm"
                         onClick={() => setViewMode("grid")}
                         className="rounded-r-none"
+                        aria-label="Ver imóveis em grade"
+                        aria-pressed={viewMode === "grid"}
                       >
-                        <Grid3x3 className="h-4 w-4" />
+                        <Grid3x3 className="h-4 w-4" aria-hidden="true" />
                       </Button>
                       <Button
                         variant={viewMode === "list" ? "secondary" : "ghost"}
                         size="sm"
                         onClick={() => setViewMode("list")}
                         className="rounded-l-none"
+                        aria-label="Ver imóveis em lista"
+                        aria-pressed={viewMode === "list"}
                       >
-                        <List className="h-4 w-4" />
+                        <List className="h-4 w-4" aria-hidden="true" />
                       </Button>
                     </div>
                   </div>

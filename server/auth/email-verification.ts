@@ -11,6 +11,11 @@ import { users } from "@shared/schema-sqlite";
 import { eq, and, gt } from "drizzle-orm";
 import { sendVerificationEmail } from "./email-service";
 import { createAuditLog } from "../routes-security";
+import {
+  runWithAuthEmailRlsContext,
+  runWithEmailVerificationTokenRlsContext,
+  runWithTenantRlsContext,
+} from "../db-rls";
 
 // Rate limiting for verification email resends
 const resendLimiter = new Map<string, { count: number; resetAt: number }>();
@@ -83,15 +88,17 @@ export function registerEmailVerificationRoutes(app: Express) {
       const now = new Date().toISOString();
 
       // Find user with valid token
-      const userList = await db.select()
-        .from(users)
-        .where(
-          and(
-            eq(users.verificationToken, hashedToken),
-            gt(users.verificationTokenExpires, now)
+      const userList = await runWithEmailVerificationTokenRlsContext(hashedToken, () =>
+        db.select()
+          .from(users)
+          .where(
+            and(
+              eq(users.verificationToken, hashedToken),
+              gt(users.verificationTokenExpires, now)
+            )
           )
-        )
-        .limit(1);
+          .limit(1),
+      );
 
       if (!userList.length) {
         return res.status(400).json({
@@ -111,26 +118,28 @@ export function registerEmailVerificationRoutes(app: Express) {
         });
       }
 
-      // Mark email as verified
-      await db.update(users)
-        .set({
-          emailVerified: true,
-          verificationToken: null,
-          verificationTokenExpires: null,
-        })
-        .where(eq(users.id, user.id));
+      await runWithTenantRlsContext(user.tenantId, async () => {
+        // Mark email as verified
+        await db.update(users)
+          .set({
+            emailVerified: true,
+            verificationToken: null,
+            verificationTokenExpires: null,
+          })
+          .where(eq(users.id, user.id));
 
-      // Audit log
-      await createAuditLog(
-        user.tenantId,
-        user.id,
-        'email_verified',
-        'user',
-        user.id,
-        { emailVerified: false },
-        { emailVerified: true },
-        req
-      );
+        // Audit log
+        await createAuditLog(
+          user.tenantId,
+          user.id,
+          'email_verified',
+          'user',
+          user.id,
+          { emailVerified: false },
+          { emailVerified: true },
+          req
+        );
+      });
 
       res.json({
         success: true,
@@ -164,7 +173,9 @@ export function registerEmailVerificationRoutes(app: Express) {
       }
 
       // Find user by email
-      const userList = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
+      const userList = await runWithAuthEmailRlsContext(normalizedEmail, () =>
+        db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1),
+      );
 
       // Always return success to prevent email enumeration
       if (!userList.length) {
@@ -185,20 +196,22 @@ export function registerEmailVerificationRoutes(app: Express) {
         });
       }
 
-      // Generate and send new verification token
-      await sendVerificationTokenToUser(user.id, user.email, user.name);
+      await runWithTenantRlsContext(user.tenantId, async () => {
+        // Generate and send new verification token
+        await sendVerificationTokenToUser(user.id, user.email, user.name);
 
-      // Audit log
-      await createAuditLog(
-        user.tenantId,
-        user.id,
-        'verification_email_resent',
-        'user',
-        user.id,
-        null,
-        { email: user.email },
-        req
-      );
+        // Audit log
+        await createAuditLog(
+          user.tenantId,
+          user.id,
+          'verification_email_resent',
+          'user',
+          user.id,
+          null,
+          { email: user.email },
+          req
+        );
+      });
 
       res.json({
         success: true,
@@ -221,7 +234,9 @@ export function registerEmailVerificationRoutes(app: Express) {
 
       const userId = req.user.id;
 
-      const userList = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      const userList = await runWithTenantRlsContext(req.user.tenantId, () =>
+        db.select().from(users).where(eq(users.id, userId)).limit(1),
+      );
 
       if (!userList.length) {
         return res.status(404).json({ error: "Usuário não encontrado" });

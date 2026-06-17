@@ -7,9 +7,11 @@ import type { Express, Request, Response } from "express";
 import { nanoid } from "nanoid";
 import axios from "axios";
 import { db } from "../db";
-import { users, loginHistory } from "@shared/schema-sqlite";
+import { tenants, users, loginHistory } from "@shared/schema-sqlite";
+import { ROLES } from "@shared/constants/roles";
 import { eq, or, and } from "drizzle-orm";
 import { createAuditLog } from "../routes-security";
+import { runWithAuthEmailRlsContext, runWithTenantRlsContext } from "../db-rls";
 
 // Google OAuth configuration
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
@@ -20,6 +22,7 @@ const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'http://localhost
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo';
+const OAUTH_AUTO_PROVISION_TENANT_ID = process.env.OAUTH_AUTO_PROVISION_TENANT_ID || '';
 
 interface GoogleTokenResponse {
   access_token: string;
@@ -41,8 +44,26 @@ interface GoogleUserInfo {
   locale: string;
 }
 
+type OAuthUser = typeof users.$inferSelect;
+
 // State storage for OAuth flow (in production, use Redis)
 const oauthStateStore = new Map<string, { createdAt: number; redirectUrl?: string }>();
+
+function sanitizeRedirectUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  if (!value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return undefined;
+  return value;
+}
+
+async function getAutoProvisionTenantId(): Promise<string | null> {
+  if (!OAUTH_AUTO_PROVISION_TENANT_ID) return null;
+  const [tenant] = await db
+    .select({ id: tenants.id })
+    .from(tenants)
+    .where(eq(tenants.id, OAUTH_AUTO_PROVISION_TENANT_ID))
+    .limit(1);
+  return tenant?.id ?? null;
+}
 
 function generateState(): string {
   const state = nanoid(32);
@@ -86,7 +107,7 @@ export function registerGoogleOAuthRoutes(app: Express) {
       const state = generateState();
 
       // Store redirect URL if provided
-      const redirectUrl = req.query.redirect as string;
+      const redirectUrl = sanitizeRedirectUrl(req.query.redirect);
       if (redirectUrl) {
         const stateData = oauthStateStore.get(state);
         if (stateData) {
@@ -157,20 +178,22 @@ export function registerGoogleOAuthRoutes(app: Express) {
       const googleUser = userInfoResponse.data;
 
       // Check if user already exists (by email or OAuth ID)
-      const existingUserList = await db.select()
-        .from(users)
-        .where(
-          or(
-            eq(users.email, googleUser.email),
-            and(
-              eq(users.oauthProvider, 'google'),
-              eq(users.oauthId, googleUser.id)
+      const existingUserList = await runWithAuthEmailRlsContext(googleUser.email, () =>
+        db.select()
+          .from(users)
+          .where(
+            or(
+              eq(users.email, googleUser.email),
+              and(
+                eq(users.oauthProvider, 'google'),
+                eq(users.oauthId, googleUser.id)
+              )
             )
           )
-        )
-        .limit(1);
+          .limit(1),
+      );
 
-      let user;
+      let user: OAuthUser;
       let isNewUser = false;
 
       if (existingUserList.length > 0) {
@@ -178,16 +201,18 @@ export function registerGoogleOAuthRoutes(app: Express) {
 
         // Update OAuth tokens if this is an OAuth account
         if (user.oauthProvider === 'google' && user.oauthId === googleUser.id) {
-          await db.update(users)
-            .set({
-              oauthAccessToken: access_token,
-              oauthRefreshToken: refresh_token || user.oauthRefreshToken,
-              lastLogin: new Date().toISOString(),
-              lastLoginIp: req.ip || req.headers['x-forwarded-for']?.toString() || null,
-              avatar: googleUser.picture || user.avatar,
-              emailVerified: googleUser.verified_email,
-            })
-            .where(eq(users.id, user.id));
+          await runWithTenantRlsContext(user.tenantId, () =>
+            db.update(users)
+              .set({
+                oauthAccessToken: access_token,
+                oauthRefreshToken: refresh_token || user.oauthRefreshToken,
+                lastLogin: new Date().toISOString(),
+                lastLoginIp: req.ip || req.headers['x-forwarded-for']?.toString() || null,
+                avatar: googleUser.picture || user.avatar,
+                emailVerified: googleUser.verified_email,
+              })
+              .where(eq(users.id, user.id)),
+          );
         } else {
           // User exists with same email but different provider
           // This is a linking scenario - handled separately
@@ -195,68 +220,76 @@ export function registerGoogleOAuthRoutes(app: Express) {
         }
 
       } else {
-        // Create new user
+        // Create new user only when an explicit tenant was configured and verified.
         isNewUser = true;
-
-        // Get default tenant (you may need to adjust this logic)
-        const defaultTenantId = 'default-tenant'; // Replace with actual tenant selection logic
+        const tenantId = await getAutoProvisionTenantId();
+        if (!tenantId) {
+          oauthStateStore.delete(state as string);
+          return res.redirect(`/auth/login?error=oauth_account_not_found&provider=google`);
+        }
 
         const userId = nanoid();
 
-        await db.insert(users).values({
-          id: userId,
-          tenantId: defaultTenantId,
-          name: googleUser.name,
-          email: googleUser.email,
-          password: '', // No password for OAuth users
-          role: 'user',
-          avatar: googleUser.picture,
-          emailVerified: googleUser.verified_email,
-          oauthProvider: 'google',
-          oauthId: googleUser.id,
-          oauthAccessToken: access_token,
-          oauthRefreshToken: refresh_token || null,
-          lastLogin: new Date().toISOString(),
-          lastLoginIp: req.ip || req.headers['x-forwarded-for']?.toString() || null,
+        user = await runWithTenantRlsContext(tenantId, async () => {
+          await db.insert(users).values({
+            id: userId,
+            tenantId,
+            name: googleUser.name,
+            email: googleUser.email,
+            password: '', // No password for OAuth users
+            role: ROLES.MEMBER,
+            avatar: googleUser.picture,
+            emailVerified: googleUser.verified_email,
+            oauthProvider: 'google',
+            oauthId: googleUser.id,
+            oauthAccessToken: access_token,
+            oauthRefreshToken: refresh_token || null,
+            lastLogin: new Date().toISOString(),
+            lastLoginIp: req.ip || req.headers['x-forwarded-for']?.toString() || null,
+          });
+
+          const createdUser = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0];
+
+          // Audit log for new account
+          await createAuditLog(
+            createdUser.tenantId,
+            createdUser.id,
+            'account_created',
+            'user',
+            createdUser.id,
+            null,
+            { provider: 'google', email: createdUser.email },
+            req
+          );
+
+          return createdUser;
+        });
+      }
+
+      await runWithTenantRlsContext(user.tenantId, async () => {
+        // Log successful login
+        await db.insert(loginHistory).values({
+          id: nanoid(),
+          userId: user.id,
+          email: user.email,
+          success: true,
+          failureReason: null,
+          ipAddress: req.ip || req.headers['x-forwarded-for']?.toString() || null,
+          userAgent: req.headers['user-agent'] || null,
         });
 
-        user = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0];
-
-        // Audit log for new account
+        // Audit log for login
         await createAuditLog(
           user.tenantId,
           user.id,
-          'account_created',
+          'login',
           'user',
           user.id,
           null,
-          { provider: 'google', email: user.email },
+          { provider: 'google', isNewUser },
           req
         );
-      }
-
-      // Log successful login
-      await db.insert(loginHistory).values({
-        id: nanoid(),
-        userId: user.id,
-        email: user.email,
-        success: true,
-        failureReason: null,
-        ipAddress: req.ip || req.headers['x-forwarded-for']?.toString() || null,
-        userAgent: req.headers['user-agent'] || null,
       });
-
-      // Audit log for login
-      await createAuditLog(
-        user.tenantId,
-        user.id,
-        'login',
-        'user',
-        user.id,
-        null,
-        { provider: 'google', isNewUser },
-        req
-      );
 
       // Set up session with regeneration to prevent session fixation
       if (req.login) {

@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import InterestForm from "@/components/public/InterestForm";
 import { toast } from "sonner";
 import { unwrapList } from "@/lib/api-envelope";
+import { breadcrumbSchema, SeoHead, siteUrl } from "@/components/seo/SeoHead";
 import {
   MapPin,
   BedDouble,
@@ -113,45 +114,6 @@ export default function PropertyDetails() {
         }
         const propertyData = await propertyRes.json();
         setProperty(propertyData);
-
-        // Set page title and meta tags for SEO
-        document.title = `${propertyData.title} - ${tenantData.name}`;
-
-        // Set meta description
-        const metaDescription = document.querySelector(
-          'meta[name="description"]',
-        );
-        if (metaDescription) {
-          metaDescription.setAttribute(
-            "content",
-            `${propertyData.title} - ${categoryLabels[propertyData.category]} por ${formatPrice(propertyData.price)}. ${propertyData.city}, ${propertyData.state}. ${tenantData.name}`,
-          );
-        }
-
-        // Set Open Graph tags
-        const ogTitle = document.querySelector('meta[property="og:title"]');
-        if (ogTitle)
-          ogTitle.setAttribute(
-            "content",
-            `${propertyData.title} - ${tenantData.name}`,
-          );
-
-        const ogDescription = document.querySelector(
-          'meta[property="og:description"]',
-        );
-        if (ogDescription)
-          ogDescription.setAttribute(
-            "content",
-            propertyData.description ||
-              `${propertyData.title} em ${propertyData.city}`,
-          );
-
-        const ogImage = document.querySelector('meta[property="og:image"]');
-        if (ogImage && propertyData.images?.[0])
-          ogImage.setAttribute("content", propertyData.images[0]);
-
-        const ogUrl = document.querySelector('meta[property="og:url"]');
-        if (ogUrl) ogUrl.setAttribute("content", window.location.href);
 
         // Fetch similar properties
         const similarRes = await fetch(
@@ -310,6 +272,47 @@ export default function PropertyDetails() {
     property.images && property.images.length > 0
       ? property.images
       : ["https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200"];
+  const propertyPath = `/e/${slug}/imovel/${property.id}`;
+  const propertyDescription =
+    property.description ||
+    `${property.title} em ${property.city} - ${property.state}, ${categoryLabels[property.category] || property.category} por ${formatPrice(property.price)}.`;
+  const propertySchema = {
+    "@type": "Product",
+    name: property.title,
+    description: propertyDescription,
+    image: images,
+    url: siteUrl(propertyPath),
+    brand: {
+      "@type": "RealEstateAgent",
+      name: tenant.name,
+      telephone: tenant.phone || undefined,
+      email: tenant.email || undefined,
+      url: siteUrl(`/e/${slug}`),
+    },
+    category: typeLabels[property.type] || property.type,
+    offers: {
+      "@type": "Offer",
+      price: property.price,
+      priceCurrency: "BRL",
+      availability: "https://schema.org/InStock",
+      url: siteUrl(propertyPath),
+      businessFunction:
+        property.category === "rent"
+          ? "https://schema.org/LeaseOut"
+          : "https://schema.org/Sell",
+    },
+    additionalProperty: [
+      property.bedrooms !== null
+        ? { "@type": "PropertyValue", name: "Quartos", value: property.bedrooms }
+        : null,
+      property.bathrooms !== null
+        ? { "@type": "PropertyValue", name: "Banheiros", value: property.bathrooms }
+        : null,
+      property.area !== null
+        ? { "@type": "PropertyValue", name: "Area", value: `${property.area} m2` }
+        : null,
+    ].filter(Boolean),
+  };
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
@@ -321,6 +324,23 @@ export default function PropertyDetails() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <SeoHead
+        title={`${property.title} | ${tenant.name}`}
+        description={propertyDescription}
+        path={propertyPath}
+        image={images[0]}
+        imageAlt={property.title}
+        type="product"
+        structuredData={[
+          breadcrumbSchema([
+            { name: "Inicio", path: "/" },
+            { name: tenant.name, path: `/e/${slug}` },
+            { name: "Imoveis", path: `/e/${slug}/imoveis` },
+            { name: property.title, path: propertyPath },
+          ]),
+          propertySchema,
+        ]}
+      />
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -401,6 +421,7 @@ export default function PropertyDetails() {
                   size="icon"
                   className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white"
                   onClick={prevImage}
+                  aria-label="Imagem anterior do imóvel"
                 >
                   <ChevronLeft className="h-6 w-6" />
                 </Button>
@@ -409,6 +430,7 @@ export default function PropertyDetails() {
                   size="icon"
                   className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white"
                   onClick={nextImage}
+                  aria-label="Próxima imagem do imóvel"
                 >
                   <ChevronRight className="h-6 w-6" />
                 </Button>
@@ -427,8 +449,9 @@ export default function PropertyDetails() {
                 {images.map((img, idx) => (
                   <button
                     key={idx}
-                    onClick={() => setCurrentImageIndex(idx)}
-                    className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all snap-start ${
+                      onClick={() => setCurrentImageIndex(idx)}
+                      aria-label={`Ver imagem ${idx + 1} do imóvel`}
+                      className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all snap-start ${
                       idx === currentImageIndex
                         ? "border-primary scale-105"
                         : "border-transparent opacity-60 hover:opacity-100"
@@ -766,6 +789,7 @@ export default function PropertyDetails() {
                       style={{ border: 0 }}
                       referrerPolicy="no-referrer-when-downgrade"
                       src={`https://www.google.com/maps/embed/v1/place?key=YOUR_GOOGLE_MAPS_API_KEY&q=${encodeURIComponent(`${property.address}, ${property.city}, ${property.state}`)}`}
+                      title={`Mapa de ${property.title}`}
                       allowFullScreen
                       loading="lazy"
                     />
@@ -913,12 +937,24 @@ export default function PropertyDetails() {
 
       {/* Lightbox */}
       {lightboxOpen && (
-        <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center">
+        <div
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Galeria de imagens de ${property.title}`}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setLightboxOpen(false);
+            }
+          }}
+          tabIndex={-1}
+        >
           <Button
             variant="ghost"
             size="icon"
             className="absolute top-4 right-4 text-white hover:bg-white/20"
             onClick={() => setLightboxOpen(false)}
+            aria-label="Fechar galeria"
           >
             <X className="h-6 w-6" />
           </Button>
@@ -928,6 +964,7 @@ export default function PropertyDetails() {
             size="icon"
             className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20"
             onClick={prevImage}
+            aria-label="Imagem anterior na galeria"
           >
             <ChevronLeft className="h-8 w-8" />
           </Button>
@@ -943,6 +980,7 @@ export default function PropertyDetails() {
             size="icon"
             className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20"
             onClick={nextImage}
+            aria-label="Próxima imagem na galeria"
           >
             <ChevronRight className="h-8 w-8" />
           </Button>
@@ -976,7 +1014,7 @@ export default function PropertyDetails() {
           )}
           {tenant.phone && (
             <Button variant="outline" size="icon" asChild>
-              <a href={`tel:${tenant.phone}`}>
+              <a href={`tel:${tenant.phone}`} aria-label={`Ligar para ${tenant.name}`}>
                 <Phone className="h-4 w-4" />
               </a>
             </Button>
@@ -990,11 +1028,11 @@ export default function PropertyDetails() {
           className="fixed inset-0 z-50 bg-black/50 sm:hidden"
           onClick={() => setShowContactForm(false)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
+            if (e.key === "Escape" || e.key === "Enter" || e.key === " ") {
               setShowContactForm(false);
             }
           }}
-          role="button"
+          role="presentation"
           tabIndex={0}
         >
           <div
@@ -1002,15 +1040,18 @@ export default function PropertyDetails() {
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
             role="dialog"
+            aria-modal="true"
+            aria-labelledby="mobile-contact-form-title"
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-heading font-bold">
+              <h3 id="mobile-contact-form-title" className="text-lg font-heading font-bold">
                 Entre em contato
               </h3>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setShowContactForm(false)}
+                aria-label="Fechar formulário de contato"
               >
                 <X className="h-5 w-5" />
               </Button>

@@ -277,7 +277,7 @@ export class WebhookHandler {
       });
 
       // Update conversation
-      await conversationManager.updateConversation(conversation.id, {
+      await conversationManager.updateConversation(conversation.id, tenantId, {
         lastMessageAt: new Date(),
         lastMessageFrom: "contact",
         unreadCount: conversation.unreadCount + 1,
@@ -377,7 +377,7 @@ export class WebhookHandler {
 
       if (existingLead) {
         // Link conversation to existing lead
-        await conversationManager.updateConversation(conversation.id, {
+        await conversationManager.updateConversation(conversation.id, tenantId, {
           leadId: existingLead.id,
           contactName: contactName || existingLead.name,
         });
@@ -396,7 +396,7 @@ export class WebhookHandler {
         }).returning();
 
         // Link conversation to new lead
-        await conversationManager.updateConversation(conversation.id, {
+        await conversationManager.updateConversation(conversation.id, tenantId, {
           leadId: newLead.id,
           contactName: contactName || phoneNumber,
         });

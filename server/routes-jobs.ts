@@ -23,6 +23,11 @@ import {
 import { getScheduledJobsStatus } from './jobs/scheduled-jobs';
 import { checkRedisHealth, getRedisInfo } from './cache/redis-client';
 import { generateRateLimitKey } from './middleware/rate-limit-key-generator';
+import { isAdminRole } from '@shared/constants/roles';
+
+export function isJobAdminUser(user: { role?: string | null } | undefined): boolean {
+  return isAdminRole(user?.role);
+}
 
 /**
  * Register job management routes
@@ -35,9 +40,8 @@ export function registerJobRoutes(app: Express): void {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    // Check if user has admin role
     const user = req.user as { role?: string } | undefined;
-    if (!user || user.role !== 'admin') {
+    if (!isJobAdminUser(user)) {
       return res.status(403).json({ error: 'Forbidden: admin access required' });
     }
 
