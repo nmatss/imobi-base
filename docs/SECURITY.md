@@ -4,6 +4,24 @@
 
 This document provides comprehensive security guidelines for developers, administrators, and security personnel working with ImobiBase.
 
+## Enterprise Readiness Note - 2026-06-17
+
+The current enterprise security priorities are:
+
+- validate PostgreSQL Row Level Security (RLS) for all multi-tenant tables;
+- keep tenant ownership checks in every route that accesses resources by ID;
+- expand security tests for IDOR, CSRF, SSRF, XSS, upload abuse and forged tokens;
+- validate backup and restore with documented RPO/RTO;
+- keep webhook idempotency in the persistent `webhook_events` ledger for signed external providers;
+- run an external pentest before enterprise production readiness.
+
+See also:
+
+- `docs/RLS_RUNBOOK.md`
+- `docs/KNOWN_ISSUES.md`
+- `docs/TECH_DEBT.md`
+- `docs/ROADMAP.md`
+
 ## Table of Contents
 
 1. [Architecture Security](#architecture-security)
@@ -55,10 +73,23 @@ const properties = await db
 
 **Recommendations:**
 
-- Enable PostgreSQL Row-Level Security (RLS)
+- Validate PostgreSQL Row-Level Security (RLS) in staging/production with a non-owner runtime role
 - Implement database encryption at rest
 - Regular backups with encryption
 - Monitor slow queries for potential attacks
+
+### Webhook Security
+
+Critical payment/signature webhooks now use a persistent `webhook_events` ledger
+instead of Redis-only idempotency. Stripe, Mercado Pago and ClickSign reserve the
+event before processing and mark it as processed or failed afterward.
+
+- Stripe: provider signature plus persistent idempotency.
+- Mercado Pago: provider signature plus persistent idempotency; legacy IPN is
+  disabled by default and requires an explicit secret if re-enabled.
+- ClickSign: HMAC validation uses `rawBody` and timing-safe comparison.
+- ISA legacy webhook: disabled by default in production; prefer the official
+  WhatsApp webhook validated by Meta.
 
 ---
 
@@ -576,7 +607,13 @@ Run penetration tests:
 npm run dev
 
 # In another terminal, run pen tests
-TEST_URL=http://localhost:5000 tsx scripts/security/pen-test.ts
+TEST_URL=http://localhost:5000 npm run security:pentest
+```
+
+Antes de go-live enterprise, rode contra staging/producao e arquive o resultado:
+
+```bash
+TEST_URL=https://staging.imobibase.com.br npm run security:pentest
 ```
 
 ### Automated Testing
