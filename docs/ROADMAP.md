@@ -66,9 +66,10 @@ Atualizado em: 17/06/2026
   - concluido: Kanban exibe alertas de SLA por filtros visiveis;
   - concluido: interacoes atualizam `updatedAt` do lead;
   - concluido: validacao de tenant para `assignedTo` em leads e follow-ups;
+  - concluido: contrato API/UI do score de oportunidade alinhado em `/api/leads/:leadId/score/calculate`, com metadata `calculatedAt`/`trend` e estado vazio quando nao calculado;
   - deduplicacao;
   - roleta/distribuicao;
-  - score de oportunidade.
+  - score de oportunidade avançado com pesos configuraveis por tenant.
 - IA acionavel:
   - qualificar lead;
   - sugerir imoveis;

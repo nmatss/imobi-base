@@ -119,6 +119,11 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
   - `storage.unsubscribeNewsletter` agora persiste supressao mesmo sem assinatura previa e `subscribeNewsletter` nao reativa opt-out silenciosamente;
   - `POST /api/email/send-bulk` filtra destinatarios descadastrados;
   - adicionados testes `newsletter-opt-out-storage` e `newsletter-opt-out-source`.
+- Bloco CRM/lead score em 17/06/2026:
+  - backend passou a expor `POST /api/leads/:leadId/score/calculate`, mantendo compatibilidade com `POST /api/leads/:leadId/score`;
+  - respostas calculadas agora incluem `calculated`, `calculatedAt`, `lastCalculated`, `trend` e `scoreHistory` normalizado;
+  - `LeadScoreDisplay` trata `{ calculated:false }` como estado vazio e nao tenta renderizar score inexistente;
+  - adicionado teste `lead-score-contract-source`.
 
 ## Validacoes executadas
 
@@ -193,6 +198,8 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
   - `npm run ops:go-live:verify:static`: passou, 12 checks aprovados.
 - Validacao focada do bloco opt-out/unsubscribe em 17/06/2026:
   - `npx vitest run tests/unit/backend/newsletter-opt-out-storage.test.ts tests/unit/newsletter-opt-out-source.test.ts tests/unit/backend/email-unsubscribe-token.test.ts --reporter=verbose`: passou, 9 testes.
+- Validacao focada do bloco CRM/lead score em 17/06/2026:
+  - `npx vitest run tests/unit/lead-score-contract-source.test.ts tests/unit/lead-sla.test.ts tests/unit/feature-routes-map-tenant.test.ts --reporter=verbose`: passou, 15 testes.
 
 ## Pendencias relevantes
 

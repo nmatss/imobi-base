@@ -81,6 +81,7 @@ O diferencial recomendado e posicionar o produto como o sistema que nao perde vi
 - Webhook oficial do WhatsApp usa `webhook_events` para idempotencia persistente por change roteado ao tenant.
 - Go Live enterprise deve ser bloqueado por `npm run ops:go-live:verify:strict` no workflow de producao; o modo `strict` exige prova real de Redis, DB, RLS, backup, restore drill e pentest.
 - Unsubscribe publico persiste opt-out em `newsletter_subscriptions`, nao reativa email descadastrado por subscribe publico e bulk email filtra destinatarios optados-out.
+- Lead score deve manter contrato API/UI em `/api/leads/:leadId/score/calculate`; GET retorna `calculated:false` para estado vazio e respostas calculadas incluem `calculatedAt` e `trend`.
 
 ## Documentacao importante
 

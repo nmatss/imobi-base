@@ -30,6 +30,8 @@ import {
 
 const MAX_PUBLIC_COMPARISON_PROPERTIES = 20;
 
+type LeadScoreData = ReturnType<typeof calculateLeadScore>;
+
 // Lead Score Calculator
 function calculateLeadScore(lead: any, interactions: any[], followUps: any[]): {
   totalScore: number;
@@ -126,6 +128,58 @@ function calculateLeadScore(lead: any, interactions: any[], followUps: any[]): {
   };
 }
 
+function parseScoreHistory(rawHistory: string | null | undefined): Array<{ score: number; date: string }> {
+  if (!rawHistory) return [];
+  try {
+    const parsed = JSON.parse(rawHistory);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (entry): entry is { score: number; date: string } =>
+        typeof entry?.score === "number" && typeof entry?.date === "string",
+    );
+  } catch {
+    return [];
+  }
+}
+
+function getScoreTrend(scoreHistory: Array<{ score: number }>): "up" | "down" | "stable" {
+  if (scoreHistory.length < 2) return "stable";
+
+  const previous = scoreHistory[scoreHistory.length - 2].score;
+  const current = scoreHistory[scoreHistory.length - 1].score;
+  if (current > previous) return "up";
+  if (current < previous) return "down";
+  return "stable";
+}
+
+function toIsoDateString(value: unknown): string {
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "string" && value.trim()) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
+  }
+  return new Date().toISOString();
+}
+
+function formatLeadScoreResponse(
+  scoreData: LeadScoreData,
+  scoreHistory: Array<{ score: number; date: string }>,
+  calculatedAt: string,
+  id?: string,
+  leadId?: string,
+) {
+  return {
+    calculated: true,
+    id,
+    leadId,
+    ...scoreData,
+    trend: getScoreTrend(scoreHistory),
+    calculatedAt,
+    lastCalculated: calculatedAt,
+    scoreHistory,
+  };
+}
+
 export function registerFeatureRoutes(app: Express) {
   const requireAuth = (req: Request, res: Response, next: Function) => {
     if (!req.isAuthenticated?.() || !req.user) {
@@ -165,8 +219,7 @@ export function registerFeatureRoutes(app: Express) {
 
   // ==================== LEAD SCORING ====================
 
-  // Calculate/update lead score
-  app.post("/api/leads/:leadId/score", requireAuth, async (req, res) => {
+  const calculateAndPersistLeadScore = async (req: Request, res: Response) => {
     try {
       const { leadId } = req.params;
       const tenantId = req.user!.tenantId;
@@ -194,15 +247,14 @@ export function registerFeatureRoutes(app: Express) {
 
       // Get existing score history
       const existingScore = await db.select().from(leadScores).where(eq(leadScores.leadId, leadId));
-      let scoreHistory: any[] = [];
-      if (existingScore.length > 0 && existingScore[0].scoreHistory) {
-        scoreHistory = JSON.parse(existingScore[0].scoreHistory);
-      }
+      const scoreId = existingScore[0]?.id ?? nanoid();
+      let scoreHistory = parseScoreHistory(existingScore[0]?.scoreHistory);
 
       // Add new score to history (keep last 30)
+      const calculatedAt = new Date().toISOString();
       scoreHistory.push({
         score: scoreData.totalScore,
-        date: new Date().toISOString(),
+        date: calculatedAt,
       });
       if (scoreHistory.length > 30) scoreHistory = scoreHistory.slice(-30);
 
@@ -212,28 +264,38 @@ export function registerFeatureRoutes(app: Express) {
           .set({
             ...scoreData,
             scoreHistory: JSON.stringify(scoreHistory),
-            lastCalculated: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
+            lastCalculated: calculatedAt,
+            updatedAt: calculatedAt,
           })
           .where(eq(leadScores.leadId, leadId));
       } else {
         await db.insert(leadScores).values({
-          id: nanoid(),
+          id: scoreId,
           leadId,
           ...scoreData,
+          lastCalculated: calculatedAt,
+          updatedAt: calculatedAt,
           scoreHistory: JSON.stringify(scoreHistory),
         });
       }
 
-      res.json({
-        ...scoreData,
+      res.json(formatLeadScoreResponse(
+        scoreData,
         scoreHistory,
-      });
+        calculatedAt,
+        scoreId,
+        leadId,
+      ));
     } catch (error: any) {
       console.error('Lead score error:', error);
       res.status(500).json({ error: "Erro ao calcular score" });
     }
-  });
+  };
+
+  // Calculate/update lead score. Keep the legacy route and expose the
+  // explicit `/calculate` route consumed by the frontend.
+  app.post("/api/leads/:leadId/score", requireAuth, calculateAndPersistLeadScore);
+  app.post("/api/leads/:leadId/score/calculate", requireAuth, calculateAndPersistLeadScore);
 
   // Get lead score
   app.get("/api/leads/:leadId/score", requireAuth, async (req, res) => {
@@ -257,10 +319,15 @@ export function registerFeatureRoutes(app: Express) {
         return res.json({ calculated: false });
       }
 
+      const scoreHistory = parseScoreHistory(score[0].scoreHistory);
+      const calculatedAt = toIsoDateString(score[0].lastCalculated || score[0].updatedAt || score[0].createdAt);
+
       res.json({
         calculated: true,
         ...score[0],
-        scoreHistory: score[0].scoreHistory ? JSON.parse(score[0].scoreHistory) : [],
+        trend: getScoreTrend(scoreHistory),
+        calculatedAt,
+        scoreHistory,
       });
     } catch (error: any) {
       console.error('Get lead score error:', error);
