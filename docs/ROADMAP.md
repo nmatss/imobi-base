@@ -29,14 +29,15 @@ Atualizado em: 17/06/2026
   - Guard anti-SSRF central passou a resolver DNS, bloquear IPs privados em respostas DNS e controlar redirects manualmente antes de `fetch`.
   - Security webhooks e WhatsApp passaram a usar o fetch externo seguro; WhatsApp media URL tambem resolve DNS antes de enfileirar.
   - Upload de imagens de imovel passou a limitar 10 arquivos de ate 10MB, teto de lote de 50MB e validacao de tenant do `propertyId`.
+  - Rate limit/lockout de 2FA passou a usar Redis quando `REDIS_URL` existe, mantendo fallback local apenas para dev/test ou indisponibilidade explicita.
+  - Webhook oficial do WhatsApp passou a reservar/processar/falhar changes no ledger persistente `webhook_events`.
 - Em aberto:
   - Executar RLS apply/verify em staging/producao com role nao-owner e sem `BYPASSRLS`.
   - Aplicar e validar migration `20260617_001_webhook_events.sql` em staging/producao.
-  - Estender ledger persistente para webhook oficial do WhatsApp.
   - Provar dinamicamente isolamento multi-tenant das rotas com FK ownership em staging/producao.
   - Validar anti-SSRF/upload em staging/producao e executar pentest externo/manual.
   - Evoluir upload de imagens para streaming/upload assinado para maturidade 10/10.
-  - Persistir/distribuir rate limit e lockout de 2FA para ambiente serverless.
+  - Validar Redis real para rate limit/lockout de 2FA no deploy serverless.
   - Elevar cobertura de testes de 11,1% statements para >= 80%.
   - Reduzir 5166 warnings de lint.
   - Executar restore drill contra banco isolado real e registrar RPO/RTO.

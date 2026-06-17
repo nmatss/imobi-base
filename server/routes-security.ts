@@ -12,6 +12,7 @@ import { db } from "./db";
 import { twoFactorAuth, auditLogs } from "@shared/schema-sqlite";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 import { runWithTenantRlsContext } from "./db-rls";
+import { getRedisClient } from "./cache/redis-client";
 
 // TOTP implementation (RFC 6238)
 const BASE32_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -187,12 +188,70 @@ function timingSafeCompare(a: string, b: string): boolean {
   return timingSafeEqual(Buffer.from(a), Buffer.from(b));
 }
 
-// Simple in-memory rate limiter for 2FA endpoints
+// 2FA rate limiter. Uses Redis when REDIS_URL is configured; falls back to
+// process-local memory only for dev/test or explicit Redis outage.
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
 const RATE_LIMIT_MAX_ATTEMPTS = 5;
 
-function checkRateLimit(key: string): { allowed: boolean; remainingAttempts: number; resetIn: number } {
+function getTwoFactorRedis() {
+  if (!process.env.REDIS_URL) {
+    return null;
+  }
+
+  try {
+    return getRedisClient();
+  } catch (error) {
+    console.warn(
+      "[2FA] Redis rate limiter unavailable; falling back to process-local memory",
+      error,
+    );
+    return null;
+  }
+}
+
+function redisRateLimitKey(key: string): string {
+  return `2fa:rate-limit:${key}`;
+}
+
+async function checkRateLimit(key: string): Promise<{
+  allowed: boolean;
+  remainingAttempts: number;
+  resetIn: number;
+}> {
+  const redis = getTwoFactorRedis();
+  if (redis) {
+    try {
+      const redisKey = redisRateLimitKey(key);
+      const count = await redis.incr(redisKey);
+      if (count === 1) {
+        await redis.pexpire(redisKey, RATE_LIMIT_WINDOW);
+      }
+
+      const ttl = await redis.pttl(redisKey);
+      const resetIn = ttl > 0 ? ttl : RATE_LIMIT_WINDOW;
+
+      return {
+        allowed: count <= RATE_LIMIT_MAX_ATTEMPTS,
+        remainingAttempts: Math.max(0, RATE_LIMIT_MAX_ATTEMPTS - count),
+        resetIn,
+      };
+    } catch (error) {
+      console.warn(
+        "[2FA] Redis rate limiter failed; falling back to process-local memory",
+        error,
+      );
+    }
+  }
+
+  return checkMemoryRateLimit(key);
+}
+
+function checkMemoryRateLimit(key: string): {
+  allowed: boolean;
+  remainingAttempts: number;
+  resetIn: number;
+} {
   const now = Date.now();
   const record = rateLimitStore.get(key);
 
@@ -216,8 +275,19 @@ function checkRateLimit(key: string): { allowed: boolean; remainingAttempts: num
   return { allowed: true, remainingAttempts: RATE_LIMIT_MAX_ATTEMPTS - record.count, resetIn: record.resetAt - now };
 }
 
-function resetRateLimit(key: string): void {
+async function resetRateLimit(key: string): Promise<void> {
   rateLimitStore.delete(key);
+
+  const redis = getTwoFactorRedis();
+  if (!redis) {
+    return;
+  }
+
+  try {
+    await redis.del(redisRateLimitKey(key));
+  } catch (error) {
+    console.warn("[2FA] Failed to reset Redis rate limiter key", error);
+  }
 }
 
 export async function isTwoFactorEnabledForUser(userId: string): Promise<boolean> {
@@ -260,7 +330,7 @@ export async function verifyTwoFactorChallenge(
   }
 
   const rateLimitKey = `${rateLimitPrefix}:${userId}`;
-  const rateLimit = checkRateLimit(rateLimitKey);
+  const rateLimit = await checkRateLimit(rateLimitKey);
   if (!rateLimit.allowed) {
     return {
       ok: false,
@@ -295,7 +365,7 @@ export async function verifyTwoFactorChallenge(
     };
   }
 
-  resetRateLimit(rateLimitKey);
+  await resetRateLimit(rateLimitKey);
   return { ok: true, required: true };
 }
 
@@ -383,7 +453,7 @@ export function registerSecurityRoutes(app: Express) {
 
       // Rate limiting
       const rateLimitKey = `2fa_verify:${userId}`;
-      const rateLimit = checkRateLimit(rateLimitKey);
+      const rateLimit = await checkRateLimit(rateLimitKey);
       if (!rateLimit.allowed) {
         return res.status(429).json({
           error: "Muitas tentativas. Tente novamente mais tarde.",
@@ -409,7 +479,7 @@ export function registerSecurityRoutes(app: Express) {
       }
 
       // Success - reset rate limit
-      resetRateLimit(rateLimitKey);
+      await resetRateLimit(rateLimitKey);
 
       // Enable 2FA
       await db.update(twoFactorAuth)
@@ -437,7 +507,7 @@ export function registerSecurityRoutes(app: Express) {
 
       // Rate limiting
       const rateLimitKey = `2fa_disable:${userId}`;
-      const rateLimit = checkRateLimit(rateLimitKey);
+      const rateLimit = await checkRateLimit(rateLimitKey);
       if (!rateLimit.allowed) {
         return res.status(429).json({
           error: "Muitas tentativas. Tente novamente mais tarde.",
@@ -490,7 +560,7 @@ export function registerSecurityRoutes(app: Express) {
       }
 
       // Success - reset rate limit
-      resetRateLimit(rateLimitKey);
+      await resetRateLimit(rateLimitKey);
 
       // Disable 2FA
       await db.update(twoFactorAuth)

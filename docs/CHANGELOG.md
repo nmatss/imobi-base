@@ -40,6 +40,7 @@
 - Testes unitarios `cron-runtime-guards`, `backup-pitr-readiness`, `deploy-workflow-policy` e `security-go-live-guards`.
 - Teste unitario `tenant-fk-ownership-guards` para travar validacao de FKs por tenant em rotas core.
 - Testes focados `upload-hardening-source` e `ssrf-fetch-adoption-source`.
+- Testes focados `two-factor-redis-rate-limit-source` e `whatsapp-webhook-ledger-source`.
 
 ### Changed
 
@@ -88,6 +89,8 @@
 - Security webhooks e download de midia do WhatsApp passaram a usar `fetchExternalUrl`; envio de midia WhatsApp resolve DNS antes de enfileirar URL.
 - Upload generico passou a bloquear bucket arbitrario incompativel com o `fileType`.
 - Upload de imagens de imovel passou a limitar 10 arquivos de ate 10MB, lote maximo de 50MB e validar ownership do `propertyId`.
+- Rate limit/lockout de 2FA passou a usar Redis quando `REDIS_URL` esta configurado, mantendo fallback local para dev/test.
+- Webhook oficial do WhatsApp passou a usar ledger persistente por change, ignorando duplicatas e marcando falhas para retry.
 
 ### Validated
 
@@ -128,6 +131,11 @@
 - `npm run lint -- --quiet`: aprovado apos hardening anti-SSRF/upload.
 - `npm run test`: 90 arquivos, 1423 testes aprovados, 1 ignorado apos hardening anti-SSRF/upload.
 - `npm run build`: aprovado apos hardening anti-SSRF/upload.
+- Testes focados `two-factor-redis-rate-limit-source`, `whatsapp-webhook-ledger-source`, `security-go-live-guards`, `auth-rls-context`, `webhook-validation` e `auth-http`: 50 testes aprovados.
+- `npm run check`: aprovado apos hardening 2FA/WhatsApp ledger.
+- `npm run lint -- --quiet`: aprovado apos hardening 2FA/WhatsApp ledger.
+- `npm run test`: 92 arquivos, 1430 testes aprovados, 1 ignorado apos hardening 2FA/WhatsApp ledger.
+- `npm run build`: aprovado apos hardening 2FA/WhatsApp ledger.
 - `npm run lint -- --format json`: 5166 warnings, 0 errors apos a rodada P0/P2 de continuidade.
 - Checks Playwright de meta/canonical/JSON-LD/overflow.
 - Playwright em preview local: `/contato`, `/novidades`, `/termos`, `/privacidade` sem overflow horizontal em 320px e 390px.

@@ -77,6 +77,8 @@ O diferencial recomendado e posicionar o produto como o sistema que nao perde vi
 - Fetch de URL externa deve passar por `server/security/url-validator.ts` via `fetchExternalUrl`, que valida protocolo/host/IP, resolve DNS, bloqueia IP privado em respostas DNS e controla redirects manualmente.
 - Upload generico deve resolver bucket por `fileType`; cliente nao deve escolher bucket publico arbitrario.
 - Upload de imagens de imovel esta limitado localmente a 10 arquivos de ate 10MB, lote maximo de 50MB e validacao de tenant do `propertyId`; maturidade 10/10 ainda pede streaming/upload assinado.
+- Rate limit/lockout de 2FA usa Redis quando `REDIS_URL` esta configurado; sem Redis, degrada para memoria apenas em dev/test/fallback explicito.
+- Webhook oficial do WhatsApp usa `webhook_events` para idempotencia persistente por change roteado ao tenant.
 
 ## Documentacao importante
 

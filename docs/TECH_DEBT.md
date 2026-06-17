@@ -17,10 +17,10 @@ Atualizado em: 17/06/2026
 - Consolidar estrategia oficial de jobs longos: crons HTTP da Vercel estao manifestados e possuem lock/status via Redis; BullMQ/worker persistente pode ser habilitado por `ENABLE_BACKGROUND_JOBS=true`.
 - Concluir rollout operacional de CORS: `server/config/cors.ts` ja centraliza runtime e defaults de producao sao seguros; falta remover `ALLOWED_ORIGINS` dos ambientes depois de migrar para `CORS_ORIGINS`.
 - Revisar rotas antigas para garantir tenant ownership e ausencia de IDOR. Vistorias e fluxos centrais de contratos, locacoes, pagamentos, repasses, propostas, vendas, lancamentos financeiros e AVM foram reforcados em 17/06/2026; ainda falta prova dinamica multi-tenant em staging/producao e auditoria de rotas legadas/integracoes.
-- Distribuir rate limit/lockout de 2FA em Redis para ambiente serverless; QR Code TOTP ja deixou de depender de servico externo.
+- Validar rate limit/lockout de 2FA com Redis real no deploy serverless; o codigo ja usa Redis quando `REDIS_URL` existe e fallback local em dev/test.
 - Manter o wrapper anti-SSRF (`fetchExternalUrl`) como caminho obrigatorio para qualquer novo fetch de URL externa; DNS, redirects manuais e webhooks/WhatsApp ja foram cobertos localmente.
 - Reduzir risco residual de DoS autenticado em upload de imagens substituindo `memoryStorage` por streaming/upload assinado; limites locais ja foram reduzidos para 10 arquivos de 10MB e lote maximo de 50MB.
-- Estender o ledger persistente para webhook oficial do WhatsApp e remover fluxos legados quando nao forem mais necessarios.
+- Validar ledger persistente do webhook oficial do WhatsApp em staging/producao e remover fluxos legados quando nao forem mais necessarios.
 - Manifesto de crons ja unifica `vercel.json`, status HTTP e fallback `node-cron`; manter `npm run ops:cron:verify` no CI.
 - Persistir opt-out/unsubscribe real e exigir token forte em todos os fluxos publicos de descadastro.
 

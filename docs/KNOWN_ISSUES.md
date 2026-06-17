@@ -23,10 +23,10 @@ Atualizado em: 17/06/2026
 - SEO das paginas publicas conhecidas ja possui HTML estatico por rota no build; vitrines dinamicas de tenant/imovel/cidade/bairro ainda precisam de prerender/SSR ou geracao estatica.
 - `/sitemap-dynamic.xml` foi roteado para o backend, mas ainda precisa ser validado no deploy Vercel real.
 - Webhook legado da ISA foi desabilitado por padrao em producao; se for mantido, ainda deve derivar tenant da configuracao do numero/WABA e usar assinatura/idempotencia propria.
-- Stripe, Mercado Pago e ClickSign ja usam ledger persistente; falta validar a migration em staging/producao e estender o ledger para o webhook oficial do WhatsApp.
+- Stripe, Mercado Pago, ClickSign e webhook oficial do WhatsApp ja usam ledger persistente; falta validar a migration em staging/producao.
 - Pentest externo manual ainda e recomendado antes de contrato enterprise, mesmo com `security:pentest` automatizado.
 - IDOR/FK ownership: vistorias e fluxos centrais de contratos, locacoes, pagamentos, repasses, propostas, vendas, lancamentos financeiros e AVM foram reforcados localmente em 17/06/2026. Ainda falta prova dinamica multi-tenant em staging/producao e auditoria de rotas legadas/integracoes fora desse nucleo.
-- Setup de 2FA nao usa mais QR Code externo (`api.qrserver.com`) e gera QR localmente via `qrcode`; ainda falta distribuir rate limit/lockout de 2FA em Redis para ambiente serverless.
+- Setup de 2FA nao usa mais QR Code externo (`api.qrserver.com`) e gera QR localmente via `qrcode`; rate limit/lockout de 2FA usa Redis quando `REDIS_URL` existe e degrada para memoria em dev/test. Ainda falta validar Redis real no deploy serverless.
 - Upload de imagens de imovel foi reduzido localmente para 10 arquivos de ate 10MB cada, com teto de lote de 50MB e validacao de ownership do imovel. Ainda falta substituir `memoryStorage` por streaming/upload assinado para maturidade 10/10.
 - Validacao anti-SSRF agora resolve DNS, bloqueia redirects para alvos privados e foi aplicada a security webhooks/WhatsApp. Ainda falta prova em staging/producao e pentest externo/manual antes de Go Live enterprise.
 

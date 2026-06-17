@@ -103,6 +103,11 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
   - upload generico deixou de aceitar bucket arbitrario incompatível com o `fileType`;
   - upload de imagens de imovel passou a limitar 10 arquivos de ate 10MB, lote maximo de 50MB e validar que `propertyId` pertence ao tenant;
   - adicionados testes `url-validator`, `ssrf-protection`, `upload-hardening-source` e `ssrf-fetch-adoption-source` para as novas garantias.
+- Bloco 2FA/WhatsApp ledger em 17/06/2026:
+  - rate limit/lockout de 2FA em `server/routes-security.ts` passou a usar Redis quando `REDIS_URL` esta configurado, com fallback local apenas para dev/test ou indisponibilidade explicita;
+  - verificacao, validacao e desativacao de 2FA agora aguardam o rate limit distribuido e limpam a chave Redis em sucesso;
+  - webhook oficial do WhatsApp em `server/routes-whatsapp.ts` passou a gerar ID estavel por change, reservar no ledger persistente, ignorar duplicatas e marcar sucesso/falha em `webhook_events`;
+  - adicionados testes `two-factor-redis-rate-limit-source` e `whatsapp-webhook-ledger-source`.
 
 ## Validacoes executadas
 
@@ -167,6 +172,12 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
   - `npm run lint -- --quiet`: passou, sem erros bloqueantes.
   - `npm run test`: 90 arquivos passaram; 1423 testes passaram, 1 ignorado.
   - `npm run build`: passou e gerou HTML estatico para 11 rotas publicas.
+- Validacao focada do bloco 2FA/WhatsApp ledger em 17/06/2026:
+  - `npm run check`: passou.
+  - Testes focados `two-factor-redis-rate-limit-source`, `whatsapp-webhook-ledger-source`, `security-go-live-guards`, `auth-rls-context`, `webhook-validation` e `auth-http`: 50 testes passaram.
+  - `npm run lint -- --quiet`: passou, sem erros bloqueantes.
+  - `npm run test`: 92 arquivos passaram; 1430 testes passaram, 1 ignorado.
+  - `npm run build`: passou e gerou HTML estatico para 11 rotas publicas.
 
 ## Pendencias relevantes
 
@@ -177,7 +188,7 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
 - Execucao real de restore drill e registro de RPO/RTO.
 - Validar locks/status de cron no deploy real com `REDIS_URL` e `CRON_SECRET`.
 - Provar dinamicamente FK ownership cross-tenant em staging/producao e ampliar testes de isolamento multi-tenant.
-- Provar anti-SSRF/upload em staging/producao, evoluir upload para streaming/upload assinado e distribuir rate limit/lockout de 2FA.
+- Provar anti-SSRF/upload, Redis 2FA e ledger WhatsApp em staging/producao; evoluir upload para streaming/upload assinado.
 - Reducao adicional de LCP e bundle inicial.
 - SEO de rotas publicas conhecidas ja possui HTML estatico no build; ainda faltam prerender/SSR ou geracao estatica para vitrines dinamicas de tenant/imovel/cidade/bairro.
 - `/sitemap-dynamic.xml` foi roteado para o backend; ainda precisa ser validado no deploy Vercel real.
