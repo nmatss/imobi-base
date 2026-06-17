@@ -23,7 +23,7 @@ Atualizado em: 17/06/2026
 - Validar ledger persistente do webhook oficial do WhatsApp em staging/producao e remover fluxos legados quando nao forem mais necessarios.
 - Manifesto de crons ja unifica `vercel.json`, status HTTP e fallback `node-cron`; manter `npm run ops:cron:verify` no CI.
 - Manter `npm run ops:go-live:verify:strict` como gate de producao pre-deploy; qualquer alteracao em RLS, Redis, webhooks, cron, backup ou restore deve passar por esse gate.
-- Persistir opt-out/unsubscribe real e exigir token forte em todos os fluxos publicos de descadastro.
+- Validar `20260617_002_newsletter_opt_out.sql` em staging/producao para fechar opt-out persistente fora do ambiente local.
 
 ## Banco
 

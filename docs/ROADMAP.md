@@ -32,9 +32,11 @@ Atualizado em: 17/06/2026
   - Rate limit/lockout de 2FA passou a usar Redis quando `REDIS_URL` existe, mantendo fallback local apenas para dev/test ou indisponibilidade explicita.
   - Webhook oficial do WhatsApp passou a reservar/processar/falhar changes no ledger persistente `webhook_events`.
   - Gate unificado `npm run ops:go-live:verify` criado; workflow de producao agora usa `ops:go-live:verify:strict` antes do deploy para exigir Redis, DB, RLS, backup, restore drill e pentest.
+  - Unsubscribe publico passou a persistir opt-out real em `newsletter_subscriptions`, bloquear reativacao silenciosa e filtrar bulk email para destinatarios descadastrados.
 - Em aberto:
   - Executar RLS apply/verify em staging/producao com role nao-owner e sem `BYPASSRLS`.
   - Aplicar e validar migration `20260617_001_webhook_events.sql` em staging/producao.
+  - Aplicar e validar migration `20260617_002_newsletter_opt_out.sql` em staging/producao.
   - Provar dinamicamente isolamento multi-tenant das rotas com FK ownership em staging/producao.
   - Validar anti-SSRF/upload em staging/producao e executar pentest externo/manual.
   - Evoluir upload de imagens para streaming/upload assinado para maturidade 10/10.

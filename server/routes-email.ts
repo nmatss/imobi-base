@@ -176,14 +176,27 @@ export function registerEmailRoutes(app: Express) {
     try {
       // req.body is already validated and typed by Zod
       const { emails } = req.body;
+      const deliverableEmails: typeof emails = [];
+      const skippedOptOut: string[] = [];
 
-      const result = await emailService.sendBulk(emails);
+      for (const email of emails) {
+        if (await storage.isNewsletterOptedOut(email.to)) {
+          skippedOptOut.push(email.to);
+          continue;
+        }
+        deliverableEmails.push(email);
+      }
+
+      const result = deliverableEmails.length > 0
+        ? await emailService.sendBulk(deliverableEmails)
+        : { success: true, sent: 0, failed: 0, errors: [] };
 
       res.json({
         success: result.success,
         sent: result.sent,
         failed: result.failed,
         errors: result.errors,
+        skippedOptOut: skippedOptOut.length,
       });
     } catch (error: unknown) {
       console.error('Error sending bulk emails:', error);
@@ -412,8 +425,7 @@ export function registerEmailRoutes(app: Express) {
         `);
       }
 
-      // Here you would update the user's email preferences in your database
-      // For now, we'll just show a success message
+      await storage.unsubscribeNewsletter(tokenData.email, 'email_unsubscribe_link');
       const escapedEmail = escapeHtml(tokenData.email);
 
       res.send(`

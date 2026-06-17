@@ -162,9 +162,19 @@ export const newsletterSubscriptions = pgTable("newsletter_subscriptions", {
   tenantId: varchar("tenant_id").references(() => tenants.id),
   subscribedAt: timestamp("subscribed_at").notNull().defaultNow(),
   active: boolean("active").notNull().default(true),
+  unsubscribedAt: timestamp("unsubscribed_at"),
+  unsubscribeReason: text("unsubscribe_reason"),
+  resubscribedAt: timestamp("resubscribed_at"),
 });
 
-export const insertNewsletterSchema = createInsertSchema(newsletterSubscriptions).omit({ id: true, subscribedAt: true });
+export const insertNewsletterSchema = createInsertSchema(newsletterSubscriptions).omit({
+  id: true,
+  subscribedAt: true,
+  active: true,
+  unsubscribedAt: true,
+  unsubscribeReason: true,
+  resubscribedAt: true,
+});
 export type InsertNewsletter = z.infer<typeof insertNewsletterSchema>;
 export type Newsletter = typeof newsletterSubscriptions.$inferSelect;
 

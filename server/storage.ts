@@ -79,6 +79,10 @@ const fromJson = <T>(str: string | null | undefined): T[] | null => {
 // Helper to get current timestamp
 const now = () => new Date().toISOString();
 
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+const newsletterEmailFilter = (email: string) =>
+  sql`lower(${schema.newsletterSubscriptions.email}) = ${normalizeEmail(email)}`;
+
 // ============================================================================
 // FINANCIAL CALCULATION HELPERS (pure functions, unit-tested em
 // tests/unit/financial-calc.test.ts)
@@ -234,7 +238,8 @@ export interface IStorage {
   createContract(contract: InsertContract): Promise<Contract>;
   updateContract(id: string, contract: Partial<InsertContract>): Promise<Contract | undefined>;
   subscribeNewsletter(subscription: InsertNewsletter): Promise<Newsletter>;
-  unsubscribeNewsletter(email: string): Promise<boolean>;
+  unsubscribeNewsletter(email: string, reason?: string): Promise<boolean>;
+  isNewsletterOptedOut(email: string): Promise<boolean>;
   globalSearch(tenantId: string, query: string): Promise<{ properties: Property[]; leads: Lead[]; contracts: Contract[] }>;
   getDashboardStats(tenantId: string): Promise<{ totalProperties: number; totalLeads: number; totalContracts: number; totalVisits: number }>;
   getOwner(id: string): Promise<Owner | undefined>;
@@ -808,19 +813,73 @@ export class DbStorage implements IStorage {
   // Newsletter
   async subscribeNewsletter(subscription: InsertNewsletter): Promise<Newsletter> {
     const id = generateId();
+    const email = normalizeEmail(subscription.email);
+    const payload = { ...subscription, email };
     // Check if already exists
-    const existing = await db.select().from(schema.newsletterSubscriptions).where(eq(schema.newsletterSubscriptions.email, subscription.email));
+    const existing = await db.select().from(schema.newsletterSubscriptions).where(newsletterEmailFilter(email));
     if (existing.length > 0) {
-      const [updated] = await db.update(schema.newsletterSubscriptions).set({ active: true }).where(eq(schema.newsletterSubscriptions.email, subscription.email)).returning();
+      const current = existing[0];
+      if (current.active === false) {
+        return current;
+      }
+
+      const [updated] = await db
+        .update(schema.newsletterSubscriptions)
+        .set({
+          ...payload,
+          active: true,
+          resubscribedAt: current.unsubscribedAt ? now() : current.resubscribedAt,
+          unsubscribedAt: null,
+          unsubscribeReason: null,
+        })
+        .where(newsletterEmailFilter(email))
+        .returning();
       return updated;
     }
-    const [created] = await db.insert(schema.newsletterSubscriptions).values({ ...subscription, id, subscribedAt: now() }).returning();
+    const [created] = await db.insert(schema.newsletterSubscriptions).values({ ...payload, id, subscribedAt: now(), active: true }).returning();
     return created;
   }
 
-  async unsubscribeNewsletter(email: string): Promise<boolean> {
-    await db.update(schema.newsletterSubscriptions).set({ active: false }).where(eq(schema.newsletterSubscriptions.email, email));
+  async unsubscribeNewsletter(email: string, reason = "unsubscribe_link"): Promise<boolean> {
+    const normalizedEmail = normalizeEmail(email);
+    const existing = await db
+      .select()
+      .from(schema.newsletterSubscriptions)
+      .where(newsletterEmailFilter(normalizedEmail));
+
+    const unsubscribedAt = now();
+    if (existing.length > 0) {
+      await db
+        .update(schema.newsletterSubscriptions)
+        .set({
+          active: false,
+          unsubscribedAt,
+          unsubscribeReason: reason,
+        })
+        .where(newsletterEmailFilter(normalizedEmail));
+      return true;
+    }
+
+    await db.insert(schema.newsletterSubscriptions).values({
+      id: generateId(),
+      email: normalizedEmail,
+      tenantId: null,
+      subscribedAt: unsubscribedAt,
+      active: false,
+      unsubscribedAt,
+      unsubscribeReason: reason,
+    });
     return true;
+  }
+
+  async isNewsletterOptedOut(email: string): Promise<boolean> {
+    const normalizedEmail = normalizeEmail(email);
+    const [subscription] = await db
+      .select()
+      .from(schema.newsletterSubscriptions)
+      .where(newsletterEmailFilter(normalizedEmail));
+
+    return Boolean(subscription && subscription.active === false);
   }
 
   // Global search

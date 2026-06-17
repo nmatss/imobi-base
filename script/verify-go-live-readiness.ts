@@ -123,6 +123,19 @@ async function checkStaticReadiness(): Promise<void> {
     "requires unique provider/event idempotency index",
   );
 
+  const newsletterOptOutMigration = await readFile(
+    path.resolve(root, "migrations/20260617_002_newsletter_opt_out.sql"),
+    "utf8",
+  );
+  addResult(
+    "newsletter opt-out migration",
+    newsletterOptOutMigration.includes("ADD COLUMN IF NOT EXISTS unsubscribed_at") &&
+      newsletterOptOutMigration.includes("idx_newsletter_subscriptions_active_email")
+      ? "pass"
+      : "fail",
+    "requires durable unsubscribe audit fields and active/email lookup index",
+  );
+
   const rlsMigration = await readFile(path.resolve(root, "migrations/RLS_enable.sql"), "utf8");
   addResult(
     "RLS covers webhook_events",

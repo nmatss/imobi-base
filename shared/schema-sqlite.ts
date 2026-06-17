@@ -163,9 +163,19 @@ export const newsletterSubscriptions = sqliteTable("newsletter_subscriptions", {
   tenantId: text("tenant_id").references(() => tenants.id),
   subscribedAt: text("subscribed_at").notNull().default(now()),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
+  unsubscribedAt: text("unsubscribed_at"),
+  unsubscribeReason: text("unsubscribe_reason"),
+  resubscribedAt: text("resubscribed_at"),
 });
 
-export const insertNewsletterSchema = createInsertSchema(newsletterSubscriptions).omit({ id: true, subscribedAt: true });
+export const insertNewsletterSchema = createInsertSchema(newsletterSubscriptions).omit({
+  id: true,
+  subscribedAt: true,
+  active: true,
+  unsubscribedAt: true,
+  unsubscribeReason: true,
+  resubscribedAt: true,
+});
 export type InsertNewsletter = z.infer<typeof insertNewsletterSchema>;
 export type Newsletter = typeof newsletterSubscriptions.$inferSelect;
 

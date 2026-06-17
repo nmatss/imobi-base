@@ -114,6 +114,11 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
   - workflow de producao passou a rodar `npm run ops:go-live:verify:strict` apos `vercel pull`/build e antes do deploy, com `VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` no ambiente do job;
   - `docs/GO_LIVE_CHECKLIST.md`, `docs/RUNBOOK.md` e `docs/DEPLOYMENT_RUNBOOK.md` passaram a documentar o gate unificado;
   - adicionado teste `tests/unit/go-live-readiness-gate.test.ts`.
+- Bloco opt-out/unsubscribe em 17/06/2026:
+  - criada migration `20260617_002_newsletter_opt_out.sql` com campos `unsubscribed_at`, `unsubscribe_reason` e `resubscribed_at`;
+  - `storage.unsubscribeNewsletter` agora persiste supressao mesmo sem assinatura previa e `subscribeNewsletter` nao reativa opt-out silenciosamente;
+  - `POST /api/email/send-bulk` filtra destinatarios descadastrados;
+  - adicionados testes `newsletter-opt-out-storage` e `newsletter-opt-out-source`.
 
 ## Validacoes executadas
 
@@ -185,7 +190,9 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
   - `npm run test`: 92 arquivos passaram; 1430 testes passaram, 1 ignorado.
   - `npm run build`: passou e gerou HTML estatico para 11 rotas publicas.
 - Validacao focada do bloco gate Go Live em 17/06/2026:
-  - `npm run ops:go-live:verify:static`: passou, 11 checks aprovados.
+  - `npm run ops:go-live:verify:static`: passou, 12 checks aprovados.
+- Validacao focada do bloco opt-out/unsubscribe em 17/06/2026:
+  - `npx vitest run tests/unit/backend/newsletter-opt-out-storage.test.ts tests/unit/newsletter-opt-out-source.test.ts tests/unit/backend/email-unsubscribe-token.test.ts --reporter=verbose`: passou, 9 testes.
 
 ## Pendencias relevantes
 

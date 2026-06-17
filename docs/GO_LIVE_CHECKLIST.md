@@ -77,6 +77,7 @@ com aviso no log. Marcar cada uma como "ativa" ou "aceito lançar sem":
 - [ ] RLS aplicado e validado com `npm run db:rls:verify` usando role runtime
       nao-owner e sem `BYPASSRLS`.
 - [ ] Migration `20260617_001_webhook_events.sql` aplicada em staging/producao.
+- [ ] Migration `20260617_002_newsletter_opt_out.sql` aplicada em staging/producao.
 - [ ] `npm run ops:go-live:verify:strict` aprovado com
       `GO_LIVE_RESTORE_DRILL_VERIFIED=true` e `GO_LIVE_PENTEST_VERIFIED=true`
       ou executando os dois gates via `GO_LIVE_RUN_RESTORE_DRILL=true` e

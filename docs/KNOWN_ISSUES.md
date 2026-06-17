@@ -25,6 +25,7 @@ Atualizado em: 17/06/2026
 - `/sitemap-dynamic.xml` foi roteado para o backend, mas ainda precisa ser validado no deploy Vercel real.
 - Webhook legado da ISA foi desabilitado por padrao em producao; se for mantido, ainda deve derivar tenant da configuracao do numero/WABA e usar assinatura/idempotencia propria.
 - Stripe, Mercado Pago, ClickSign e webhook oficial do WhatsApp ja usam ledger persistente; falta validar a migration em staging/producao.
+- Opt-out/unsubscribe agora persiste supressao real e filtra bulk email localmente; falta aplicar/validar `20260617_002_newsletter_opt_out.sql` em staging/producao.
 - Pentest externo manual ainda e recomendado antes de contrato enterprise, mesmo com `security:pentest` automatizado.
 - IDOR/FK ownership: vistorias e fluxos centrais de contratos, locacoes, pagamentos, repasses, propostas, vendas, lancamentos financeiros e AVM foram reforcados localmente em 17/06/2026. Ainda falta prova dinamica multi-tenant em staging/producao e auditoria de rotas legadas/integracoes fora desse nucleo.
 - Setup de 2FA nao usa mais QR Code externo (`api.qrserver.com`) e gera QR localmente via `qrcode`; rate limit/lockout de 2FA usa Redis quando `REDIS_URL` existe e degrada para memoria em dev/test ou se o Redis configurado ficar indisponivel. Ainda falta validar Redis real no deploy serverless.
@@ -38,7 +39,6 @@ Atualizado em: 17/06/2026
 - CORS foi padronizado no runtime e defaults de producao nao incluem localhost; producao ainda deve configurar `CORS_ORIGINS` explicitamente e aposentar `ALLOWED_ORIGINS`.
 - Handler serverless agora registra `cookie-parser` e alinha preflight com `Authorization`; validar em deploy real com login, CSRF e portal por cookie.
 - Workers BullMQ existem, mas e preciso decidir operacao oficial fora da Vercel ou via crons HTTP. Crons HTTP agora possuem lock distribuido via Redis quando `REDIS_URL` esta configurado; ainda falta provar execucao no deploy real e observar duracao/timeout dos jobs longos.
-- Unsubscribe/opt-out ainda precisa persistir bloqueio real de envio e aposentar qualquer fluxo legado sem token forte.
 - Portal de atendimento comprador/lead ainda nao existe como fluxo funcional de selecao, aceite/recusa, comentario e pedido de visita.
 - Acoes de IA ainda nao sao auditaveis/aprovaveis em tabela propria.
 

@@ -43,6 +43,8 @@
 - Testes focados `two-factor-redis-rate-limit-source` e `whatsapp-webhook-ledger-source`.
 - Script `script/verify-go-live-readiness.ts` e teste `go-live-readiness-gate`.
 - Scripts `ops:go-live:verify`, `ops:go-live:verify:static` e `ops:go-live:verify:strict`.
+- Migration `20260617_002_newsletter_opt_out.sql`.
+- Testes `newsletter-opt-out-storage` e `newsletter-opt-out-source`.
 
 ### Changed
 
@@ -95,6 +97,7 @@
 - Webhook oficial do WhatsApp passou a usar ledger persistente por change, ignorando duplicatas e marcando falhas para retry.
 - Workflow de producao passou a rodar o gate `npm run ops:go-live:verify:strict` antes do deploy e a configurar `VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` no job.
 - Checklist/runbooks de Go Live passaram a apontar para o gate unificado em modo estatico/deploy/strict.
+- Descadastro publico passou a persistir opt-out real, bloquear reativacao silenciosa por subscribe publico e filtrar bulk email para destinatarios optados-out.
 
 ### Validated
 
@@ -140,7 +143,8 @@
 - `npm run lint -- --quiet`: aprovado apos hardening 2FA/WhatsApp ledger.
 - `npm run test`: 92 arquivos, 1430 testes aprovados, 1 ignorado apos hardening 2FA/WhatsApp ledger.
 - `npm run build`: aprovado apos hardening 2FA/WhatsApp ledger.
-- `npm run ops:go-live:verify:static`: aprovado, 11 checks.
+- `npm run ops:go-live:verify:static`: aprovado, 12 checks.
+- `npx vitest run tests/unit/backend/newsletter-opt-out-storage.test.ts tests/unit/newsletter-opt-out-source.test.ts tests/unit/backend/email-unsubscribe-token.test.ts --reporter=verbose`: aprovado, 9 testes.
 - `npm run lint -- --format json`: 5166 warnings, 0 errors apos a rodada P0/P2 de continuidade.
 - Checks Playwright de meta/canonical/JSON-LD/overflow.
 - Playwright em preview local: `/contato`, `/novidades`, `/termos`, `/privacidade` sem overflow horizontal em 320px e 390px.

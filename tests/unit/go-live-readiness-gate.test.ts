@@ -61,6 +61,7 @@ describe('go-live readiness gate', () => {
 
     expect(source).toContain('const mode = getMode();');
     expect(source).toContain('if (mode !== "static")');
+    expect(source).toContain('20260617_002_newsletter_opt_out.sql');
     expect(source).toContain('npm run ops:go-live:verify:strict');
     expect(source).toContain('await runCommand("Cron manifest"');
   });
