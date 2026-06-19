@@ -104,8 +104,8 @@ export default function AnalyticsPage() {
         <Card>
           <CardContent className="p-12 text-center">
             <AlertTriangle className="mx-auto h-12 w-12 text-red-400 mb-4" />
-            <h2 className="text-lg font-semibold text-gray-700">Erro ao carregar analytics</h2>
-            <p className="text-gray-500 mt-2">Tente novamente mais tarde.</p>
+            <h2 className="text-lg font-semibold text-foreground">Erro ao carregar analytics</h2>
+            <p className="text-muted-foreground mt-2">Tente novamente mais tarde.</p>
           </CardContent>
         </Card>
       </div>
@@ -117,8 +117,8 @@ export default function AnalyticsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Analytics</h1>
-          <p className="text-gray-500">Monitoramento de uso e performance do sistema</p>
+          <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
+          <p className="text-muted-foreground">Monitoramento de uso e performance do sistema</p>
         </div>
         <Select value={period} onValueChange={setPeriod}>
           <SelectTrigger className="w-[160px]">
@@ -137,11 +137,11 @@ export default function AnalyticsPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 rounded-lg">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                 <Eye className="h-5 w-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Pageviews</p>
+                <p className="text-sm text-muted-foreground">Pageviews</p>
                 {isLoading ? (
                   <Skeleton className="h-7 w-16 mt-1" />
                 ) : (
@@ -155,11 +155,11 @@ export default function AnalyticsPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 rounded-lg">
+              <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
                 <Users className="h-5 w-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Sessoes Unicas</p>
+                <p className="text-sm text-muted-foreground">Sessoes Unicas</p>
                 {isLoading ? (
                   <Skeleton className="h-7 w-16 mt-1" />
                 ) : (
@@ -173,11 +173,11 @@ export default function AnalyticsPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 rounded-lg">
+              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
                 <AlertTriangle className="h-5 w-5 text-red-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Erros</p>
+                <p className="text-sm text-muted-foreground">Erros</p>
                 {isLoading ? (
                   <Skeleton className="h-7 w-16 mt-1" />
                 ) : (
@@ -191,11 +191,11 @@ export default function AnalyticsPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 rounded-lg">
+              <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
                 <Gauge className="h-5 w-5 text-purple-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Web Vitals</p>
+                <p className="text-sm text-muted-foreground">Web Vitals</p>
                 {isLoading ? (
                   <Skeleton className="h-7 w-16 mt-1" />
                 ) : (
@@ -250,7 +250,7 @@ export default function AnalyticsPage() {
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[300px] flex items-center justify-center text-gray-400">
+            <div className="h-[300px] flex items-center justify-center text-muted-foreground">
               <div className="text-center">
                 <Activity className="h-12 w-12 mx-auto mb-2 opacity-40" />
                 <p>Nenhum dado de pageview no periodo</p>
@@ -281,7 +281,7 @@ export default function AnalyticsPage() {
                   <div key={vital.name} className="flex items-center justify-between p-3 border rounded-lg">
                     <div>
                       <p className="font-semibold text-sm">{vital.name}</p>
-                      <p className="text-xs text-gray-500">{vitalDescription(vital.name)}</p>
+                      <p className="text-xs text-muted-foreground">{vitalDescription(vital.name)}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-lg font-bold">
@@ -295,7 +295,7 @@ export default function AnalyticsPage() {
                 ))}
               </div>
             ) : (
-              <div className="py-12 text-center text-gray-400">
+              <div className="py-12 text-center text-muted-foreground">
                 <Gauge className="h-12 w-12 mx-auto mb-2 opacity-40" />
                 <p>Nenhum dado de Web Vitals no periodo</p>
               </div>
@@ -339,7 +339,7 @@ export default function AnalyticsPage() {
                 </TableBody>
               </Table>
             ) : (
-              <div className="py-12 text-center text-gray-400">
+              <div className="py-12 text-center text-muted-foreground">
                 <Eye className="h-12 w-12 mx-auto mb-2 opacity-40" />
                 <p>Nenhum dado de paginas no periodo</p>
               </div>
@@ -380,13 +380,13 @@ export default function AnalyticsPage() {
                     <TableCell className="max-w-[400px]">
                       <p className="text-sm font-medium text-red-700 truncate">{err.message}</p>
                       {err.stack && (
-                        <p className="text-xs text-gray-400 truncate mt-1">{err.stack.split('\n')[0]}</p>
+                        <p className="text-xs text-muted-foreground truncate mt-1">{err.stack.split('\n')[0]}</p>
                       )}
                     </TableCell>
-                    <TableCell className="text-xs text-gray-500 max-w-[200px] truncate">
+                    <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
                       {err.userAgent ? `${err.userAgent.slice(0, 60)  }...` : '-'}
                     </TableCell>
-                    <TableCell className="text-right text-sm text-gray-500 whitespace-nowrap">
+                    <TableCell className="text-right text-sm text-muted-foreground whitespace-nowrap">
                       {new Date(err.createdAt).toLocaleString('pt-BR')}
                     </TableCell>
                   </TableRow>
@@ -394,7 +394,7 @@ export default function AnalyticsPage() {
               </TableBody>
             </Table>
           ) : (
-            <div className="py-12 text-center text-gray-400">
+            <div className="py-12 text-center text-muted-foreground">
               <AlertTriangle className="h-12 w-12 mx-auto mb-2 opacity-40" />
               <p>Nenhum erro reportado no periodo</p>
             </div>

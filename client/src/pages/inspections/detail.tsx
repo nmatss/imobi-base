@@ -1,6 +1,8 @@
 import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useLocation } from "wouter";
+import { toast } from "sonner";
+import { csrfHeaders } from "@/lib/queryClient";
 import { useImobi } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -90,11 +92,11 @@ type Inspection = {
 };
 
 const conditionOptions = [
-  { value: "excellent", label: "Excelente", color: "bg-green-500", textColor: "text-green-700", bgLight: "bg-green-50 border-green-200" },
-  { value: "good", label: "Bom", color: "bg-blue-500", textColor: "text-blue-700", bgLight: "bg-blue-50 border-blue-200" },
-  { value: "fair", label: "Regular", color: "bg-yellow-500", textColor: "text-yellow-700", bgLight: "bg-yellow-50 border-yellow-200" },
-  { value: "poor", label: "Ruim", color: "bg-red-500", textColor: "text-red-700", bgLight: "bg-red-50 border-red-200" },
-  { value: "not_applicable", label: "N/A", color: "bg-gray-400", textColor: "text-gray-600", bgLight: "bg-gray-50 border-gray-200" },
+  { value: "excellent", label: "Excelente", color: "bg-green-500", ring: "ring-green-500", textColor: "text-green-700", bgLight: "bg-green-50 border-green-200" },
+  { value: "good", label: "Bom", color: "bg-blue-500", ring: "ring-blue-500", textColor: "text-blue-700", bgLight: "bg-blue-50 border-blue-200" },
+  { value: "fair", label: "Regular", color: "bg-yellow-500", ring: "ring-yellow-500", textColor: "text-yellow-700", bgLight: "bg-yellow-50 border-yellow-200" },
+  { value: "poor", label: "Ruim", color: "bg-red-500", ring: "ring-red-500", textColor: "text-red-700", bgLight: "bg-red-50 border-red-200" },
+  { value: "not_applicable", label: "N/A", color: "bg-gray-400", ring: "ring-gray-400", textColor: "text-gray-600", bgLight: "bg-gray-50 border-gray-200" },
 ];
 
 const conditionLabels: Record<string, string> = {
@@ -604,7 +606,7 @@ export default function InspectionDetailPage() {
                             key={opt.value}
                             className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
                               room.overallCondition === opt.value
-                                ? `${opt.bgLight} ${opt.textColor} ring-2 ring-offset-1 ring-${opt.color}`
+                                ? `${opt.bgLight} ${opt.textColor} ring-2 ring-offset-1 ${opt.ring}`
                                 : "bg-muted text-muted-foreground hover:bg-muted/80"
                             }`}
                             onClick={() =>
@@ -788,7 +790,7 @@ export default function InspectionDetailPage() {
       )}
 
       {/* Bottom Action Bar - Fixed on mobile */}
-      <div className="fixed bottom-0 left-0 right-0 lg:static bg-background border-t lg:border-0 p-4 lg:p-0 z-40 flex gap-3">
+      <div className="fixed bottom-0 left-0 right-0 lg:static bg-background border-t lg:border-0 p-4 lg:p-0 pb-safe-4 lg:pb-0 z-40 flex flex-wrap gap-3">
         {isEditable && (
           <Button
             className="flex-1 lg:flex-none gap-2"
@@ -928,7 +930,52 @@ function ItemRow({
   onUpdate: (roomId: string, itemId: string, updates: Partial<InspectionItem>) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const currentCondition = conditionOptions.find((c) => c.value === item.condition);
+
+  const itemPhotos: string[] = (() => {
+    if (!item.photos) return [];
+    try {
+      const parsed = JSON.parse(item.photos);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  })();
+
+  const handlePhotoSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite reenviar o mesmo arquivo
+    if (!file) return;
+
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("fileType", "image");
+
+      const res = await fetch("/api/files/upload", {
+        method: "POST",
+        credentials: "include",
+        // Não setar Content-Type: o browser define o boundary do multipart.
+        headers: csrfHeaders(),
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Falha no upload");
+      const data = await res.json();
+      const url = data?.file?.url;
+      if (!url) throw new Error("Resposta de upload inválida");
+
+      onUpdate(roomId, item.id, { photos: JSON.stringify([...itemPhotos, url]) });
+      toast.success("Foto adicionada");
+    } catch (err) {
+      console.error("Failed to upload photo", err);
+      toast.error("Não foi possível enviar a foto. Tente novamente.");
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   return (
     <div
@@ -1060,24 +1107,35 @@ function ItemRow({
               {/* Photo capture */}
               <div>
                 <Label className="text-xs">Fotos</Label>
-                <label className="flex items-center justify-center gap-2 mt-1 p-3 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors touch-manipulation">
-                  <Camera className="h-5 w-5 text-muted-foreground" />
+                {itemPhotos.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-1 mb-2">
+                    {itemPhotos.map((url, idx) => (
+                      <div key={idx} className="relative h-16 w-16 rounded-lg overflow-hidden border">
+                        <img src={url} alt={`Foto ${idx + 1}`} className="h-full w-full object-cover" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <label
+                  className={`flex items-center justify-center gap-2 mt-1 p-3 border-2 border-dashed rounded-lg transition-colors touch-manipulation ${
+                    uploadingPhoto ? "opacity-60 pointer-events-none" : "cursor-pointer hover:bg-muted/50"
+                  }`}
+                >
+                  {uploadingPhoto ? (
+                    <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
+                  ) : (
+                    <Camera className="h-5 w-5 text-muted-foreground" />
+                  )}
                   <span className="text-sm text-muted-foreground">
-                    Tirar foto ou selecionar
+                    {uploadingPhoto ? "Enviando foto..." : "Tirar foto ou selecionar"}
                   </span>
                   <input
                     type="file"
                     accept="image/*"
                     capture="environment"
                     className="hidden"
-                    onChange={(e) => {
-                      // Photo handling placeholder
-                      // In production, would upload to storage and save URL
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        console.log("Photo selected:", file.name);
-                      }
-                    }}
+                    disabled={uploadingPhoto}
+                    onChange={handlePhotoSelected}
                   />
                 </label>
               </div>

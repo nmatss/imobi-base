@@ -353,7 +353,7 @@ export default function SettingsPage() {
       case "plans":
         return <PlansTab />;
       case "users":
-        return <UsersTab users={users} onRefresh={fetchUsers} />;
+        return <UsersTab users={users} onRefresh={fetchUsers} isLoadingUsers={loading} />;
       case "permissions":
         return <PermissionsTab />;
       case "security":

@@ -1,7 +1,7 @@
 import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { useImobi, Property } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -274,6 +274,7 @@ export default function PropertiesList() {
   usePageTitle("Imóveis");
   const { properties, tenant, visits, leads, refetchProperties, loading } = useImobi();
   const [, setLocation] = useLocation();
+  const search = useSearch();
 
   // View & Filter State
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -435,6 +436,20 @@ export default function PropertiesList() {
     setFormStep(1);
     setIsModalOpen(true);
   };
+
+  // Deep-link de edição: /properties?edit=<id> (usado pelo botão Editar do detalhe).
+  // Abre o modal de edição quando a property correspondente já estiver carregada e
+  // limpa o query param para não reabrir ao fechar.
+  const editParam = new URLSearchParams(search).get("edit");
+  useEffect(() => {
+    if (!editParam || properties.length === 0) return;
+    const target = properties.find((p) => p.id === editParam);
+    if (target) {
+      openEditModal(target);
+      setLocation("/properties", { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editParam, properties]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

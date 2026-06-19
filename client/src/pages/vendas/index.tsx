@@ -1,5 +1,7 @@
 import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "wouter";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useImobi, User as UserType, Lead, Property } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -239,6 +241,8 @@ type Filters = {
 
 export default function VendasPage() {
   usePageTitle("Vendas");
+  const [, setLocation] = useLocation();
+  const isMobile = useIsMobile();
   const { leads, properties, tenant, user } = useImobi();
   const { toast } = useToast();
 
@@ -918,7 +922,7 @@ export default function VendasPage() {
                   <span className="hidden sm:inline">Filtros</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="bottom" className="h-[85vh] sm:h-auto sm:side-right sm:w-[400px]">
+              <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-[400px]">
                 <SheetHeader>
                   <SheetTitle>Filtros</SheetTitle>
                   <SheetDescription>Filtre propostas e vendas</SheetDescription>
@@ -939,12 +943,15 @@ export default function VendasPage() {
 
                   <div className="space-y-2">
                     <Label>Status (Propostas)</Label>
-                    <Select value={filters.status} onValueChange={(v) => setFilters(f => ({ ...f, status: v }))}>
+                    <Select
+                      value={filters.status || "__all__"}
+                      onValueChange={(v) => setFilters(f => ({ ...f, status: v === "__all__" ? "" : v }))}
+                    >
                       <SelectTrigger className="h-11">
                         <SelectValue placeholder="Todos os status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos os status</SelectItem>
+                        <SelectItem value="__all__">Todos os status</SelectItem>
                         {Object.entries(PROPOSAL_STATUS).map(([key, val]) => (
                           <SelectItem key={key} value={key}>{val.label}</SelectItem>
                         ))}
@@ -954,12 +961,15 @@ export default function VendasPage() {
 
                   <div className="space-y-2">
                     <Label>Corretor</Label>
-                    <Select value={filters.brokerId} onValueChange={(v) => setFilters(f => ({ ...f, brokerId: v }))}>
+                    <Select
+                      value={filters.brokerId || "__all__"}
+                      onValueChange={(v) => setFilters(f => ({ ...f, brokerId: v === "__all__" ? "" : v }))}
+                    >
                       <SelectTrigger className="h-11">
                         <SelectValue placeholder="Todos os corretores" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos os corretores</SelectItem>
+                        <SelectItem value="__all__">Todos os corretores</SelectItem>
                         {users.map(u => (
                           <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
                         ))}
@@ -1352,7 +1362,7 @@ export default function VendasPage() {
                                           className="flex-1 h-8 text-xs"
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            window.open(`/properties/${proposal.property?.id}`, "_blank");
+                                            setLocation(`/properties/${proposal.property?.id}`);
                                           }}
                                         >
                                           <Eye className="h-3 w-3 mr-1" />
@@ -1576,7 +1586,7 @@ export default function VendasPage() {
                               className="flex-1 h-8 text-xs"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                window.open(`/properties/${details.property?.id}`, "_blank");
+                                setLocation(`/properties/${details.property?.id}`);
                               }}
                             >
                               <Eye className="h-3 w-3 mr-1" />
@@ -1657,7 +1667,7 @@ export default function VendasPage() {
                               <TableCell>
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Abrir ações da venda">
                                       <MoreVertical className="h-4 w-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
@@ -2312,7 +2322,7 @@ export default function VendasPage() {
 
       {/* Detail Sheet */}
       <Sheet open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <SheetContent side="bottom" className="h-[90vh] sm:h-auto sm:side-right sm:w-[500px] p-0">
+        <SheetContent side={isMobile ? "bottom" : "right"} className={isMobile ? "h-[90vh] p-0" : "w-full sm:max-w-[500px] p-0"}>
           {(selectedProposal || selectedSale) && (
             <>
               <SheetHeader className="p-4 border-b bg-muted/20">
@@ -2389,10 +2399,10 @@ export default function VendasPage() {
                             {selectedProposal?.lead?.name || selectedSale?.lead?.name || "—"}
                           </span>
                           <Button variant="ghost" size="sm" className="h-8 text-xs" asChild>
-                            <a href="/leads">
+                            <Link href="/leads">
                               <ExternalLink className="h-3 w-3 mr-1" />
                               CRM
-                            </a>
+                            </Link>
                           </Button>
                         </div>
                         {(selectedProposal?.lead?.phone || selectedSale?.lead?.phone) && (
@@ -2446,10 +2456,10 @@ export default function VendasPage() {
                             {selectedProposal?.property?.title || selectedSale?.property?.title || "—"}
                           </span>
                           <Button variant="ghost" size="sm" className="h-8 text-xs" asChild>
-                            <a href={`/properties/${selectedProposal?.propertyId || selectedSale?.propertyId}`}>
+                            <Link href={`/properties/${selectedProposal?.propertyId || selectedSale?.propertyId}`}>
                               <ExternalLink className="h-3 w-3 mr-1" />
                               Detalhes
-                            </a>
+                            </Link>
                           </Button>
                         </div>
                         {(selectedProposal?.property?.address || selectedSale?.property?.address) && (

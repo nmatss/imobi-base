@@ -1,6 +1,7 @@
 import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useCallback, useEffect, useState } from "react";
 import { useImobi } from "@/lib/imobi-context";
+import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -137,6 +138,7 @@ const RENTAL_AI_PROMPTS: RentalAIPrompt[] = [
 export default function RentalsPage() {
   usePageTitle("Aluguéis");
   const { properties, tenant } = useImobi();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   // Main state
@@ -719,12 +721,15 @@ export default function RentalsPage() {
                       className="pl-9 min-h-[44px]"
                     />
                   </div>
-                  <Select value={contractFilters.status} onValueChange={(v) => setContractFilters({ ...contractFilters, status: v })}>
+                  <Select
+                    value={contractFilters.status || "__all__"}
+                    onValueChange={(v) => setContractFilters({ ...contractFilters, status: v === "__all__" ? "" : v })}
+                  >
                     <SelectTrigger className="w-full sm:w-[150px] min-h-[44px]">
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos</SelectItem>
+                      <SelectItem value="__all__">Todos</SelectItem>
                       <SelectItem value="active">Ativos</SelectItem>
                       <SelectItem value="ended">Encerrados</SelectItem>
                       <SelectItem value="cancelled">Cancelados</SelectItem>
@@ -793,11 +798,34 @@ export default function RentalsPage() {
                         </div>
 
                         <div className="flex items-center gap-2 pt-2 border-t">
-                          <Button variant="outline" size="sm" className="flex-1 min-h-[40px]">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 min-h-[40px]"
+                            onClick={() => contract.propertyId && setLocation(`/properties/${contract.propertyId}`)}
+                            disabled={!contract.propertyId}
+                          >
                             <FileText className="h-4 w-4 mr-1" />
                             Ver
                           </Button>
-                          <Button variant="outline" size="sm" className="flex-1 min-h-[40px]">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 min-h-[40px]"
+                            onClick={() => {
+                              const phone = renter?.phone?.replace(/\D/g, "") || "";
+                              const formatted = phone.startsWith("55") ? phone : `55${phone}`;
+                              const msg = `Olá ${renter?.name || ""}! Tudo bem?`;
+                              window.open(
+                                phone
+                                  ? `https://wa.me/${formatted}?text=${encodeURIComponent(msg)}`
+                                  : `https://wa.me/?text=${encodeURIComponent(msg)}`,
+                                "_blank",
+                                "noopener,noreferrer"
+                              );
+                            }}
+                            disabled={!renter?.phone}
+                          >
                             <Phone className="h-4 w-4 mr-1" />
                             Contato
                           </Button>
@@ -818,12 +846,15 @@ export default function RentalsPage() {
             <Card className="rounded-xl">
               <CardContent className="pt-4">
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Select value={paymentFilters.status} onValueChange={(v) => setPaymentFilters({ ...paymentFilters, status: v })}>
+                  <Select
+                    value={paymentFilters.status || "__all__"}
+                    onValueChange={(v) => setPaymentFilters({ ...paymentFilters, status: v === "__all__" ? "" : v })}
+                  >
                     <SelectTrigger className="w-full sm:w-[150px] min-h-[44px]">
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todos</SelectItem>
+                      <SelectItem value="__all__">Todos</SelectItem>
                       <SelectItem value="pending">Pendentes</SelectItem>
                       <SelectItem value="paid">Pagos</SelectItem>
                     </SelectContent>
@@ -990,10 +1021,6 @@ export default function RentalsPage() {
                               Marcar Pago
                             </Button>
                           )}
-                          <Button variant="outline" size="sm" className="flex-1 min-h-[44px]">
-                            <FileText className="h-4 w-4 mr-1" />
-                            Boleto
-                          </Button>
                           {payment.status === "pending" && daysOverdue > 0 && (
                             <Button
                               variant="outline"

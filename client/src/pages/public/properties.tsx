@@ -84,7 +84,7 @@ async function fetchAllPublicProperties(tenantId: string): Promise<Property[]> {
 }
 
 export default function PublicProperties() {
-  const [match, params] = useRoute("/e/:rest*");
+  const [, params] = useRoute("/e/:slug/imoveis");
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,8 +107,7 @@ export default function PublicProperties() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
 
-  const rest = (params as any)?.rest || (params as any)?.["rest*"] || "";
-  const tenantSlug = rest.split("/")[0];
+  const tenantSlug = (params as any)?.slug || "";
 
   useEffect(() => {
     if (!tenantSlug) return;
@@ -441,9 +440,9 @@ export default function PublicProperties() {
         <div className="text-center">
           <h1 className="text-4xl font-bold mb-4">404</h1>
           <p className="text-muted-foreground mb-4">{error || "Imobiliária não encontrada."}</p>
-          <Link href="/">
-            <Button variant="link">Voltar para o início</Button>
-          </Link>
+          <Button asChild variant="link">
+            <Link href="/">Voltar para o início</Link>
+          </Button>
         </div>
       </div>
     );
@@ -510,12 +509,8 @@ export default function PublicProperties() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex gap-6 text-sm font-medium">
-            <Link href={`/e/${tenantSlug}`}>
-              <a className="hover:text-primary transition-colors">Início</a>
-            </Link>
-            <Link href={`/e/${tenantSlug}/imoveis`}>
-              <a className="text-primary font-semibold">Imóveis</a>
-            </Link>
+            <Link href={`/e/${tenantSlug}`} className="hover:text-primary transition-colors">Início</Link>
+            <Link href={`/e/${tenantSlug}/imoveis`} className="text-primary font-semibold">Imóveis</Link>
             <a href={`/e/${tenantSlug}#sobre`} className="hover:text-primary transition-colors">Sobre</a>
             <a href={`/e/${tenantSlug}#contato`} className="hover:text-primary transition-colors">Contato</a>
           </nav>
@@ -523,11 +518,11 @@ export default function PublicProperties() {
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-4">
             {tenant.phone && (
-              <a href={`https://wa.me/${tenant.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
-                <Button size="sm" style={{ backgroundColor: tenant.primaryColor }}>
+              <Button asChild size="sm" style={{ backgroundColor: tenant.primaryColor }}>
+                <a href={`https://wa.me/${tenant.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
                   Falar no WhatsApp
-                </Button>
-              </a>
+                </a>
+              </Button>
             )}
           </div>
 
@@ -537,7 +532,8 @@ export default function PublicProperties() {
             size="icon"
             className="md:hidden"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle menu"
+            aria-label={mobileMenuOpen ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={mobileMenuOpen}
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
@@ -547,21 +543,19 @@ export default function PublicProperties() {
         {mobileMenuOpen && (
           <div className="md:hidden border-t bg-background">
             <nav className="container mx-auto px-4 py-4 flex flex-col gap-3">
-              <Link href={`/e/${tenantSlug}`}>
-                <a
-                  className="py-2 px-3 rounded-md hover:bg-muted transition-colors"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Início
-                </a>
+              <Link
+                href={`/e/${tenantSlug}`}
+                className="py-2 px-3 rounded-md hover:bg-muted transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Início
               </Link>
-              <Link href={`/e/${tenantSlug}/imoveis`}>
-                <a
-                  className="py-2 px-3 rounded-md bg-muted font-semibold"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Imóveis
-                </a>
+              <Link
+                href={`/e/${tenantSlug}/imoveis`}
+                className="py-2 px-3 rounded-md bg-muted font-semibold"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Imóveis
               </Link>
               <a
                 href={`/e/${tenantSlug}#sobre`}
@@ -579,12 +573,12 @@ export default function PublicProperties() {
               </a>
               {tenant.phone && (
                 <div className="border-t pt-3 mt-1">
-                  <a href={`https://wa.me/${tenant.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
-                    <Button size="sm" className="w-full" style={{ backgroundColor: tenant.primaryColor }}>
+                  <Button asChild size="sm" className="w-full" style={{ backgroundColor: tenant.primaryColor }}>
+                    <a href={`https://wa.me/${tenant.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
                       <Phone className="h-4 w-4 mr-2" />
                       Falar no WhatsApp
-                    </Button>
-                  </a>
+                    </a>
+                  </Button>
                 </div>
               )}
             </nav>
@@ -867,14 +861,10 @@ export default function PublicProperties() {
                                       <span className="text-xs sm:text-sm text-muted-foreground">/mês</span>
                                     )}
                                   </div>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="group-hover:bg-primary group-hover:text-white transition-colors shrink-0"
-                                  >
+                                  <span className="inline-flex min-h-9 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-input bg-background px-3 text-xs font-medium shadow-xs transition-colors group-hover:bg-primary group-hover:text-white">
                                     Ver mais
                                     <ArrowRight className="w-4 h-4 ml-1" />
-                                  </Button>
+                                  </span>
                                 </div>
                               </div>
                             </div>
@@ -971,14 +961,10 @@ export default function PublicProperties() {
               <h4 className="font-bold text-white mb-3 sm:mb-4 text-sm sm:text-base">Links Rápidos</h4>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <Link href={`/e/${tenantSlug}`}>
-                    <a className="hover:text-white transition-colors">Início</a>
-                  </Link>
+                  <Link href={`/e/${tenantSlug}`} className="hover:text-white transition-colors">Início</Link>
                 </li>
                 <li>
-                  <Link href={`/e/${tenantSlug}/imoveis`}>
-                    <a className="hover:text-white transition-colors">Todos os Imóveis</a>
-                  </Link>
+                  <Link href={`/e/${tenantSlug}/imoveis`} className="hover:text-white transition-colors">Todos os Imóveis</Link>
                 </li>
                 <li>
                   <a href={`/e/${tenantSlug}#sobre`} className="hover:text-white transition-colors">Sobre Nós</a>
@@ -1035,7 +1021,7 @@ export default function PublicProperties() {
           </div>
           <div className="border-t border-slate-800 mt-8 sm:mt-12 pt-6 sm:pt-8 text-center text-xs opacity-50">
             <p>&copy; {new Date().getFullYear()} {tenant.name}. Todos os direitos reservados.</p>
-            <p className="mt-1">Powered by <a href="/" className="hover:text-white">ImobiBase</a></p>
+            <p className="mt-1">Powered by <Link href="/" className="hover:text-white">ImobiBase</Link></p>
           </div>
         </div>
       </footer>

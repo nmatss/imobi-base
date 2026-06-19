@@ -1,5 +1,6 @@
 import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState, useCallback, useMemo, useEffect } from "react";
+import { Link } from "wouter";
 import { useImobi, Contract, Lead, Property } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -643,12 +644,15 @@ export default function ContractsPage() {
 
                   <div className="space-y-2">
                     <Label>Tipo de Negócio</Label>
-                    <Select value={filters.type} onValueChange={(v) => setFilters(f => ({ ...f, type: v }))}>
+                    <Select
+                      value={filters.type || "__all__"}
+                      onValueChange={(v) => setFilters(f => ({ ...f, type: v === "__all__" ? "" : v }))}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Todos os tipos" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos os tipos</SelectItem>
+                        <SelectItem value="__all__">Todos os tipos</SelectItem>
                         <SelectItem value="sale">Venda</SelectItem>
                         <SelectItem value="rent">Locação</SelectItem>
                       </SelectContent>
@@ -657,12 +661,15 @@ export default function ContractsPage() {
 
                   <div className="space-y-2">
                     <Label>Status (Propostas)</Label>
-                    <Select value={filters.status} onValueChange={(v) => setFilters(f => ({ ...f, status: v }))}>
+                    <Select
+                      value={filters.status || "__all__"}
+                      onValueChange={(v) => setFilters(f => ({ ...f, status: v === "__all__" ? "" : v }))}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Todos os status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos os status</SelectItem>
+                        <SelectItem value="__all__">Todos os status</SelectItem>
                         {Object.entries(PROPOSAL_STATUS).map(([key, val]) => (
                           <SelectItem key={key} value={key}>{val.label}</SelectItem>
                         ))}
@@ -985,9 +992,9 @@ export default function ContractsPage() {
                                 {contract.createdAt ? format(new Date(contract.createdAt), "dd/MM/yyyy") : "—"}
                               </TableCell>
                               <TableCell>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Abrir ações do contrato">
                                       <MoreVertical className="h-4 w-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
@@ -1204,7 +1211,12 @@ export default function ContractsPage() {
                               <TableCell>
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      aria-label="Abrir ações do contrato"
+                                    >
                                       <MoreVertical className="h-4 w-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
@@ -1674,10 +1686,10 @@ export default function ContractsPage() {
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-sm">{selectedItem.lead?.name || "Não informado"}</span>
                           <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
-                            <a href="/leads">
+                            <Link href="/leads">
                               <ExternalLink className="h-3 w-3 mr-1" />
                               Ver no CRM
-                            </a>
+                            </Link>
                           </Button>
                         </div>
                         {selectedItem.lead?.phone && (
@@ -1733,10 +1745,10 @@ export default function ContractsPage() {
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-sm">{selectedItem.property?.title || "Não informado"}</span>
                           <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
-                            <a href={`/properties/${selectedItem.propertyId}`}>
+                            <Link href={`/properties/${selectedItem.propertyId}`}>
                               <ExternalLink className="h-3 w-3 mr-1" />
                               Ver detalhes
-                            </a>
+                            </Link>
                           </Button>
                         </div>
                         {selectedItem.property?.address && (

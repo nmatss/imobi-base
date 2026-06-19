@@ -59,6 +59,7 @@ import type { User } from "../types";
 interface UsersTabProps {
   users: User[];
   onRefresh: () => void;
+  isLoadingUsers?: boolean;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -93,7 +94,7 @@ const STATUS_CONFIG = {
   },
 };
 
-export function UsersTab({ users, onRefresh }: UsersTabProps) {
+export function UsersTab({ users, onRefresh, isLoadingUsers = false }: UsersTabProps) {
   const { toast } = useToast();
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -327,7 +328,12 @@ export function UsersTab({ users, onRefresh }: UsersTabProps) {
           </Button>
         }
       >
-        {users.length === 0 ? (
+        {isLoadingUsers ? (
+          <div className="flex items-center justify-center py-12" role="status" aria-live="polite">
+            <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+            <span className="sr-only">Carregando usuários...</span>
+          </div>
+        ) : users.length === 0 ? (
           <div className="text-center py-8">
             <Users className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
             <p className="text-muted-foreground">Nenhum usuário encontrado</p>

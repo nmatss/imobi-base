@@ -403,6 +403,13 @@ export default function ReportsPage() {
           break;
       }
 
+      // 'comissoes' (e qualquer tipo sem endpoint) tem carregamento/render próprios
+      // (CommissionReports). Sem este guard, o fetch viraria GET da própria SPA,
+      // res.json() lançaria e dispararia um toast de erro espúrio.
+      if (!endpoint) {
+        return;
+      }
+
       const res = await fetch(`${endpoint}?${params}`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
@@ -772,11 +779,17 @@ export default function ReportsPage() {
                       className="w-full justify-start h-auto py-3 px-4"
                       onClick={() => {
                         setSelectedReport(report.type);
-                        // Apply saved filters
-                        setPeriod(report.filters.period);
-                        setStartDate(report.filters.startDate);
-                        setEndDate(report.filters.endDate);
                         setSelectedBroker(report.filters.selectedBroker || 'all');
+                        // Deriva datas válidas a partir do período salvo; só usa startDate/endDate
+                        // explícitos quando o filtro salvo é 'custom' (evita enviar 'undefined' e
+                        // renderizar "Invalid Date").
+                        if (report.filters.period === 'custom' && report.filters.startDate && report.filters.endDate) {
+                          setPeriod('custom');
+                          setStartDate(report.filters.startDate);
+                          setEndDate(report.filters.endDate);
+                        } else {
+                          handlePeriodChange(report.filters.period);
+                        }
                         loadReportData(report.type);
                       }}
                     >
@@ -825,11 +838,12 @@ export default function ReportsPage() {
                           variant="ghost"
                           size="sm"
                           className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
                             setSelectedReport(type.id);
-                            loadReportData(type.id);
-                            setTimeout(() => setShowExportOptions(true), 500);
+                            // Aguarda os dados antes de abrir o ExportSheet (evita CSV vazio por race de timeout).
+                            await loadReportData(type.id);
+                            setShowExportOptions(true);
                           }}
                         >
                           <Download className="w-4 h-4" />
@@ -870,10 +884,11 @@ export default function ReportsPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            handleReportTypeSelect(type.id);
-                            setTimeout(() => setShowExportOptions(true), 500);
+                            // Aguarda o carregamento concluir antes de abrir o ExportSheet.
+                            await handleReportTypeSelect(type.id);
+                            setShowExportOptions(true);
                           }}
                           disabled={generatingReport === type.id}
                         >

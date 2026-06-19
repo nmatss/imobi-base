@@ -61,9 +61,12 @@ export default function ResetPassword() {
   }, [token]);
 
   useEffect(() => {
-    if (password) {
+    if (!password) return;
+    // Debounce: evita uma requisição a /validate-password por tecla (e race conditions na barra de força).
+    const handle = setTimeout(() => {
       checkPasswordStrength();
-    }
+    }, 300);
+    return () => clearTimeout(handle);
   }, [password]);
 
   const validateToken = async () => {
@@ -164,30 +167,49 @@ export default function ResetPassword() {
 
   if (validating) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-blue-600" />
-          <p className="mt-2 text-sm text-gray-600">Validando link...</p>
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
+          <p className="mt-2 text-sm text-muted-foreground">Validando link...</p>
         </div>
       </div>
     );
   }
 
   if (!tokenValid) {
-    return null;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
+        <Card className="w-full max-w-md space-y-6 p-8 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+            <XCircle className="h-8 w-8 text-red-600" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">
+              Link inválido ou expirado
+            </h1>
+            <p className="mt-2 text-sm text-gray-600">
+              Solicite uma nova redefinição de senha para receber um link válido.
+            </p>
+          </div>
+          <Button asChild className="w-full">
+            <Link href="/auth/forgot-password">Solicitar novo link</Link>
+          </Button>
+        </Card>
+      </div>
+    );
   }
 
   if (success) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+      <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
         <Card className="w-full max-w-md space-y-8 p-8">
           <div className="text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
               <CheckCircle2 className="h-8 w-8 text-green-600" />
             </div>
-            <h2 className="mt-6 text-3xl font-bold tracking-tight text-gray-900">
+            <h1 className="mt-6 text-3xl font-bold tracking-tight text-foreground">
               Senha redefinida!
-            </h2>
+            </h1>
             <p className="mt-2 text-sm text-gray-600">
               Sua senha foi alterada com sucesso. Redirecionando para o login...
             </p>
@@ -204,13 +226,13 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md space-y-8 p-8">
         <div>
-          <h2 className="text-center text-3xl font-bold tracking-tight text-gray-900">
+          <h1 className="text-center text-3xl font-bold tracking-tight text-foreground">
             Redefinir senha
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          </h1>
+          <p className="mt-2 text-center text-sm text-muted-foreground">
             Para: <strong>{email}</strong>
           </p>
         </div>
@@ -231,7 +253,8 @@ export default function ResetPassword() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -240,10 +263,10 @@ export default function ResetPassword() {
             {password && (
               <div className="mt-2 space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-600">Força da senha:</span>
+                  <span className="text-muted-foreground">Força da senha:</span>
                   <span className="font-medium">{passwordStrength.score}%</span>
                 </div>
-                <div className="h-2 w-full rounded-full bg-gray-200">
+                <div className="h-2 w-full rounded-full bg-muted">
                   <div
                     className={`h-full rounded-full transition-all ${getStrengthColor(passwordStrength.score)}`}
                     style={{ width: `${passwordStrength.score}%` }}
@@ -251,23 +274,23 @@ export default function ResetPassword() {
                 </div>
 
                 <div className="space-y-1 text-xs">
-                  <div className={`flex items-center gap-1 ${passwordStrength.requirements.minLength ? "text-green-600" : "text-gray-400"}`}>
+                  <div className={`flex items-center gap-1 ${passwordStrength.requirements.minLength ? "text-green-600" : "text-muted-foreground"}`}>
                     {passwordStrength.requirements.minLength ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
                     <span>Mínimo 8 caracteres</span>
                   </div>
-                  <div className={`flex items-center gap-1 ${passwordStrength.requirements.hasUppercase ? "text-green-600" : "text-gray-400"}`}>
+                  <div className={`flex items-center gap-1 ${passwordStrength.requirements.hasUppercase ? "text-green-600" : "text-muted-foreground"}`}>
                     {passwordStrength.requirements.hasUppercase ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
                     <span>Letra maiúscula</span>
                   </div>
-                  <div className={`flex items-center gap-1 ${passwordStrength.requirements.hasLowercase ? "text-green-600" : "text-gray-400"}`}>
+                  <div className={`flex items-center gap-1 ${passwordStrength.requirements.hasLowercase ? "text-green-600" : "text-muted-foreground"}`}>
                     {passwordStrength.requirements.hasLowercase ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
                     <span>Letra minúscula</span>
                   </div>
-                  <div className={`flex items-center gap-1 ${passwordStrength.requirements.hasNumber ? "text-green-600" : "text-gray-400"}`}>
+                  <div className={`flex items-center gap-1 ${passwordStrength.requirements.hasNumber ? "text-green-600" : "text-muted-foreground"}`}>
                     {passwordStrength.requirements.hasNumber ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
                     <span>Número</span>
                   </div>
-                  <div className={`flex items-center gap-1 ${passwordStrength.requirements.hasSpecialChar ? "text-green-600" : "text-gray-400"}`}>
+                  <div className={`flex items-center gap-1 ${passwordStrength.requirements.hasSpecialChar ? "text-green-600" : "text-muted-foreground"}`}>
                     {passwordStrength.requirements.hasSpecialChar ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
                     <span>Caractere especial</span>
                   </div>
@@ -304,7 +327,7 @@ export default function ResetPassword() {
           <div className="text-center">
             <Link
               href="/login"
-              className="text-sm font-medium text-blue-600 hover:text-blue-500"
+              className="text-sm font-medium text-primary hover:text-primary/80"
             >
               Voltar para login
             </Link>

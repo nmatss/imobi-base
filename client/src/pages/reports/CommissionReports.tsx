@@ -725,7 +725,7 @@ export default function CommissionReports() {
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={brokerData} layout="horizontal">
+                <BarChart data={brokerData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`} />
                   <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={120} />

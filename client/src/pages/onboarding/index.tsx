@@ -1,6 +1,6 @@
 import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useImobi } from "@/lib/imobi-context";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -581,9 +581,9 @@ export default function OnboardingPage() {
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-4">
-          <a href="/pricing" className="text-primary hover:underline">
+          <Link href="/pricing" className="text-primary hover:underline">
             Ver detalhes completos dos planos
-          </a>
+          </Link>
         </p>
       </div>
     );
@@ -663,19 +663,22 @@ export default function OnboardingPage() {
   ];
 
   const renderStep = () => {
+    // Chamadas de função (não <Componente/>): evita criar novos tipos de componente
+    // a cada render do pai, o que remontaria a subárvore e faria os <Input> perderem
+    // o foco a cada tecla digitada.
     switch (currentStep) {
       case 1:
-        return <StepWelcome />;
+        return StepWelcome();
       case 2:
-        return <StepBrand />;
+        return StepBrand();
       case 3:
-        return <StepProperty />;
+        return StepProperty();
       case 4:
-        return <StepPlan />;
+        return StepPlan();
       case 5:
-        return <StepDone />;
+        return StepDone();
       default:
-        return <StepWelcome />;
+        return StepWelcome();
     }
   };
 

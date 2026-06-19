@@ -285,16 +285,16 @@ export default function ProductLanding() {
           </nav>
 
           <div className="hidden lg:flex items-center gap-4">
-            <Link href="/login">
-              <Button variant="ghost" className="hover:bg-primary/5">
+            <Button asChild variant="ghost" className="hover:bg-primary/5">
+              <Link href="/login">
                 Entrar
-              </Button>
-            </Link>
-            <Link href="/login">
-              <Button className="rounded-full px-6 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-0.5">
+              </Link>
+            </Button>
+            <Button asChild className="rounded-full px-6 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-0.5">
+              <Link href="/login">
                 Começar Grátis
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
 
           <button
@@ -315,7 +315,7 @@ export default function ProductLanding() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="fixed top-16 left-0 w-full bg-background border-b z-40 lg:hidden overflow-hidden"
+            className={`fixed ${scrolled ? "top-16" : "top-24"} left-0 w-full bg-background border-b z-40 lg:hidden overflow-hidden transition-all duration-300`}
           >
             <div className="p-4 flex flex-col gap-4">
               {[
@@ -342,14 +342,14 @@ export default function ProductLanding() {
                 Preços
               </Link>
               <div className="h-px bg-border my-2" />
-              <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-                <Button variant="outline" className="w-full justify-start">
+              <Button asChild variant="outline" className="w-full justify-start">
+                <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
                   Entrar
-                </Button>
-              </Link>
-              <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-                <Button className="w-full">Criar Conta</Button>
-              </Link>
+                </Link>
+              </Button>
+              <Button asChild className="w-full">
+                <Link href="/login" onClick={() => setMobileMenuOpen(false)}>Criar Conta</Link>
+              </Button>
             </div>
           </motion.div>
         )}
@@ -404,14 +404,15 @@ export default function ProductLanding() {
                   variants={fadeInUp}
                   className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start"
                 >
-                  <Link href="/login">
-                    <Button
-                      size="lg"
-                      className="h-12 md:h-14 px-6 md:px-8 text-base md:text-lg rounded-full shadow-xl shadow-primary/25 hover:scale-105 transition-all duration-300"
-                    >
+                  <Button
+                    asChild
+                    size="lg"
+                    className="h-12 md:h-14 px-6 md:px-8 text-base md:text-lg rounded-full shadow-xl shadow-primary/25 hover:scale-105 transition-all duration-300"
+                  >
+                    <Link href="/login">
                       Começar Agora <ArrowRight className="ml-2 w-5 h-5" />
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                   <Button
                     variant="outline"
                     size="lg"
@@ -1173,31 +1174,33 @@ export default function ProductLanding() {
                       </div>
 
                       {isExternal ? (
-                        <a
-                          href={plan.ctaLink}
-                          target={
-                            plan.ctaLink.startsWith("mailto:")
-                              ? undefined
-                              : "_blank"
-                          }
-                          rel="noopener noreferrer"
+                        <Button
+                          asChild
+                          variant={plan.variant}
+                          className={`w-full mb-8 ${plan.popular ? "shadow-lg shadow-primary/20" : ""}`}
                         >
-                          <Button
-                            variant={plan.variant}
-                            className={`w-full mb-8 ${plan.popular ? "shadow-lg shadow-primary/20" : ""}`}
+                          <a
+                            href={plan.ctaLink}
+                            target={
+                              plan.ctaLink.startsWith("mailto:")
+                                ? undefined
+                                : "_blank"
+                            }
+                            rel="noopener noreferrer"
                           >
                             {plan.cta}
-                          </Button>
-                        </a>
+                          </a>
+                        </Button>
                       ) : (
-                        <Link href={plan.ctaLink}>
-                          <Button
-                            variant={plan.variant}
-                            className={`w-full mb-8 ${plan.popular ? "shadow-lg shadow-primary/20" : ""}`}
-                          >
+                        <Button
+                          asChild
+                          variant={plan.variant}
+                          className={`w-full mb-8 ${plan.popular ? "shadow-lg shadow-primary/20" : ""}`}
+                        >
+                          <Link href={plan.ctaLink}>
                             {plan.cta}
-                          </Button>
-                        </Link>
+                          </Link>
+                        </Button>
                       )}
 
                       <div className="space-y-3 text-sm flex-1">
@@ -1310,14 +1313,15 @@ export default function ProductLanding() {
                 revolução digital do mercado imobiliário.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link href="/login">
-                  <Button
-                    size="lg"
-                    className="h-16 px-12 text-lg rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-2xl shadow-primary/30"
-                  >
+                <Button
+                  asChild
+                  size="lg"
+                  className="h-16 px-12 text-lg rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-2xl shadow-primary/30"
+                >
+                  <Link href="/login">
                     Criar Conta Grátis
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               </div>
             </ScrollReveal>
           </div>
@@ -1450,9 +1454,14 @@ export default function ProductLanding() {
                   Receba dicas de vendas e novidades da plataforma.
                 </p>
                 <form onSubmit={handleNewsletterSubmit} className="flex gap-2">
+                  <label htmlFor="product-newsletter-email" className="sr-only">
+                    E-mail para newsletter
+                  </label>
                   <Input
+                    id="product-newsletter-email"
                     name="email"
                     type="email"
+                    autoComplete="email"
                     placeholder="seu@email.com"
                     className="bg-muted border-transparent focus:bg-background"
                     required

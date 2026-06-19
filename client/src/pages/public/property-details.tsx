@@ -257,12 +257,12 @@ export default function PropertyDetails() {
           <p className="text-muted-foreground mb-4">
             {error || "Imóvel não encontrado."}
           </p>
-          <Link href={`/e/${slug}`}>
-            <Button variant="link">
+          <Button asChild variant="link">
+            <Link href={`/e/${slug}`}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Voltar para o catálogo
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </div>
     );
@@ -362,12 +362,12 @@ export default function PropertyDetails() {
             </div>
           </Link>
 
-          <Link href={`/e/${slug}`}>
-            <Button variant="ghost" size="sm">
+          <Button asChild variant="ghost" size="sm">
+            <Link href={`/e/${slug}`}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Voltar
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </header>
 
@@ -376,11 +376,12 @@ export default function PropertyDetails() {
         <div className="bg-muted/30 border-b">
           <div className="container mx-auto px-4 py-3">
             <nav className="flex items-center gap-2 text-sm text-muted-foreground overflow-x-auto">
-              <Link href={`/e/${slug}`}>
-                <button className="hover:text-foreground transition-colors flex items-center gap-1 bg-transparent border-none cursor-pointer p-0 text-sm text-muted-foreground">
-                  <Home className="h-4 w-4" />
-                  Início
-                </button>
+              <Link
+                href={`/e/${slug}`}
+                className="hover:text-foreground transition-colors flex items-center gap-1 text-sm text-muted-foreground"
+              >
+                <Home className="h-4 w-4" />
+                Início
               </Link>
               <span>/</span>
               <span>Imóveis</span>
@@ -780,20 +781,42 @@ export default function PropertyDetails() {
                     </div>
                   </div>
 
-                  {/* Embedded Map */}
-                  <div className="aspect-video w-full rounded-lg overflow-hidden border bg-muted">
-                    <iframe
-                      width="100%"
-                      height="100%"
-                      frameBorder="0"
-                      style={{ border: 0 }}
-                      referrerPolicy="no-referrer-when-downgrade"
-                      src={`https://www.google.com/maps/embed/v1/place?key=YOUR_GOOGLE_MAPS_API_KEY&q=${encodeURIComponent(`${property.address}, ${property.city}, ${property.state}`)}`}
-                      title={`Mapa de ${property.title}`}
-                      allowFullScreen
-                      loading="lazy"
-                    />
-                  </div>
+                  {/* Embedded Map — só usa o embed do Google quando há API key
+                      configurada; caso contrário, evita exibir um iframe de erro e
+                      mostra um link para abrir no Google Maps. */}
+                  {(() => {
+                    const mapsKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+                    const query = encodeURIComponent(`${property.address}, ${property.city}, ${property.state}`);
+                    if (mapsKey) {
+                      return (
+                        <div className="aspect-video w-full rounded-lg overflow-hidden border bg-muted">
+                          <iframe
+                            width="100%"
+                            height="100%"
+                            frameBorder="0"
+                            style={{ border: 0 }}
+                            referrerPolicy="no-referrer-when-downgrade"
+                            src={`https://www.google.com/maps/embed/v1/place?key=${mapsKey}&q=${query}`}
+                            title={`Mapa de ${property.title}`}
+                            allowFullScreen
+                            loading="lazy"
+                          />
+                        </div>
+                      );
+                    }
+                    return (
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${query}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="aspect-video w-full rounded-lg overflow-hidden border bg-muted flex flex-col items-center justify-center gap-2 text-muted-foreground hover:bg-muted/70 transition-colors"
+                      >
+                        <MapPin className="h-8 w-8" />
+                        <span className="text-sm font-medium">Ver localização no Google Maps</span>
+                        <span className="text-xs">{property.address}, {property.city}</span>
+                      </a>
+                    );
+                  })()}
 
                   <p className="text-xs text-muted-foreground text-center">
                     * A localização exata será informada após o agendamento da

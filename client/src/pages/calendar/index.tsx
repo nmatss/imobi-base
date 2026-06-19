@@ -1,5 +1,6 @@
 import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
 import { useImobi, Visit, Lead, Property } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -433,12 +434,14 @@ export default function CalendarPage() {
   const getAvailableSlots = useCallback((date: Date) => {
     const dateVisits = visits.filter(v =>
       v.status === "scheduled" &&
-      isSameDay(new Date(v.scheduledFor), date)
+      isSameDay(new Date(v.scheduledFor), date) &&
+      // Não exclui o horário da própria visita em edição (senão o Select fica em branco ao reagendar).
+      v.id !== editingVisit?.id
     );
 
     const bookedTimes = dateVisits.map(v => format(new Date(v.scheduledFor), "HH:mm"));
     return TIME_SLOTS.filter(slot => !bookedTimes.includes(slot));
-  }, [visits]);
+  }, [visits, editingVisit]);
 
   // Swipe handlers for date navigation
   const minSwipeDistance = 50;
@@ -481,7 +484,7 @@ export default function CalendarPage() {
     if (viewMode === "day" || viewMode === "list") {
       setSelectedDate(addDays(selectedDate, -1));
     } else if (viewMode === "week") {
-      setSelectedDate(subWeeks(selectedDate, -1));
+      setSelectedDate(subWeeks(selectedDate, 1));
     } else if (viewMode === "month") {
       setCurrentMonth(subMonths(currentMonth, 1));
     }
@@ -905,6 +908,7 @@ export default function CalendarPage() {
               size="sm"
               variant="outline"
               className="h-8 flex-1 text-xs"
+              aria-label="Ligar para o lead"
               onClick={(e) => {
                 e.stopPropagation();
                 window.open(`tel:${details.lead?.phone}`, "_blank");
@@ -918,6 +922,7 @@ export default function CalendarPage() {
               size="sm"
               variant="outline"
               className="h-8 flex-1 text-xs"
+              aria-label="Abrir endereço no mapa"
               onClick={(e) => {
                 e.stopPropagation();
                 const address = encodeURIComponent(details.property?.address || "");
@@ -932,6 +937,7 @@ export default function CalendarPage() {
               size="sm"
               variant="outline"
               className="h-8 px-2 text-xs"
+              aria-label="Reagendar visita"
               onClick={(e) => {
                 e.stopPropagation();
                 openEditModal(visit);
@@ -983,12 +989,15 @@ export default function CalendarPage() {
 
                   <div className="space-y-2">
                     <Label>Tipo de Visita</Label>
-                    <Select value={filters.visitType} onValueChange={(v) => setFilters(f => ({ ...f, visitType: v }))}>
+                    <Select
+                      value={filters.visitType || "__all__"}
+                      onValueChange={(v) => setFilters(f => ({ ...f, visitType: v === "__all__" ? "" : v }))}
+                    >
                       <SelectTrigger className="h-11">
                         <SelectValue placeholder="Todos os tipos" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos os tipos</SelectItem>
+                        <SelectItem value="__all__">Todos os tipos</SelectItem>
                         {VISIT_TYPES.map(t => (
                           <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                         ))}
@@ -998,12 +1007,15 @@ export default function CalendarPage() {
 
                   <div className="space-y-2">
                     <Label>Canal/Origem</Label>
-                    <Select value={filters.channel} onValueChange={(v) => setFilters(f => ({ ...f, channel: v }))}>
+                    <Select
+                      value={filters.channel || "__all__"}
+                      onValueChange={(v) => setFilters(f => ({ ...f, channel: v === "__all__" ? "" : v }))}
+                    >
                       <SelectTrigger className="h-11">
                         <SelectValue placeholder="Todos os canais" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos os canais</SelectItem>
+                        <SelectItem value="__all__">Todos os canais</SelectItem>
                         {VISIT_CHANNELS.map(c => (
                           <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                         ))}
@@ -1214,6 +1226,7 @@ export default function CalendarPage() {
                       variant="ghost"
                       size="icon"
                       className="h-9 w-9"
+                      aria-label="Ver dia anterior"
                       onClick={() => setSelectedDate(addDays(selectedDate, -1))}
                     >
                       <ChevronLeft className="h-5 w-5" />
@@ -1222,6 +1235,7 @@ export default function CalendarPage() {
                       variant="ghost"
                       size="icon"
                       className="h-9 w-9"
+                      aria-label="Ver próximo dia"
                       onClick={() => setSelectedDate(addDays(selectedDate, 1))}
                     >
                       <ChevronRight className="h-5 w-5" />
@@ -1282,6 +1296,7 @@ export default function CalendarPage() {
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9"
+                    aria-label="Ver dia anterior"
                     onClick={() => setSelectedDate(addDays(selectedDate, -1))}
                   >
                     <ChevronLeft className="h-5 w-5" />
@@ -1290,6 +1305,7 @@ export default function CalendarPage() {
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9"
+                    aria-label="Ver próximo dia"
                     onClick={() => setSelectedDate(addDays(selectedDate, 1))}
                   >
                     <ChevronRight className="h-5 w-5" />
@@ -1367,6 +1383,7 @@ export default function CalendarPage() {
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9"
+                    aria-label="Ver semana anterior"
                     onClick={() => setSelectedDate(addDays(selectedDate, -7))}
                   >
                     <ChevronLeft className="h-5 w-5" />
@@ -1375,6 +1392,7 @@ export default function CalendarPage() {
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9"
+                    aria-label="Ver próxima semana"
                     onClick={() => setSelectedDate(addDays(selectedDate, 7))}
                   >
                     <ChevronRight className="h-5 w-5" />
@@ -1430,6 +1448,7 @@ export default function CalendarPage() {
                                 e.stopPropagation();
                                 openCreateModal(day);
                               }}
+                              aria-label={`Criar visita em ${format(day, "dd/MM/yyyy")}`}
                               className="w-full py-3 text-xs text-muted-foreground hover:bg-accent rounded-lg transition-colors"
                             >
                               <Plus className="h-4 w-4 mx-auto" />
@@ -1485,6 +1504,7 @@ export default function CalendarPage() {
                             e.stopPropagation();
                             openCreateModal(day);
                           }}
+                          aria-label={`Criar visita em ${format(day, "dd/MM/yyyy")}`}
                           className="w-full h-full min-h-[60px] flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
                         >
                           <Plus className="h-5 w-5 text-muted-foreground" />
@@ -1512,6 +1532,7 @@ export default function CalendarPage() {
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9"
+                    aria-label="Ver mês anterior"
                     onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
                   >
                     <ChevronLeft className="h-5 w-5" />
@@ -1523,6 +1544,7 @@ export default function CalendarPage() {
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9"
+                    aria-label="Ver próximo mês"
                     onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
                   >
                     <ChevronRight className="h-5 w-5" />
@@ -1664,6 +1686,7 @@ export default function CalendarPage() {
       <Button
         size="lg"
         className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 h-14 w-14 rounded-full shadow-lg z-40"
+        aria-label="Criar visita"
         onClick={() => openCreateModal()}
       >
         <Plus className="h-6 w-6" />
@@ -1876,10 +1899,10 @@ export default function CalendarPage() {
                         <div className="flex items-center justify-between">
                           <span className="font-medium">{selectedVisit.lead?.name || "Não informado"}</span>
                           <Button variant="ghost" size="sm" className="h-8 text-xs" asChild>
-                            <a href={`/leads`}>
+                            <Link href="/leads">
                               <ExternalLink className="h-3 w-3 mr-1" />
                               Ver no CRM
-                            </a>
+                            </Link>
                           </Button>
                         </div>
                         {selectedVisit.lead?.phone && (
@@ -1936,10 +1959,10 @@ export default function CalendarPage() {
                         <div className="flex items-center justify-between">
                           <span className="font-medium">{selectedVisit.property?.title || "Não informado"}</span>
                           <Button variant="ghost" size="sm" className="h-8 text-xs" asChild>
-                            <a href={`/properties/${selectedVisit.propertyId}`}>
+                            <Link href={`/properties/${selectedVisit.propertyId}`}>
                               <ExternalLink className="h-3 w-3 mr-1" />
                               Ver detalhes
-                            </a>
+                            </Link>
                           </Button>
                         </div>
                         {selectedVisit.property?.address && (

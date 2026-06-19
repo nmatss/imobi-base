@@ -3,6 +3,7 @@
 import { eq, and, desc, gte, sql, like, or, inArray } from "drizzle-orm";
 import { db, schema, isSqlite } from "./db";
 import { activeRowsFilter } from "./utils/soft-delete";
+import { normalizeWhatsAppIntegrationConfig } from "./integrations/whatsapp/phone-number-id";
 import { nanoid } from "nanoid";
 import type {
   Tenant, InsertTenant,
@@ -78,6 +79,36 @@ const fromJson = <T>(str: string | null | undefined): T[] | null => {
 
 // Helper to get current timestamp
 const now = () => new Date().toISOString();
+
+const IMMUTABLE_PERSISTENCE_FIELDS = new Set([
+  "id",
+  "tenantId",
+  "tenant_id",
+  "integrationName",
+  "integration_name",
+  "createdAt",
+  "created_at",
+  "updatedAt",
+  "updated_at",
+]);
+
+function stripImmutablePersistenceFields<T extends Record<string, unknown>>(data: T): Partial<T> {
+  const sanitized: Partial<T> = {};
+  for (const [key, value] of Object.entries(data || {})) {
+    if (!IMMUTABLE_PERSISTENCE_FIELDS.has(key)) {
+      sanitized[key as keyof T] = value as T[keyof T];
+    }
+  }
+  return sanitized;
+}
+
+function sanitizeIntegrationPersistenceData(data: Record<string, unknown>, integrationName: string): Record<string, unknown> {
+  const safeData = stripImmutablePersistenceFields(data) as Record<string, unknown>;
+  if (integrationName === "whatsapp" && "config" in safeData) {
+    safeData.config = normalizeWhatsAppIntegrationConfig(safeData.config);
+  }
+  return safeData;
+}
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 const newsletterEmailFilter = (email: string) =>
@@ -1999,7 +2030,8 @@ export class DbStorage implements IStorage {
       const rentalRevenue = filteredRentalPayments.reduce((sum, p) => sum + toNumber(p.paidValue), 0);
       const salesRevenue = filteredSales.reduce((sum, s) => sum + toNumber(s.saleValue), 0);
       const operationalExpenses = allEntries
-        .filter(e => e.flow === 'out' && e.status === 'completed' && inWindow(e.entryDate, from, to))
+        // Fluxo canônico é 'expense'; aceita 'out' legado por compatibilidade.
+        .filter(e => (e.flow === 'expense' || e.flow === 'out') && e.status === 'completed' && inWindow(e.entryDate, from, to))
         .reduce((sum, e) => sum + toNumber(e.amount), 0);
 
       const totalRevenue = commissionsReceived + (rentalRevenue - ownerTransfers);
@@ -2077,7 +2109,7 @@ export class DbStorage implements IStorage {
     return entries.map(entry => ({
       ...entry,
       category: entry.categoryId ? categoriesMap.get(entry.categoryId) : null,
-      type: entry.flow === 'in' ? 'receita' : 'despesa',
+      type: (entry.flow === 'income' || entry.flow === 'in') ? 'receita' : 'despesa',
     }));
   }
 
@@ -2121,7 +2153,9 @@ export class DbStorage implements IStorage {
         byMonthMap.set(monthKey, { revenue: 0, expenses: 0 });
       }
       const monthData = byMonthMap.get(monthKey)!;
-      if (entry.flow === 'in') {
+      // Fluxo canônico 'income'/'expense' (aceita 'in'/'out' legado).
+      const isIncome = entry.flow === 'income' || entry.flow === 'in';
+      if (isIncome) {
         monthData.revenue += Number(entry.amount || 0);
       } else {
         monthData.expenses += Number(entry.amount || 0);
@@ -2133,7 +2167,7 @@ export class DbStorage implements IStorage {
         if (category) {
           const categoryKey = category.name;
           if (!byCategoryMap.has(categoryKey)) {
-            byCategoryMap.set(categoryKey, { amount: 0, type: entry.flow });
+            byCategoryMap.set(categoryKey, { amount: 0, type: (entry.flow === 'income' || entry.flow === 'in') ? 'income' : 'expense' });
           }
           const categoryData = byCategoryMap.get(categoryKey)!;
           categoryData.amount += Number(entry.amount || 0);
@@ -2391,10 +2425,11 @@ export class DbStorage implements IStorage {
 
   async createOrUpdateIntegrationConfig(tenantId: string, integrationType: string, data: any): Promise<IntegrationConfig> {
     const existing = await this.getIntegrationConfig(tenantId, integrationType);
+    const safeData = sanitizeIntegrationPersistenceData(data, integrationType);
 
     if (existing) {
       const [updated] = await db.update(schema.integrationConfigs)
-        .set({ ...data, updatedAt: now() })
+        .set({ ...safeData, updatedAt: now() })
         .where(and(
           eq(schema.integrationConfigs.tenantId, tenantId),
           eq(schema.integrationConfigs.integrationName, integrationType)
@@ -2404,7 +2439,7 @@ export class DbStorage implements IStorage {
     } else {
       const id = generateId();
       const [created] = await db.insert(schema.integrationConfigs)
-        .values({ ...data, id, tenantId, integrationName: integrationType, updatedAt: now() } as any)
+        .values({ ...safeData, id, tenantId, integrationName: integrationType, updatedAt: now() } as any)
         .returning();
       return created;
     }
@@ -2426,10 +2461,11 @@ export class DbStorage implements IStorage {
 
   async createOrUpdateIntegration(tenantId: string, name: string, data: any): Promise<IntegrationConfig> {
     const existing = await this.getIntegrationByName(tenantId, name);
+    const safeData = sanitizeIntegrationPersistenceData(data, name);
 
     if (existing) {
       const [updated] = await db.update(schema.integrationConfigs)
-        .set({ ...data, updatedAt: now() })
+        .set({ ...safeData, updatedAt: now() })
         .where(and(
           eq(schema.integrationConfigs.tenantId, tenantId),
           eq(schema.integrationConfigs.integrationName, name)
@@ -2439,7 +2475,7 @@ export class DbStorage implements IStorage {
     } else {
       const id = generateId();
       const [created] = await db.insert(schema.integrationConfigs)
-        .values({ ...data, id, tenantId, integrationName: name, updatedAt: now() } as any)
+        .values({ ...safeData, id, tenantId, integrationName: name, updatedAt: now() } as any)
         .returning();
       return created;
     }

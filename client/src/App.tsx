@@ -1,5 +1,5 @@
 import React, { useEffect, useState, lazy, Suspense } from "react";
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, Link } from "wouter";
 import { ImobiProvider, TwoFactorRequiredError, useImobi } from "@/lib/imobi-context";
 import { AccessibilityProvider } from "@/lib/accessibility-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -206,7 +206,7 @@ function LoginPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password" className="text-sm font-medium">Senha</Label>
-                <a href="/auth/forgot-password" className="text-sm text-primary hover:underline">Esqueceu?</a>
+                <Link href="/auth/forgot-password" className="text-sm text-primary hover:underline">Esqueceu?</Link>
               </div>
               <Input
                 id="password"
@@ -258,7 +258,7 @@ function LoginPage() {
           
           <p className="text-center text-sm text-muted-foreground">
             Não tem uma conta?{" "}
-            <a href="/signup" className="text-primary font-medium hover:underline">Criar conta grátis</a>
+            <Link href="/signup" className="text-primary font-medium hover:underline">Criar conta grátis</Link>
           </p>
         </div>
       </div>

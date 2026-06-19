@@ -142,7 +142,7 @@ export default function LogsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
@@ -165,7 +165,7 @@ export default function LogsPage() {
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
-              <Label>Buscar</Label>
+              <Label>Buscar <span className="font-normal text-muted-foreground">(página atual)</span></Label>
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -173,8 +173,12 @@ export default function LogsPage() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-8"
+                  aria-describedby="logs-search-hint"
                 />
               </div>
+              <p id="logs-search-hint" className="text-xs text-muted-foreground">
+                Filtra apenas os registros já carregados nesta página.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Tipo de Ação</Label>

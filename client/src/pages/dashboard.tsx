@@ -118,7 +118,7 @@ function formatCurrency(value: number) {
 export default function Dashboard() {
   usePageTitle("Dashboard");
   useFirstAccessTour();
-  const { tenant, refetchLeads, contracts, leads } = useImobi();
+  const { tenant, refetchLeads, contracts, leads, refetchVisits } = useImobi();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [newLeadOpen, setNewLeadOpen] = useState(false);
@@ -143,6 +143,24 @@ export default function Dashboard() {
   } = useDashboardData();
 
   const [completingFollowUp, setCompletingFollowUp] = useState<string | null>(null);
+  const [confirmingVisit, setConfirmingVisit] = useState<string | null>(null);
+
+  const handleConfirmVisit = async (id: string) => {
+    setConfirmingVisit(id);
+    try {
+      await apiRequest("PATCH", `/api/visits/${id}`, { status: "completed" });
+      toast({ title: "Visita confirmada", description: "A visita foi marcada como concluída." });
+      await refetchVisits();
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: extractApiErrorMessage(error, "Não foi possível confirmar a visita."),
+        variant: "destructive",
+      });
+    } finally {
+      setConfirmingVisit(null);
+    }
+  };
 
   const handleCompleteFollowUp = async (id: string) => {
     setCompletingFollowUp(id);
@@ -606,9 +624,11 @@ export default function Dashboard() {
                               variant="outline"
                               size="sm"
                               className="min-h-[32px] text-xs px-3 mt-2 focus-visible:ring-2"
+                              onClick={() => handleConfirmVisit(visit.id)}
+                              disabled={confirmingVisit === visit.id}
                             >
                               <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-                              Confirmar
+                              {confirmingVisit === visit.id ? "Confirmando..." : "Confirmar"}
                             </Button>
                           )}
                         </div>
@@ -710,6 +730,18 @@ export default function Dashboard() {
                                   size="icon"
                                   className="min-h-[36px] min-w-[36px] hover:bg-green-100 focus-visible:ring-2"
                                   aria-label={`WhatsApp para ${lead.name}`}
+                                  onClick={() => {
+                                    const phone = lead.phone?.replace(/\D/g, "") || "";
+                                    const formatted = phone.startsWith("55") ? phone : `55${phone}`;
+                                    const msg = `Olá ${lead.name}! Tudo bem?`;
+                                    window.open(
+                                      phone
+                                        ? `https://wa.me/${formatted}?text=${encodeURIComponent(msg)}`
+                                        : `https://wa.me/?text=${encodeURIComponent(msg)}`,
+                                      "_blank",
+                                      "noopener,noreferrer"
+                                    );
+                                  }}
                                 >
                                   <MessageSquare className="h-4 w-4" />
                                 </Button>
