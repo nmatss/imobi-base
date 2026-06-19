@@ -398,14 +398,14 @@ export default function SettingsPage() {
                 "hover:bg-accent hover:text-accent-foreground",
                 "border-l-4 transition-all",
                 activeTab === item.id
-                  ? "bg-blue-50 text-blue-700 border-blue-600 shadow-sm"
-                  : "border-transparent hover:border-blue-200"
+                  ? "bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-600 shadow-sm"
+                  : "border-transparent hover:border-blue-200 dark:hover:border-blue-800"
               )}
             >
               <div
                 className={cn(
                   "p-2 rounded-md shrink-0 transition-all",
-                  activeTab === item.id ? "bg-blue-600 text-white" : "bg-muted"
+                  activeTab === item.id ? "bg-blue-600 dark:bg-blue-700 text-white" : "bg-muted"
                 )}
               >
                 {item.icon}
@@ -415,7 +415,7 @@ export default function SettingsPage() {
                 <div className="text-xs text-muted-foreground line-clamp-1">{item.description}</div>
               </div>
               {activeTab === item.id && (
-                <ChevronRight className="w-4 h-4 shrink-0 mt-2 text-blue-600" />
+                <ChevronRight className="w-4 h-4 shrink-0 mt-2 text-blue-600 dark:text-blue-400" />
               )}
             </button>
           ))}
@@ -476,8 +476,8 @@ export default function SettingsPage() {
                 className={cn(
                   "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap",
                   activeTab === item.id
-                    ? "border-blue-600 text-blue-700 bg-blue-50/50"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-blue-200"
+                    ? "border-blue-600 text-blue-700 dark:text-blue-300 bg-blue-50/50 dark:bg-blue-950/30"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-blue-200 dark:hover:border-blue-800"
                 )}
               >
                 {item.icon}

@@ -404,17 +404,17 @@ export default function Dashboard() {
       {/* ==================== PENDÊNCIAS DE HOJE (URGENTE) ==================== */}
       {(pendencies.totalUrgent > 0 || pendencies.todayVisitsList.length > 0 || pendencies.todayFollowUps.length > 0) && (
         <section aria-labelledby="pendencies-title">
-          <Card className="border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 transition-all duration-200 hover:shadow-lg">
+          <Card className="border-amber-200 dark:border-amber-800 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 transition-all duration-200 hover:shadow-lg">
             <CardHeader className="p-4 sm:p-6 pb-3">
               <div className="flex items-center gap-3">
-                <div className="min-h-[44px] min-w-[44px] xs:h-10 xs:w-10 sm:h-12 sm:w-12 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="h-5 w-5 xs:h-5 xs:w-5 sm:h-6 sm:w-6 text-amber-600" />
+                <div className="min-h-[44px] min-w-[44px] xs:h-10 xs:w-10 sm:h-12 sm:w-12 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="h-5 w-5 xs:h-5 xs:w-5 sm:h-6 sm:w-6 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div className="min-w-0">
                   <CardTitle id="pendencies-title" className="text-lg sm:text-xl font-semibold leading-tight">
                     Pendências de Hoje
                   </CardTitle>
-                  <CardDescription className="text-amber-700 text-sm sm:text-base mt-1 leading-relaxed">
+                  <CardDescription className="text-amber-700 dark:text-amber-300 text-sm sm:text-base mt-1 leading-relaxed">
                     {pendencies.overdueFollowUps.length > 0 && `${pendencies.overdueFollowUps.length} atrasado • `}
                     {pendencies.todayVisitsList.length} visita(s) • {pendencies.todayFollowUps.length} tarefa(s)
                   </CardDescription>
@@ -427,10 +427,10 @@ export default function Dashboard() {
                 <div className="flex gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-4">
                   {/* Atrasados */}
                   {pendencies.overdueFollowUps.length > 0 && (
-                    <div className="p-3 xs:p-4 sm:p-5 rounded-lg bg-red-100/50 border border-red-200 min-w-[200px] xs:min-w-[220px] sm:min-w-0 shrink-0 sm:shrink transition-all duration-200 hover:shadow-md">
+                    <div className="p-3 xs:p-4 sm:p-5 rounded-lg bg-red-100/50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 min-w-[200px] xs:min-w-[220px] sm:min-w-0 shrink-0 sm:shrink transition-all duration-200 hover:shadow-md">
                       <div className="flex items-center gap-2 mb-3">
-                        <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600" />
-                        <span className="text-sm sm:text-base font-semibold text-red-700">Atrasados</span>
+                        <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 dark:text-red-400" />
+                        <span className="text-sm sm:text-base font-semibold text-red-700 dark:text-red-300">Atrasados</span>
                       </div>
                       <div className="space-y-2">
                         {pendencies.overdueFollowUps.slice(0, 2).map(f => (
@@ -454,10 +454,10 @@ export default function Dashboard() {
 
                   {/* Visitas de Hoje */}
                   {pendencies.todayVisitsList.length > 0 && (
-                    <div className="p-3 xs:p-4 sm:p-5 rounded-lg bg-blue-100/50 border border-blue-200 min-w-[200px] xs:min-w-[220px] sm:min-w-0 shrink-0 sm:shrink transition-all duration-200 hover:shadow-md">
+                    <div className="p-3 xs:p-4 sm:p-5 rounded-lg bg-blue-100/50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 min-w-[200px] xs:min-w-[220px] sm:min-w-0 shrink-0 sm:shrink transition-all duration-200 hover:shadow-md">
                       <div className="flex items-center gap-2 mb-3">
-                        <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-                        <span className="text-sm sm:text-base font-semibold text-blue-700">Visitas Hoje</span>
+                        <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400" />
+                        <span className="text-sm sm:text-base font-semibold text-blue-700 dark:text-blue-300">Visitas Hoje</span>
                       </div>
                       <div className="space-y-2">
                         {pendencies.todayVisitsList.slice(0, 2).map(v => (
@@ -474,10 +474,10 @@ export default function Dashboard() {
 
                   {/* Tarefas de Hoje */}
                   {pendencies.todayFollowUps.length > 0 && (
-                    <div className="p-3 xs:p-4 sm:p-5 rounded-lg bg-purple-100/50 border border-purple-200 min-w-[200px] xs:min-w-[220px] sm:min-w-0 shrink-0 sm:shrink transition-all duration-200 hover:shadow-md">
+                    <div className="p-3 xs:p-4 sm:p-5 rounded-lg bg-purple-100/50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-800 min-w-[200px] xs:min-w-[220px] sm:min-w-0 shrink-0 sm:shrink transition-all duration-200 hover:shadow-md">
                       <div className="flex items-center gap-2 mb-3">
-                        <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
-                        <span className="text-sm sm:text-base font-semibold text-purple-700">Tarefas</span>
+                        <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 dark:text-purple-400" />
+                        <span className="text-sm sm:text-base font-semibold text-purple-700 dark:text-purple-300">Tarefas</span>
                       </div>
                       <div className="space-y-2">
                         {pendencies.todayFollowUps.slice(0, 2).map(f => (
@@ -605,12 +605,12 @@ export default function Dashboard() {
                       >
                         <div className="flex flex-col items-center shrink-0">
                           <div className={`min-h-[44px] min-w-[44px] xs:h-10 xs:w-10 rounded-full flex items-center justify-center text-xs font-bold ${
-                            visit.isPast ? "bg-gray-200 text-gray-500" :
-                            visit.status === "completed" ? "bg-green-100 text-green-600" : "bg-orange-100 text-orange-600"
+                            visit.isPast ? "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400" :
+                            visit.status === "completed" ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400" : "bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400"
                           }`}>
                             {format(new Date(visit.scheduledFor), "HH:mm")}
                           </div>
-                          {i < todayTimeline.length - 1 && <div className="w-0.5 flex-1 bg-gray-200 mt-2" />}
+                          {i < todayTimeline.length - 1 && <div className="w-0.5 flex-1 bg-gray-200 dark:bg-gray-700 mt-2" />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm xs:text-base font-semibold truncate">
@@ -688,7 +688,7 @@ export default function Dashboard() {
                       key={lead.id}
                       className={`p-3 xs:p-4 rounded-lg border transition-all duration-200 ${
                         lead.needsAttention
-                          ? "border-amber-200 bg-amber-50/50 hover:shadow-md"
+                          ? "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/30 hover:shadow-md"
                           : "hover:bg-muted/50 hover:shadow-sm"
                       }`}
                     >
@@ -759,7 +759,7 @@ export default function Dashboard() {
                           <span className="truncate">{lead.nextAction}</span>
                         </span>
                         {lead.needsAttention && (
-                          <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 shrink-0 px-2">
+                          <Badge variant="outline" className="text-xs text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700 shrink-0 px-2">
                             {lead.daysSinceUpdate}d
                           </Badge>
                         )}

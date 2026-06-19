@@ -1237,7 +1237,13 @@ export default function LeadsKanban() {
                   <Bookmark className={`h-3.5 w-3.5 ${activeView === view.id ? "text-primary" : ""}`} />
                   {view.name}
                 </button>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteView(view.id)}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  aria-label={`Excluir visualização ${view.name}`}
+                  onClick={() => deleteView(view.id)}
+                >
                   <X className="h-3 w-3" />
                 </Button>
               </div>
@@ -1395,25 +1401,25 @@ export default function LeadsKanban() {
               </Badge>
             )}
             {slaAlerts.leadsWithoutUpdate > 0 && (
-              <Badge variant="outline" className="shrink-0 gap-1 py-0.5 px-2 text-[10px] sm:text-xs text-amber-600 border-amber-300">
+              <Badge variant="outline" className="shrink-0 gap-1 py-0.5 px-2 text-[10px] sm:text-xs text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800">
                 <Timer className="h-3 w-3" />
                 <span>{slaAlerts.leadsWithoutUpdate} parados</span>
               </Badge>
             )}
             {slaAlerts.urgent > 0 && (
-              <Badge variant="outline" className="shrink-0 gap-1 py-0.5 px-2 text-[10px] sm:text-xs text-orange-600 border-orange-300">
+              <Badge variant="outline" className="shrink-0 gap-1 py-0.5 px-2 text-[10px] sm:text-xs text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-800">
                 <Flame className="h-3 w-3" />
                 <span>{slaAlerts.urgent} urgentes</span>
               </Badge>
             )}
             {slaAlerts.unassigned > 0 && (
-              <Badge variant="outline" className="shrink-0 gap-1 py-0.5 px-2 text-[10px] sm:text-xs text-sky-600 border-sky-300">
+              <Badge variant="outline" className="shrink-0 gap-1 py-0.5 px-2 text-[10px] sm:text-xs text-sky-600 dark:text-sky-400 border-sky-300 dark:border-sky-800">
                 <Users className="h-3 w-3" />
                 <span>{slaAlerts.unassigned} sem corretor</span>
               </Badge>
             )}
             {slaAlerts.overdueFollowUps > 0 && (
-              <Badge variant="outline" className="shrink-0 gap-1 py-0.5 px-2 text-[10px] sm:text-xs text-red-600 border-red-300">
+              <Badge variant="outline" className="shrink-0 gap-1 py-0.5 px-2 text-[10px] sm:text-xs text-red-600 dark:text-red-400 border-red-300 dark:border-red-800">
                 <Bell className="h-3 w-3" />
                 <span>{slaAlerts.overdueFollowUps} atrasados</span>
               </Badge>
@@ -1425,7 +1431,7 @@ export default function LeadsKanban() {
         {hotLeads.length > 0 && (
           <div className="hidden sm:block space-y-2">
             <div className="flex items-center gap-2">
-              <Flame className="h-4 w-4 text-orange-500" />
+              <Flame className="h-4 w-4 text-orange-500 dark:text-orange-400" />
               <span className="text-sm font-medium">Leads Quentes</span>
               <Badge variant="secondary" className="text-[10px] h-5 px-1.5">{hotLeads.length}</Badge>
             </div>
@@ -1433,7 +1439,7 @@ export default function LeadsKanban() {
               {hotLeads.map((lead) => (
                 <div
                   key={lead.id}
-                  className="flex items-center gap-2 p-2 rounded-lg border bg-orange-50 border-orange-200 min-w-[200px] shrink-0 cursor-pointer hover:bg-orange-100 active:bg-orange-200 transition-colors"
+                  className="flex items-center gap-2 p-2 rounded-lg border bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800 min-w-[200px] shrink-0 cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900/30 active:bg-orange-200 dark:active:bg-orange-900/50 transition-colors"
                   onClick={() => openLeadDetail(lead)}
                 >
                   <div
@@ -1445,13 +1451,14 @@ export default function LeadsKanban() {
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium truncate">{lead.name}</p>
                     <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                      {lead.budget && <span className="font-medium text-orange-600">{formatBudgetShort(lead.budget)}</span>}
+                      {lead.budget && <span className="font-medium text-orange-600 dark:text-orange-400">{formatBudgetShort(lead.budget)}</span>}
                     </div>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 shrink-0 text-green-600 hover:bg-green-100"
+                    className="h-7 w-7 shrink-0 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30"
+                    aria-label={`Abrir WhatsApp para ${lead.name}`}
                     onClick={(e) => { e.stopPropagation(); openWhatsApp(lead); }}
                   >
                     <MessageSquare className="h-3.5 w-3.5" />
@@ -1514,7 +1521,13 @@ export default function LeadsKanban() {
                         {columnLeads.length}
                       </Badge>
                     </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setIsCreateModalOpen(true)}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0"
+                      aria-label={`Criar lead em ${column.label}`}
+                      onClick={() => setIsCreateModalOpen(true)}
+                    >
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
@@ -1567,7 +1580,13 @@ export default function LeadsKanban() {
                   {getLeadsByStatus(column.id).length}
                 </Badge>
               </div>
-              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setIsCreateModalOpen(true)}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0"
+                aria-label={`Criar lead em ${column.label}`}
+                onClick={() => setIsCreateModalOpen(true)}
+              >
                 <Plus className="h-3.5 w-3.5" />
               </Button>
             </div>
@@ -1695,9 +1714,9 @@ export default function LeadsKanban() {
                   {/* WhatsApp */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="h-7 sm:h-8 gap-1 px-2 sm:px-3 text-[10px] sm:text-xs bg-green-50 hover:bg-green-100 border-green-200">
-                        <MessageSquare className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-green-600" />
-                        <span className="hidden sm:inline text-green-700">WhatsApp</span>
+                      <Button variant="outline" size="sm" className="h-7 sm:h-8 gap-1 px-2 sm:px-3 text-[10px] sm:text-xs bg-green-50 dark:bg-green-950/30 hover:bg-green-100 dark:hover:bg-green-900/30 border-green-200 dark:border-green-800">
+                        <MessageSquare className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-green-600 dark:text-green-400" />
+                        <span className="hidden sm:inline text-green-700 dark:text-green-300">WhatsApp</span>
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="center">
@@ -1720,6 +1739,7 @@ export default function LeadsKanban() {
                     variant="outline"
                     size="sm"
                     className="h-7 sm:h-8 gap-1 px-2 sm:px-3 text-[10px] sm:text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                    aria-label="Arquivar leads selecionados"
                     onClick={handleBulkArchive}
                     disabled={bulkActionLoading}
                   >
@@ -1732,6 +1752,7 @@ export default function LeadsKanban() {
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 sm:h-8 sm:w-8 shrink-0"
+                  aria-label="Fechar modo de seleção em massa"
                   onClick={() => { setIsBulkMode(false); setSelectedLeads(new Set()); }}
                 >
                   <X className="h-3.5 w-3.5" />
@@ -1797,10 +1818,13 @@ export default function LeadsKanban() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label className="text-xs">Tipo</Label>
-                  <Select value={formData.preferredType} onValueChange={(v) => setFormData((f) => ({ ...f, preferredType: v }))}>
+                  <Select
+                    value={formData.preferredType || "__none__"}
+                    onValueChange={(v) => setFormData((f) => ({ ...f, preferredType: v === "__none__" ? "" : v }))}
+                  >
                     <SelectTrigger className="h-9"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Qualquer</SelectItem>
+                      <SelectItem value="__none__">Qualquer</SelectItem>
                       <SelectItem value="Apartamento">Apartamento</SelectItem>
                       <SelectItem value="Casa">Casa</SelectItem>
                       <SelectItem value="Terreno">Terreno</SelectItem>
@@ -1810,10 +1834,13 @@ export default function LeadsKanban() {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs">Interesse</Label>
-                  <Select value={formData.preferredCategory} onValueChange={(v) => setFormData((f) => ({ ...f, preferredCategory: v }))}>
+                  <Select
+                    value={formData.preferredCategory || "__none__"}
+                    onValueChange={(v) => setFormData((f) => ({ ...f, preferredCategory: v === "__none__" ? "" : v }))}
+                  >
                     <SelectTrigger className="h-9"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Qualquer</SelectItem>
+                      <SelectItem value="__none__">Qualquer</SelectItem>
                       <SelectItem value="Venda">Comprar</SelectItem>
                       <SelectItem value="Aluguel">Alugar</SelectItem>
                     </SelectContent>
@@ -2017,7 +2044,7 @@ export default function LeadsKanban() {
                     {/* WhatsApp Templates */}
                     <div className="space-y-3">
                       <h3 className="font-medium text-sm flex items-center gap-2">
-                        <MessageSquare className="h-4 w-4 text-green-600" />
+                        <MessageSquare className="h-4 w-4 text-green-600 dark:text-green-400" />
                         Mensagens Rápidas
                       </h3>
                       <div className="grid grid-cols-2 gap-2">
@@ -2149,7 +2176,14 @@ export default function LeadsKanban() {
                         onChange={(e) => setNewInteractionContent(e.target.value)}
                         className="flex-1 h-9"
                       />
-                      <Button size="icon" className="h-9 w-9" onClick={handleAddInteraction} isLoading={isAddingInteraction} disabled={!newInteractionContent.trim()}>
+                      <Button
+                        size="icon"
+                        className="h-9 w-9"
+                        aria-label="Adicionar interação"
+                        onClick={handleAddInteraction}
+                        isLoading={isAddingInteraction}
+                        disabled={!newInteractionContent.trim()}
+                      >
                         <Send className="h-4 w-4" />
                       </Button>
                     </div>
@@ -2227,7 +2261,7 @@ export default function LeadsKanban() {
                               <div
                                 className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
                                   fu.status === "completed"
-                                    ? "bg-green-100 text-green-600"
+                                    ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
                                     : isOverdue
                                     ? "bg-destructive/10 text-destructive"
                                     : "bg-primary/10 text-primary"
@@ -2250,7 +2284,14 @@ export default function LeadsKanban() {
                                 {fu.notes && <p className="text-sm">{fu.notes}</p>}
                               </div>
                               {fu.status === "pending" && (
-                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleCompleteFollowUp(fu.id)} disabled={completingFollowUp === fu.id}>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7"
+                                  aria-label="Concluir follow-up"
+                                  onClick={() => handleCompleteFollowUp(fu.id)}
+                                  disabled={completingFollowUp === fu.id}
+                                >
                                   {completingFollowUp === fu.id ? <Spinner size="sm" /> : <Check className="h-4 w-4" />}
                                 </Button>
                               )}
@@ -2335,6 +2376,7 @@ export default function LeadsKanban() {
       <Button
         className="fixed bottom-20 right-4 md:hidden z-50 h-14 w-14 rounded-full shadow-2xl hover:shadow-3xl active:scale-95 transition-all"
         size="icon"
+        aria-label="Criar lead"
         onClick={() => setIsCreateModalOpen(true)}
       >
         <Plus className="h-6 w-6" />

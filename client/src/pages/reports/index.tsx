@@ -192,7 +192,7 @@ function KPICard({
           {trend && (
             <div className={cn(
               "flex items-center text-sm font-medium",
-              trend.direction === 'up' ? "text-green-600" : "text-red-600"
+              trend.direction === 'up' ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
             )}>
               {trend.direction === 'up' ? (
                 <ArrowUpRight className="h-4 w-4 mr-1" />
@@ -919,19 +919,19 @@ export default function ReportsPage() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="text-center p-3 bg-background/50 rounded-lg">
-                <p className="text-xl sm:text-2xl font-bold text-green-600">12</p>
+                <p className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400">12</p>
                 <p className="text-xs text-muted-foreground">Vendas</p>
               </div>
               <div className="text-center p-3 bg-background/50 rounded-lg">
-                <p className="text-xl sm:text-2xl font-bold text-blue-600">38</p>
+                <p className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400">38</p>
                 <p className="text-xs text-muted-foreground">Contratos</p>
               </div>
               <div className="text-center p-3 bg-background/50 rounded-lg">
-                <p className="text-xl sm:text-2xl font-bold text-purple-600">156</p>
+                <p className="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-400">156</p>
                 <p className="text-xs text-muted-foreground">Leads</p>
               </div>
               <div className="text-center p-3 bg-background/50 rounded-lg">
-                <p className="text-xl sm:text-2xl font-bold text-orange-600">87%</p>
+                <p className="text-xl sm:text-2xl font-bold text-orange-600 dark:text-orange-400">87%</p>
                 <p className="text-xs text-muted-foreground">Meta</p>
               </div>
             </div>
@@ -1624,19 +1624,19 @@ export default function ReportsPage() {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
                     <span className="text-sm font-medium">Receita de Vendas</span>
-                    <span className="font-bold text-green-600">
+                    <span className="font-bold text-green-600 dark:text-green-400">
                       {formatCurrency(data.dre?.salesRevenue || 0)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
                     <span className="text-sm font-medium">Receita de Aluguéis</span>
-                    <span className="font-bold text-blue-600">
+                    <span className="font-bold text-blue-600 dark:text-blue-400">
                       {formatCurrency(data.dre?.rentalRevenue || 0)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
                     <span className="text-sm font-medium">Outras Receitas</span>
-                    <span className="font-bold text-purple-600">
+                    <span className="font-bold text-purple-600 dark:text-purple-400">
                       {formatCurrency(data.dre?.otherIncome || 0)}
                     </span>
                   </div>
@@ -1648,13 +1648,13 @@ export default function ReportsPage() {
                   </div>
                   <div className="flex justify-between items-center p-3 bg-red-50 dark:bg-red-950/20 rounded-lg">
                     <span className="text-sm font-medium">Despesas Operacionais</span>
-                    <span className="font-bold text-red-600">
+                    <span className="font-bold text-red-600 dark:text-red-400">
                       {formatCurrency(data.dre?.operationalExpenses || 0)}
                     </span>
                   </div>
                   <div className="border-t pt-3 flex justify-between items-center p-3 bg-green-100 dark:bg-green-950/30 rounded-lg">
                     <span className="font-semibold">Lucro Líquido</span>
-                    <span className="text-lg font-bold text-green-600">
+                    <span className="text-lg font-bold text-green-600 dark:text-green-400">
                       {formatCurrency(data.dre?.netProfit || 0)}
                     </span>
                   </div>
@@ -1804,7 +1804,7 @@ export default function ReportsPage() {
                         <td className="text-center py-3 px-4 text-sm">{broker.leadsWorked}</td>
                         <td className="text-center py-3 px-4 text-sm">{broker.visits}</td>
                         <td className="text-center py-3 px-4 text-sm">{broker.proposals}</td>
-                        <td className="text-center py-3 px-4 font-semibold text-green-600 text-sm">
+                        <td className="text-center py-3 px-4 font-semibold text-green-600 dark:text-green-400 text-sm">
                           {broker.contractsClosed}
                         </td>
                         <td className="text-right py-3 px-4 text-sm">

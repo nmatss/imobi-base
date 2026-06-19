@@ -28,32 +28,32 @@ export interface DashboardRecentActivityProps {
 const activityConfig = {
   lead: {
     icon: UserPlus,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-100',
+    color: 'text-blue-600 dark:text-blue-400',
+    bgColor: 'bg-blue-100 dark:bg-blue-900/30',
     label: 'Novo Lead',
   },
   property: {
     icon: Home,
-    color: 'text-green-600',
-    bgColor: 'bg-green-100',
+    color: 'text-green-600 dark:text-green-400',
+    bgColor: 'bg-green-100 dark:bg-green-900/30',
     label: 'Propriedade',
   },
   visit: {
     icon: Calendar,
-    color: 'text-orange-600',
-    bgColor: 'bg-orange-100',
+    color: 'text-orange-600 dark:text-orange-400',
+    bgColor: 'bg-orange-100 dark:bg-orange-900/30',
     label: 'Visita',
   },
   proposal: {
     icon: FileText,
-    color: 'text-cyan-600',
-    bgColor: 'bg-cyan-100',
+    color: 'text-cyan-600 dark:text-cyan-400',
+    bgColor: 'bg-cyan-100 dark:bg-cyan-900/30',
     label: 'Proposta',
   },
   contract: {
     icon: FileSignature,
-    color: 'text-emerald-600',
-    bgColor: 'bg-emerald-100',
+    color: 'text-emerald-600 dark:text-emerald-400',
+    bgColor: 'bg-emerald-100 dark:bg-emerald-900/30',
     label: 'Contrato',
   },
 } as const;
@@ -87,12 +87,12 @@ export function DashboardRecentActivity({
             <Activity className="h-5 w-5 text-muted-foreground" />
             <CardTitle className="text-lg">Atividades Recentes</CardTitle>
           </div>
-          <Link href="/activity">
-            <Button variant="ghost" size="sm" className="text-xs -mr-2">
+          <Button asChild variant="ghost" size="sm" className="text-xs -mr-2">
+            <Link href="/activity">
               Ver todas
               <ChevronRight className="h-3 w-3 ml-1" />
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </CardHeader>
 

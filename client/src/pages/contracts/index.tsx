@@ -100,28 +100,28 @@ function formatPrice(price: string | number) {
 
 // Proposal status config
 const PROPOSAL_STATUS = {
-  draft: { label: "Rascunho", color: "bg-gray-100 text-gray-700 border-gray-300", icon: FileText },
-  sent: { label: "Enviada", color: "bg-blue-100 text-blue-700 border-blue-300", icon: Send },
-  analyzing: { label: "Em Análise", color: "bg-amber-100 text-amber-700 border-amber-300", icon: Clock },
-  approved: { label: "Aprovada", color: "bg-green-100 text-green-700 border-green-300", icon: CheckCircle },
-  rejected: { label: "Recusada", color: "bg-red-100 text-red-700 border-red-300", icon: XCircle },
-  expired: { label: "Vencida", color: "bg-purple-100 text-purple-700 border-purple-300", icon: AlertTriangle },
+  draft: { label: "Rascunho", color: "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700", icon: FileText },
+  sent: { label: "Enviada", color: "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800", icon: Send },
+  analyzing: { label: "Em Análise", color: "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800", icon: Clock },
+  approved: { label: "Aprovada", color: "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800", icon: CheckCircle },
+  rejected: { label: "Recusada", color: "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800", icon: XCircle },
+  expired: { label: "Vencida", color: "bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800", icon: AlertTriangle },
 };
 
 // Contract status config
 const CONTRACT_STATUS = {
-  active: { label: "Ativo", color: "bg-green-100 text-green-700 border-green-300", icon: CheckCircle },
-  terminated: { label: "Rescindido", color: "bg-red-100 text-red-700 border-red-300", icon: Ban },
-  expired: { label: "Vencido", color: "bg-amber-100 text-amber-700 border-amber-300", icon: AlertTriangle },
-  renewing: { label: "Em Renovação", color: "bg-blue-100 text-blue-700 border-blue-300", icon: RefreshCw },
+  active: { label: "Ativo", color: "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800", icon: CheckCircle },
+  terminated: { label: "Rescindido", color: "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800", icon: Ban },
+  expired: { label: "Vencido", color: "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800", icon: AlertTriangle },
+  renewing: { label: "Em Renovação", color: "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800", icon: RefreshCw },
 };
 
 // Signature status config
 const SIGNATURE_STATUS = {
-  pending: { label: "Aguardando", color: "bg-gray-100 text-gray-700" },
-  sent: { label: "Enviado", color: "bg-blue-100 text-blue-700" },
-  signed: { label: "Assinado", color: "bg-green-100 text-green-700" },
-  rejected: { label: "Recusado", color: "bg-red-100 text-red-700" },
+  pending: { label: "Aguardando", color: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
+  sent: { label: "Enviado", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
+  signed: { label: "Assinado", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" },
+  rejected: { label: "Recusado", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" },
 };
 
 // AI prompts for contracts/proposals
@@ -1031,14 +1031,14 @@ export default function ContractsPage() {
                                     {["sent", "analyzing"].includes(contract.status) && (
                                       <>
                                         <DropdownMenuItem
-                                          className="text-green-600"
+                                          className="text-green-600 dark:text-green-400"
                                           onClick={(e) => { e.stopPropagation(); handleUpdateStatus(contract.id, "approved"); }}
                                         >
                                           <CheckCircle className="h-4 w-4 mr-2" />
                                           Aprovar
                                         </DropdownMenuItem>
                                         <DropdownMenuItem
-                                          className="text-red-600"
+                                          className="text-red-600 dark:text-red-400"
                                           onClick={(e) => { e.stopPropagation(); handleUpdateStatus(contract.id, "rejected"); }}
                                         >
                                           <XCircle className="h-4 w-4 mr-2" />
@@ -1201,7 +1201,7 @@ export default function ContractsPage() {
                               <TableCell>
                                 {contract.signedAt ? (
                                   <div className="flex items-center gap-1.5 text-xs">
-                                    <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                                    <CheckCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
                                     <span>{format(new Date(contract.signedAt), "dd/MM/yyyy")}</span>
                                   </div>
                                 ) : (
@@ -1718,7 +1718,7 @@ export default function ContractsPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="flex-1 h-9 text-xs text-green-600"
+                            className="flex-1 h-9 text-xs text-green-600 dark:text-green-400"
                             onClick={() => {
                               if (selectedItem.lead?.phone) {
                                 const phone = selectedItem.lead.phone.replace(/\D/g, "");
@@ -1846,7 +1846,7 @@ export default function ContractsPage() {
                             <>
                               <Button
                                 variant="outline"
-                                className="h-10 text-xs text-green-600"
+                                className="h-10 text-xs text-green-600 dark:text-green-400"
                                 onClick={() => handleUpdateStatus(selectedItem.id, "approved")}
                               >
                                 <CheckCircle className="h-4 w-4 mr-1.5" />
@@ -1854,7 +1854,7 @@ export default function ContractsPage() {
                               </Button>
                               <Button
                                 variant="outline"
-                                className="h-10 text-xs text-red-600"
+                                className="h-10 text-xs text-red-600 dark:text-red-400"
                                 onClick={() => handleUpdateStatus(selectedItem.id, "rejected")}
                               >
                                 <XCircle className="h-4 w-4 mr-1.5" />

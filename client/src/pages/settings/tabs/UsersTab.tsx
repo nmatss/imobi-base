@@ -80,17 +80,17 @@ const STATUS_CONFIG = {
   active: {
     label: "Ativo",
     icon: UserCheck,
-    className: "text-green-600 bg-green-50 border-green-200",
+    className: "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800",
   },
   inactive: {
     label: "Inativo",
     icon: UserX,
-    className: "text-gray-600 bg-gray-50 border-gray-200",
+    className: "text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
   },
   pending: {
     label: "Pendente",
     icon: Clock,
-    className: "text-orange-600 bg-orange-50 border-orange-200",
+    className: "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30 border-orange-200 dark:border-orange-800",
   },
 };
 
@@ -277,7 +277,7 @@ export function UsersTab({ users, onRefresh, isLoadingUsers = false }: UsersTabP
         <Card>
           <CardContent className="p-3 sm:p-4">
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 rounded-lg bg-green-100 text-green-600 hidden sm:block">
+              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 hidden sm:block">
                 <UserCheck className="w-4 h-4" />
               </div>
               <div>
@@ -290,7 +290,7 @@ export function UsersTab({ users, onRefresh, isLoadingUsers = false }: UsersTabP
         <Card>
           <CardContent className="p-3 sm:p-4">
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 rounded-lg bg-orange-100 text-orange-600 hidden sm:block">
+              <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 hidden sm:block">
                 <Clock className="w-4 h-4" />
               </div>
               <div>
@@ -303,7 +303,7 @@ export function UsersTab({ users, onRefresh, isLoadingUsers = false }: UsersTabP
         <Card>
           <CardContent className="p-3 sm:p-4">
             <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-2 rounded-lg bg-gray-100 text-gray-600 hidden sm:block">
+              <div className="p-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hidden sm:block">
                 <UserX className="w-4 h-4" />
               </div>
               <div>

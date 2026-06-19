@@ -93,15 +93,15 @@ function MetricCard({
               <div className="flex items-center gap-1.5 text-sm">
                 {trend.isPositive ? (
                   <>
-                    <TrendingUp className="h-4 w-4 text-green-600" />
-                    <span className="text-green-600 font-medium">
+                    <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    <span className="text-green-600 dark:text-green-400 font-medium">
                       +{trend.value}%
                     </span>
                   </>
                 ) : (
                   <>
-                    <TrendingDown className="h-4 w-4 text-red-600" />
-                    <span className="text-red-600 font-medium">
+                    <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
+                    <span className="text-red-600 dark:text-red-400 font-medium">
                       {trend.value}%
                     </span>
                   </>
@@ -144,7 +144,7 @@ export function SalesDashboard({ kpis, period, className }: SalesDashboardProps)
           value={formatNumber(kpis.totalSales)}
           description={`Vendas concluídas em ${periodLabel}`}
           icon={CheckCircle}
-          color="bg-green-500/10 text-green-600"
+          color="bg-green-500/10 text-green-600 dark:text-green-400"
         />
 
         <MetricCard
@@ -152,7 +152,7 @@ export function SalesDashboard({ kpis, period, className }: SalesDashboardProps)
           value={formatCurrency(kpis.totalSalesValue)}
           description="Volume de vendas"
           icon={DollarSign}
-          color="bg-blue-500/10 text-blue-600"
+          color="bg-blue-500/10 text-blue-600 dark:text-blue-400"
         />
 
         <MetricCard
@@ -160,7 +160,7 @@ export function SalesDashboard({ kpis, period, className }: SalesDashboardProps)
           value={formatCurrency(kpis.avgTicket)}
           description="Valor médio por venda"
           icon={Target}
-          color="bg-purple-500/10 text-purple-600"
+          color="bg-purple-500/10 text-purple-600 dark:text-purple-400"
         />
 
         <MetricCard
@@ -168,7 +168,7 @@ export function SalesDashboard({ kpis, period, className }: SalesDashboardProps)
           value={`${kpis.conversionRate}%`}
           description="Propostas aceitas / total"
           icon={Percent}
-          color="bg-orange-500/10 text-orange-600"
+          color="bg-orange-500/10 text-orange-600 dark:text-orange-400"
         />
       </div>
 
@@ -186,7 +186,7 @@ export function SalesDashboard({ kpis, period, className }: SalesDashboardProps)
                 </p>
               </div>
               <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                <Award className="h-5 w-5 text-emerald-600" />
+                <Award className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
               </div>
             </div>
             <div className="space-y-1">
@@ -224,7 +224,7 @@ export function SalesDashboard({ kpis, period, className }: SalesDashboardProps)
                 </p>
               </div>
               <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-yellow-500/10 flex items-center justify-center">
-                <Clock className="h-5 w-5 text-yellow-600" />
+                <Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
@@ -245,7 +245,7 @@ export function SalesDashboard({ kpis, period, className }: SalesDashboardProps)
                 </p>
               </div>
               <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center">
-                <FileText className="h-5 w-5 text-indigo-600" />
+                <FileText className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
               </div>
             </div>
             <div className="space-y-1">
@@ -272,7 +272,7 @@ export function SalesDashboard({ kpis, period, className }: SalesDashboardProps)
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Aceitas</p>
@@ -284,7 +284,7 @@ export function SalesDashboard({ kpis, period, className }: SalesDashboardProps)
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center">
-                  <Clock className="h-4 w-4 text-yellow-600" />
+                  <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Pendentes</p>
@@ -296,7 +296,7 @@ export function SalesDashboard({ kpis, period, className }: SalesDashboardProps)
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                  <DollarSign className="h-4 w-4 text-blue-600" />
+                  <DollarSign className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Vendas</p>
@@ -308,7 +308,7 @@ export function SalesDashboard({ kpis, period, className }: SalesDashboardProps)
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                  <Target className="h-4 w-4 text-purple-600" />
+                  <Target className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Conversão</p>

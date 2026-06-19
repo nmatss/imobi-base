@@ -343,17 +343,17 @@ export default function TransactionTable({
                           <>
                             <ArrowUpCircle
                               {...iconA11yProps}
-                              className="h-4 w-4 text-green-600"
+                              className="h-4 w-4 text-green-600 dark:text-green-400"
                             />
-                            <span className="text-green-600">Receita</span>
+                            <span className="text-green-600 dark:text-green-400">Receita</span>
                           </>
                         ) : (
                           <>
                             <ArrowDownCircle
                               {...iconA11yProps}
-                              className="h-4 w-4 text-red-600"
+                              className="h-4 w-4 text-red-600 dark:text-red-400"
                             />
-                            <span className="text-red-600">Despesa</span>
+                            <span className="text-red-600 dark:text-red-400">Despesa</span>
                           </>
                         )}
                       </div>
@@ -517,12 +517,12 @@ export default function TransactionTable({
                           {isIncomeFlow(transaction.flow) ? (
                             <ArrowUpCircle
                               {...iconA11yProps}
-                              className="h-4 w-4 text-green-600 shrink-0"
+                              className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0"
                             />
                           ) : (
                             <ArrowDownCircle
                               {...iconA11yProps}
-                              className="h-4 w-4 text-red-600 shrink-0"
+                              className="h-4 w-4 text-red-600 dark:text-red-400 shrink-0"
                             />
                           )}
                           <p className="font-medium text-sm truncate">
@@ -536,7 +536,7 @@ export default function TransactionTable({
                         )}
                       </div>
                       <div className="text-right shrink-0">
-                        <p className={`font-bold text-base ${isIncomeFlow(transaction.flow) ? 'text-green-600' : 'text-red-600'}`}>
+                        <p className={`font-bold text-base ${isIncomeFlow(transaction.flow) ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                           {isIncomeFlow(transaction.flow) ? '+' : '-'} {formatCurrency(transaction.amount)}
                         </p>
                       </div>

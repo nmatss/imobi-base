@@ -154,7 +154,7 @@ const PROPOSAL_STATUS = {
   negotiating: { label: "Em Negociação", color: "bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400", icon: MessageCircle, stage: "negociacao" },
   accepted: { label: "Aceita", color: "badge-success", icon: CheckCircle, stage: "documentacao" },
   rejected: { label: "Recusada", color: "badge-error", icon: XCircle, stage: "rejected" },
-  expired: { label: "Vencida", color: "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-900/30 dark:text-gray-400", icon: AlertTriangle, stage: "expired" },
+  expired: { label: "Vencida", color: "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700", icon: AlertTriangle, stage: "expired" },
 };
 
 // Pipeline stages
@@ -175,10 +175,10 @@ const PERIOD_OPTIONS = [
 
 // Closing probability options
 const PROBABILITY_OPTIONS = [
-  { value: "low", label: "Baixa", color: "text-red-600", percent: 25 },
-  { value: "medium", label: "Média", color: "text-amber-600", percent: 50 },
-  { value: "high", label: "Alta", color: "text-green-600", percent: 75 },
-  { value: "very_high", label: "Muito Alta", color: "text-emerald-600", percent: 90 },
+  { value: "low", label: "Baixa", color: "text-red-600 dark:text-red-400", percent: 25 },
+  { value: "medium", label: "Média", color: "text-amber-600 dark:text-amber-400", percent: 50 },
+  { value: "high", label: "Alta", color: "text-green-600 dark:text-green-400", percent: 75 },
+  { value: "very_high", label: "Muito Alta", color: "text-emerald-600 dark:text-emerald-400", percent: 90 },
 ];
 
 // Lead sources
@@ -1017,7 +1017,7 @@ export default function VendasPage() {
 
         {/* KPI Cards - 2x2 grid on mobile */}
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-5 gap-6 sm:gap-8">
-          <Card className="bg-gradient-to-br from-green-50 to-green-100/50 border-green-200">
+          <Card className="bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/30 dark:to-green-900/30 border-green-200 dark:border-green-800">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -1025,15 +1025,15 @@ export default function VendasPage() {
                     <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-green-600 font-medium mb-0.5">Total em Vendas</p>
-                    <p className="text-base sm:text-xl font-bold text-green-700 truncate">
+                    <p className="text-xs text-green-600 dark:text-green-400 font-medium mb-0.5">Total em Vendas</p>
+                    <p className="text-base sm:text-xl font-bold text-green-700 dark:text-green-300 truncate">
                       {formatPrice(kpis.totalSalesValue)}
                     </p>
                   </div>
                 </div>
                 <div className={cn(
                   "flex items-center gap-1 text-xs font-semibold",
-                  parseFloat(kpis.salesValueTrend) >= 0 ? "text-green-600" : "text-red-600"
+                  parseFloat(kpis.salesValueTrend) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
                 )}>
                   {parseFloat(kpis.salesValueTrend) >= 0 ? (
                     <TrendingUp className="w-4 h-4" />
@@ -1046,7 +1046,7 @@ export default function VendasPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-200">
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/30 border-blue-200 dark:border-blue-800">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -1054,13 +1054,13 @@ export default function VendasPage() {
                     <Target className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-blue-600 font-medium mb-0.5">Vendas</p>
-                    <p className="text-xl sm:text-2xl font-bold text-blue-700">{kpis.totalSales}</p>
+                    <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mb-0.5">Vendas</p>
+                    <p className="text-xl sm:text-2xl font-bold text-blue-700 dark:text-blue-300">{kpis.totalSales}</p>
                   </div>
                 </div>
                 <div className={cn(
                   "flex items-center gap-1 text-xs font-semibold",
-                  parseFloat(kpis.salesCountTrend) >= 0 ? "text-green-600" : "text-red-600"
+                  parseFloat(kpis.salesCountTrend) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
                 )}>
                   {parseFloat(kpis.salesCountTrend) >= 0 ? (
                     <TrendingUp className="w-4 h-4" />
@@ -1073,7 +1073,7 @@ export default function VendasPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50 border-purple-200">
+          <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950/30 dark:to-purple-900/30 border-purple-200 dark:border-purple-800">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -1081,15 +1081,15 @@ export default function VendasPage() {
                     <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-purple-600 font-medium mb-0.5">Ticket Médio</p>
-                    <p className="text-base sm:text-xl font-bold text-purple-700 truncate">
+                    <p className="text-xs text-purple-600 dark:text-purple-400 font-medium mb-0.5">Ticket Médio</p>
+                    <p className="text-base sm:text-xl font-bold text-purple-700 dark:text-purple-300 truncate">
                       {formatPrice(kpis.avgTicket)}
                     </p>
                   </div>
                 </div>
                 <div className={cn(
                   "flex items-center gap-1 text-xs font-semibold",
-                  parseFloat(kpis.avgTicketTrend) >= 0 ? "text-green-600" : "text-red-600"
+                  parseFloat(kpis.avgTicketTrend) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
                 )}>
                   {parseFloat(kpis.avgTicketTrend) >= 0 ? (
                     <TrendingUp className="w-4 h-4" />
@@ -1102,21 +1102,21 @@ export default function VendasPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-200">
+          <Card className="bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/30 dark:to-amber-900/30 border-amber-200 dark:border-amber-800">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 sm:p-2.5 bg-amber-500 rounded-xl shrink-0">
                   <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs text-amber-600 font-medium mb-0.5">Conversão</p>
-                  <p className="text-xl sm:text-2xl font-bold text-amber-700">{kpis.conversionRate}%</p>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mb-0.5">Conversão</p>
+                  <p className="text-xl sm:text-2xl font-bold text-amber-700 dark:text-amber-300">{kpis.conversionRate}%</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-200 col-span-2 sm:col-span-1">
+          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-emerald-900/30 border-emerald-200 dark:border-emerald-800 col-span-2 sm:col-span-1">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -1124,15 +1124,15 @@ export default function VendasPage() {
                     <Percent className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-emerald-600 font-medium mb-0.5">Comissões</p>
-                    <p className="text-base sm:text-xl font-bold text-emerald-700 truncate">
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mb-0.5">Comissões</p>
+                    <p className="text-base sm:text-xl font-bold text-emerald-700 dark:text-emerald-300 truncate">
                       {formatPrice(kpis.totalCommissions)}
                     </p>
                   </div>
                 </div>
                 <div className={cn(
                   "flex items-center gap-1 text-xs font-semibold",
-                  parseFloat(kpis.commissionsTrend) >= 0 ? "text-green-600" : "text-red-600"
+                  parseFloat(kpis.commissionsTrend) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
                 )}>
                   {parseFloat(kpis.commissionsTrend) >= 0 ? (
                     <TrendingUp className="w-4 h-4" />
@@ -1148,9 +1148,9 @@ export default function VendasPage() {
 
         {/* Critical Opportunities */}
         {criticalOpportunities.length > 0 && (
-          <Card className="border-amber-200 bg-amber-50/50">
+          <Card className="border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/30">
             <CardHeader className="p-4 pb-3">
-              <CardTitle className="text-sm flex items-center gap-2 text-amber-800">
+              <CardTitle className="text-sm flex items-center gap-2 text-amber-800 dark:text-amber-300">
                 <Flame className="h-4 w-4" />
                 Oportunidades Críticas ({criticalOpportunities.length})
               </CardTitle>
@@ -1162,9 +1162,9 @@ export default function VendasPage() {
                     key={i}
                     className={cn(
                       "w-full flex items-center gap-3 text-sm p-3 rounded-xl transition-all active:scale-[0.98]",
-                      opp.severity === "high" && "bg-red-100 text-red-800 hover:bg-red-200",
-                      opp.severity === "medium" && "bg-amber-100 text-amber-800 hover:bg-amber-200",
-                      opp.severity === "low" && "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                      opp.severity === "high" && "bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50",
+                      opp.severity === "medium" && "bg-amber-100 text-amber-800 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:hover:bg-amber-900/50",
+                      opp.severity === "low" && "bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                     )}
                     onClick={() => {
                       if (opp.type === "no_commission") {
@@ -1267,7 +1267,7 @@ export default function VendasPage() {
                       <CardHeader className="p-4 pb-3 bg-muted/30 border-b">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <div className={cn("p-1.5 rounded-lg bg-white", stage.color)}>
+                            <div className={cn("p-1.5 rounded-lg bg-white dark:bg-gray-800", stage.color)}>
                               <StageIcon className="h-4 w-4" />
                             </div>
                             <div>
@@ -1395,7 +1395,7 @@ export default function VendasPage() {
                 <Card key={stage.id} className="flex flex-col h-[calc(100vh-400px)]">
                   <CardHeader className="p-4 pb-3 bg-muted/30 border-b shrink-0">
                     <div className="flex items-center gap-2">
-                      <div className={cn("p-1.5 rounded-lg bg-white", stage.color)}>
+                      <div className={cn("p-1.5 rounded-lg bg-white dark:bg-gray-800", stage.color)}>
                         <StageIcon className="h-4 w-4" />
                       </div>
                       <div className="flex-1">
@@ -1529,7 +1529,7 @@ export default function VendasPage() {
                               {details.property?.address || "Endereço"}
                             </p>
                           </div>
-                          <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300 text-[10px] shrink-0">
+                          <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800 text-[10px] shrink-0">
                             <CheckCircle className="h-2.5 w-2.5 mr-1" />
                             Fechado
                           </Badge>
@@ -1545,7 +1545,7 @@ export default function VendasPage() {
                             <p className="text-xl font-bold text-primary">
                               {formatPrice(sale.saleValue)}
                             </p>
-                            <p className="text-xs text-green-600 font-medium">
+                            <p className="text-xs text-green-600 dark:text-green-400 font-medium">
                               Comissão: {formatPrice(sale.commissionValue || "0")}
                             </p>
                           </div>
@@ -1653,7 +1653,7 @@ export default function VendasPage() {
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex flex-col items-end">
-                                  <span className="font-semibold text-green-600">
+                                  <span className="font-semibold text-green-600 dark:text-green-400">
                                     {formatPrice(sale.commissionValue || "0")}
                                   </span>
                                   <span className="text-xs text-muted-foreground">
@@ -1720,9 +1720,9 @@ export default function VendasPage() {
                     <div className="flex items-center gap-3">
                       <div className={cn(
                         "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold",
-                        i === 0 && "bg-amber-100 text-amber-700",
-                        i === 1 && "bg-gray-100 text-gray-700",
-                        i === 2 && "bg-orange-100 text-orange-700"
+                        i === 0 && "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+                        i === 1 && "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+                        i === 2 && "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
                       )}>
                         {i + 1}
                       </div>
@@ -2136,32 +2136,32 @@ export default function VendasPage() {
                 )}
 
                 {/* Commission calculator - Premium visual */}
-                <Card className="bg-gradient-to-br from-green-50 to-green-100/50 border-green-200">
+                <Card className="bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/30 dark:to-green-900/30 border-green-200 dark:border-green-800">
                   <CardHeader className="p-4 pb-3">
-                    <CardTitle className="text-sm flex items-center gap-2 text-green-800">
+                    <CardTitle className="text-sm flex items-center gap-2 text-green-800 dark:text-green-300">
                       <PiggyBank className="h-4 w-4" />
                       Calculadora de Comissões
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-4 pt-0 space-y-3">
-                    <div className="flex justify-between items-center p-3 rounded-lg bg-white">
+                    <div className="flex justify-between items-center p-3 rounded-lg bg-white dark:bg-gray-900">
                       <span className="text-sm text-muted-foreground">Comissão Total ({saleForm.commissionRate}%):</span>
-                      <span className="text-lg font-bold text-green-600">{formatPrice(commissionCalc.totalCommission)}</span>
+                      <span className="text-lg font-bold text-green-600 dark:text-green-400">{formatPrice(commissionCalc.totalCommission)}</span>
                     </div>
                     {saleForm.brokerId && (
                       <>
-                        <div className="flex justify-between items-center p-3 rounded-lg bg-blue-50 text-blue-800">
+                        <div className="flex justify-between items-center p-3 rounded-lg bg-blue-50 text-blue-800 dark:bg-blue-950/30 dark:text-blue-300">
                           <span className="text-sm">Corretor ({saleForm.brokerCommissionRate}%):</span>
                           <span className="text-base font-bold">{formatPrice(commissionCalc.brokerCommission)}</span>
                         </div>
-                        <div className="flex justify-between items-center p-3 rounded-lg bg-purple-50 text-purple-800">
+                        <div className="flex justify-between items-center p-3 rounded-lg bg-purple-50 text-purple-800 dark:bg-purple-950/30 dark:text-purple-300">
                           <span className="text-sm">Imobiliária:</span>
                           <span className="text-base font-bold">{formatPrice(commissionCalc.agencyCommission)}</span>
                         </div>
                       </>
                     )}
                     <Separator />
-                    <div className="flex justify-between items-center p-3 rounded-lg bg-emerald-50 text-emerald-800">
+                    <div className="flex justify-between items-center p-3 rounded-lg bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
                       <span className="text-sm font-medium">Repasse Proprietário:</span>
                       <span className="text-lg font-bold">{formatPrice(commissionCalc.ownerPayout)}</span>
                     </div>
@@ -2270,7 +2270,7 @@ export default function VendasPage() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Comissão Total:</span>
-                      <span className="font-bold text-green-600">{formatPrice(commissionCalc.totalCommission)}</span>
+                      <span className="font-bold text-green-600 dark:text-green-400">{formatPrice(commissionCalc.totalCommission)}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">Data:</span>
@@ -2279,12 +2279,12 @@ export default function VendasPage() {
                   </CardContent>
                 </Card>
 
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                  <p className="font-medium flex items-center gap-2 text-sm text-amber-800">
+                <div className="p-4 bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800 rounded-xl">
+                  <p className="font-medium flex items-center gap-2 text-sm text-amber-800 dark:text-amber-300">
                     <AlertTriangle className="h-4 w-4" />
                     Atenção
                   </p>
-                  <p className="mt-1 text-sm text-amber-700">
+                  <p className="mt-1 text-sm text-amber-700 dark:text-amber-400">
                     Ao confirmar, a venda será registrada e os dados serão enviados para o módulo Financeiro.
                   </p>
                 </div>
@@ -2336,7 +2336,7 @@ export default function VendasPage() {
                         </>
                       ) : (
                         <>
-                          <CheckCircle className="h-5 w-5 text-green-600" />
+                          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                           Venda Concluída
                         </>
                       )}
@@ -2375,11 +2375,11 @@ export default function VendasPage() {
                           {formatPrice(selectedProposal?.proposedValue || selectedSale?.saleValue || "0")}
                         </p>
                         {selectedSale?.commissionValue && (
-                          <div className="mt-3 p-3 bg-green-50 rounded-lg">
-                            <p className="text-base font-semibold text-green-600">
+                          <div className="mt-3 p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
+                            <p className="text-base font-semibold text-green-600 dark:text-green-400">
                               Comissão: {formatPrice(selectedSale.commissionValue)}
                             </p>
-                            <p className="text-xs text-green-600/70">({selectedSale.commissionRate}%)</p>
+                            <p className="text-xs text-green-600/70 dark:text-green-400/70">({selectedSale.commissionRate}%)</p>
                           </div>
                         )}
                       </CardContent>
@@ -2504,7 +2504,7 @@ export default function VendasPage() {
                           )}
                           <Button
                             variant="outline"
-                            className="h-11 text-green-600 hover:text-green-700"
+                            className="h-11 text-green-600 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
                             onClick={() => handleUpdateProposalStatus(selectedProposal.id, "accepted")}
                           >
                             <CheckCircle className="h-4 w-4 mr-2" />
@@ -2512,7 +2512,7 @@ export default function VendasPage() {
                           </Button>
                           <Button
                             variant="outline"
-                            className="h-11 text-red-600 hover:text-red-700"
+                            className="h-11 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                             onClick={() => handleUpdateProposalStatus(selectedProposal.id, "rejected")}
                           >
                             <XCircle className="h-4 w-4 mr-2" />
@@ -2539,8 +2539,8 @@ export default function VendasPage() {
                     <div className="space-y-4">
                       {/* Creation */}
                       <div className="flex items-start gap-3">
-                        <div className="p-2 bg-blue-100 rounded-full shrink-0">
-                          <FileText className="h-4 w-4 text-blue-600" />
+                        <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full shrink-0">
+                          <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div>
                           <p className="text-sm font-medium">
@@ -2556,8 +2556,8 @@ export default function VendasPage() {
                       {detailType === "sale" && selectedSale && (
                         <>
                           <div className="flex items-start gap-3">
-                            <div className="p-2 bg-green-100 rounded-full shrink-0">
-                              <CheckCircle className="h-4 w-4 text-green-600" />
+                            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full shrink-0">
+                              <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                             </div>
                             <div>
                               <p className="text-sm font-medium">Venda concluída</p>
@@ -2567,8 +2567,8 @@ export default function VendasPage() {
                             </div>
                           </div>
                           <div className="flex items-start gap-3">
-                            <div className="p-2 bg-purple-100 rounded-full shrink-0">
-                              <Receipt className="h-4 w-4 text-purple-600" />
+                            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-full shrink-0">
+                              <Receipt className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                             </div>
                             <div>
                               <p className="text-sm font-medium">Lançamento financeiro</p>

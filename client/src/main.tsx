@@ -2,9 +2,13 @@ import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "./lib/queryClient";
 import { installCSRFFetchInterceptor } from "./lib/csrf-fetch";
+import { initTheme } from "./lib/theme";
 import App from "./App";
 import "./index.css";
 import React from "react";
+
+// Aplica o tema (light/dark/system) antes do render para evitar flash.
+initTheme();
 
 // Injeta X-CSRF-Token em todo fetch state-changing same-origin (cobre call sites
 // que usam fetch cru sem o header). Antes de qualquer requisição da aplicação.

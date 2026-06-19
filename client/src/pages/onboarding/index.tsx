@@ -202,7 +202,7 @@ export default function OnboardingPage() {
   const StepBrand = () => (
     <div className="py-6 px-4 max-w-xl mx-auto w-full">
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center">
           <Palette className="w-5 h-5" />
         </div>
         <div>
@@ -309,7 +309,7 @@ export default function OnboardingPage() {
   const StepProperty = () => (
     <div className="py-6 px-4 max-w-xl mx-auto w-full">
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-green-100 text-green-600 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center">
           <Home className="w-5 h-5" />
         </div>
         <div>
@@ -508,7 +508,7 @@ export default function OnboardingPage() {
     return (
       <div className="py-6 px-4 max-w-3xl mx-auto w-full">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
             <CreditCard className="w-5 h-5" />
           </div>
           <div>
@@ -591,9 +591,9 @@ export default function OnboardingPage() {
 
   const StepDone = () => (
     <div className="flex flex-col items-center text-center py-8 px-4">
-      <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-8 relative">
-        <Check className="w-10 h-10 text-green-600" />
-        <div className="absolute inset-0 rounded-full border-4 border-green-200 animate-ping opacity-20" />
+      <div className="w-20 h-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-8 relative">
+        <Check className="w-10 h-10 text-green-600 dark:text-green-400" />
+        <div className="absolute inset-0 rounded-full border-4 border-green-200 dark:border-green-800 animate-ping opacity-20" />
       </div>
       <h1 className="text-3xl md:text-4xl font-heading font-bold mb-4">Tudo pronto!</h1>
       <p className="text-lg text-muted-foreground max-w-lg mb-8">
