@@ -810,4 +810,82 @@ CREATE POLICY tenant_isolation ON "whatsapp_templates"
         tenant_id = current_setting('app.tenant_id', true)
     );
 
+-- ---- buyer_selections -------------------------------------------------------------------
+ALTER TABLE "buyer_selections" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "buyer_selections" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "buyer_selections";
+CREATE POLICY tenant_isolation ON "buyer_selections"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- ai_actions -------------------------------------------------------------------
+ALTER TABLE "ai_actions" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "ai_actions" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "ai_actions";
+CREATE POLICY tenant_isolation ON "ai_actions"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- ai_action_audit -------------------------------------------------------------------
+ALTER TABLE "ai_action_audit" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "ai_action_audit" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "ai_action_audit";
+CREATE POLICY tenant_isolation ON "ai_action_audit"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- lead_score_weights -------------------------------------------------------------------
+ALTER TABLE "lead_score_weights" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "lead_score_weights" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "lead_score_weights";
+CREATE POLICY tenant_isolation ON "lead_score_weights"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- lead_assignment_state -------------------------------------------------------------------
+ALTER TABLE "lead_assignment_state" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "lead_assignment_state" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "lead_assignment_state";
+CREATE POLICY tenant_isolation ON "lead_assignment_state"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- signature_certificates -------------------------------------------------------------------
+ALTER TABLE "signature_certificates" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "signature_certificates" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "signature_certificates";
+CREATE POLICY tenant_isolation ON "signature_certificates"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
 COMMIT;

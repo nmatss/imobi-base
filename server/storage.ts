@@ -33,7 +33,14 @@ import type {
   NotificationPreference, InsertNotificationPreference,
   SavedReport, InsertSavedReport,
   ClientPortalAccess, InsertClientPortalAccess,
-  AnalyticsEvent, InsertAnalyticsEvent
+  AnalyticsEvent, InsertAnalyticsEvent,
+  BuyerSelection, InsertBuyerSelection,
+  BuyerSelectionItem, InsertBuyerSelectionItem,
+  AiAction, InsertAiAction,
+  AiActionAudit, InsertAiActionAudit,
+  LeadScoreWeights, InsertLeadScoreWeights,
+  LeadAssignmentState,
+  SignatureCertificate, InsertSignatureCertificate
 } from "@shared/schema-sqlite";
 
 // These types exist in the PG schema but not in schema-sqlite.
@@ -551,7 +558,42 @@ export interface IStorage {
   // Analytics
   createAnalyticsEvent(event: InsertAnalyticsEvent): Promise<AnalyticsEvent>;
   getAnalyticsEventsByTenant(tenantId: string, filters?: { eventType?: string; startDate?: string; endDate?: string; limit?: number }): Promise<AnalyticsEvent[]>;
-  getAnalyticsSummary(tenantId: string, period: 'today' | 'week' | 'month'): Promise<any>;}
+  getAnalyticsSummary(tenantId: string, period: 'today' | 'week' | 'month'): Promise<any>;
+  // ==================== BUYER SELECTIONS (Portal) ====================
+  createBuyerSelection(data: InsertBuyerSelection): Promise<BuyerSelection>;
+  getBuyerSelectionByToken(token: string): Promise<(BuyerSelection & { items: Array<BuyerSelectionItem & { property: Property | undefined }> }) | undefined>;
+  getBuyerSelectionsByTenant(tenantId: string): Promise<BuyerSelection[]>;
+  getBuyerSelection(id: string): Promise<BuyerSelection | undefined>;
+  addSelectionItems(items: InsertBuyerSelectionItem[]): Promise<BuyerSelectionItem[]>;
+  updateSelectionItemResponse(itemId: string, response: string, comment?: string): Promise<BuyerSelectionItem | undefined>;
+  closeBuyerSelection(id: string): Promise<BuyerSelection | undefined>;
+  // ==================== AI ACTIONS ====================
+  createAiAction(data: InsertAiAction): Promise<AiAction>;
+  getAiActionsByTenant(tenantId: string, filters?: { status?: string; targetType?: string; targetId?: string; actionType?: string }): Promise<AiAction[]>;
+  getAiActionsByLead(tenantId: string, leadId: string): Promise<AiAction[]>;
+  getAiAction(id: string): Promise<AiAction | undefined>;
+  updateAiActionStatus(id: string, patch: Partial<InsertAiAction>): Promise<AiAction | undefined>;
+  appendAiActionAudit(data: InsertAiActionAudit): Promise<AiActionAudit>;
+  getAiActionAudit(actionId: string): Promise<AiActionAudit[]>;
+  // ==================== AGENDA / CRM ====================
+  getVisitByConfirmationToken(token: string): Promise<Visit | undefined>;
+  updateVisitConfirmation(id: string, status: string): Promise<Visit | undefined>;
+  createRescheduledVisit(oldId: string, data: Partial<InsertVisit>): Promise<Visit>;
+  getUpcomingVisitsForReminder(windowStart: Date, windowEnd: Date): Promise<Visit[]>;
+  markVisitReminderSent(id: string): Promise<Visit | undefined>;
+  saveVisitChecklist(id: string, checklistJson: unknown): Promise<Visit | undefined>;
+  saveVisitFeedback(id: string, rating: number, notes: string | undefined, nextActionType: string | undefined, nextActionDueAt: Date | string | undefined): Promise<Visit | undefined>;
+  findLeadByDedup(tenantId: string, normalizedPhone: string | undefined, normalizedEmail: string | undefined): Promise<Lead | undefined>;
+  getLeadScoreWeights(tenantId: string): Promise<LeadScoreWeights>;
+  upsertLeadScoreWeights(tenantId: string, weights: Partial<InsertLeadScoreWeights>): Promise<LeadScoreWeights>;
+  getLeadAssignmentState(tenantId: string): Promise<LeadAssignmentState | undefined>;
+  advanceLeadAssignment(tenantId: string, nextUserId: string): Promise<LeadAssignmentState>;
+  getActiveBrokers(tenantId: string): Promise<User[]>;
+  // ==================== SIGNATURE CERTIFICATES (Legal) ====================
+  storeCertificate(data: InsertSignatureCertificate): Promise<SignatureCertificate>;
+  getCertificate(id: string): Promise<SignatureCertificate | undefined>;
+  getUserCertificates(tenantId: string, userId: string): Promise<SignatureCertificate[]>;
+}
 
 export class DbStorage implements IStorage {
   // Tenants
@@ -4046,6 +4088,407 @@ export class DbStorage implements IStorage {
     const uniqueSessions = Number(sessResult?.count || 0);
     const pageviewsByDay = await db.select({ date: sql<string>`date(${(schema as any).analyticsEvents.createdAt})`, count: sql<number>`count(*)` }).from((schema as any).analyticsEvents).where(and(baseCondition, eq((schema as any).analyticsEvents.eventType, 'pageview'))).groupBy(sql`date(${(schema as any).analyticsEvents.createdAt})`).orderBy(sql`date(${(schema as any).analyticsEvents.createdAt})`);
     return { totalPageviews, topPages: topPages.map((p: any) => ({ path: p.path || '/', count: Number(p.count) })), webVitals, errorCount, uniqueSessions, pageviewsByDay: pageviewsByDay.map((d: any) => ({ date: d.date, count: Number(d.count) })) };
+  }
+
+  // ==================== BUYER SELECTIONS (Portal) ====================
+  async createBuyerSelection(data: InsertBuyerSelection): Promise<BuyerSelection> {
+    const id = generateId();
+    const [created] = await db
+      .insert((schema as any).buyerSelections)
+      .values({ ...data, id, createdAt: now(), updatedAt: now() } as any)
+      .returning();
+    return created;
+  }
+
+  async getBuyerSelectionByToken(
+    token: string,
+  ): Promise<(BuyerSelection & { items: Array<BuyerSelectionItem & { property: Property | undefined }> }) | undefined> {
+    const [selection] = await db
+      .select()
+      .from((schema as any).buyerSelections)
+      .where(eq((schema as any).buyerSelections.publicToken, token));
+    if (!selection) return undefined;
+
+    const items = await db
+      .select()
+      .from((schema as any).buyerSelectionItems)
+      .where(eq((schema as any).buyerSelectionItems.selectionId, selection.id))
+      .orderBy((schema as any).buyerSelectionItems.sortOrder);
+
+    const propertyIds = items.map((i: any) => i.propertyId).filter(Boolean);
+    const propertiesList = propertyIds.length
+      ? await db.select().from(schema.properties).where(inArray(schema.properties.id, propertyIds))
+      : [];
+    const propertyMap = new Map<string, Property>(propertiesList.map((p: any) => [p.id, p]));
+
+    return {
+      ...(selection as any),
+      items: items.map((item: any) => ({ ...item, property: propertyMap.get(item.propertyId) })),
+    };
+  }
+
+  async getBuyerSelectionsByTenant(tenantId: string): Promise<BuyerSelection[]> {
+    return db
+      .select()
+      .from((schema as any).buyerSelections)
+      .where(eq((schema as any).buyerSelections.tenantId, tenantId))
+      .orderBy(desc((schema as any).buyerSelections.createdAt));
+  }
+
+  async getBuyerSelection(id: string): Promise<BuyerSelection | undefined> {
+    const [selection] = await db
+      .select()
+      .from((schema as any).buyerSelections)
+      .where(eq((schema as any).buyerSelections.id, id));
+    return selection;
+  }
+
+  async addSelectionItems(items: InsertBuyerSelectionItem[]): Promise<BuyerSelectionItem[]> {
+    if (!items.length) return [];
+    const values = items.map((item) => ({ ...item, id: generateId(), createdAt: now() }));
+    const created = await db.insert((schema as any).buyerSelectionItems).values(values as any).returning();
+    return created;
+  }
+
+  async updateSelectionItemResponse(
+    itemId: string,
+    response: string,
+    comment?: string,
+  ): Promise<BuyerSelectionItem | undefined> {
+    const [updated] = await db
+      .update((schema as any).buyerSelectionItems)
+      .set({ response, comment, respondedAt: now() } as any)
+      .where(eq((schema as any).buyerSelectionItems.id, itemId))
+      .returning();
+    return updated;
+  }
+
+  async closeBuyerSelection(id: string): Promise<BuyerSelection | undefined> {
+    const [updated] = await db
+      .update((schema as any).buyerSelections)
+      .set({ status: "closed", updatedAt: now() } as any)
+      .where(eq((schema as any).buyerSelections.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ==================== AI ACTIONS ====================
+  async createAiAction(data: InsertAiAction): Promise<AiAction> {
+    const id = generateId();
+    const values = {
+      ...data,
+      id,
+      payload: isSqlite ? JSON.stringify(data.payload ?? null) : data.payload,
+      result: isSqlite && (data as any).result !== undefined ? JSON.stringify((data as any).result) : (data as any).result,
+      createdAt: now(),
+      updatedAt: now(),
+    };
+    const [created] = await db.insert((schema as any).aiActions).values(values as any).returning();
+    return created;
+  }
+
+  async getAiActionsByTenant(
+    tenantId: string,
+    filters?: { status?: string; targetType?: string; targetId?: string; actionType?: string },
+  ): Promise<AiAction[]> {
+    const conditions: any[] = [eq((schema as any).aiActions.tenantId, tenantId)];
+    if (filters?.status) conditions.push(eq((schema as any).aiActions.status, filters.status));
+    if (filters?.targetType) conditions.push(eq((schema as any).aiActions.targetType, filters.targetType));
+    if (filters?.targetId) conditions.push(eq((schema as any).aiActions.targetId, filters.targetId));
+    if (filters?.actionType) conditions.push(eq((schema as any).aiActions.actionType, filters.actionType));
+    return db
+      .select()
+      .from((schema as any).aiActions)
+      .where(and(...conditions))
+      .orderBy(desc((schema as any).aiActions.createdAt));
+  }
+
+  async getAiActionsByLead(tenantId: string, leadId: string): Promise<AiAction[]> {
+    return db
+      .select()
+      .from((schema as any).aiActions)
+      .where(
+        and(
+          eq((schema as any).aiActions.tenantId, tenantId),
+          eq((schema as any).aiActions.targetType, "lead"),
+          eq((schema as any).aiActions.targetId, leadId),
+        ),
+      )
+      .orderBy(desc((schema as any).aiActions.createdAt));
+  }
+
+  async getAiAction(id: string): Promise<AiAction | undefined> {
+    const [action] = await db
+      .select()
+      .from((schema as any).aiActions)
+      .where(eq((schema as any).aiActions.id, id));
+    return action;
+  }
+
+  async updateAiActionStatus(id: string, patch: Partial<InsertAiAction>): Promise<AiAction | undefined> {
+    const data: any = { ...patch, updatedAt: now() };
+    if (isSqlite) {
+      if (data.payload !== undefined) data.payload = JSON.stringify(data.payload);
+      if (data.result !== undefined) data.result = JSON.stringify(data.result);
+    }
+    const [updated] = await db
+      .update((schema as any).aiActions)
+      .set(data)
+      .where(eq((schema as any).aiActions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async appendAiActionAudit(data: InsertAiActionAudit): Promise<AiActionAudit> {
+    const id = generateId();
+    const values: any = { ...data, id, createdAt: now() };
+    if (isSqlite) {
+      if (values.beforeState !== undefined) values.beforeState = JSON.stringify(values.beforeState);
+      if (values.afterState !== undefined) values.afterState = JSON.stringify(values.afterState);
+      if (values.details !== undefined) values.details = JSON.stringify(values.details);
+    }
+    const [created] = await db.insert((schema as any).aiActionAudit).values(values).returning();
+    return created;
+  }
+
+  async getAiActionAudit(actionId: string): Promise<AiActionAudit[]> {
+    return db
+      .select()
+      .from((schema as any).aiActionAudit)
+      .where(eq((schema as any).aiActionAudit.actionId, actionId))
+      .orderBy(desc((schema as any).aiActionAudit.createdAt));
+  }
+
+  // ==================== AGENDA / CRM ====================
+  async getVisitByConfirmationToken(token: string): Promise<Visit | undefined> {
+    const [visit] = await db
+      .select()
+      .from(schema.visits)
+      .where(eq((schema.visits as any).confirmationToken, token));
+    return visit;
+  }
+
+  async updateVisitConfirmation(id: string, status: string): Promise<Visit | undefined> {
+    const [updated] = await db
+      .update(schema.visits)
+      .set({ confirmationStatus: status, confirmedAt: now() } as any)
+      .where(eq(schema.visits.id, id))
+      .returning();
+    return updated;
+  }
+
+  async createRescheduledVisit(oldId: string, data: Partial<InsertVisit>): Promise<Visit> {
+    const id = generateId();
+    const scheduledFor =
+      data.scheduledFor && typeof data.scheduledFor === "object"
+        ? (data.scheduledFor as Date).toISOString()
+        : data.scheduledFor;
+    const values: any = {
+      ...data,
+      id,
+      scheduledFor,
+      rescheduledFromId: oldId,
+      status: "scheduled",
+      confirmationStatus: "pending",
+      createdAt: now(),
+    };
+    const [created] = await db.insert(schema.visits).values(values).returning();
+    return created;
+  }
+
+  async getUpcomingVisitsForReminder(windowStart: Date, windowEnd: Date): Promise<Visit[]> {
+    const start = windowStart instanceof Date ? windowStart.toISOString() : windowStart;
+    const end = windowEnd instanceof Date ? windowEnd.toISOString() : windowEnd;
+    return db
+      .select()
+      .from(schema.visits)
+      .where(
+        and(
+          gte(schema.visits.scheduledFor, start as any),
+          sql`${schema.visits.scheduledFor} <= ${end}`,
+          sql`${(schema.visits as any).reminderSentAt} is null`,
+        ),
+      )
+      .orderBy(schema.visits.scheduledFor);
+  }
+
+  async markVisitReminderSent(id: string): Promise<Visit | undefined> {
+    const [updated] = await db
+      .update(schema.visits)
+      .set({ reminderSentAt: now() } as any)
+      .where(eq(schema.visits.id, id))
+      .returning();
+    return updated;
+  }
+
+  async saveVisitChecklist(id: string, checklistJson: unknown): Promise<Visit | undefined> {
+    const serialized = typeof checklistJson === "string" ? checklistJson : JSON.stringify(checklistJson);
+    const [updated] = await db
+      .update(schema.visits)
+      .set({ checklistJson: serialized } as any)
+      .where(eq(schema.visits.id, id))
+      .returning();
+    return updated;
+  }
+
+  async saveVisitFeedback(
+    id: string,
+    rating: number,
+    notes: string | undefined,
+    nextActionType: string | undefined,
+    nextActionDueAt: Date | string | undefined,
+  ): Promise<Visit | undefined> {
+    const dueAt =
+      nextActionDueAt && typeof nextActionDueAt === "object"
+        ? (nextActionDueAt as Date).toISOString()
+        : nextActionDueAt;
+    const [updated] = await db
+      .update(schema.visits)
+      .set({
+        feedbackRating: rating,
+        feedbackNotes: notes,
+        feedbackAt: now(),
+        nextActionType,
+        nextActionDueAt: dueAt,
+      } as any)
+      .where(eq(schema.visits.id, id))
+      .returning();
+    return updated;
+  }
+
+  async findLeadByDedup(
+    tenantId: string,
+    normalizedPhone: string | undefined,
+    normalizedEmail: string | undefined,
+  ): Promise<Lead | undefined> {
+    const matchers: any[] = [];
+    if (normalizedPhone) matchers.push(eq(schema.leads.phone, normalizedPhone));
+    if (normalizedEmail) matchers.push(eq(schema.leads.email, normalizedEmail));
+    if (!matchers.length) return undefined;
+    const conditions: any[] = [eq(schema.leads.tenantId, tenantId), or(...matchers)];
+    const active = activeRowsFilter(schema.leads);
+    if (active) conditions.push(active);
+    const [lead] = await db
+      .select()
+      .from(schema.leads)
+      .where(and(...conditions))
+      .orderBy(desc(schema.leads.createdAt));
+    return lead;
+  }
+
+  async getLeadScoreWeights(tenantId: string): Promise<LeadScoreWeights> {
+    const [row] = await db
+      .select()
+      .from((schema as any).leadScoreWeights)
+      .where(eq((schema as any).leadScoreWeights.tenantId, tenantId));
+    if (row) return row;
+    return {
+      id: "",
+      tenantId,
+      budgetWeight: 25,
+      engagementWeight: 25,
+      profileWeight: 20,
+      urgencyWeight: 15,
+      behaviorWeight: 15,
+      hotThreshold: 70,
+      warmThreshold: 40,
+      updatedAt: now(),
+    } as any;
+  }
+
+  async upsertLeadScoreWeights(
+    tenantId: string,
+    weights: Partial<InsertLeadScoreWeights>,
+  ): Promise<LeadScoreWeights> {
+    const [existing] = await db
+      .select()
+      .from((schema as any).leadScoreWeights)
+      .where(eq((schema as any).leadScoreWeights.tenantId, tenantId));
+    if (existing) {
+      const [updated] = await db
+        .update((schema as any).leadScoreWeights)
+        .set({ ...weights, tenantId, updatedAt: now() } as any)
+        .where(eq((schema as any).leadScoreWeights.tenantId, tenantId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db
+      .insert((schema as any).leadScoreWeights)
+      .values({ ...weights, id: generateId(), tenantId, updatedAt: now() } as any)
+      .returning();
+    return created;
+  }
+
+  async getLeadAssignmentState(tenantId: string): Promise<LeadAssignmentState | undefined> {
+    const [row] = await db
+      .select()
+      .from((schema as any).leadAssignmentState)
+      .where(eq((schema as any).leadAssignmentState.tenantId, tenantId));
+    return row;
+  }
+
+  async advanceLeadAssignment(tenantId: string, nextUserId: string): Promise<LeadAssignmentState> {
+    const [existing] = await db
+      .select()
+      .from((schema as any).leadAssignmentState)
+      .where(eq((schema as any).leadAssignmentState.tenantId, tenantId));
+    if (existing) {
+      const [updated] = await db
+        .update((schema as any).leadAssignmentState)
+        .set({ lastAssignedUserId: nextUserId, updatedAt: now() } as any)
+        .where(eq((schema as any).leadAssignmentState.tenantId, tenantId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db
+      .insert((schema as any).leadAssignmentState)
+      .values({ id: generateId(), tenantId, lastAssignedUserId: nextUserId, updatedAt: now() } as any)
+      .returning();
+    return created;
+  }
+
+  async getActiveBrokers(tenantId: string): Promise<User[]> {
+    return db
+      .select()
+      .from(schema.users)
+      .where(
+        and(
+          eq(schema.users.tenantId, tenantId),
+          inArray(schema.users.role, ["broker", "agent", "corretor", "admin", "manager", "owner"]),
+        ),
+      )
+      .orderBy(schema.users.name);
+  }
+
+  // ==================== SIGNATURE CERTIFICATES (Legal) ====================
+  async storeCertificate(data: InsertSignatureCertificate): Promise<SignatureCertificate> {
+    const id = generateId();
+    const values: any = { ...data, id, createdAt: now() };
+    if (values.validFrom && typeof values.validFrom === "object") values.validFrom = (values.validFrom as Date).toISOString();
+    if (values.validTo && typeof values.validTo === "object") values.validTo = (values.validTo as Date).toISOString();
+    const [created] = await db.insert((schema as any).signatureCertificates).values(values).returning();
+    return created;
+  }
+
+  async getCertificate(id: string): Promise<SignatureCertificate | undefined> {
+    const [cert] = await db
+      .select()
+      .from((schema as any).signatureCertificates)
+      .where(eq((schema as any).signatureCertificates.id, id));
+    return cert;
+  }
+
+  async getUserCertificates(tenantId: string, userId: string): Promise<SignatureCertificate[]> {
+    return db
+      .select()
+      .from((schema as any).signatureCertificates)
+      .where(
+        and(
+          eq((schema as any).signatureCertificates.tenantId, tenantId),
+          eq((schema as any).signatureCertificates.userId, userId),
+        ),
+      )
+      .orderBy(desc((schema as any).signatureCertificates.createdAt));
   }
 
   // Table accessors for direct database access (needed by compliance and other modules)
