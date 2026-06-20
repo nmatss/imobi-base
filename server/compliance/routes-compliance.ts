@@ -34,6 +34,14 @@ import { createReadStream } from "fs";
 import { generateRateLimitKey } from "../middleware/rate-limit-key-generator";
 import { runWithTenantRlsContext } from "../db-rls";
 
+/**
+ * Versão dos documentos legais (Termos de Uso / Política de Privacidade) vigente
+ * no momento do registro de consentimento. Mantém rastreabilidade LGPD: ao
+ * atualizar os termos, basta apontar LEGAL_CONSENT_VERSION para a nova versão e
+ * os consentimentos passam a ser registrados com a versão correta.
+ */
+const LEGAL_CONSENT_VERSION = process.env.LEGAL_CONSENT_VERSION || "1.0.0";
+
 function isComplianceAdmin(req: Request): req is Request & { user: Express.User } {
   const role = req.user?.role;
   return role === "admin" || role === "super_admin";
@@ -82,7 +90,7 @@ export function registerComplianceRoutes(app: Express) {
       const result = await setCookieConsent(
         sessionId || "anonymous",
         preferences,
-        consentVersion || "1.0.0",
+        consentVersion || LEGAL_CONSENT_VERSION,
         userId,
         ipAddress,
         userAgent
@@ -160,7 +168,7 @@ export function registerComplianceRoutes(app: Express) {
         userId,
         tenantId,
         consentType: type as any,
-        consentVersion: "1.0.0", // TODO: Get from legal documents
+        consentVersion: LEGAL_CONSENT_VERSION,
         purpose,
         ipAddress,
         userAgent,

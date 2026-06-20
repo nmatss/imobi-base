@@ -16,6 +16,7 @@ import propertyLocationService from "./integrations/maps/property-location";
 import googleMapsClient from "./integrations/maps/google-maps-client";
 import mapsCache from "./integrations/maps/cache";
 import rateLimit from "express-rate-limit";
+import * as Sentry from "@sentry/node";
 import { validateBody, validateParams, validateQuery } from "./middleware/validate";
 import { generateRateLimitKey } from "./middleware/rate-limit-key-generator";
 import {
@@ -641,22 +642,31 @@ function monitorHighUsage(tenantId: string, operation: string): void {
   const threshold = ALERT_THRESHOLDS[operation as keyof typeof ALERT_THRESHOLDS] || 500;
 
   if (current.count > threshold) {
-    console.warn(`[MAPS MONITORING] High ${operation} usage detected`, {
+    const alert = {
+      type: 'high_api_usage',
+      service: 'google-maps',
       tenantId,
+      operation,
       count: current.count,
       threshold,
       period: '1 hour',
       timestamp: new Date().toISOString(),
-    });
+    };
 
-    // TODO: Enviar alerta para admin
-    // await sendAdminAlert({
-    //   type: 'high_api_usage',
-    //   service: 'google-maps',
-    //   tenantId,
-    //   operation,
-    //   count: current.count,
-    // });
+    console.warn(`[MAPS MONITORING] High ${operation} usage detected`, alert);
+
+    // Encaminha o alerta para o admin via Sentry (já é dependência do projeto).
+    // Mantém os mesmos campos do objeto de alerta logado acima.
+    Sentry.captureMessage(`High google-maps ${operation} usage`, {
+      level: 'warning',
+      tags: {
+        alert: 'high_api_usage',
+        service: 'google-maps',
+        operation,
+        tenant_id: tenantId,
+      },
+      extra: alert,
+    });
   }
 }
 
