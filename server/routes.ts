@@ -86,6 +86,7 @@ import { subscriptionGuard } from "./middleware/subscription-guard";
 import { validateResourceTenant } from "./middleware/tenant-resource";
 import { assertVisitSchedulePolicy } from "./services/visit-scheduling";
 import { summarizeLeadSla } from "./services/lead-sla";
+import { applyLeadDedupAndAssign } from "./services/lead-intake";
 
 // ===== ERROR HELPER =====
 function toHttpError(error: unknown): { status: number; message: string } {
@@ -335,6 +336,15 @@ const csrfExcludedPaths = [
   "/api/portal/forgot-password",
   "/api/portal/reset-password",
   "/api/portal/logout",
+  // Confirmação/reagendamento público de visita por token (sem sessão). Os
+  // endpoints autenticados /api/visits/:id/checklist e /:id/feedback NÃO casam
+  // com estes prefixos, então continuam exigindo CSRF.
+  "/api/visits/confirm/",
+  "/api/visits/reschedule/",
+  // Seleção de imóveis do comprador via token público (sem sessão). Os endpoints
+  // autenticados da imobiliária são /api/portal/buyer-selections* (prefixo
+  // diferente), então continuam exigindo CSRF.
+  "/api/portal/selection/",
   "/api/cron/",
   "/api/admin/bootstrap",
   // Fluxos pré-autenticação do app principal: o usuário ainda não tem sessão
@@ -1940,15 +1950,20 @@ export async function registerRoutes(
       const data = insertLeadSchema.parse(req.body);
       // Lead publico conta contra o limite mensal do tenant dono do site.
       // Sem req.user aqui, entao a checagem usa o tenantId do proprio lead.
-      const lead = await runWithTenantRlsContext(data.tenantId, async () => {
+      const outcome = await runWithTenantRlsContext(data.tenantId, async () => {
         if (await isLeadLimitReachedForTenant(data.tenantId)) {
-          return null;
+          return { status: "limit" as const };
         }
 
-        return storage.createLead(data);
+        const intake = await applyLeadDedupAndAssign(data.tenantId, data);
+        if (intake.duplicate) {
+          return { status: "duplicate" as const, existingLead: intake.existingLead };
+        }
+
+        return { status: "created" as const, lead: await storage.createLead(intake.leadData) };
       });
 
-      if (!lead) {
+      if (outcome.status === "limit") {
         return res.status(403).json({
           error: "Lead limit reached",
           upgradeRequired: true,
@@ -1957,7 +1972,14 @@ export async function registerRoutes(
         });
       }
 
-      res.status(201).json({ success: true, lead });
+      if (outcome.status === "duplicate") {
+        return res.status(409).json({
+          error: "Lead duplicado para este telefone/email",
+          existingLeadId: outcome.existingLead?.id,
+        });
+      }
+
+      res.status(201).json({ success: true, lead: outcome.lead });
     } catch (error: unknown) {
       res.status(400).json({
         error: error instanceof Error ? error.message : "Erro ao criar lead",
@@ -2030,7 +2052,13 @@ export async function registerRoutes(
         tenantId: req.user!.tenantId,
       });
       await validateLeadAssignment(req.user!.tenantId, data.assignedTo);
-      const lead = await storage.createLead(data);
+      const intake = await applyLeadDedupAndAssign(req.user!.tenantId, data);
+      if (intake.duplicate) {
+        return apiError(res, 409, "Lead duplicado para este telefone/email", "LEAD_DUPLICATE", {
+          existingLeadId: intake.existingLead?.id,
+        });
+      }
+      const lead = await storage.createLead(intake.leadData);
       apiResponse(res, lead, undefined, 201);
     } catch (error: unknown) {
       apiError(

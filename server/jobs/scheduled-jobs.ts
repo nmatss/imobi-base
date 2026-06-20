@@ -389,6 +389,20 @@ export async function runCleanupSoftDeletes(): Promise<void> {
   console.log("[Cron] Soft-delete cleanup completed");
 }
 
+/**
+ * Send visit confirmation reminders for visits happening in the next 24h.
+ */
+export async function runVisitReminders(): Promise<void> {
+  const { processVisitReminders } = await import("../services/visit-notifications");
+
+  const windowStart = new Date();
+  const windowEnd = new Date(windowStart.getTime() + 24 * 60 * 60 * 1000);
+
+  console.log("[Cron] Running visit reminders sweep (next 24h)...");
+  const { processed } = await processVisitReminders(windowStart, windowEnd);
+  console.log(`[Cron] Visit reminders complete: ${processed} reminders enqueued`);
+}
+
 // ===================================================================
 // NODE-CRON FALLBACK (for non-Vercel deployments: Docker, Railway, etc.)
 //
@@ -455,6 +469,7 @@ export function initializeScheduledJobs(): void {
     "cleanup-temp-files": runCleanupTempFiles,
     "cleanup-soft-deletes": runCleanupSoftDeletes,
     "enforce-plan-limits": runEnforcePlanLimits,
+    "visit-reminders": runVisitReminders,
   };
 
   for (const job of CRON_JOB_MANIFEST) {

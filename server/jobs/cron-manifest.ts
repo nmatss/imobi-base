@@ -9,7 +9,8 @@ export type CronJobName =
   | "database-backup"
   | "cleanup-temp-files"
   | "cleanup-soft-deletes"
-  | "enforce-plan-limits";
+  | "enforce-plan-limits"
+  | "visit-reminders";
 
 export interface CronJobManifestEntry {
   name: CronJobName;
@@ -106,6 +107,14 @@ export const CRON_JOB_MANIFEST: CronJobManifestEntry[] = [
     path: "/api/cron/enforce-plan-limits",
     localSchedule: "30 3 * * *",
     vercelSchedule: "30 6 * * *",
+    timezone: CRON_TIMEZONE,
+  },
+  {
+    name: "visit-reminders",
+    label: "Visit Confirmation Reminders",
+    path: "/api/cron/visit-reminders",
+    localSchedule: "0 * * * *",
+    vercelSchedule: "0 * * * *",
     timezone: CRON_TIMEZONE,
   },
 ];

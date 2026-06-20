@@ -23,6 +23,7 @@ import {
   runCleanupTempFiles,
   runCleanupSoftDeletes,
   runEnforcePlanLimits,
+  runVisitReminders,
 } from "./jobs/scheduled-jobs";
 import { CRON_JOB_MANIFEST, type CronJobName } from "./jobs/cron-manifest";
 import { getRedisClient } from "./cache/redis-client";
@@ -322,6 +323,7 @@ export function registerCronRoutes(app: Express): void {
     "cleanup-temp-files": runCleanupTempFiles,
     "cleanup-soft-deletes": runCleanupSoftDeletes,
     "enforce-plan-limits": runEnforcePlanLimits,
+    "visit-reminders": runVisitReminders,
   };
 
   for (const job of CRON_JOB_MANIFEST) {

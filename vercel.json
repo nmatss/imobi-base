@@ -83,7 +83,8 @@
     { "path": "/api/cron/database-backup", "schedule": "0 5 * * *" },
     { "path": "/api/cron/cleanup-temp-files", "schedule": "0 6 * * 0" },
     { "path": "/api/cron/cleanup-soft-deletes", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/enforce-plan-limits", "schedule": "30 6 * * *" }
+    { "path": "/api/cron/enforce-plan-limits", "schedule": "30 6 * * *" },
+    { "path": "/api/cron/visit-reminders", "schedule": "0 * * * *" }
   ],
   "env": {
     "NODE_ENV": "production"

@@ -16,6 +16,10 @@ import { registerInspectionRoutes } from "./routes-inspections";
 import { registerPortalRoutes } from "./routes-portal";
 import { registerExtensionRoutes } from "./routes-extensions";
 import { registerDocsRoutes } from "./routes-docs";
+import { registerBuyerPortalRoutes } from "./routes-buyer-portal";
+import { registerAiActionRoutes } from "./routes-ai-actions";
+import { registerAgendaCrmRoutes } from "./routes-agenda-crm";
+import { registerSignatureIntegrityRoutes } from "./routes-signature-integrity";
 import { createServer } from "http";
 import { initializeSentry, addSentryErrorHandler } from "./monitoring/sentry";
 import { initializeRedis } from "./cache/redis-client";
@@ -148,6 +152,9 @@ const appReadyPromise: Promise<void> = (async () => {
   // Register e-signature routes
   registerESignatureRoutes(app);
 
+  // Register signature integrity routes (verify/inspect document signatures)
+  registerSignatureIntegrityRoutes(app);
+
   // Register WhatsApp routes
   registerWhatsAppRoutes(app);
 
@@ -183,6 +190,15 @@ const appReadyPromise: Promise<void> = (async () => {
 
   // Register portal routes (owner/renter self-service)
   registerPortalRoutes(app);
+
+  // Register buyer selection portal routes (/api/portal/selection/*, /api/portal/buyer-selections*)
+  registerBuyerPortalRoutes(app);
+
+  // Register AI actions routes (plan/approve/execute IA actions)
+  registerAiActionRoutes(app);
+
+  // Register agenda + CRM routes (visits confirm/reschedule, lead intake)
+  registerAgendaCrmRoutes(app);
 
   // Register extension routes (settings, roles, permissions, integrations)
   registerExtensionRoutes(app);

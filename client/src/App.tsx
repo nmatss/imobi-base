@@ -48,6 +48,8 @@ const OwnerPortal = lazy(() => import("@/pages/portal/owner-portal"));
 const RenterPortal = lazy(() => import("@/pages/portal/renter-portal"));
 const PortalAdmin = lazy(() => import("@/pages/portal/portal-admin"));
 const PortalResetPassword = lazy(() => import("@/pages/portal/reset-password"));
+const BuyerSelectionPage = lazy(() => import("@/pages/portal/buyer-selection"));
+const VisitConfirmPage = lazy(() => import("@/pages/visits/confirm"));
 const OnboardingPage = lazy(() => import("@/pages/onboarding"));
 const PricingPage = lazy(() => import("@/pages/public/pricing"));
 const TermsPage = lazy(() => import("@/pages/public/terms"));
@@ -368,6 +370,10 @@ function Router() {
         <Route key="portal-reset" path="/portal/reset-password" component={() => <ErrorBoundary><PortalResetPassword /></ErrorBoundary>} />
         <Route key="portal-owner" path="/portal/owner" component={() => <ErrorBoundary><OwnerPortal /></ErrorBoundary>} />
         <Route key="portal-renter" path="/portal/renter" component={() => <ErrorBoundary><RenterPortal /></ErrorBoundary>} />
+
+        {/* Public token-based pages (no auth) */}
+        <Route key="buyer-selection" path="/s/:token" component={() => <ErrorBoundary><BuyerSelectionPage /></ErrorBoundary>} />
+        <Route key="visit-confirm" path="/v/confirm/:token" component={() => <ErrorBoundary><VisitConfirmPage /></ErrorBoundary>} />
 
         <Route key="dashboard" path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
         <Route key="properties" path="/properties" component={() => <ProtectedRoute component={PropertiesList} />} />
