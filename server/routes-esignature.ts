@@ -626,18 +626,30 @@ export function registerESignatureRoutes(app: Express) {
 
       const certInfo = certificateStorage.parseCertificate(certificateData);
 
+      // Reject malformed / expired certificates before persisting. Full
+      // ICP-Brasil chain validation is a follow-up (requires ICP root bundle).
+      if (certInfo.parseError) {
+        res.status(400).json({ error: certInfo.parseError });
+        return;
+      }
+      if (certInfo.expired) {
+        res.status(400).json({ error: 'Certificado expirado ou ainda não válido' });
+        return;
+      }
+
       const certificate = await certificateStorage.storeCertificate({
         tenantId,
         userId,
         certificateType: certificateType || 'ICP-Brasil',
         holderName: certInfo.holderName || 'Unknown',
         issuer: certInfo.issuer || 'Unknown',
-        serialNumber: 'MOCK_SERIAL',
+        serialNumber: certInfo.serialNumber || '',
         validFrom: certInfo.validFrom || new Date(),
         validUntil: certInfo.validUntil || new Date(),
         status: certInfo.status || 'active',
         certificateData,
-      });
+        fingerprint: certInfo.fingerprint,
+      } as any);
 
       await auditTrailService.logEvent({
         tenantId,

@@ -3,8 +3,9 @@
  * Manages ICP-Brasil digital certificates for enhanced signature security
  */
 
-import { db, schema } from '../../db';
-import { eq, and, gt } from 'drizzle-orm';
+import { X509Certificate } from 'node:crypto';
+import { storage } from '../../storage';
+import type { SignatureCertificate } from '../../../shared/schema';
 
 export interface DigitalCertificate {
   id: string;
@@ -25,48 +26,107 @@ export interface DigitalCertificate {
   updatedAt: Date;
 }
 
+/**
+ * Map a persisted signature_certificates row to the richer in-memory
+ * DigitalCertificate shape used by the service layer. The DB schema is leaner
+ * (it stores subject/issuer/serial/validFrom/validTo/fingerprint/certificatePem)
+ * so derived fields (status, type) are computed here.
+ */
+// The dual schema (pg uses Date, sqlite uses string for timestamps) makes the
+// inferred row type vary by build target; accept a structural superset and
+// normalize dates defensively via `new Date(... as any)`.
+type StoredCertRow = Omit<SignatureCertificate, 'validFrom' | 'validTo' | 'createdAt'> & {
+  validFrom: Date | string | null;
+  validTo: Date | string | null;
+  createdAt: Date | string;
+};
+
+function toDigitalCertificate(row: StoredCertRow): DigitalCertificate {
+  const validFrom = row.validFrom ? new Date(row.validFrom as any) : new Date(0);
+  const validUntil = row.validTo ? new Date(row.validTo as any) : new Date(0);
+  const now = new Date();
+  const status: DigitalCertificate['status'] = validUntil < now ? 'expired' : 'active';
+
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    userId: row.userId ?? '',
+    certificateType: 'ICP-Brasil',
+    // The DB stores the X.509 subject DN; expose it as holderName for callers.
+    holderName: row.subject ?? 'Unknown',
+    issuer: row.issuer ?? 'Unknown',
+    serialNumber: row.serialNumber ?? '',
+    validFrom,
+    validUntil,
+    status,
+    certificateData: row.certificatePem,
+    publicKey: undefined,
+    createdAt: row.createdAt ? new Date(row.createdAt as any) : new Date(),
+    updatedAt: row.createdAt ? new Date(row.createdAt as any) : new Date(),
+  };
+}
+
 export class CertificateStorage {
   /**
-   * Store a digital certificate
+   * Store a digital certificate.
+   *
+   * Persists into the shared signature_certificates table via the storage
+   * layer. The PEM is required for storage; subject/issuer/serial/validity/
+   * fingerprint are taken from the parsed certificate where available.
    */
   async storeCertificate(cert: Omit<DigitalCertificate, 'id' | 'createdAt' | 'updatedAt'>): Promise<DigitalCertificate> {
-    const certificate: DigitalCertificate = {
-      ...cert,
-      id: this.generateCertId(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    const pem = cert.certificateData;
+    if (!pem) {
+      throw new Error('certificateData (PEM) is required to store a certificate');
+    }
 
-    // TODO: Store in database when schema is extended
-    console.log('Certificate stored:', certificate.id);
+    const created = await storage.storeCertificate({
+      tenantId: cert.tenantId,
+      userId: cert.userId || null,
+      serialNumber: cert.serialNumber || null,
+      subject: cert.holderName || null,
+      issuer: cert.issuer || null,
+      validFrom: cert.validFrom ?? null,
+      validTo: cert.validUntil ?? null,
+      certificatePem: pem,
+      fingerprint: (cert as { fingerprint?: string }).fingerprint ?? null,
+    } as any);
 
-    return certificate;
+    return toDigitalCertificate(created);
   }
 
   /**
    * Get certificate by ID
    */
   async getCertificate(certId: string): Promise<DigitalCertificate | null> {
-    // TODO: Implement database lookup
-    console.log('Getting certificate:', certId);
-    return null;
+    const row = await storage.getCertificate(certId);
+    return row ? toDigitalCertificate(row) : null;
   }
 
   /**
-   * Get all certificates for a user
+   * Get all certificates for a user within a tenant.
+   *
+   * tenantId is required by the storage layer (RLS / tenant isolation). It is
+   * accepted as a second argument for backward compatibility with the original
+   * single-argument signature.
    */
-  async getUserCertificates(userId: string): Promise<DigitalCertificate[]> {
-    // TODO: Implement database lookup
-    console.log('Getting certificates for user:', userId);
-    return [];
+  async getUserCertificates(userId: string, tenantId?: string): Promise<DigitalCertificate[]> {
+    if (!tenantId) {
+      // Without a tenant we cannot safely scope the query; return empty rather
+      // than leaking cross-tenant data.
+      console.warn('getUserCertificates called without tenantId — returning empty set');
+      return [];
+    }
+    const rows = await storage.getUserCertificates(tenantId, userId);
+    return rows.map(toDigitalCertificate);
   }
 
   /**
    * Get active certificates for a user
    */
-  async getActiveCertificates(userId: string): Promise<DigitalCertificate[]> {
+  async getActiveCertificates(userId: string, tenantId?: string): Promise<DigitalCertificate[]> {
     const now = new Date();
-    const allCerts = await this.getUserCertificates(userId);
+    const allCerts = await this.getUserCertificates(userId, tenantId);
 
     return allCerts.filter(cert =>
       cert.status === 'active' &&
@@ -177,17 +237,77 @@ export class CertificateStorage {
   /**
    * Extract certificate information
    */
-  parseCertificate(certData: string): Partial<DigitalCertificate> {
-    // TODO: Implement X.509 certificate parsing
-    // For now, return mock data
+  parseCertificate(certData: string): Partial<DigitalCertificate> & {
+    fingerprint?: string;
+    parseError?: string;
+    expired?: boolean;
+  } {
+    // Real X.509 parsing via node:crypto. Accepts PEM (or DER base64 wrapped in
+    // PEM headers). Extracts subject/issuer/validity/serial/fingerprint.
+    //
+    // SCOPE: This performs structural parsing + temporal validity only. It does
+    // NOT validate the certificate chain against ICP-Brasil roots, nor CRL/OCSP
+    // revocation — that requires the ICP root bundle (ops decision). See notes.
+    let x509: X509Certificate;
+    try {
+      x509 = new X509Certificate(certData);
+    } catch (error: any) {
+      return {
+        parseError: `Falha ao parsear certificado X.509: ${error?.message || String(error)}`,
+      };
+    }
+
+    const validFrom = new Date(x509.validFrom);
+    const validUntil = new Date(x509.validTo);
+    const now = new Date();
+    const expired = !(validUntil > now) || validFrom > now;
+
+    // serialNumber from node is uppercase hex; normalize fingerprint to a
+    // conventional colon-separated SHA-256 form.
+    const fingerprint = x509.fingerprint256 || x509.fingerprint;
+
     return {
       certificateType: 'ICP-Brasil',
-      holderName: 'Mock Certificate',
-      issuer: 'ICP-Brasil AC',
-      validFrom: new Date(),
-      validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-      status: 'active',
+      holderName: x509.subject,
+      issuer: x509.issuer,
+      serialNumber: x509.serialNumber,
+      validFrom,
+      validUntil,
+      status: expired ? 'expired' : 'active',
+      publicKey: x509.publicKey ? x509.publicKey.export({ type: 'spki', format: 'pem' }).toString() : undefined,
+      fingerprint,
+      expired,
     };
+  }
+
+  /**
+   * Basic (stdlib-only) certificate validation: parse OK + not temporally
+   * expired. Does NOT establish full ICP-Brasil legal validity (chain/CRL/OCSP).
+   */
+  validateParsedCertificate(certData: string): { valid: boolean; errors: string[]; warnings: string[] } {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    const parsed = this.parseCertificate(certData);
+
+    if (parsed.parseError) {
+      errors.push(parsed.parseError);
+      return { valid: false, errors, warnings };
+    }
+
+    const now = new Date();
+    if (parsed.validFrom && parsed.validFrom > now) {
+      errors.push('Certificado ainda não é válido (data de início no futuro)');
+    }
+    if (parsed.validUntil && !(parsed.validUntil > now)) {
+      errors.push('Certificado expirado');
+    }
+
+    // Chain/revocation cannot be verified with stdlib alone.
+    warnings.push(
+      'Validação de cadeia ICP-Brasil e revogação (CRL/OCSP) não realizada — requer bundle de raízes ICP-Brasil (ação de ops).',
+    );
+
+    return { valid: errors.length === 0, errors, warnings };
   }
 
   /**
