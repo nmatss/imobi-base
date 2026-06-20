@@ -874,6 +874,11 @@ export function registerFeatureRoutes(app: Express) {
         return res.status(404).json({ error: "Assinatura não encontrada" });
       }
 
+      const expiresAt = signature[0].expiresAt ? new Date(signature[0].expiresAt) : null;
+      if (!expiresAt || Number.isNaN(expiresAt.getTime()) || expiresAt < new Date()) {
+        return res.status(400).json({ error: "Link expirado" });
+      }
+
       // Mark as viewed
       if (!signature[0].viewedAt) {
         await db.update(digitalSignatures)
@@ -908,12 +913,13 @@ export function registerFeatureRoutes(app: Express) {
         return res.status(404).json({ error: "Assinatura não encontrada" });
       }
 
-      if (signature[0].status === 'signed') {
-        return res.status(400).json({ error: "Documento já assinado" });
+      const expiresAt = signature[0].expiresAt ? new Date(signature[0].expiresAt) : null;
+      if (!expiresAt || Number.isNaN(expiresAt.getTime()) || expiresAt < new Date()) {
+        return res.status(400).json({ error: "Link expirado" });
       }
 
-      if (new Date(signature[0].expiresAt!) < new Date()) {
-        return res.status(400).json({ error: "Link expirado" });
+      if (signature[0].status === 'signed') {
+        return res.status(400).json({ error: "Documento já assinado" });
       }
 
       // Generate signature hash

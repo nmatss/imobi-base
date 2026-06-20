@@ -31,18 +31,18 @@ export default function CheckoutCancelPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2">
-            <Link href="/pricing" className="flex-1">
-              <Button variant="default" className="w-full">
+            <Button asChild variant="default" className="flex-1 w-full">
+              <Link href="/pricing">
                 <CreditCard className="w-4 h-4 mr-2" />
                 Ver planos
-              </Button>
-            </Link>
-            <Link href="/dashboard" className="flex-1">
-              <Button variant="outline" className="w-full">
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="flex-1 w-full">
+              <Link href="/dashboard">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Voltar ao dashboard
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
 
           <p className="mt-6 pt-4 border-t text-xs text-muted-foreground text-center">

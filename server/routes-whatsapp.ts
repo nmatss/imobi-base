@@ -12,10 +12,12 @@ import type { Express, Request, Response } from "express";
 import rateLimit from 'express-rate-limit';
 import { whatsappAPI } from "./integrations/whatsapp/business-api";
 import { templateManager } from "./integrations/whatsapp/template-manager";
+import type { CreateTemplateParams } from "./integrations/whatsapp/template-manager";
 import { conversationManager } from "./integrations/whatsapp/conversation-manager";
 import { autoResponder } from "./integrations/whatsapp/auto-responder";
 import { messageQueue } from "./integrations/whatsapp/message-queue";
 import { webhookHandler } from "./integrations/whatsapp/webhook-handler";
+import { normalizeWhatsAppPhoneNumberId } from "./integrations/whatsapp/phone-number-id";
 import { log } from "./utils/log";
 import { validateExternalUrlResolved } from "./security/url-validator";
 import { generateRateLimitKey } from "./middleware/rate-limit-key-generator";
@@ -28,6 +30,28 @@ import {
   markWebhookEventProcessed,
   reserveWebhookEvent,
 } from "./integrations/webhook-ledger";
+
+const IMMUTABLE_CLIENT_FIELDS = new Set([
+  "id",
+  "tenantId",
+  "tenant_id",
+  "userId",
+  "user_id",
+  "createdAt",
+  "created_at",
+  "updatedAt",
+  "updated_at",
+]);
+
+function stripImmutablePayloadFields<T extends Record<string, unknown>>(payload: T): Partial<T> {
+  const sanitized: Partial<T> = {};
+  for (const [key, value] of Object.entries(payload || {})) {
+    if (!IMMUTABLE_CLIENT_FIELDS.has(key)) {
+      sanitized[key as keyof T] = value as T[keyof T];
+    }
+  }
+  return sanitized;
+}
 
 // ==================== RATE LIMITERS ====================
 
@@ -327,10 +351,11 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
+      const safeTemplatePayload = stripImmutablePayloadFields(req.body);
       const template = await templateManager.createTemplate({
+        ...safeTemplatePayload,
         tenantId: req.user.tenantId,
-        ...req.body,
-      });
+      } as CreateTemplateParams);
 
       res.json({ template });
     } catch (error: any) {
@@ -352,7 +377,7 @@ export function registerWhatsAppRoutes(app: Express) {
       const template = await templateManager.updateTemplate(
         req.user.tenantId,
         req.params.id,
-        req.body
+        stripImmutablePayloadFields(req.body)
       );
 
       if (!template) {
@@ -584,9 +609,10 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
+      const safeAutoResponsePayload = stripImmutablePayloadFields(req.body);
       const autoResponse = await autoResponder.createAutoResponse({
+        ...safeAutoResponsePayload,
         tenantId: req.user.tenantId,
-        ...req.body,
       });
 
       res.json({ autoResponse });
@@ -609,7 +635,7 @@ export function registerWhatsAppRoutes(app: Express) {
       const autoResponse = await autoResponder.updateAutoResponse(
         req.params.id,
         req.user.tenantId,
-        req.body
+        stripImmutablePayloadFields(req.body)
       );
 
       res.json({ autoResponse });
@@ -727,8 +753,9 @@ export function registerWhatsAppRoutes(app: Express) {
         const changes = Array.isArray(entry?.changes) ? entry.changes : [];
         for (const change of changes) {
           const phoneNumberId: unknown = change?.value?.metadata?.phone_number_id;
+          const normalizedPhoneNumberId = normalizeWhatsAppPhoneNumberId(phoneNumberId);
 
-          if (typeof phoneNumberId !== "string" || !phoneNumberId) {
+          if (!normalizedPhoneNumberId) {
             log('[WHATSAPP] Webhook change sem phone_number_id; ignorado', "whatsapp");
             continue;
           }
@@ -741,14 +768,14 @@ export function registerWhatsAppRoutes(app: Express) {
           const eventId = getWhatsAppWebhookEventId(entry.id, change, payloadDigest);
           const eventType = getWhatsAppWebhookEventType(change);
 
-          const tenantId = await runWithWhatsAppPhoneNumberRlsContext(phoneNumberId, () =>
-            webhookHandler.resolveTenantId(phoneNumberId),
+          const tenantId = await runWithWhatsAppPhoneNumberRlsContext(normalizedPhoneNumberId, () =>
+            webhookHandler.resolveTenantId(normalizedPhoneNumberId),
           );
 
           if (!tenantId) {
             // FAIL-CLOSED: sem mapeamento, nao gravamos nada.
             log(
-              `[WHATSAPP] Nenhum tenant mapeado para phone_number_id ${phoneNumberId}; evento ignorado (fail-closed)`,
+              `[WHATSAPP] Nenhum tenant mapeado para phone_number_id ${normalizedPhoneNumberId}; evento ignorado (fail-closed)`,
               "whatsapp"
             );
             continue;

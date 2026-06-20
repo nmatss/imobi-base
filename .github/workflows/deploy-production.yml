@@ -112,21 +112,6 @@ jobs:
           echo "Automatic production migrations are disabled by policy."
           echo "Apply reviewed migrations before deploy, one file at a time, following docs/DEPLOYMENT_RUNBOOK.md."
 
-      - name: Notify Sentry of Deployment
-        if: always()
-        run: |
-          curl -X POST "https://sentry.io/api/0/organizations/${{ secrets.SENTRY_ORG }}/releases/" \
-            -H "Authorization: Bearer ${{ secrets.SENTRY_AUTH_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "version": "${{ github.sha }}",
-              "projects": ["imobibase"],
-              "refs": [{
-                "repository": "${{ github.repository }}",
-                "commit": "${{ github.sha }}"
-              }]
-            }' || echo "⚠️  Sentry notification failed (non-blocking)"
-
       - name: Health Check
         run: |
           echo "Waiting 10s for deployment to stabilize..."
@@ -144,6 +129,21 @@ jobs:
             echo "::error::Production deployment is not healthy!"
             exit 1
           fi
+
+      - name: Notify Sentry of Deployment
+        if: success() && steps.deploy.outputs.DEPLOY_URL != ''
+        run: |
+          curl -X POST "https://sentry.io/api/0/organizations/${{ secrets.SENTRY_ORG }}/releases/" \
+            -H "Authorization: Bearer ${{ secrets.SENTRY_AUTH_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "version": "${{ github.sha }}",
+              "projects": ["imobibase"],
+              "refs": [{
+                "repository": "${{ github.repository }}",
+                "commit": "${{ github.sha }}"
+              }]
+            }' || echo "⚠️  Sentry notification failed (non-blocking)"
 
       - name: Create GitHub Deployment
         uses: actions/github-script@v7

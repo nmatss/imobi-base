@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fetchExternalUrl } from "../server/security/url-validator";
 
 function fail(message: string): never {
   console.error(message);
@@ -100,7 +101,10 @@ let resolvedBackupFile = backupFile;
 
 try {
   if (backupUrl) {
-    const response = await fetch(backupUrl);
+    const response = await fetchExternalUrl(backupUrl, {
+      maxRedirects: 3,
+      timeoutMs: 60_000,
+    });
     if (!response.ok) {
       fail(`Failed to download backup: HTTP ${response.status}`);
     }

@@ -145,9 +145,9 @@ export default function TenantLanding() {
         <div className="text-center">
           <h1 className="text-4xl font-bold mb-4">404</h1>
           <p className="text-muted-foreground mb-4">{error || "Imobiliária não encontrada."}</p>
-          <Link href="/">
-            <Button variant="link">Voltar para o início</Button>
-          </Link>
+          <Button asChild variant="link">
+            <Link href="/">Voltar para o início</Link>
+          </Button>
         </div>
       </div>
     );
@@ -225,8 +225,8 @@ export default function TenantLanding() {
           {/* Desktop Navigation */}
           <nav className="hidden md:flex gap-6 text-sm font-medium">
             <a href="#" className="hover:text-primary transition-colors">Início</a>
-            <Link href={`/e/${tenantSlug}/imoveis`}>
-              <a className="hover:text-primary transition-colors">Imóveis</a>
+            <Link href={`/e/${tenantSlug}/imoveis`} className="hover:text-primary transition-colors">
+              Imóveis
             </Link>
             <a href="#sobre" className="hover:text-primary transition-colors">Sobre</a>
             <a href="#contato" className="hover:text-primary transition-colors">Contato</a>
@@ -234,15 +234,15 @@ export default function TenantLanding() {
 
           {/* Desktop Actions */}
           <div className="hidden md:flex items-center gap-4">
-            <Link href="/login">
-              <Button variant="ghost" size="sm">Área do Corretor</Button>
-            </Link>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/login">Área do Corretor</Link>
+            </Button>
             {tenant.phone && (
-              <a href={`https://wa.me/${tenant.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
-                <Button size="sm" style={{ backgroundColor: tenant.primaryColor }}>
+              <Button asChild size="sm" style={{ backgroundColor: tenant.primaryColor }}>
+                <a href={`https://wa.me/${tenant.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
                   Falar no WhatsApp
-                </Button>
-              </a>
+                </a>
+              </Button>
             )}
           </div>
 
@@ -252,7 +252,8 @@ export default function TenantLanding() {
             size="icon"
             className="md:hidden"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle menu"
+            aria-label={mobileMenuOpen ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={mobileMenuOpen}
           >
             {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
@@ -269,13 +270,12 @@ export default function TenantLanding() {
               >
                 Início
               </a>
-              <Link href={`/e/${tenantSlug}/imoveis`}>
-                <a
-                  className="py-2 px-3 rounded-md hover:bg-muted transition-colors"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Imóveis
-                </a>
+              <Link
+                href={`/e/${tenantSlug}/imoveis`}
+                className="py-2 px-3 rounded-md hover:bg-muted transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Imóveis
               </Link>
               <a
                 href="#sobre"
@@ -292,16 +292,16 @@ export default function TenantLanding() {
                 Contato
               </a>
               <div className="border-t pt-3 mt-1 flex flex-col gap-2">
-                <Link href="/login">
-                  <Button variant="outline" size="sm" className="w-full">Área do Corretor</Button>
-                </Link>
+                <Button asChild variant="outline" size="sm" className="w-full">
+                  <Link href="/login">Área do Corretor</Link>
+                </Button>
                 {tenant.phone && (
-                  <a href={`https://wa.me/${tenant.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
-                    <Button size="sm" className="w-full" style={{ backgroundColor: tenant.primaryColor }}>
+                  <Button asChild size="sm" className="w-full" style={{ backgroundColor: tenant.primaryColor }}>
+                    <a href={`https://wa.me/${tenant.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
                       <Phone className="h-4 w-4 mr-2" />
                       Falar no WhatsApp
-                    </Button>
-                  </a>
+                    </a>
+                  </Button>
                 )}
               </div>
             </nav>
@@ -326,16 +326,16 @@ export default function TenantLanding() {
               As melhores opções de compra e aluguel você encontra na {tenant.name}.
             </p>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4 sm:px-0">
-              <Link href={`/e/${tenantSlug}/imoveis`}>
-                <Button size="lg" className="text-base sm:text-lg px-6 sm:px-8 h-12 sm:h-14 bg-white text-black hover:bg-white/90 border-none w-full sm:w-auto">
+              <Button asChild size="lg" className="text-base sm:text-lg px-6 sm:px-8 h-12 sm:h-14 bg-white text-black hover:bg-white/90 border-none w-full sm:w-auto">
+                <Link href={`/e/${tenantSlug}/imoveis`}>
                   Ver Imóveis
-                </Button>
-              </Link>
-              <a href="#contato" className="w-full sm:w-auto">
-                <Button size="lg" className="text-base sm:text-lg px-6 sm:px-8 h-12 sm:h-14 w-full sm:w-auto" style={{ backgroundColor: tenant.primaryColor }}>
+                </Link>
+              </Button>
+              <Button asChild size="lg" className="text-base sm:text-lg px-6 sm:px-8 h-12 sm:h-14 w-full sm:w-auto" style={{ backgroundColor: tenant.primaryColor }}>
+                <a href="#contato" className="w-full sm:w-auto">
                   Fale Conosco
-                </Button>
-              </a>
+                </a>
+              </Button>
             </div>
           </div>
         </section>
@@ -446,12 +446,12 @@ export default function TenantLanding() {
                           {formatPrice(property.price)}
                           {property.category === 'rent' && <span className="text-xs sm:text-sm font-normal text-muted-foreground">/mês</span>}
                         </span>
-                        <Link href={`/e/${tenantSlug}/imovel/${property.id}`}>
-                          <Button size="sm" variant="outline" className="group-hover:bg-primary group-hover:text-white transition-colors border-primary/20 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3 shrink-0">
+                        <Button asChild size="sm" variant="outline" className="group-hover:bg-primary group-hover:text-white transition-colors border-primary/20 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3 shrink-0">
+                          <Link href={`/e/${tenantSlug}/imovel/${property.id}`}>
                             <span className="hidden sm:inline">Detalhes</span>
                             <ArrowRight className="w-4 h-4 sm:ml-1" />
-                          </Button>
-                        </Link>
+                          </Link>
+                        </Button>
                       </div>
                     </div>
                   </div>
@@ -488,11 +488,11 @@ export default function TenantLanding() {
                     </div>
                   ))}
                 </div>
-                <a href="#contato">
-                  <Button className="mt-8" size="lg" style={{ backgroundColor: tenant.primaryColor }}>
+                <Button asChild className="mt-8" size="lg" style={{ backgroundColor: tenant.primaryColor }}>
+                  <a href="#contato">
                     Entre em contato
-                  </Button>
-                </a>
+                  </a>
+                </Button>
               </div>
               <div className="relative h-[400px] rounded-2xl overflow-hidden shadow-2xl">
                 <img
@@ -526,8 +526,8 @@ export default function TenantLanding() {
                 <h4 className="font-bold text-white mb-3 sm:mb-4 text-sm sm:text-base">Links Rápidos</h4>
                 <ul className="space-y-2 text-sm">
                   <li>
-                    <Link href={`/e/${tenantSlug}/imoveis`}>
-                      <a className="hover:text-white transition-colors">Todos os Imóveis</a>
+                    <Link href={`/e/${tenantSlug}/imoveis`} className="hover:text-white transition-colors">
+                      Todos os Imóveis
                     </Link>
                   </li>
                   <li><a href="#imoveis" className="hover:text-white transition-colors">Imóveis em Destaque</a></li>
@@ -561,8 +561,14 @@ export default function TenantLanding() {
                 <h4 className="font-bold text-white mb-3 sm:mb-4 text-sm sm:text-base">Newsletter</h4>
                 <p className="text-sm opacity-70 mb-3">Receba novidades de imóveis no seu e-mail</p>
                 <form onSubmit={handleNewsletterSubmit} className="flex flex-col sm:flex-row gap-2">
+                  <label htmlFor="tenant-newsletter-email" className="sr-only">
+                    Email para receber novidades
+                  </label>
                   <Input
+                    id="tenant-newsletter-email"
+                    name="email"
                     type="email"
+                    autoComplete="email"
                     placeholder="Seu e-mail"
                     value={newsletterEmail}
                     onChange={(e) => setNewsletterEmail(e.target.value)}
@@ -576,7 +582,14 @@ export default function TenantLanding() {
                     className="h-10 px-6 sm:px-4 shrink-0"
                     style={{ backgroundColor: tenant.primaryColor }}
                   >
-                    {newsletterLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Inscrever"}
+                    {newsletterLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                        <span className="sr-only">Enviando inscrição</span>
+                      </>
+                    ) : (
+                      "Inscrever"
+                    )}
                   </Button>
                 </form>
                 {newsletterSuccess && (

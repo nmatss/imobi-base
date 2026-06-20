@@ -5,6 +5,7 @@ import { spawn } from 'child_process';
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
+import { fetchExternalUrl } from '../../security/url-validator';
 
 /**
  * Execute a command safely using spawn (prevents command injection).
@@ -175,13 +176,15 @@ async function uploadBackupFile(input: {
   const file = await fs.readFile(input.backupPath);
   const headers = parseBackupUploadHeaders();
 
-  const response = await fetch(uploadUrl, {
+  const response = await fetchExternalUrl(uploadUrl, {
     method: 'PUT',
     body: file,
     headers: {
       'content-type': 'application/octet-stream',
       ...headers,
     },
+    maxRedirects: 0,
+    timeoutMs: 60_000,
   });
 
   if (!response.ok) {

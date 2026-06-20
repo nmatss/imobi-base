@@ -90,13 +90,31 @@ function parseUnsubscribeToken(
 ): { userId: string; email: string; timestamp: number | string } | null {
   const [payload, signature] = token.split('.');
 
-  if (payload && signature) {
-    if (!verifyUnsubscribeSignature(payload, signature)) return null;
-    return JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8'));
+  if (!payload || !signature) {
+    return null;
   }
 
-  const decoded = Buffer.from(token, 'base64url').toString('utf-8');
-  const [userId, email, timestamp] = decoded.split(':');
+  if (!verifyUnsubscribeSignature(payload, signature)) return null;
+
+  const decoded = Buffer.from(payload, 'base64url').toString('utf-8');
+  const parsed = JSON.parse(decoded);
+
+  if (!parsed || typeof parsed !== 'object') return null;
+
+  const { userId, email, timestamp } = parsed as {
+    userId?: unknown;
+    email?: unknown;
+    timestamp?: unknown;
+  };
+
+  if (
+    typeof userId !== 'string' ||
+    typeof email !== 'string' ||
+    (typeof timestamp !== 'number' && typeof timestamp !== 'string')
+  ) {
+    return null;
+  }
+
   return { userId, email, timestamp };
 }
 

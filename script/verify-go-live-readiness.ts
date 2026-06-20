@@ -136,6 +136,19 @@ async function checkStaticReadiness(): Promise<void> {
     "requires durable unsubscribe audit fields and active/email lookup index",
   );
 
+  const whatsappPhoneNumberMigration = await readFile(
+    path.resolve(root, "migrations/20260618_001_whatsapp_phone_number_unique.sql"),
+    "utf8",
+  );
+  addResult(
+    "WhatsApp phoneNumberId uniqueness migration",
+    whatsappPhoneNumberMigration.includes("uq_integration_configs_whatsapp_phone_number_id") &&
+      whatsappPhoneNumberMigration.includes("integration_name = 'whatsapp'")
+      ? "pass"
+      : "fail",
+    "requires a partial unique index for configured WhatsApp phoneNumberId values",
+  );
+
   const rlsMigration = await readFile(path.resolve(root, "migrations/RLS_enable.sql"), "utf8");
   addResult(
     "RLS covers webhook_events",
@@ -281,23 +294,111 @@ async function checkDatabaseReadiness(): Promise<void> {
       "provider/event unique index must exist",
     );
 
+    const webhookRls = await pool.query<{ rlsEnabled: boolean; rlsForced: boolean }>(`
+      SELECT relrowsecurity AS "rlsEnabled", relforcerowsecurity AS "rlsForced"
+      FROM pg_class
+      WHERE oid = 'public.webhook_events'::regclass
+    `);
+    addResult(
+      "webhook_events RLS",
+      webhookRls.rows[0]?.rlsEnabled && webhookRls.rows[0]?.rlsForced ? "pass" : "fail",
+      "webhook_events must have ENABLE and FORCE row level security",
+    );
+
+    const newsletterColumns = await pool.query<{ columnName: string }>(`
+      SELECT column_name AS "columnName"
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'newsletter_subscriptions'
+        AND column_name IN ('unsubscribed_at', 'unsubscribe_reason', 'resubscribed_at')
+    `);
+    const newsletterColumnNames = new Set(
+      newsletterColumns.rows.map((row) => row.columnName),
+    );
+    addResult(
+      "newsletter opt-out columns",
+      ["unsubscribed_at", "unsubscribe_reason", "resubscribed_at"].every((column) =>
+        newsletterColumnNames.has(column),
+      )
+        ? "pass"
+        : "fail",
+      "newsletter_subscriptions must include durable opt-out audit fields",
+    );
+
+    const newsletterIndex = await pool.query<{ exists: boolean }>(`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public'
+          AND tablename = 'newsletter_subscriptions'
+          AND indexname = 'idx_newsletter_subscriptions_active_email'
+      ) AS exists
+    `);
+    addResult(
+      "newsletter active email index",
+      newsletterIndex.rows[0]?.exists ? "pass" : "fail",
+      "active/lower(email) index must exist for unsubscribe and bulk filters",
+    );
+
+    const whatsappPhoneNumberIndex = await pool.query<{ exists: boolean }>(`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE schemaname = 'public'
+          AND tablename = 'integration_configs'
+          AND indexname = 'uq_integration_configs_whatsapp_phone_number_id'
+      ) AS exists
+    `);
+    addResult(
+      "WhatsApp phoneNumberId unique index",
+      whatsappPhoneNumberIndex.rows[0]?.exists ? "pass" : "fail",
+      "configured WhatsApp phoneNumberId values must be unique across tenants",
+    );
+
     const migration = await pool.query<{ exists: boolean }>(`
       SELECT EXISTS (
         SELECT 1 FROM information_schema.tables
         WHERE table_schema = 'public' AND table_name = '_migrations'
       ) AS exists
     `);
-    if (migration.rows[0]?.exists) {
+    const migrationTableExists = migration.rows[0]?.exists;
+    addResult(
+      "migrations audit table",
+      migrationTableExists ? "pass" : "fail",
+      "_migrations must exist so critical production migrations are auditable",
+    );
+
+    if (migrationTableExists) {
       const record = await pool.query<{ exists: boolean }>(
         "SELECT EXISTS (SELECT 1 FROM _migrations WHERE filename = $1) AS exists",
         ["20260617_001_webhook_events.sql"],
       );
       addResult(
         "webhook_events migration record",
-        record.rows[0]?.exists ? "pass" : "warn",
+        record.rows[0]?.exists ? "pass" : "fail",
         record.rows[0]?.exists
           ? "migration recorded"
-          : "migration not recorded; if applied manually, attach audit evidence",
+          : "critical migration missing from _migrations audit table",
+      );
+      const newsletterRecord = await pool.query<{ exists: boolean }>(
+        "SELECT EXISTS (SELECT 1 FROM _migrations WHERE filename = $1) AS exists",
+        ["20260617_002_newsletter_opt_out.sql"],
+      );
+      addResult(
+        "newsletter opt-out migration record",
+        newsletterRecord.rows[0]?.exists ? "pass" : "fail",
+        newsletterRecord.rows[0]?.exists
+          ? "migration recorded"
+          : "critical migration missing from _migrations audit table",
+      );
+      const whatsappRecord = await pool.query<{ exists: boolean }>(
+        "SELECT EXISTS (SELECT 1 FROM _migrations WHERE filename = $1) AS exists",
+        ["20260618_001_whatsapp_phone_number_unique.sql"],
+      );
+      addResult(
+        "WhatsApp phoneNumberId migration record",
+        whatsappRecord.rows[0]?.exists ? "pass" : "fail",
+        whatsappRecord.rows[0]?.exists
+          ? "migration recorded"
+          : "critical migration missing from _migrations audit table",
       );
     }
   } catch (error) {
@@ -361,7 +462,9 @@ async function runCommand(name: string, command: string, args: string[]): Promis
       addResult(
         name,
         code === 0 ? "pass" : "fail",
-        code === 0 ? firstLine(output) || "ok" : firstLine(output) || `${command} exited with ${code}`,
+        code === 0
+          ? firstLine(output) || "ok"
+          : summarizeCommandOutput(output) || `${command} exited with ${code}`,
       );
       resolve();
     });
@@ -473,6 +576,42 @@ function firstLine(output: string): string {
     .map((line) => line.trim())
     .filter(Boolean)
     .at(-1) ?? "";
+}
+
+function summarizeCommandOutput(output: string): string {
+  const lines = output
+    .split(/\r?\n/)
+    .map((line) => stripAnsi(line).trim())
+    .filter((line) => line && !line.startsWith(">"));
+  const failureLines = lines.filter((line) =>
+    /\b(error|fail|failed|missing|invalid|denied|authentication|ECONN|timeout|RLS)\b/i.test(line),
+  );
+  const selected = failureLines.length > 0 ? failureLines : lines.slice(-5);
+  return selected.join(" | ").slice(0, 500);
+}
+
+function stripAnsi(value: string): string {
+  let output = "";
+  for (let index = 0; index < value.length; index++) {
+    if (value.charCodeAt(index) !== 27) {
+      output += value[index];
+      continue;
+    }
+
+    index++;
+    if (value[index] !== "[") {
+      continue;
+    }
+
+    while (index + 1 < value.length) {
+      index++;
+      const code = value.charCodeAt(index);
+      if (code >= 64 && code <= 126) {
+        break;
+      }
+    }
+  }
+  return output;
 }
 
 function errorMessage(error: unknown): string {

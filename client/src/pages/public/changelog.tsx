@@ -120,11 +120,11 @@ export default function ChangelogPage() {
           <Link href="/">
             <Logo className="cursor-pointer" wordmarkClassName="text-xl" iconClassName="h-9 w-9" />
           </Link>
-          <Link href="/">
-            <Button variant="ghost" size="sm" className="gap-2">
+          <Button asChild variant="ghost" size="sm" className="gap-2">
+            <Link href="/">
               <ArrowLeft className="w-4 h-4" /> Voltar
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </header>
 

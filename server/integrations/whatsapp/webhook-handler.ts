@@ -10,6 +10,7 @@ import { whatsappMessages, whatsappConversations, leads, integrationConfigs } fr
 import { eq, and } from "drizzle-orm";
 import { conversationManager } from "./conversation-manager";
 import { autoResponder } from "./auto-responder";
+import { normalizeWhatsAppPhoneNumberId } from "./phone-number-id";
 import { log } from "../../utils/log";
 
 interface WhatsappIntegrationConfig {
@@ -115,7 +116,8 @@ export class WebhookHandler {
    * phone_number_id.
    */
   async resolveTenantId(phoneNumberId: string): Promise<string | null> {
-    if (!phoneNumberId) {
+    const normalizedPhoneNumberId = normalizeWhatsAppPhoneNumberId(phoneNumberId);
+    if (!normalizedPhoneNumberId) {
       return null;
     }
 
@@ -128,17 +130,30 @@ export class WebhookHandler {
         .from(integrationConfigs)
         .where(eq(integrationConfigs.integrationName, "whatsapp"));
 
+      const matches: string[] = [];
+
       for (const row of rows) {
         const config = (row.config ?? {}) as WhatsappIntegrationConfig;
-        if (config.phoneNumberId === phoneNumberId) {
-          return row.tenantId;
+        if (normalizeWhatsAppPhoneNumberId(config.phoneNumberId) === normalizedPhoneNumberId) {
+          matches.push(row.tenantId);
         }
+      }
+
+      if (matches.length === 1) {
+        return matches[0];
+      }
+
+      if (matches.length > 1) {
+        log(
+          `Ambiguous WhatsApp phone_number_id ${normalizedPhoneNumberId}: ${matches.length} tenants matched; failing closed`,
+          "whatsapp"
+        );
       }
 
       return null;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      log(`Error resolving tenant for phone_number_id ${phoneNumberId}: ${message}`, "whatsapp");
+      log(`Error resolving tenant for phone_number_id ${normalizedPhoneNumberId}: ${message}`, "whatsapp");
       return null;
     }
   }

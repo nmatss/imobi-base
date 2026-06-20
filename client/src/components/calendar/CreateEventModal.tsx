@@ -254,14 +254,14 @@ export function CreateEventModal({
               <div className="space-y-2">
                 <Label htmlFor="client">Cliente/Lead</Label>
                 <Select
-                  value={formData.clientId || ''}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, clientId: value || undefined }))}
+                  value={formData.clientId || "__none__"}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, clientId: value === "__none__" ? undefined : value }))}
                 >
                   <SelectTrigger id="client" className="h-11">
                     <SelectValue placeholder="Selecione um cliente" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum</SelectItem>
+                    <SelectItem value="__none__">Nenhum</SelectItem>
                     {clients.map(client => (
                       <SelectItem key={client.id} value={client.id}>
                         <div className="flex items-center gap-2">
@@ -288,14 +288,14 @@ export function CreateEventModal({
                   <div className="space-y-2">
                     <Label htmlFor="property">Propriedade Relacionada</Label>
                     <Select
-                      value={formData.propertyId || ''}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, propertyId: value || undefined }))}
+                      value={formData.propertyId || "__none__"}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, propertyId: value === "__none__" ? undefined : value }))}
                     >
                       <SelectTrigger id="property" className="h-11">
                         <SelectValue placeholder="Selecione uma propriedade" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Nenhuma</SelectItem>
+                        <SelectItem value="__none__">Nenhuma</SelectItem>
                         {properties.map(property => (
                           <SelectItem key={property.id} value={property.id}>
                             <div className="flex items-center gap-2">
@@ -333,17 +333,17 @@ export function CreateEventModal({
                 <div className="space-y-2">
                   <Label htmlFor="reminder">Lembrete</Label>
                   <Select
-                    value={formData.reminderMinutes?.toString() || ''}
+                    value={formData.reminderMinutes?.toString() || "__none__"}
                     onValueChange={(value) => setFormData(prev => ({
                       ...prev,
-                      reminderMinutes: value ? parseInt(value) : undefined
+                      reminderMinutes: value === "__none__" ? undefined : parseInt(value)
                     }))}
                   >
                     <SelectTrigger id="reminder" className="h-11">
                       <SelectValue placeholder="Sem lembrete" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Sem lembrete</SelectItem>
+                      <SelectItem value="__none__">Sem lembrete</SelectItem>
                       <SelectItem value="5">5 minutos antes</SelectItem>
                       <SelectItem value="15">15 minutos antes</SelectItem>
                       <SelectItem value="30">30 minutos antes</SelectItem>

@@ -354,9 +354,9 @@ export default function SolutionPage() {
               Preços
             </Link>
           </nav>
-          <Link href="/login">
-            <Button size="sm">Começar</Button>
-          </Link>
+          <Button asChild size="sm">
+            <Link href="/login">Começar</Link>
+          </Button>
         </div>
       </header>
 
@@ -391,21 +391,22 @@ export default function SolutionPage() {
                 ))}
               </div>
               <div className="flex flex-col sm:flex-row gap-3">
-                <Link href="/login">
-                  <Button size="lg" className="w-full sm:w-auto">
+                <Button asChild size="lg" className="w-full sm:w-auto">
+                  <Link href="/login">
                     Testar ImobiBase
                     <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
-                <Link href="/pricing">
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="w-full sm:w-auto bg-white/10 border-white/30 text-white hover:bg-white/20"
-                  >
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  size="lg"
+                  variant="outline"
+                  className="w-full sm:w-auto bg-white/10 border-white/30 text-white hover:bg-white/20"
+                >
+                  <Link href="/pricing">
                     Ver planos
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               </div>
             </div>
           </div>
@@ -508,9 +509,9 @@ export default function SolutionPage() {
               Teste a plataforma e veja como CRM, agenda, site, contratos,
               financeiro, locações, vistorias, WhatsApp e IA trabalham juntos.
             </p>
-            <Link href="/login">
-              <Button size="lg">Criar conta grátis</Button>
-            </Link>
+            <Button asChild size="lg">
+              <Link href="/login">Criar conta grátis</Link>
+            </Button>
           </div>
         </section>
       </main>

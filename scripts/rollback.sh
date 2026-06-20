@@ -6,7 +6,7 @@
 # Usage: ./scripts/rollback.sh [staging|production] [version]
 # ==================================
 
-set -e  # Exit on error
+set -euo pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 ENVIRONMENT=${1:-staging}
-VERSION=${2:-previous}
+VERSION=${2:-}
 BACKUP_DIR="backups"
 
 # Functions
@@ -55,6 +55,12 @@ log_info "Starting rollback to $ENVIRONMENT..."
 if command -v vercel &> /dev/null; then
     log_info "Rolling back Vercel deployment..."
 
+    if [[ -z "$VERSION" ]]; then
+        log_error "Vercel rollback requires an explicit deployment URL or deployment ID."
+        log_error "Usage: ./scripts/rollback.sh $ENVIRONMENT <deployment-url-or-id>"
+        exit 1
+    fi
+
     # List recent deployments
     log_info "Recent deployments:"
     if [[ "$ENVIRONMENT" == "production" ]]; then
@@ -64,8 +70,13 @@ if command -v vercel &> /dev/null; then
     fi
 
     # Perform rollback
-    log_info "Performing rollback..."
-    vercel rollback || {
+    log_info "Performing rollback to deployment: $VERSION"
+    VERCEL_TOKEN_ARGS=()
+    if [[ -n "${VERCEL_TOKEN:-}" ]]; then
+        VERCEL_TOKEN_ARGS+=(--token="$VERCEL_TOKEN")
+    fi
+
+    vercel rollback "$VERSION" --yes "${VERCEL_TOKEN_ARGS[@]}" || {
         log_error "Vercel rollback failed!"
         exit 1
     }
@@ -75,28 +86,28 @@ fi
 if [[ -f "docker-compose.yml" ]] && command -v docker &> /dev/null; then
     log_info "Rolling back Docker containers..."
 
-    # Get previous image
-    PREVIOUS_IMAGE=$(docker images imobibase --format "{{.ID}}" | sed -n 2p)
-
-    if [[ -n "$PREVIOUS_IMAGE" ]]; then
-        log_info "Rolling back to image: $PREVIOUS_IMAGE"
-        docker-compose down
-        docker tag "$PREVIOUS_IMAGE" imobibase:latest
-        docker-compose up -d
+    if command -v docker-compose &> /dev/null; then
+        COMPOSE_CMD=(docker-compose)
     else
-        log_warn "No previous Docker image found. Rebuilding from git..."
-
-        # Checkout previous commit
-        CURRENT_COMMIT=$(git rev-parse HEAD)
-        PREVIOUS_COMMIT=$(git rev-parse HEAD~1)
-
-        git checkout "$PREVIOUS_COMMIT"
-        docker-compose down
-        docker-compose up -d --build
-
-        # Return to current commit (just in case)
-        # git checkout "$CURRENT_COMMIT"
+        COMPOSE_CMD=(docker compose)
     fi
+
+    if [[ -n "$VERSION" ]]; then
+        TARGET_IMAGE="$VERSION"
+    else
+        TARGET_IMAGE=$(docker images imobibase --format "{{.ID}}" | sed -n 2p)
+    fi
+
+    if [[ -z "$TARGET_IMAGE" ]]; then
+        log_error "No previous Docker image found. Provide an explicit image tag or ID."
+        exit 1
+    fi
+
+    docker image inspect "$TARGET_IMAGE" > /dev/null
+    log_info "Rolling back to image: $TARGET_IMAGE"
+    "${COMPOSE_CMD[@]}" down
+    docker tag "$TARGET_IMAGE" imobibase:latest
+    "${COMPOSE_CMD[@]}" up -d
 fi
 
 # 3. Restore database backup (optional)
@@ -132,7 +143,7 @@ log_info "Performing health check..."
 sleep 5  # Wait for rollback to stabilize
 
 if [[ "$ENVIRONMENT" == "production" ]]; then
-    HEALTH_URL="https://imobibase.com/api/health"
+    HEALTH_URL="https://imobibase.com.br/api/health"
 else
     HEALTH_URL="https://staging-imobibase.vercel.app/api/health"
 fi
@@ -157,7 +168,7 @@ log_info "Health check: $HEALTH_URL"
 
 if [[ "$ENVIRONMENT" == "production" ]]; then
     log_warn "PRODUCTION was rolled back. Please investigate the issue!"
-    log_info "Production URL: https://imobibase.com"
+    log_info "Production URL: https://imobibase.com.br"
 else
     log_info "Staging URL: https://staging-imobibase.vercel.app"
 fi
