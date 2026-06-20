@@ -7,6 +7,16 @@ import type { Request, Response } from 'express';
 import { db, schema } from '../../db';
 import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
+import {
+  runWithClickSignDocumentRlsContext,
+  runWithTenantRlsContext,
+} from '../../db-rls';
+import {
+  createWebhookPayloadDigest,
+  markWebhookEventFailed,
+  markWebhookEventProcessed,
+  reserveWebhookEvent,
+} from '../webhook-ledger';
 
 // ClickSign Webhook Event Types
 export type ClickSignEventType =
@@ -43,12 +53,28 @@ export interface ClickSignWebhookEvent {
 }
 
 export class WebhookHandler {
+  private async findContractByDocumentKey(
+    documentKey: string,
+  ): Promise<{ id: string; tenantId: string } | null> {
+    const contracts = await runWithClickSignDocumentRlsContext(documentKey, () =>
+      db
+        .select({ id: schema.contracts.id, tenantId: schema.contracts.tenantId })
+        .from(schema.contracts)
+        .where(eq(schema.contracts.clicksignDocumentKey, documentKey))
+        .limit(1),
+    );
+
+    return contracts[0] ?? null;
+  }
+
   /**
    * Main webhook handler
    */
   async handleWebhook(req: Request, res: Response): Promise<void> {
+    let eventId: string | undefined;
     try {
       const event = req.body as ClickSignWebhookEvent;
+      const payloadDigest = createWebhookPayloadDigest(req.rawBody ?? event);
 
       // Validate webhook signature (OBRIGATÓRIO)
       if (!this.validateWebhookSignature(req)) {
@@ -59,6 +85,21 @@ export class WebhookHandler {
       // Validate timestamp (se disponível)
       if (!this.validateWebhookTimestamp(req)) {
         res.status(401).json({ error: 'Invalid webhook timestamp' });
+        return;
+      }
+
+      eventId = this.getWebhookEventId(event, payloadDigest);
+      const signature = req.headers['x-clicksign-signature'] as string | undefined;
+      const reservation = await reserveWebhookEvent({
+        provider: 'clicksign',
+        eventId,
+        eventType: event.event,
+        payloadDigest,
+        signatureDigest: signature ? createWebhookPayloadDigest(signature) : undefined,
+      });
+      if (!reservation.reserved) {
+        console.warn('Duplicate ClickSign webhook ignored:', event.event, eventId);
+        res.status(200).json({ success: true, duplicate: true });
         return;
       }
 
@@ -91,9 +132,13 @@ export class WebhookHandler {
           console.log('Unhandled webhook event:', event.event);
       }
 
+      await markWebhookEventProcessed({ provider: 'clicksign', eventId });
       res.status(200).json({ success: true });
     } catch (error) {
       console.error('Webhook handling error:', error);
+      if (eventId) {
+        await markWebhookEventFailed({ provider: 'clicksign', eventId, error });
+      }
       res.status(500).json({ error: 'Internal server error' });
     }
   }
@@ -106,38 +151,33 @@ export class WebhookHandler {
     if (!documentKey) return;
 
     try {
-      // Find contract by ClickSign document key
-      const contracts = await db
-        .select()
-        .from(schema.contracts)
-        .where(eq(schema.contracts.clicksignDocumentKey, documentKey))
-        .limit(1);
+      const contract = await this.findContractByDocumentKey(documentKey);
 
-      if (contracts.length === 0) {
+      if (!contract) {
         console.log('No contract found for document key:', documentKey);
         return;
       }
 
-      const contract = contracts[0];
+      await runWithTenantRlsContext(contract.tenantId, async () => {
+        // Update contract status to signed
+        await db
+          .update(schema.contracts)
+          .set({
+            status: 'signed',
+            signedAt: new Date(event.occurred_at),
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.contracts.id, contract.id));
 
-      // Update contract status to signed
-      await db
-        .update(schema.contracts)
-        .set({
-          status: 'signed',
-          signedAt: new Date(event.occurred_at),
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.contracts.id, contract.id));
-
-      // Log the event in audit trail
-      await this.logAuditEvent({
-        tenantId: contract.tenantId,
-        contractId: contract.id,
-        eventType: 'document_signed',
-        documentKey,
-        occurredAt: new Date(event.occurred_at),
-        metadata: event.data,
+        // Log the event in audit trail
+        await this.logAuditEvent({
+          tenantId: contract.tenantId,
+          contractId: contract.id,
+          eventType: 'document_signed',
+          documentKey,
+          occurredAt: new Date(event.occurred_at),
+          metadata: event.data,
+        });
       });
 
       // TODO: Send notification to relevant parties
@@ -159,31 +199,27 @@ export class WebhookHandler {
     if (!documentKey) return;
 
     try {
-      const contracts = await db
-        .select()
-        .from(schema.contracts)
-        .where(eq(schema.contracts.clicksignDocumentKey, documentKey))
-        .limit(1);
+      const contract = await this.findContractByDocumentKey(documentKey);
 
-      if (contracts.length === 0) return;
+      if (!contract) return;
 
-      const contract = contracts[0];
+      await runWithTenantRlsContext(contract.tenantId, async () => {
+        await db
+          .update(schema.contracts)
+          .set({
+            status: 'cancelled',
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.contracts.id, contract.id));
 
-      await db
-        .update(schema.contracts)
-        .set({
-          status: 'cancelled',
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.contracts.id, contract.id));
-
-      await this.logAuditEvent({
-        tenantId: contract.tenantId,
-        contractId: contract.id,
-        eventType: 'document_cancelled',
-        documentKey,
-        occurredAt: new Date(event.occurred_at),
-        metadata: event.data,
+        await this.logAuditEvent({
+          tenantId: contract.tenantId,
+          contractId: contract.id,
+          eventType: 'document_cancelled',
+          documentKey,
+          occurredAt: new Date(event.occurred_at),
+          metadata: event.data,
+        });
       });
 
       console.log('Contract cancelled:', contract.id);
@@ -205,34 +241,36 @@ export class WebhookHandler {
     try {
       // Look up the contract by document key to fill in tenantId
       const documentKey = event.data.list?.key || event.data.document?.key;
-      let tenantId = '';
+      let tenantId: string | undefined;
       let contractId: string | undefined;
 
       if (documentKey) {
-        const contracts = await db
-          .select()
-          .from(schema.contracts)
-          .where(eq(schema.contracts.clicksignDocumentKey, documentKey))
-          .limit(1);
-
-        if (contracts.length > 0) {
-          tenantId = contracts[0].tenantId;
-          contractId = contracts[0].id;
+        const contract = await this.findContractByDocumentKey(documentKey);
+        if (contract) {
+          tenantId = contract.tenantId;
+          contractId = contract.id;
         }
       }
 
-      await this.logAuditEvent({
-        tenantId,
-        contractId,
-        eventType: 'signer_signed',
-        documentKey: documentKey || '',
-        occurredAt: new Date(event.occurred_at),
-        metadata: {
-          email: signerEmail,
-          signedAt,
-          signerKey: event.data.signer?.key,
-        },
-      });
+      if (!tenantId || !contractId) {
+        console.log('No contract found for signer signed event:', documentKey);
+        return;
+      }
+
+      await runWithTenantRlsContext(tenantId, () =>
+        this.logAuditEvent({
+          tenantId,
+          contractId,
+          eventType: 'signer_signed',
+          documentKey: documentKey || '',
+          occurredAt: new Date(event.occurred_at),
+          metadata: {
+            email: signerEmail,
+            signedAt,
+            signerKey: event.data.signer?.key,
+          },
+        }),
+      );
 
       // TODO: Send notification to contract creator
       // TODO: Check if all signers have signed and trigger completion
@@ -253,16 +291,27 @@ export class WebhookHandler {
     if (!signerEmail || !viewedAt) return;
 
     try {
-      await this.logAuditEvent({
-        tenantId: '',
+      const documentKey = event.data.list?.key || event.data.document?.key;
+      const contract = documentKey
+        ? await this.findContractByDocumentKey(documentKey)
+        : null;
+
+      if (!contract) {
+        console.log('No contract found for signer viewed event:', documentKey);
+        return;
+      }
+
+      await runWithTenantRlsContext(contract.tenantId, () => this.logAuditEvent({
+        tenantId: contract.tenantId,
+        contractId: contract.id,
         eventType: 'signer_viewed',
-        documentKey: '',
+        documentKey: documentKey || '',
         occurredAt: new Date(event.occurred_at),
         metadata: {
           email: signerEmail,
           viewedAt,
         },
-      });
+      }));
 
       console.log('Signer viewed document:', signerEmail);
     } catch (error) {
@@ -281,38 +330,40 @@ export class WebhookHandler {
 
     try {
       const documentKey = event.data.list?.key || event.data.document?.key;
-      let tenantId = '';
+      let tenantId: string | undefined;
       let contractId: string | undefined;
 
       if (documentKey) {
-        const contracts = await db
-          .select()
-          .from(schema.contracts)
-          .where(eq(schema.contracts.clicksignDocumentKey, documentKey))
-          .limit(1);
-
-        if (contracts.length > 0) {
-          tenantId = contracts[0].tenantId;
-          contractId = contracts[0].id;
-
-          // Update contract status to rejected
-          await db
-            .update(schema.contracts)
-            .set({ status: 'rejected', updatedAt: new Date() })
-            .where(eq(schema.contracts.id, contracts[0].id));
+        const contract = await this.findContractByDocumentKey(documentKey);
+        if (contract) {
+          tenantId = contract.tenantId;
+          contractId = contract.id;
         }
       }
 
-      await this.logAuditEvent({
-        tenantId,
-        contractId,
-        eventType: 'signer_refused',
-        documentKey: documentKey || '',
-        occurredAt: new Date(event.occurred_at),
-        metadata: {
-          email: signerEmail,
-          refusedAt,
-        },
+      if (!tenantId || !contractId) {
+        console.log('No contract found for signer refused event:', documentKey);
+        return;
+      }
+
+      await runWithTenantRlsContext(tenantId, async () => {
+        // Update contract status to rejected
+        await db
+          .update(schema.contracts)
+          .set({ status: 'rejected', updatedAt: new Date() })
+          .where(eq(schema.contracts.id, contractId));
+
+        await this.logAuditEvent({
+          tenantId,
+          contractId,
+          eventType: 'signer_refused',
+          documentKey: documentKey || '',
+          occurredAt: new Date(event.occurred_at),
+          metadata: {
+            email: signerEmail,
+            refusedAt,
+          },
+        });
       });
 
       // TODO: Notify contract creator about refusal
@@ -346,17 +397,26 @@ export class WebhookHandler {
     }
 
     try {
-      // Implementar validação HMAC
-      const payload = JSON.stringify(req.body);
+      const rawPayload = Buffer.isBuffer(req.rawBody)
+        ? req.rawBody
+        : Buffer.from(JSON.stringify(req.body));
 
       // ClickSign usa HMAC-SHA256
       const hmac = crypto.createHmac('sha256', webhookSecret);
-      const expectedSignature = hmac.update(payload).digest('hex');
+      const expectedSignature = hmac.update(rawPayload).digest('hex');
+      const receivedSignature = signature.startsWith('sha256=')
+        ? signature.slice('sha256='.length)
+        : signature;
+
+      if (!/^[a-f0-9]{64}$/i.test(receivedSignature)) {
+        console.warn('[CLICKSIGN] Invalid webhook signature format');
+        return false;
+      }
 
       // Verify lengths match before timing-safe comparison
-      if (signature.length !== expectedSignature.length) {
+      if (receivedSignature.length !== expectedSignature.length) {
         console.warn('[CLICKSIGN] Invalid webhook signature (length mismatch)', {
-          receivedLength: signature.length,
+          receivedLength: receivedSignature.length,
           expectedLength: expectedSignature.length,
         });
         return false;
@@ -364,13 +424,13 @@ export class WebhookHandler {
 
       // Timing-safe comparison
       const isValid = crypto.timingSafeEqual(
-        Buffer.from(signature),
-        Buffer.from(expectedSignature)
+        Buffer.from(receivedSignature, 'hex'),
+        Buffer.from(expectedSignature, 'hex')
       );
 
       if (!isValid) {
         console.warn('[CLICKSIGN] Invalid webhook signature', {
-          received: `${signature.substring(0, 10)  }...`,
+          received: `${receivedSignature.substring(0, 10)  }...`,
           expected: `${expectedSignature.substring(0, 10)  }...`,
         });
       }
@@ -389,7 +449,10 @@ export class WebhookHandler {
     const timestamp = req.headers['x-clicksign-timestamp'] as string;
 
     if (!timestamp) {
-      // Se ClickSign não envia timestamp, aceitar mas logar
+      if (process.env.CLICKSIGN_WEBHOOK_REQUIRE_TIMESTAMP === 'true') {
+        console.warn('[CLICKSIGN] Webhook without required timestamp');
+        return false;
+      }
       console.warn('[CLICKSIGN] Webhook without timestamp (replay protection disabled)');
       return true;
     }
@@ -417,6 +480,27 @@ export class WebhookHandler {
     }
 
     return true;
+  }
+
+  private getWebhookEventId(event: ClickSignWebhookEvent, payloadDigest: string): string {
+    const documentKey = event.data.document?.key || event.data.list?.key;
+    const signerKey = event.data.signer?.key;
+    const eventTime =
+      event.data.document?.finished_at ||
+      event.data.signer?.signed_at ||
+      event.data.signer?.viewed_at ||
+      event.data.signer?.refused_at ||
+      event.occurred_at;
+
+    return [
+      event.event,
+      documentKey,
+      signerKey,
+      eventTime,
+      payloadDigest.slice(0, 16),
+    ]
+      .filter(Boolean)
+      .join(':');
   }
 
   /**

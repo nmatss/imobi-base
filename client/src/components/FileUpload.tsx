@@ -379,6 +379,7 @@ export function FileUpload({
                   size="sm"
                   onClick={() => removeFile(index)}
                   className="flex-shrink-0"
+                  aria-label={`Remover arquivo ${file.name}`}
                 >
                   <X className="h-4 w-4" />
                 </Button>

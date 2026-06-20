@@ -28,6 +28,26 @@ export interface CreateTemplateParams {
   language?: string;
 }
 
+const IMMUTABLE_WHATSAPP_FIELDS = new Set([
+  "id",
+  "tenantId",
+  "tenant_id",
+  "createdAt",
+  "created_at",
+  "updatedAt",
+  "updated_at",
+]);
+
+function stripWhatsappImmutableFields<T extends Record<string, unknown>>(payload: T): Partial<T> {
+  const sanitized: Partial<T> = {};
+  for (const [key, value] of Object.entries(payload || {})) {
+    if (!IMMUTABLE_WHATSAPP_FIELDS.has(key)) {
+      sanitized[key as keyof T] = value as T[keyof T];
+    }
+  }
+  return sanitized;
+}
+
 /**
  * Pre-defined template configurations for common use cases
  */
@@ -206,7 +226,7 @@ export class TemplateManager {
   async updateTemplate(tenantId: string, templateId: string, updates: Partial<InsertWhatsappTemplate>) {
     const [updated] = await db
       .update(whatsappTemplates)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ ...stripWhatsappImmutableFields(updates), updatedAt: new Date() })
       .where(
         and(
           eq(whatsappTemplates.id, templateId),

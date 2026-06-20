@@ -27,25 +27,6 @@ type Props = {
   isRefreshing?: boolean;
 };
 
-// Helper to calculate accounts receivable (contas a receber)
-function calculateAccountsReceivable(metrics: FinancialMetrics): number {
-  // This would normally come from the API, but for now we'll use a portion of revenue
-  // In a real implementation, this should be fetched from scheduled transactions
-  return metrics.rentalRevenue * 0.3; // Example: 30% of rental revenue is pending
-}
-
-// Helper to calculate accounts payable (contas a pagar)
-function calculateAccountsPayable(metrics: FinancialMetrics): number {
-  // This would normally come from the API
-  return metrics.ownerTransfers * 0.2; // Example: 20% of transfers are pending
-}
-
-// Helper to calculate overdue amount (inadimplência)
-function calculateOverdueAmount(metrics: FinancialMetrics): number {
-  // This would normally come from the API
-  return metrics.rentalRevenue * 0.05; // Example: 5% is overdue
-}
-
 const iconA11yProps = { "aria-hidden": true, focusable: false } as const;
 
 export default function FinancialDashboard({
@@ -73,16 +54,24 @@ export default function FinancialDashboard({
     }
   };
 
-  // Calculate derived metrics
+  // Receita real do período (vem da API).
   const totalRevenue = metrics.commissionsReceived + metrics.rentalRevenue + metrics.salesRevenue;
-  const accountsReceivable = calculateAccountsReceivable(metrics);
-  const accountsPayable = calculateAccountsPayable(metrics);
-  const overdueAmount = calculateOverdueAmount(metrics);
-  const overduePercentage = totalRevenue > 0 ? (overdueAmount / totalRevenue) * 100 : 0;
 
-  // Count of pending invoices (example data - should come from API)
-  const pendingInvoicesCount = 12;
-  const overdueContractsCount = 3;
+  // Contas a receber / pagar / inadimplência: usamos SOMENTE os valores reais quando a
+  // API os fornece (campos opcionais). Enquanto o backend não envia, NÃO inventamos números —
+  // mostramos KPIs reais alternativos derivados das métricas já retornadas (comissões,
+  // repasses e despesas operacionais), evitando exibir dados financeiros fictícios.
+  const hasReceivable = typeof metrics.accountsReceivable === "number";
+  const hasPayable = typeof metrics.accountsPayable === "number";
+  const hasOverdue = typeof metrics.overdueAmount === "number";
+
+  const accountsReceivable = metrics.accountsReceivable ?? 0;
+  const accountsPayable = metrics.accountsPayable ?? 0;
+  const overdueAmount = metrics.overdueAmount ?? 0;
+  const overduePercentage =
+    metrics.overduePercentage ?? (totalRevenue > 0 ? (overdueAmount / totalRevenue) * 100 : 0);
+  const pendingInvoicesCount = metrics.pendingInvoicesCount;
+  const overdueContractsCount = metrics.overdueContractsCount;
 
   if (isLoading) {
     return (
@@ -131,6 +120,7 @@ export default function FinancialDashboard({
                 onClick={onRefresh}
                 disabled={isRefreshing}
                 className="gap-2"
+                aria-label="Atualizar dashboard financeiro"
               >
                 <RefreshCw
                   {...iconA11yProps}
@@ -140,7 +130,12 @@ export default function FinancialDashboard({
               </Button>
             )}
             {onAddTransaction && (
-              <Button onClick={onAddTransaction} size="sm" className="gap-2">
+              <Button
+                onClick={onAddTransaction}
+                size="sm"
+                className="gap-2"
+                aria-label="Criar lançamento financeiro"
+              >
                 <Plus {...iconA11yProps} className="h-4 w-4" />
                 <span className="hidden sm:inline">Novo Lançamento</span>
               </Button>
@@ -190,48 +185,76 @@ export default function FinancialDashboard({
           iconColor="text-green-600"
         />
 
-        <FinancialSummaryCard
-          icon={TrendingUp}
-          label="Contas a Receber"
-          value={accountsReceivable}
-          currency={true}
-          badge={{
-            label: `${pendingInvoicesCount} faturas`,
-            variant: 'info',
-          }}
-          subLabel="Vencimento até 30 dias"
-          bgColor="bg-blue-100 dark:bg-blue-900/30"
-          iconColor="text-blue-600"
-        />
+        {hasReceivable ? (
+          <FinancialSummaryCard
+            icon={TrendingUp}
+            label="Contas a Receber"
+            value={accountsReceivable}
+            currency={true}
+            badge={pendingInvoicesCount !== undefined ? { label: `${pendingInvoicesCount} faturas`, variant: 'info' } : undefined}
+            subLabel="Vencimento até 30 dias"
+            bgColor="bg-blue-100 dark:bg-blue-900/30"
+            iconColor="text-blue-600"
+          />
+        ) : (
+          <FinancialSummaryCard
+            icon={TrendingUp}
+            label="Comissões Recebidas"
+            value={metrics.commissionsReceived}
+            currency={true}
+            subLabel="No período"
+            bgColor="bg-blue-100 dark:bg-blue-900/30"
+            iconColor="text-blue-600"
+          />
+        )}
 
-        <FinancialSummaryCard
-          icon={TrendingDown}
-          label="Contas a Pagar"
-          value={accountsPayable}
-          currency={true}
-          badge={
-            accountsPayable > metrics.ownerTransfers * 0.5
-              ? { label: 'Urgente', variant: 'warning' }
-              : undefined
-          }
-          subLabel="Próximos vencimentos"
-          bgColor="bg-orange-100 dark:bg-orange-900/30"
-          iconColor="text-orange-600"
-        />
+        {hasPayable ? (
+          <FinancialSummaryCard
+            icon={TrendingDown}
+            label="Contas a Pagar"
+            value={accountsPayable}
+            currency={true}
+            subLabel="Próximos vencimentos"
+            bgColor="bg-orange-100 dark:bg-orange-900/30"
+            iconColor="text-orange-600"
+          />
+        ) : (
+          <FinancialSummaryCard
+            icon={TrendingDown}
+            label="Repasses a Proprietários"
+            value={metrics.ownerTransfers}
+            currency={true}
+            subLabel="No período"
+            bgColor="bg-orange-100 dark:bg-orange-900/30"
+            iconColor="text-orange-600"
+          />
+        )}
 
-        <FinancialSummaryCard
-          icon={AlertTriangle}
-          label="Inadimplência"
-          value={overdueAmount}
-          currency={true}
-          badge={{
-            label: `${overduePercentage.toFixed(1)}%`,
-            variant: overdueAmount > 0 ? 'error' : 'success',
-          }}
-          subLabel={overdueContractsCount > 0 ? `${overdueContractsCount} contratos em atraso` : 'Nenhum atraso'}
-          bgColor={overdueAmount > 0 ? "bg-red-100 dark:bg-red-900/30" : "bg-green-100 dark:bg-green-900/30"}
-          iconColor={overdueAmount > 0 ? "text-red-600" : "text-green-600"}
-        />
+        {hasOverdue ? (
+          <FinancialSummaryCard
+            icon={AlertTriangle}
+            label="Inadimplência"
+            value={overdueAmount}
+            currency={true}
+            badge={{
+              label: `${overduePercentage.toFixed(1)}%`,
+              variant: overdueAmount > 0 ? 'error' : 'success',
+            }}
+            subLabel={overdueContractsCount && overdueContractsCount > 0 ? `${overdueContractsCount} contratos em atraso` : 'Nenhum atraso'}
+            bgColor={overdueAmount > 0 ? "bg-red-100 dark:bg-red-900/30" : "bg-green-100 dark:bg-green-900/30"}
+            iconColor={overdueAmount > 0 ? "text-red-600" : "text-green-600"}
+          />
+        ) : (
+          <FinancialSummaryCard
+            icon={TrendingDown}
+            label="Despesas Operacionais"
+            value={metrics.operationalExpenses}
+            currency={true}
+            subLabel="No período"
+            bgColor="bg-red-100 dark:bg-red-900/30"
+            iconColor="text-red-600"
+          />
+        )}
       </div>
     </div>
   );

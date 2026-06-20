@@ -9,47 +9,34 @@ import { StripeService } from './stripe-service';
 import { storage } from '../../storage';
 import { getEmailService } from '../../email/email-service';
 import * as Sentry from '@sentry/node';
+import { runWithTenantRlsContext } from '../../db-rls';
+import {
+  createWebhookPayloadDigest,
+  markWebhookEventFailed,
+  markWebhookEventProcessed,
+  reserveWebhookEvent,
+} from '../../integrations/webhook-ledger';
 
 /**
- * Idempotencia via Redis SETNX.
+ * Idempotencia persistente.
  * Retorna true se for a primeira vez que vemos este event.id (deve processar).
- * Retorna false se ja foi processado dentro do TTL (nao processar de novo).
- * Se Redis estiver indisponivel, returns true (fail-open) e deixa o Stripe
- * fazer retry — melhor processar duas vezes que perder evento.
+ * Retorna false se ja foi processado/esta em processamento.
  */
-async function markEventAsProcessing(eventId: string): Promise<boolean> {
-  if (!process.env.REDIS_URL) return true;
-  try {
-    const { getRedisClient } = await import('../../cache/redis-client');
-    const client = getRedisClient();
-    const key = `stripe:webhook:${eventId}`;
-    // NX = only set if not exists. EX = expiration in seconds (24h).
-    const result = await client.set(key, '1', 'EX', 24 * 60 * 60, 'NX');
-    return result === 'OK';
-  } catch (err) {
-    // Fail-open: se Redis falhar, prossegue e aceita risco de dupla execucao
-    console.warn('[stripe-webhook] Idempotency check failed (fail-open):', err);
-    Sentry.captureMessage('Stripe webhook idempotency fail-open', {
-      level: 'warning',
-      extra: { eventId, error: err instanceof Error ? err.message : String(err) },
-    });
-    return true;
-  }
+async function markEventAsProcessing(event: Stripe.Event, rawBody: unknown): Promise<boolean> {
+  const reservation = await reserveWebhookEvent({
+    provider: 'stripe',
+    eventId: event.id,
+    eventType: event.type,
+    payloadDigest: createWebhookPayloadDigest(rawBody),
+  });
+  return reservation.reserved;
 }
 
 /**
- * Marca o evento como falhou para permitir retry.
- * Deleta a chave de idempotencia para que o proximo webhook possa reprocessar.
+ * Marca o evento como falhou para permitir retry persistente.
  */
-async function markEventAsFailed(eventId: string): Promise<void> {
-  if (!process.env.REDIS_URL) return;
-  try {
-    const { getRedisClient } = await import('../../cache/redis-client');
-    const client = getRedisClient();
-    await client.del(`stripe:webhook:${eventId}`);
-  } catch (err) {
-    console.warn('[stripe-webhook] Failed to clear idempotency key:', err);
-  }
+async function markEventAsFailed(eventId: string, error: unknown): Promise<void> {
+  await markWebhookEventFailed({ provider: 'stripe', eventId, error });
 }
 
 /**
@@ -115,7 +102,9 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription): Pro
       stripeSubscriptionId: subscription.id,
     };
 
-    await storage.updateTenantSubscription(tenantId, updateData);
+    await runWithTenantRlsContext(tenantId, () =>
+      storage.updateTenantSubscription(tenantId, updateData),
+    );
 
     console.log(`✅ Subscription created for tenant ${tenantId} (sub ${subscription.id})`);
   } catch (error) {
@@ -205,7 +194,9 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Pro
       cancelAtPeriodEnd: subscription.cancel_at_period_end === true,
     };
 
-    await storage.updateTenantSubscription(tenantId, updateData);
+    await runWithTenantRlsContext(tenantId, () =>
+      storage.updateTenantSubscription(tenantId, updateData),
+    );
 
     console.log(`✅ Subscription updated for tenant ${tenantId}, status: ${status}`);
 
@@ -213,7 +204,9 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription): Pro
     // Roda fora do critical path para nao bloquear a resposta ao Stripe em caso de erro.
     try {
       const { enforceAllPlanLimits } = await import('../../middleware/plan-limits');
-      const result = await enforceAllPlanLimits(tenantId);
+      const result = await runWithTenantRlsContext(tenantId, () =>
+        enforceAllPlanLimits(tenantId),
+      );
       if (result.integrationsDisconnected > 0) {
         console.log(
           `[stripe-webhook] Tenant ${tenantId}: ${result.integrationsDisconnected} integration(s) disconnected due to plan change`,
@@ -255,10 +248,12 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription): Pro
       throw new Error('Tenant ID not found in customer metadata');
     }
 
-    await storage.updateTenantSubscription(tenantId, {
-      status: 'cancelled',
-      cancelledAt: new Date(),
-    });
+    await runWithTenantRlsContext(tenantId, () =>
+      storage.updateTenantSubscription(tenantId, {
+        status: 'cancelled',
+        cancelledAt: new Date(),
+      }),
+    );
 
     console.log(`✅ Subscription deleted for tenant ${tenantId}`);
   } catch (error) {
@@ -298,7 +293,9 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice): Promise<v
 
     // Send payment confirmation email
     try {
-      const tenant = await storage.getTenant(tenantId);
+      const tenant = await runWithTenantRlsContext(tenantId, () =>
+        storage.getTenant(tenantId),
+      );
       if (tenant?.email) {
         const emailService = getEmailService();
         await emailService.sendTemplate(
@@ -361,15 +358,19 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice): Promise<void
     // Primeira falha de pagamento → 'past_due': o subscription-guard concede
     // 7 dias de grace period antes de bloquear. O Stripe retenta a cobranca e,
     // se esgotar, customer.subscription.updated/deleted rebaixa o status.
-    await storage.updateTenantSubscription(tenantId, {
-      status: 'past_due',
-    });
+    await runWithTenantRlsContext(tenantId, () =>
+      storage.updateTenantSubscription(tenantId, {
+        status: 'past_due',
+      }),
+    );
 
     console.log(`⚠️  Payment failed for tenant ${tenantId}, invoice: ${invoice.id}`);
 
     // Send payment failure notification email
     try {
-      const tenant = await storage.getTenant(tenantId);
+      const tenant = await runWithTenantRlsContext(tenantId, () =>
+        storage.getTenant(tenantId),
+      );
       if (tenant?.email) {
         const emailService = getEmailService();
         const lastError = invoice.last_finalization_error;
@@ -428,7 +429,9 @@ async function handleTrialWillEnd(subscription: Stripe.Subscription): Promise<vo
 
     // Send trial ending notification email
     try {
-      const tenant = await storage.getTenant(tenantId);
+      const tenant = await runWithTenantRlsContext(tenantId, () =>
+        storage.getTenant(tenantId),
+      );
       if (tenant?.email) {
         const trialEnd = subscription.trial_end
           ? new Date(subscription.trial_end * 1000)
@@ -512,9 +515,11 @@ async function handleCheckoutSessionCompleted(
     // ja atualiza o planId/status; aqui so garantimos que o customerId esta la.
     // updateTenantSubscription faz MERGE do metadata: se subscription.created
     // processou primeiro, o stripeSubscriptionId gravado la NAO e apagado.
-    await storage.updateTenantSubscription(tenantId, {
-      metadata: { stripeCustomerId: customerId },
-    });
+    await runWithTenantRlsContext(tenantId, () =>
+      storage.updateTenantSubscription(tenantId, {
+        metadata: { stripeCustomerId: customerId },
+      }),
+    );
 
     console.log(
       `✅ Checkout completed for tenant ${tenantId}, customer ${customerId}, session ${session.id}`,
@@ -570,8 +575,8 @@ async function dispatchEvent(event: Stripe.Event): Promise<void> {
  *
  * Pipeline:
  * 1. Valida assinatura (signature) — rejeita 400 se falhar. Stripe nao retenta.
- * 2. Idempotencia via Redis SETNX (24h TTL). Se ja processado, responde 200
- *    imediatamente sem reprocessar (evita racing em replays).
+ * 2. Idempotencia persistente em webhook_events. Se ja processado/ativo,
+ *    responde 200 imediatamente sem reprocessar.
  * 3. Dispatch do handler especifico.
  * 4. Em caso de falha no handler, limpa a chave de idempotencia e responde 500
  *    para que o Stripe faca retry automatico (com backoff exponencial ate 72h).
@@ -602,8 +607,8 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
     return;
   }
 
-  // 2. Idempotencia — processa cada event.id no maximo uma vez por 24h
-  const isNew = await markEventAsProcessing(event.id);
+  // 2. Idempotencia — processa cada event.id no maximo uma vez.
+  const isNew = await markEventAsProcessing(event, req.rawBody);
   if (!isNew) {
     console.log(`[stripe-webhook] Duplicate event ignored: ${event.id} (${event.type})`);
     res.json({ received: true, duplicate: true });
@@ -615,6 +620,7 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
   // 3. Dispatch + handling
   try {
     await dispatchEvent(event);
+    await markWebhookEventProcessed({ provider: 'stripe', eventId: event.id });
     res.json({ received: true });
   } catch (error) {
     console.error(`[stripe-webhook] Handler failed for ${event.type} (${event.id}):`, error);
@@ -624,7 +630,7 @@ export async function handleStripeWebhook(req: Request, res: Response): Promise<
     });
     // Permite retry: limpa a chave de idempotencia e responde com 500
     // para o Stripe disparar o proximo retry (backoff automatico)
-    await markEventAsFailed(event.id);
+    await markEventAsFailed(event.id, error);
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Webhook processing failed',
       eventId: event.id,

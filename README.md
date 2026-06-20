@@ -104,7 +104,7 @@ newsletter_subscriptions, files, saved_reports
 
 - Node.js 20+
 - PostgreSQL 14+ (ou SQLite para dev)
-- Redis (opcional, para cache e jobs)
+- Redis (obrigatorio em producao para rate limit distribuido, lock/status de crons, cache e sessoes quando configuradas; opcional apenas em dev/test com fallback explicito)
 
 ### Instalacao
 
@@ -127,7 +127,7 @@ NODE_ENV=development
 ### Executar
 
 ```bash
-# Criar tabelas
+# Criar tabelas em ambiente local/dev
 npm run db:push
 
 # Seed com dados demo (opcional)
@@ -164,10 +164,10 @@ Credenciais criadas por `npm run db:seed`:
 
 | Comando                    | Descricao                      |
 | -------------------------- | ------------------------------ |
-| `npm run db:push`          | Aplicar schema                 |
+| `npm run db:push`          | Aplicar schema em dev/local    |
 | `npm run db:seed`          | Dados de demonstracao          |
 | `npm run db:clean`         | Limpar dados demo              |
-| `npm run db:migrate`       | Executar migracoes             |
+| `npm run db:migrate`       | Executar migracoes revisadas   |
 | `npm run db:indexes:apply` | Aplicar indices de performance |
 
 ### Testes
@@ -191,7 +191,7 @@ Credenciais criadas por `npm run db:seed`:
 npm install -g vercel
 vercel login
 vercel link
-vercel --prod
+npm run deploy:production
 ```
 
 Configure as variaveis de ambiente no dashboard da Vercel:
@@ -204,7 +204,7 @@ Configure as variaveis de ambiente no dashboard da Vercel:
 
 ```bash
 docker-compose up -d
-docker-compose exec app npm run db:push
+docker-compose exec app npm run db:migrate
 ```
 
 Consulte [DEPLOYMENT.md](DEPLOYMENT.md) para guia completo.
@@ -278,7 +278,7 @@ GitHub Actions pipelines:
 
 - **ci.yml** — Lint, TypeCheck, Build, Testes unitarios, E2E
 - **deploy-preview.yml** — Deploy automatico para staging
-- **deploy-production.yml** — Deploy para producao com migracoes e rollback
+- **deploy-production.yml** — Deploy para producao com gate `ops:go-live:verify:strict`; migrations automaticas ficam desabilitadas por politica e rollback exige alvo explicito
 - **security-scan.yml** — Scanning de vulnerabilidades
 
 ---

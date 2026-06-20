@@ -16,7 +16,7 @@ import {
   FILE_TYPE_CONFIG,
   type FileType,
 } from './storage/file-upload';
-import { STORAGE_BUCKETS } from './storage/supabase-client';
+import { STORAGE_BUCKETS, type StorageBucket } from './storage/supabase-client';
 import {
   getFileById,
   getFileUrl,
@@ -35,20 +35,41 @@ import {
   generateBlurhash,
 } from './storage/image-processor';
 import { storage } from './storage';
+import { runWithTenantRlsContext } from './db-rls';
+
+const MB = 1024 * 1024;
+const GENERIC_UPLOAD_MAX_SIZE = 10 * MB;
+const PROPERTY_IMAGE_MAX_SIZE = 10 * MB;
+const PROPERTY_IMAGE_MAX_FILES = 10;
+const PROPERTY_IMAGE_TOTAL_MAX_SIZE = 50 * MB;
+const FILE_URL_MIN_EXPIRES_IN_SECONDS = 60;
+const FILE_URL_MAX_EXPIRES_IN_SECONDS = 3600;
+
+const BUCKETS_BY_FILE_TYPE: Record<FileType, readonly StorageBucket[]> = {
+  image: [STORAGE_BUCKETS.PROPERTIES_IMAGES],
+  document: [STORAGE_BUCKETS.DOCUMENTS],
+  avatar: [STORAGE_BUCKETS.AVATARS],
+  logo: [STORAGE_BUCKETS.LOGOS],
+};
+const PUBLIC_UPLOAD_BUCKETS: readonly StorageBucket[] = [
+  STORAGE_BUCKETS.PROPERTIES_IMAGES,
+  STORAGE_BUCKETS.AVATARS,
+  STORAGE_BUCKETS.LOGOS,
+];
 
 // Configure Multer for memory storage - default 10MB limit
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB max (default)
+    fileSize: GENERIC_UPLOAD_MAX_SIZE,
   },
 });
 
-// Larger limit for property image uploads - 50MB
+// Property image uploads stay in memory, so keep per-file and batch caps tight.
 const uploadPropertyImages = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB max for property images
+    fileSize: PROPERTY_IMAGE_MAX_SIZE,
   },
 });
 
@@ -56,10 +77,13 @@ const uploadPropertyImages = multer({
  * Authentication middleware - ensures user is logged in
  */
 function requireAuth(req: Request, res: Response, next: Function) {
-  if (!req.isAuthenticated || !req.isAuthenticated()) {
+  if (!req.isAuthenticated || !req.isAuthenticated() || !req.user) {
     return res.status(401).json({ error: 'Authentication required' });
   }
-  next();
+  if (!req.user.tenantId) {
+    return res.status(403).json({ error: 'Sessão inválida' });
+  }
+  runWithTenantRlsContext(req.user.tenantId, () => next());
 }
 
 /**
@@ -74,6 +98,31 @@ function getTenantId(req: Request): string {
  */
 function getUserId(req: Request): string {
   return req.user?.id || '';
+}
+
+function resolveUploadBucket(
+  fileType: FileType,
+  requestedBucket: unknown
+): { bucket?: StorageBucket; error?: string } {
+  const allowedBuckets = BUCKETS_BY_FILE_TYPE[fileType];
+
+  if (!allowedBuckets) {
+    return { error: 'Invalid file type' };
+  }
+
+  if (requestedBucket === undefined || requestedBucket === null || requestedBucket === '') {
+    return { bucket: allowedBuckets[0] };
+  }
+
+  if (typeof requestedBucket !== 'string') {
+    return { error: 'Invalid bucket' };
+  }
+
+  if (!allowedBuckets.includes(requestedBucket as StorageBucket)) {
+    return { error: 'Bucket is not allowed for this file type' };
+  }
+
+  return { bucket: requestedBucket as StorageBucket };
 }
 
 /**
@@ -113,6 +162,144 @@ function safeJSONParse(jsonString: string): Record<string, any> {
   }
 }
 
+type TenantOwnedEntity = {
+  tenantId?: string | null;
+};
+
+type UploadEntityResolution = {
+  entityType?: string;
+  entityId?: string;
+  error?: string;
+  status?: number;
+};
+
+const UPLOAD_ENTITY_TYPE_ALIASES: Record<string, string> = {
+  property: 'property',
+  properties: 'property',
+  lead: 'lead',
+  leads: 'lead',
+  contract: 'contract',
+  contracts: 'contract',
+  owner: 'owner',
+  owners: 'owner',
+  renter: 'renter',
+  renters: 'renter',
+  tenant: 'tenant',
+  user: 'user',
+  rentalContract: 'rentalContract',
+  rental_contract: 'rentalContract',
+  'rental-contract': 'rentalContract',
+  rentalPayment: 'rentalPayment',
+  rental_payment: 'rentalPayment',
+  'rental-payment': 'rentalPayment',
+  saleProposal: 'saleProposal',
+  sale_proposal: 'saleProposal',
+  'sale-proposal': 'saleProposal',
+  propertySale: 'propertySale',
+  property_sale: 'propertySale',
+  'property-sale': 'propertySale',
+  financeCategory: 'financeCategory',
+  finance_category: 'financeCategory',
+  'finance-category': 'financeCategory',
+  financeEntry: 'financeEntry',
+  finance_entry: 'financeEntry',
+  'finance-entry': 'financeEntry',
+  leadTag: 'leadTag',
+  lead_tag: 'leadTag',
+  'lead-tag': 'leadTag',
+  followUp: 'followUp',
+  follow_up: 'followUp',
+  'follow-up': 'followUp',
+  propertyValuation: 'propertyValuation',
+  property_valuation: 'propertyValuation',
+  'property-valuation': 'propertyValuation',
+  propertyInspection: 'propertyInspection',
+  property_inspection: 'propertyInspection',
+  'property-inspection': 'propertyInspection',
+};
+
+const UPLOAD_ENTITY_LOADERS: Record<string, (entityId: string) => Promise<TenantOwnedEntity | undefined>> = {
+  property: (entityId) => storage.getProperty(entityId),
+  lead: (entityId) => storage.getLead(entityId),
+  contract: (entityId) => storage.getContract(entityId),
+  owner: (entityId) => storage.getOwner(entityId),
+  renter: (entityId) => storage.getRenter(entityId),
+  rentalContract: (entityId) => storage.getRentalContract(entityId),
+  rentalPayment: (entityId) => storage.getRentalPayment(entityId),
+  saleProposal: (entityId) => storage.getSaleProposal(entityId),
+  propertySale: (entityId) => storage.getPropertySale(entityId),
+  financeCategory: (entityId) => storage.getFinanceCategory(entityId),
+  financeEntry: (entityId) => storage.getFinanceEntry(entityId),
+  leadTag: (entityId) => storage.getLeadTag(entityId),
+  followUp: (entityId) => storage.getFollowUp(entityId),
+  propertyValuation: (entityId) => storage.getPropertyValuation(entityId),
+  propertyInspection: (entityId) => storage.getPropertyInspection(entityId),
+};
+
+function normalizeEntityField(value: unknown): string | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed === '' ? undefined : trimmed;
+}
+
+async function resolveUploadEntity(
+  tenantId: string,
+  userId: string,
+  entityTypeInput: unknown,
+  entityIdInput: unknown
+): Promise<UploadEntityResolution> {
+  const rawEntityType = normalizeEntityField(entityTypeInput);
+  const entityId = normalizeEntityField(entityIdInput);
+
+  if (!rawEntityType && !entityId) {
+    return {};
+  }
+
+  if (!rawEntityType || !entityId) {
+    return {
+      error: 'entityType and entityId must be provided together',
+      status: 400,
+    };
+  }
+
+  const entityType = UPLOAD_ENTITY_TYPE_ALIASES[rawEntityType];
+  if (!entityType) {
+    return {
+      error: 'Unsupported entity type for upload',
+      status: 400,
+    };
+  }
+
+  if (entityType === 'tenant') {
+    return entityId === tenantId
+      ? { entityType, entityId }
+      : { error: 'Entity not found', status: 404 };
+  }
+
+  if (entityType === 'user') {
+    const user = await storage.getUser(entityId);
+    if (!user || user.tenantId !== tenantId) {
+      return { error: 'Entity not found', status: 404 };
+    }
+
+    return { entityType, entityId };
+  }
+
+  const entity = await UPLOAD_ENTITY_LOADERS[entityType]?.(entityId);
+  if (!entity || entity.tenantId !== tenantId) {
+    return { error: 'Entity not found', status: 404 };
+  }
+
+  return { entityType, entityId };
+}
+
 /**
  * Register file upload routes
  */
@@ -135,7 +322,20 @@ export function registerFileRoutes(app: Express) {
         const userId = getUserId(req);
         const fileType = (req.body.fileType as FileType) || 'document';
         const category = req.body.category || 'general';
-        const bucket = req.body.bucket || STORAGE_BUCKETS.DOCUMENTS;
+        const entity = await resolveUploadEntity(
+          tenantId,
+          userId,
+          req.body.entityType,
+          req.body.entityId
+        );
+        if (entity.error) {
+          return res.status(entity.status ?? 400).json({ error: entity.error });
+        }
+        const bucketResolution = resolveUploadBucket(fileType, req.body.bucket);
+        if (!bucketResolution.bucket) {
+          return res.status(400).json({ error: bucketResolution.error });
+        }
+        const bucket = bucketResolution.bucket;
 
         // Validate file (includes magic bytes validation)
         const validation = await validateFile(req.file, { fileType });
@@ -174,13 +374,9 @@ export function registerFileRoutes(app: Express) {
           fileSize: result.size,
           mimeType: result.mimeType,
           category,
-          entityType: req.body.entityType,
-          entityId: req.body.entityId,
-          isPublic: [
-            STORAGE_BUCKETS.PROPERTIES_IMAGES,
-            STORAGE_BUCKETS.AVATARS,
-            STORAGE_BUCKETS.LOGOS,
-          ].includes(bucket),
+          entityType: entity.entityType,
+          entityId: entity.entityId,
+          isPublic: PUBLIC_UPLOAD_BUCKETS.includes(bucket),
         });
 
         res.json({
@@ -369,7 +565,7 @@ export function registerFileRoutes(app: Express) {
   app.post(
     '/api/files/upload/property-images',
     requireAuth,
-    uploadPropertyImages.array('images', 20),
+    uploadPropertyImages.array('images', PROPERTY_IMAGE_MAX_FILES),
     async (req: Request, res: Response) => {
       try {
         const files = req.files as Express.Multer.File[];
@@ -385,6 +581,11 @@ export function registerFileRoutes(app: Express) {
           return res.status(400).json({ error: 'Property ID required' });
         }
 
+        const property = await storage.getProperty(propertyId);
+        if (!property || property.tenantId !== tenantId) {
+          return res.status(404).json({ error: 'Property not found' });
+        }
+
         // Validate all files (includes magic bytes validation)
         for (const file of files) {
           const validation = await validateFile(file, { fileType: 'image' });
@@ -397,6 +598,13 @@ export function registerFileRoutes(app: Express) {
 
         // Check storage quota
         const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+        if (totalSize > PROPERTY_IMAGE_TOTAL_MAX_SIZE) {
+          return res.status(413).json({
+            error: 'Property image batch size exceeded',
+            maxSize: PROPERTY_IMAGE_TOTAL_MAX_SIZE,
+          });
+        }
+
         const quotaCheck = await checkStorageQuota(tenantId, totalSize);
         if (!quotaCheck.allowed) {
           return res.status(413).json({
@@ -493,8 +701,15 @@ export function registerFileRoutes(app: Express) {
         const tenantId = getTenantId(req);
         const userId = getUserId(req);
         const documentType = req.body.documentType || 'general';
-        const entityType = req.body.entityType;
-        const entityId = req.body.entityId;
+        const entity = await resolveUploadEntity(
+          tenantId,
+          userId,
+          req.body.entityType,
+          req.body.entityId
+        );
+        if (entity.error) {
+          return res.status(entity.status ?? 400).json({ error: entity.error });
+        }
 
         // Validate as document (includes magic bytes validation)
         const validation = await validateFile(req.file, { fileType: 'document' });
@@ -517,7 +732,14 @@ export function registerFileRoutes(app: Express) {
           STORAGE_BUCKETS.DOCUMENTS,
           tenantId,
           documentType,
-          { userId, metadata: { documentType, entityType, entityId } }
+          {
+            userId,
+            metadata: {
+              documentType,
+              entityType: entity.entityType,
+              entityId: entity.entityId,
+            },
+          }
         );
 
         if (!result.success) {
@@ -535,8 +757,8 @@ export function registerFileRoutes(app: Express) {
           fileSize: result.size,
           mimeType: result.mimeType,
           category: documentType,
-          entityType,
-          entityId,
+          entityType: entity.entityType,
+          entityId: entity.entityId,
           isPublic: false,
         });
 
@@ -602,7 +824,14 @@ export function registerFileRoutes(app: Express) {
         return res.status(403).json({ error: 'Access denied' });
       }
 
-      const expiresIn = parseInt(req.query.expiresIn as string) || 3600;
+      const requestedExpiresIn = parseInt(req.query.expiresIn as string);
+      const expiresIn = Math.min(
+        Math.max(
+          Number.isNaN(requestedExpiresIn) ? 3600 : requestedExpiresIn,
+          FILE_URL_MIN_EXPIRES_IN_SECONDS,
+        ),
+        FILE_URL_MAX_EXPIRES_IN_SECONDS,
+      );
       const url = await getFileUrl(file.id, expiresIn);
 
       if (!url) {

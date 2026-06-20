@@ -11,6 +11,7 @@ import { users, loginHistory } from "@shared/schema-sqlite";
 import { eq, and, desc, gte } from "drizzle-orm";
 import { createAuditLog } from "../routes-security";
 import { sendSecurityAlertEmail, sendNewLoginEmail } from "./email-service";
+import { runWithTenantRlsContext } from "../db-rls";
 
 // Account lockout configuration
 const MAX_FAILED_ATTEMPTS = 5;
@@ -330,7 +331,10 @@ export function registerSecurityRoutes(app: Express) {
     if (!req.isAuthenticated?.() || !req.user) {
       return res.status(401).json({ error: "Não autenticado" });
     }
-    next();
+    if (!req.user.tenantId) {
+      return res.status(403).json({ error: "Sessão inválida" });
+    }
+    runWithTenantRlsContext(req.user.tenantId, () => next());
   };
 
   // Get password strength requirements

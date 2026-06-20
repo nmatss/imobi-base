@@ -249,7 +249,7 @@ WHATSAPP_VERIFY_TOKEN   = [token aleatório gerado]
 
 ```bash
 # Redeploy para aplicar as novas variáveis
-vercel --prod
+npm run deploy:production
 ```
 
 ---

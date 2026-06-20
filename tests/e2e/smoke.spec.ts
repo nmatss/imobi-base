@@ -17,6 +17,18 @@ async function loginAsAdmin(page: Page) {
   await loginPage.loginAndWait(adminUser.email, adminUser.password);
 
   await expect(page).toHaveURL(/\/dashboard/);
+  await page.evaluate(async () => {
+    const response = await fetch('/api/auth/me', { credentials: 'include' });
+    if (!response.ok) return;
+
+    const session = await response.json();
+    const userId = session?.user?.id;
+    if (userId) {
+      localStorage.setItem(`imobibase:tour-done:${userId}`, '1');
+    }
+  });
+  await page.reload();
+
   await expect(page.getByRole('heading', { name: /Painel Operacional/i })).toBeVisible();
 }
 
@@ -29,12 +41,18 @@ async function expectNoAppCrash(page: Page) {
 test.describe('Smoke Tests - Critical Path @smoke', () => {
   test.describe.configure({ mode: 'serial' });
 
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('imobibase:disable-tour', '1');
+    });
+  });
+
   test('landing publica acessivel', async ({ page }) => {
     await page.goto('/');
 
     await expect(page).toHaveURL(/\/$/);
     await expect(
-      page.getByRole('heading', { name: /A intelig.ncia.*imobili.ria.*precisa/i })
+      page.getByRole('heading', { name: /sistema completo.*imobili.ria.*crescer/i })
     ).toBeVisible();
     await expect(page).not.toHaveTitle(/error/i);
     await expectNoAppCrash(page);

@@ -35,6 +35,26 @@ interface BusinessHours {
   timezone: string;
 }
 
+const IMMUTABLE_WHATSAPP_FIELDS = new Set([
+  "id",
+  "tenantId",
+  "tenant_id",
+  "createdAt",
+  "created_at",
+  "updatedAt",
+  "updated_at",
+]);
+
+function stripWhatsappImmutableFields<T extends Record<string, unknown>>(payload: T): Partial<T> {
+  const sanitized: Partial<T> = {};
+  for (const [key, value] of Object.entries(payload || {})) {
+    if (!IMMUTABLE_WHATSAPP_FIELDS.has(key)) {
+      sanitized[key as keyof T] = value as T[keyof T];
+    }
+  }
+  return sanitized;
+}
+
 export class AutoResponder {
   /**
    * Process incoming message and trigger auto-responses
@@ -337,9 +357,10 @@ export class AutoResponder {
    * Create auto-response
    */
   async createAutoResponse(data: any) {
+    const safeData = stripWhatsappImmutableFields(data);
     const [created] = await db
       .insert(whatsappAutoResponses)
-      .values(data)
+      .values({ ...safeData, tenantId: data.tenantId })
       .returning();
 
     return created;
@@ -351,7 +372,7 @@ export class AutoResponder {
   async updateAutoResponse(id: string, tenantId: string, updates: any) {
     const [updated] = await db
       .update(whatsappAutoResponses)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ ...stripWhatsappImmutableFields(updates), updatedAt: new Date() })
       .where(
         and(
           eq(whatsappAutoResponses.id, id),

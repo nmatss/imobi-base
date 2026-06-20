@@ -1,6 +1,6 @@
 import React, { useEffect, useState, lazy, Suspense } from "react";
-import { Switch, Route, useLocation } from "wouter";
-import { ImobiProvider, useImobi } from "@/lib/imobi-context";
+import { Switch, Route, useLocation, Link } from "wouter";
+import { ImobiProvider, TwoFactorRequiredError, useImobi } from "@/lib/imobi-context";
 import { AccessibilityProvider } from "@/lib/accessibility-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GlobalSearch } from "@/components/GlobalSearch";
@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Toaster } from "@/components/ui/sonner";
 import { Logo, LogoIcon } from "@/components/brand/logo";
 import { SeoHead } from "@/components/seo/SeoHead";
+import { isSuperAdminRole } from "@shared/constants/roles";
 
 // Lazy-loaded components for better code splitting
 const Dashboard = lazy(() => import("@/pages/dashboard"));
@@ -30,6 +31,7 @@ const TenantLanding = lazy(() => import("@/pages/public/landing"));
 const PropertyDetails = lazy(() => import("@/pages/public/property-details"));
 const PublicProperties = lazy(() => import("@/pages/public/properties"));
 const ProductLanding = lazy(() => import("@/pages/public/product-landing"));
+const SolutionPage = lazy(() => import("@/pages/public/solution-page"));
 const SignupPage = lazy(() => import("@/pages/auth/signup"));
 const ForgotPasswordPage = lazy(() => import("@/pages/auth/ForgotPassword"));
 const ResetPasswordPage = lazy(() => import("@/pages/auth/ResetPassword"));
@@ -46,6 +48,8 @@ const OwnerPortal = lazy(() => import("@/pages/portal/owner-portal"));
 const RenterPortal = lazy(() => import("@/pages/portal/renter-portal"));
 const PortalAdmin = lazy(() => import("@/pages/portal/portal-admin"));
 const PortalResetPassword = lazy(() => import("@/pages/portal/reset-password"));
+const BuyerSelectionPage = lazy(() => import("@/pages/portal/buyer-selection"));
+const VisitConfirmPage = lazy(() => import("@/pages/visits/confirm"));
 const OnboardingPage = lazy(() => import("@/pages/onboarding"));
 const PricingPage = lazy(() => import("@/pages/public/pricing"));
 const TermsPage = lazy(() => import("@/pages/public/terms"));
@@ -85,6 +89,7 @@ function LoginPage() {
   const [, setLocation] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [twoFactorRequired, setTwoFactorRequired] = useState(false);
 
   useEffect(() => {
     if (user) setLocation("/dashboard");
@@ -98,10 +103,16 @@ function LoginPage() {
     const formData = new FormData(e.currentTarget);
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
+    const twoFactorToken = formData.get("twoFactorToken") as string | null;
     
     try {
-      await login(email, password);
+      await login(email, password, twoFactorRequired ? { twoFactorToken: twoFactorToken || "" } : undefined);
     } catch (error: unknown) {
+      if (error instanceof TwoFactorRequiredError) {
+        setTwoFactorRequired(true);
+        setError("");
+        return;
+      }
       const errorMessage = error instanceof Error ? error.message : "Email ou senha incorretos";
       setError(errorMessage);
     } finally {
@@ -197,7 +208,7 @@ function LoginPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password" className="text-sm font-medium">Senha</Label>
-                <a href="/auth/forgot-password" className="text-sm text-primary hover:underline">Esqueceu?</a>
+                <Link href="/auth/forgot-password" className="text-sm text-primary hover:underline">Esqueceu?</Link>
               </div>
               <Input
                 id="password"
@@ -209,6 +220,24 @@ function LoginPage() {
                 data-testid="input-password"
               />
             </div>
+
+            {twoFactorRequired && (
+              <div className="space-y-2">
+                <Label htmlFor="twoFactorToken" className="text-sm font-medium">Código de autenticação</Label>
+                <Input
+                  id="twoFactorToken"
+                  name="twoFactorToken"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  pattern="[0-9]{6}"
+                  maxLength={6}
+                  required
+                  className="h-12"
+                  data-testid="input-two-factor-token"
+                />
+              </div>
+            )}
             
             <Button 
               type="submit" 
@@ -216,7 +245,7 @@ function LoginPage() {
               disabled={isLoading}
               data-testid="button-login"
             >
-              {isLoading ? "Entrando..." : "Entrar"}
+              {isLoading ? "Entrando..." : twoFactorRequired ? "Verificar" : "Entrar"}
             </Button>
           </form>
           
@@ -231,7 +260,7 @@ function LoginPage() {
           
           <p className="text-center text-sm text-muted-foreground">
             Não tem uma conta?{" "}
-            <a href="/signup" className="text-primary font-medium hover:underline">Criar conta grátis</a>
+            <Link href="/signup" className="text-primary font-medium hover:underline">Criar conta grátis</Link>
           </p>
         </div>
       </div>
@@ -287,13 +316,13 @@ function SuperAdminRoute({ component: Component }: { component: React.ComponentT
     }
     if (!user) {
       setLocation("/login");
-    } else if (user.role !== "superadmin") {
+    } else if (!isSuperAdminRole(user.role)) {
       setLocation("/dashboard");
     }
   }, [loading, user, setLocation]);
 
   // Show loader while checking auth or redirecting
-  if (loading || !user || user.role !== "superadmin") {
+  if (loading || !user || !isSuperAdminRole(user.role)) {
     return <PageLoader />;
   }
 
@@ -318,6 +347,11 @@ function Router() {
 
         {/* App Routes */}
         <Route key="landing" path="/" component={() => <ErrorBoundary><ProductLanding /></ErrorBoundary>} />
+        <Route key="sistema-imobiliario-completo" path="/sistema-imobiliario-completo" component={() => <ErrorBoundary><SolutionPage /></ErrorBoundary>} />
+        <Route key="crm-imobiliario" path="/crm-imobiliario" component={() => <ErrorBoundary><SolutionPage /></ErrorBoundary>} />
+        <Route key="software-de-agendamento-imobiliario" path="/software-de-agendamento-imobiliario" component={() => <ErrorBoundary><SolutionPage /></ErrorBoundary>} />
+        <Route key="site-para-imobiliaria" path="/site-para-imobiliaria" component={() => <ErrorBoundary><SolutionPage /></ErrorBoundary>} />
+        <Route key="crm-imobiliario-com-ia" path="/crm-imobiliario-com-ia" component={() => <ErrorBoundary><SolutionPage /></ErrorBoundary>} />
         <Route key="login" path="/login" component={() => <ErrorBoundary><LoginPage /></ErrorBoundary>} />
         <Route key="signup" path="/signup" component={() => <ErrorBoundary><SignupPage /></ErrorBoundary>} />
         {/* Fluxo de recuperação de senha/verificação de email — os links dos
@@ -336,6 +370,10 @@ function Router() {
         <Route key="portal-reset" path="/portal/reset-password" component={() => <ErrorBoundary><PortalResetPassword /></ErrorBoundary>} />
         <Route key="portal-owner" path="/portal/owner" component={() => <ErrorBoundary><OwnerPortal /></ErrorBoundary>} />
         <Route key="portal-renter" path="/portal/renter" component={() => <ErrorBoundary><RenterPortal /></ErrorBoundary>} />
+
+        {/* Public token-based pages (no auth) */}
+        <Route key="buyer-selection" path="/s/:token" component={() => <ErrorBoundary><BuyerSelectionPage /></ErrorBoundary>} />
+        <Route key="visit-confirm" path="/v/confirm/:token" component={() => <ErrorBoundary><VisitConfirmPage /></ErrorBoundary>} />
 
         <Route key="dashboard" path="/dashboard" component={() => <ProtectedRoute component={Dashboard} />} />
         <Route key="properties" path="/properties" component={() => <ProtectedRoute component={PropertiesList} />} />

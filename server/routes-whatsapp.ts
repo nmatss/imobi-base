@@ -12,14 +12,46 @@ import type { Express, Request, Response } from "express";
 import rateLimit from 'express-rate-limit';
 import { whatsappAPI } from "./integrations/whatsapp/business-api";
 import { templateManager } from "./integrations/whatsapp/template-manager";
+import type { CreateTemplateParams } from "./integrations/whatsapp/template-manager";
 import { conversationManager } from "./integrations/whatsapp/conversation-manager";
 import { autoResponder } from "./integrations/whatsapp/auto-responder";
 import { messageQueue } from "./integrations/whatsapp/message-queue";
 import { webhookHandler } from "./integrations/whatsapp/webhook-handler";
+import { normalizeWhatsAppPhoneNumberId } from "./integrations/whatsapp/phone-number-id";
 import { log } from "./utils/log";
-import { validateExternalUrl } from "./security/url-validator";
+import { validateExternalUrlResolved } from "./security/url-validator";
 import { generateRateLimitKey } from "./middleware/rate-limit-key-generator";
 import { checkFeatureAccess } from "./middleware/plan-limits";
+import { requireAuth } from "./middleware/auth";
+import { runWithTenantRlsContext, runWithWhatsAppPhoneNumberRlsContext } from "./db-rls";
+import {
+  createWebhookPayloadDigest,
+  markWebhookEventFailed,
+  markWebhookEventProcessed,
+  reserveWebhookEvent,
+} from "./integrations/webhook-ledger";
+
+const IMMUTABLE_CLIENT_FIELDS = new Set([
+  "id",
+  "tenantId",
+  "tenant_id",
+  "userId",
+  "user_id",
+  "createdAt",
+  "created_at",
+  "updatedAt",
+  "updated_at",
+]);
+
+function stripImmutablePayloadFields<T extends Record<string, unknown>>(payload: T): Partial<T> {
+  const sanitized: Partial<T> = {};
+  for (const [key, value] of Object.entries(payload || {})) {
+    if (!IMMUTABLE_CLIENT_FIELDS.has(key)) {
+      sanitized[key as keyof T] = value as T[keyof T];
+    }
+  }
+  return sanitized;
+}
 
 // ==================== RATE LIMITERS ====================
 
@@ -76,10 +108,56 @@ const bulkWhatsAppLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+function getWhatsAppWebhookEventType(change: any): string {
+  const value = change?.value ?? {};
+  const hasMessages = Array.isArray(value.messages) && value.messages.length > 0;
+  const hasStatuses = Array.isArray(value.statuses) && value.statuses.length > 0;
+
+  if (hasMessages && hasStatuses) {
+    return "messages+statuses";
+  }
+  if (hasMessages) {
+    return "messages";
+  }
+  if (hasStatuses) {
+    return "statuses";
+  }
+  return typeof change?.field === "string" ? change.field : "unknown";
+}
+
+function getWhatsAppWebhookEventId(
+  entryId: unknown,
+  change: any,
+  payloadDigest: string,
+): string {
+  const value = change?.value ?? {};
+  const phoneNumberId = value?.metadata?.phone_number_id ?? "unknown-phone";
+  const messageIds = Array.isArray(value.messages)
+    ? value.messages.map((message: any) => `message:${message?.id ?? "unknown"}`)
+    : [];
+  const statusIds = Array.isArray(value.statuses)
+    ? value.statuses.map((status: any) =>
+        [
+          "status",
+          status?.id ?? "unknown",
+          status?.status ?? "unknown",
+          status?.timestamp ?? "unknown",
+        ].join(":")
+      )
+    : [];
+
+  const identifiers = [...messageIds, ...statusIds];
+  const basis = identifiers.length > 0
+    ? `${entryId ?? "unknown-entry"}:${phoneNumberId}:${identifiers.join("|")}`
+    : `${entryId ?? "unknown-entry"}:${phoneNumberId}:${change?.field ?? "unknown"}:${payloadDigest}`;
+
+  return `whatsapp:${createWebhookPayloadDigest(basis)}`;
+}
+
 export function registerWhatsAppRoutes(app: Express) {
   // Gate all WhatsApp routes behind feature flag (webhooks use /api/webhooks/ prefix, unaffected)
-  // Individual routes already use requireAuth; this gates feature access for all WhatsApp API routes
-  app.use("/api/whatsapp", checkFeatureAccess('whatsapp'));
+  // Webhooks are under /api/webhooks and remain outside this authenticated prefix.
+  app.use("/api/whatsapp", requireAuth, checkFeatureAccess('whatsapp'));
 
   // ==================== MESSAGES ====================
 
@@ -185,8 +263,8 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(400).json({ error: "Phone number and media URL are required" });
       }
 
-      // Validar mediaUrl para prevenir SSRF
-      const validation = validateExternalUrl(mediaUrl);
+      // Validar mediaUrl com DNS antes de enfileirar para prevenir SSRF.
+      const validation = await validateExternalUrlResolved(mediaUrl);
       if (!validation.valid) {
         return res.status(400).json({
           error: `Invalid media URL: ${validation.error}`,
@@ -273,10 +351,11 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
+      const safeTemplatePayload = stripImmutablePayloadFields(req.body);
       const template = await templateManager.createTemplate({
+        ...safeTemplatePayload,
         tenantId: req.user.tenantId,
-        ...req.body,
-      });
+      } as CreateTemplateParams);
 
       res.json({ template });
     } catch (error: any) {
@@ -298,7 +377,7 @@ export function registerWhatsAppRoutes(app: Express) {
       const template = await templateManager.updateTemplate(
         req.user.tenantId,
         req.params.id,
-        req.body
+        stripImmutablePayloadFields(req.body)
       );
 
       if (!template) {
@@ -418,7 +497,10 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      await conversationManager.markAsRead(req.params.id);
+      const updated = await conversationManager.markAsRead(req.params.id, req.user.tenantId);
+      if (!updated) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
 
       res.json({ success: true });
     } catch (error: any) {
@@ -443,7 +525,10 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(400).json({ error: "User ID is required" });
       }
 
-      const conversation = await conversationManager.assignToUser(req.params.id, userId);
+      const conversation = await conversationManager.assignToUser(req.params.id, req.user.tenantId, userId);
+      if (!conversation) {
+        return res.status(404).json({ error: "Conversation or assignee not found" });
+      }
 
       res.json({ conversation });
     } catch (error: any) {
@@ -462,7 +547,10 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      await conversationManager.closeConversation(req.params.id);
+      const updated = await conversationManager.closeConversation(req.params.id, req.user.tenantId);
+      if (!updated) {
+        return res.status(404).json({ error: "Conversation not found" });
+      }
 
       res.json({ success: true });
     } catch (error: any) {
@@ -521,9 +609,10 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
+      const safeAutoResponsePayload = stripImmutablePayloadFields(req.body);
       const autoResponse = await autoResponder.createAutoResponse({
+        ...safeAutoResponsePayload,
         tenantId: req.user.tenantId,
-        ...req.body,
       });
 
       res.json({ autoResponse });
@@ -546,7 +635,7 @@ export function registerWhatsAppRoutes(app: Express) {
       const autoResponse = await autoResponder.updateAutoResponse(
         req.params.id,
         req.user.tenantId,
-        req.body
+        stripImmutablePayloadFields(req.body)
       );
 
       res.json({ autoResponse });
@@ -658,38 +747,70 @@ export function registerWhatsAppRoutes(app: Express) {
       // infinitamente um evento que nunca conseguiremos rotear.
       const entries = Array.isArray(req.body?.entry) ? req.body.entry : [];
       let routed = 0;
+      let duplicates = 0;
 
       for (const entry of entries) {
         const changes = Array.isArray(entry?.changes) ? entry.changes : [];
         for (const change of changes) {
           const phoneNumberId: unknown = change?.value?.metadata?.phone_number_id;
+          const normalizedPhoneNumberId = normalizeWhatsAppPhoneNumberId(phoneNumberId);
 
-          if (typeof phoneNumberId !== "string" || !phoneNumberId) {
+          if (!normalizedPhoneNumberId) {
             log('[WHATSAPP] Webhook change sem phone_number_id; ignorado', "whatsapp");
             continue;
           }
 
-          const tenantId = await webhookHandler.resolveTenantId(phoneNumberId);
+          const changePayload = {
+            object: req.body.object,
+            entry: [{ id: entry.id, changes: [change] }],
+          };
+          const payloadDigest = createWebhookPayloadDigest(changePayload);
+          const eventId = getWhatsAppWebhookEventId(entry.id, change, payloadDigest);
+          const eventType = getWhatsAppWebhookEventType(change);
+
+          const tenantId = await runWithWhatsAppPhoneNumberRlsContext(normalizedPhoneNumberId, () =>
+            webhookHandler.resolveTenantId(normalizedPhoneNumberId),
+          );
 
           if (!tenantId) {
             // FAIL-CLOSED: sem mapeamento, nao gravamos nada.
             log(
-              `[WHATSAPP] Nenhum tenant mapeado para phone_number_id ${phoneNumberId}; evento ignorado (fail-closed)`,
+              `[WHATSAPP] Nenhum tenant mapeado para phone_number_id ${normalizedPhoneNumberId}; evento ignorado (fail-closed)`,
               "whatsapp"
             );
             continue;
           }
 
+          const reservation = await reserveWebhookEvent({
+            provider: "whatsapp",
+            eventId,
+            eventType,
+            tenantId,
+            payloadDigest,
+            signatureDigest: createWebhookPayloadDigest(signature),
+          });
+
+          if (!reservation.reserved) {
+            duplicates++;
+            log(`[WHATSAPP] Duplicate webhook change ignored: ${eventId}`, "whatsapp");
+            continue;
+          }
+
           // Processa apenas este change, ja resolvido para o tenant correto.
-          await webhookHandler.processWebhook(
-            { object: req.body.object, entry: [{ id: entry.id, changes: [change] }] },
-            tenantId
-          );
-          routed++;
+          try {
+            await runWithTenantRlsContext(tenantId, () =>
+              webhookHandler.processWebhook(changePayload, tenantId),
+            );
+            await markWebhookEventProcessed({ provider: "whatsapp", eventId, tenantId });
+            routed++;
+          } catch (error) {
+            await markWebhookEventFailed({ provider: "whatsapp", eventId, tenantId, error });
+            throw error;
+          }
         }
       }
 
-      res.json({ success: true, routed });
+      res.json({ success: true, routed, duplicates });
     } catch (error: any) {
       log(`Webhook error: ${error.message}`, "whatsapp");
       res.status(500).json({ error: error.message });

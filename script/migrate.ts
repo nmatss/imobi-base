@@ -34,7 +34,9 @@ interface MigrationRecord {
   executed_at: Date;
 }
 
-async function runMigrations() {
+const RLS_MIGRATION_FILENAME = 'RLS_enable.sql';
+
+async function runMigrations(options: { includeRls?: boolean; onlyRls?: boolean } = {}) {
   const databaseUrl = process.env.DATABASE_URL;
 
   if (!databaseUrl) {
@@ -79,9 +81,14 @@ async function runMigrations() {
     const sqlFiles = files
       .filter(f => f.endsWith('.sql'))
       .filter(f => !f.includes('README'))
+      .filter(f => options.includeRls || f !== RLS_MIGRATION_FILENAME)
+      .filter(f => !options.onlyRls || f === RLS_MIGRATION_FILENAME)
       .sort(); // Alphabetical order ensures chronological execution
 
     log(`📁 Found ${sqlFiles.length} migration files`, 'blue');
+    if (!options.includeRls && files.includes(RLS_MIGRATION_FILENAME)) {
+      log(`🛡️  Skipping ${RLS_MIGRATION_FILENAME}; apply explicitly with "npm run db:rls:apply" after the RLS runbook prerequisites`, 'yellow');
+    }
 
     // Filter out already executed migrations
     const pendingMigrations = sqlFiles.filter(f => !executedFiles.has(f));
@@ -218,12 +225,15 @@ const command = args[0];
 if (command === 'rollback') {
   const filename = args[1];
   rollbackMigration(filename);
+} else if (command === 'rls') {
+  runMigrations({ includeRls: true, onlyRls: true });
 } else if (command === 'help' || command === '--help' || command === '-h') {
   console.log(`
 Database Migration Tool
 
 Usage:
   npm run db:migrate              - Run all pending migrations
+  npm run db:rls:apply            - Apply RLS_enable.sql explicitly
   npm run db:migrate rollback     - Rollback last migration
   npm run db:migrate rollback FILENAME.sql - Rollback specific migration
   npm run db:migrate help         - Show this help

@@ -11,6 +11,7 @@
 import { storage } from "../../storage";
 import type { Property } from "@shared/schema-sqlite";
 import { log } from "../../utils/log";
+import { createVisitWithPolicy } from "../../services/visit-scheduling";
 
 // ==================== TYPES ====================
 
@@ -931,14 +932,14 @@ export async function processIncomingMessage(
           // Schedule visit if we have a property
           if (interestedProps.length > 0 && conversation.leadId) {
             try {
-              const visit = await storage.createVisit({
+              const visit = await createVisitWithPolicy(tenantId, {
                 tenantId,
                 propertyId: interestedProps[0],
                 leadId: conversation.leadId,
                 scheduledFor: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Tomorrow as fallback
                 status: "scheduled",
                 notes: `Agendado via ISA WhatsApp. Mensagem: ${message}`,
-              });
+              }, storage);
 
               await storage.updateIsaConversation(conversation.id, {
                 visitScheduledId: visit.id,
@@ -1053,13 +1054,13 @@ export async function scheduleVisitForLead(
   propertyId: string,
   preferredDate: string
 ): Promise<any> {
-  const visit = await storage.createVisit({
+  const visit = await createVisitWithPolicy(tenantId, {
     tenantId,
     propertyId,
     leadId,
     scheduledFor: preferredDate,
     status: "scheduled",
     notes: "Agendado via ISA Virtual",
-  });
+  }, storage);
   return visit;
 }

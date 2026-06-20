@@ -25,6 +25,16 @@ interface AIAssistantProps {
   size?: 'default' | 'sm' | 'lg' | 'icon';
 }
 
+const MODULE_LABELS: Record<AIModule, string> = {
+  properties: 'Imóveis',
+  leads: 'Leads',
+  calendar: 'Agenda',
+  sales: 'Vendas',
+  rentals: 'Aluguéis',
+  financial: 'Financeiro',
+  reports: 'Relatórios',
+};
+
 export function AIAssistant({
   module,
   contextData,
@@ -98,6 +108,7 @@ export function AIAssistant({
           variant={variant}
           size={size}
           className={cn('gap-2', className)}
+          aria-label={size === 'icon' ? 'Abrir assistente de IA' : undefined}
         >
           <Sparkles className="h-4 w-4" />
           {size !== 'icon' && 'IA'}
@@ -111,7 +122,7 @@ export function AIAssistant({
               <h3 className="font-semibold">Assistente IA</h3>
             </div>
             <Badge variant="secondary" className="text-xs">
-              {module.charAt(0).toUpperCase() + module.slice(1)}
+              {MODULE_LABELS[module]}
             </Badge>
           </div>
 
@@ -182,6 +193,7 @@ export function AIAssistant({
                       size="sm"
                       onClick={handleCopy}
                       className="h-7 px-2"
+                      aria-label={copied ? 'Texto copiado' : 'Copiar resultado'}
                     >
                       {copied ? (
                         <Check className="h-3 w-3" />
@@ -191,7 +203,7 @@ export function AIAssistant({
                     </Button>
                   </div>
                 </div>
-                <div className="rounded-lg border bg-muted/50 p-3 text-sm leading-relaxed max-h-[200px] overflow-y-auto">
+                <div className="rounded-lg border bg-muted/50 p-3 text-sm leading-relaxed max-h-[200px] overflow-y-auto whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
                   {result}
                 </div>
                 {onInsert && (

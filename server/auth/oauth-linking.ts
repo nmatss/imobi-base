@@ -9,6 +9,7 @@ import { db } from "../db";
 import { users } from "@shared/schema-sqlite";
 import { eq, and } from "drizzle-orm";
 import { createAuditLog } from "../routes-security";
+import { runWithTenantRlsContext } from "../db-rls";
 
 // Temporary storage for pending OAuth links (in production, use Redis)
 const pendingLinks = new Map<string, {
@@ -54,8 +55,12 @@ export function registerOAuthLinkingRoutes(app: Express) {
       if (!req.isAuthenticated?.() || !req.user) {
         return res.status(401).json({ error: "Não autenticado" });
       }
+      if (!req.user.tenantId) {
+        return res.status(403).json({ error: "Sessão inválida" });
+      }
 
       const userId = req.user.id;
+      const tenantId = req.user.tenantId;
       const { provider, password } = req.body;
 
       if (!provider || !['google', 'microsoft'].includes(provider)) {
@@ -63,7 +68,9 @@ export function registerOAuthLinkingRoutes(app: Express) {
       }
 
       // Get user
-      const userList = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      const userList = await runWithTenantRlsContext(tenantId, () =>
+        db.select().from(users).where(eq(users.id, userId)).limit(1),
+      );
 
       if (!userList.length) {
         return res.status(404).json({ error: "Usuário não encontrado" });
@@ -112,12 +119,18 @@ export function registerOAuthLinkingRoutes(app: Express) {
       if (!req.isAuthenticated?.() || !req.user) {
         return res.status(401).json({ error: "Não autenticado" });
       }
+      if (!req.user.tenantId) {
+        return res.status(403).json({ error: "Sessão inválida" });
+      }
 
       const userId = req.user.id;
+      const tenantId = req.user.tenantId;
       const { password, newPassword } = req.body;
 
       // Get user
-      const userList = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      const userList = await runWithTenantRlsContext(tenantId, () =>
+        db.select().from(users).where(eq(users.id, userId)).limit(1),
+      );
 
       if (!userList.length) {
         return res.status(404).json({ error: "Usuário não encontrado" });
@@ -146,15 +159,17 @@ export function registerOAuthLinkingRoutes(app: Express) {
         // Hash and set password
         const hashedPassword = await bcrypt.hash(newPassword, 12); // P2 Security Fix: Increased from 10 to 12 rounds
 
-        await db.update(users)
-          .set({
-            password: hashedPassword,
-            oauthProvider: null,
-            oauthId: null,
-            oauthAccessToken: null,
-            oauthRefreshToken: null,
-          })
-          .where(eq(users.id, userId));
+        await runWithTenantRlsContext(tenantId, () =>
+          db.update(users)
+            .set({
+              password: hashedPassword,
+              oauthProvider: null,
+              oauthId: null,
+              oauthAccessToken: null,
+              oauthRefreshToken: null,
+            })
+            .where(eq(users.id, userId)),
+        );
 
       } else {
         // Verify existing password
@@ -168,26 +183,30 @@ export function registerOAuthLinkingRoutes(app: Express) {
         }
 
         // Unlink OAuth
-        await db.update(users)
-          .set({
-            oauthProvider: null,
-            oauthId: null,
-            oauthAccessToken: null,
-            oauthRefreshToken: null,
-          })
-          .where(eq(users.id, userId));
+        await runWithTenantRlsContext(tenantId, () =>
+          db.update(users)
+            .set({
+              oauthProvider: null,
+              oauthId: null,
+              oauthAccessToken: null,
+              oauthRefreshToken: null,
+            })
+            .where(eq(users.id, userId)),
+        );
       }
 
       // Audit log
-      await createAuditLog(
-        user.tenantId,
-        userId,
-        'oauth_unlinked',
-        'user',
-        userId,
-        { oauthProvider: user.oauthProvider },
-        { oauthProvider: null },
-        req
+      await runWithTenantRlsContext(tenantId, () =>
+        createAuditLog(
+          user.tenantId,
+          userId,
+          'oauth_unlinked',
+          'user',
+          userId,
+          { oauthProvider: user.oauthProvider },
+          { oauthProvider: null },
+          req
+        ),
       );
 
       res.json({
@@ -208,11 +227,17 @@ export function registerOAuthLinkingRoutes(app: Express) {
       if (!req.isAuthenticated?.() || !req.user) {
         return res.status(401).json({ error: "Não autenticado" });
       }
+      if (!req.user.tenantId) {
+        return res.status(403).json({ error: "Sessão inválida" });
+      }
 
       const userId = req.user.id;
+      const tenantId = req.user.tenantId;
 
       // Get user
-      const userList = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      const userList = await runWithTenantRlsContext(tenantId, () =>
+        db.select().from(users).where(eq(users.id, userId)).limit(1),
+      );
 
       if (!userList.length) {
         return res.status(404).json({ error: "Usuário não encontrado" });

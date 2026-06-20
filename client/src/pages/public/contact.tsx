@@ -53,11 +53,11 @@ export default function ContactPage() {
           <Link href="/">
             <Logo className="cursor-pointer" wordmarkClassName="text-xl" iconClassName="h-9 w-9" />
           </Link>
-          <Link href="/">
-            <Button variant="ghost" size="sm" className="gap-2">
+          <Button asChild variant="ghost" size="sm" className="gap-2">
+            <Link href="/">
               <ArrowLeft className="w-4 h-4" /> Voltar
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </header>
 
@@ -102,9 +102,9 @@ export default function ContactPage() {
                   <p className="text-muted-foreground">
                     Obrigado pelo contato. Retornaremos no email informado em até 1 dia útil.
                   </p>
-                  <Link href="/">
-                    <Button variant="outline">Voltar para o início</Button>
-                  </Link>
+                  <Button asChild variant="outline">
+                    <Link href="/">Voltar para o início</Link>
+                  </Button>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-4">

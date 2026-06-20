@@ -23,11 +23,11 @@ export default function TermsPage() {
           <Link href="/">
             <Logo className="cursor-pointer" wordmarkClassName="text-xl" iconClassName="h-9 w-9" />
           </Link>
-          <Link href="/">
-            <Button variant="ghost" size="sm" className="gap-2">
+          <Button asChild variant="ghost" size="sm" className="gap-2">
+            <Link href="/">
               <ArrowLeft className="w-4 h-4" /> Voltar
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </header>
 
@@ -158,13 +158,13 @@ export default function TermsPage() {
           </section>
         </div>
 
-        <div className="mt-12 pt-8 border-t flex gap-4">
-          <Link href="/privacidade">
-            <Button variant="outline">Política de Privacidade</Button>
-          </Link>
-          <Link href="/">
-            <Button variant="ghost">Voltar ao início</Button>
-          </Link>
+        <div className="mt-12 pt-8 border-t flex flex-col gap-3 sm:flex-row sm:gap-4">
+          <Button asChild variant="outline" className="w-full sm:w-auto">
+            <Link href="/privacidade">Política de Privacidade</Link>
+          </Button>
+          <Button asChild variant="ghost" className="w-full sm:w-auto">
+            <Link href="/">Voltar ao início</Link>
+          </Button>
         </div>
       </main>
       <PublicFooter variant="compact" />

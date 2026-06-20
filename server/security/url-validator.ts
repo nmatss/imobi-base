@@ -1,8 +1,20 @@
+import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 import { URL } from 'url';
 
 export interface URLValidationResult {
   valid: boolean;
   error?: string;
+}
+
+export type DnsLookup = (
+  hostname: string
+) => Promise<Array<{ address: string; family: number }>>;
+
+export interface SafeExternalFetchOptions extends RequestInit {
+  maxRedirects?: number;
+  timeoutMs?: number;
+  dnsLookup?: DnsLookup;
 }
 
 const BLOCKED_HOSTS = [
@@ -17,6 +29,27 @@ const BLOCKED_HOSTS = [
 ];
 
 const ALLOWED_PROTOCOLS = ['https:', 'http:'];
+
+function normalizeHostname(hostname: string): string {
+  const rawHostname = hostname.toLowerCase();
+  return rawHostname.startsWith('[') && rawHostname.endsWith(']')
+    ? rawHostname.slice(1, -1)
+    : rawHostname;
+}
+
+function isBlockedHostname(hostname: string): boolean {
+  return BLOCKED_HOSTS.some(
+    blocked => hostname === blocked || hostname.endsWith(`.${blocked}`)
+  );
+}
+
+function isPrivateAddress(address: string): boolean {
+  return isPrivateIP(address) || isPrivateIPv6(address);
+}
+
+async function defaultDnsLookup(hostname: string) {
+  return lookup(hostname, { all: true, verbatim: true });
+}
 
 /**
  * Valida URL externa para prevenir SSRF
@@ -45,19 +78,13 @@ export function validateExternalUrl(urlString: string): URLValidationResult {
     // url.hostname mantém os colchetes em IPv6 (ex.: "[fd00:ec2::254]"), o que
     // impediria o match exato contra entradas de BLOCKED_HOSTS sem colchetes.
     // Normalizamos removendo os colchetes para comparar literais IPv6.
-    const rawHostname = url.hostname.toLowerCase();
-    const hostname =
-      rawHostname.startsWith('[') && rawHostname.endsWith(']')
-        ? rawHostname.slice(1, -1)
-        : rawHostname;
+    const hostname = normalizeHostname(url.hostname);
 
-    for (const blocked of BLOCKED_HOSTS) {
-      if (hostname === blocked || hostname.endsWith(`.${blocked}`)) {
-        return {
-          valid: false,
-          error: 'Access to internal resources is forbidden',
-        };
-      }
+    if (isBlockedHostname(hostname)) {
+      return {
+        valid: false,
+        error: 'Access to internal resources is forbidden',
+      };
     }
 
     // 3b. Bloquear hostname malformado (labels vazios), ex.: ".com", "a..b"
@@ -107,6 +134,128 @@ export function validateExternalUrl(urlString: string): URLValidationResult {
 }
 
 /**
+ * Valida URL externa resolvendo DNS antes de qualquer fetch.
+ * Isso bloqueia DNS rebinding simples e domínios que apontem para IPs privados.
+ */
+export async function validateExternalUrlResolved(
+  urlString: string,
+  dnsLookup: DnsLookup = defaultDnsLookup
+): Promise<URLValidationResult> {
+  const basicValidation = validateExternalUrl(urlString);
+  if (!basicValidation.valid) {
+    return basicValidation;
+  }
+
+  try {
+    const url = new URL(urlString);
+    const hostname = normalizeHostname(url.hostname);
+
+    if (isIP(hostname)) {
+      return { valid: true };
+    }
+
+    const addresses = await dnsLookup(hostname);
+    if (!addresses.length) {
+      return {
+        valid: false,
+        error: 'DNS resolution returned no addresses',
+      };
+    }
+
+    const privateAddress = addresses.find(result => isPrivateAddress(result.address));
+    if (privateAddress) {
+      return {
+        valid: false,
+        error: `DNS resolves to private IP address ${privateAddress.address}`,
+      };
+    }
+
+    return { valid: true };
+  } catch (error: any) {
+    return {
+      valid: false,
+      error: `DNS resolution failed: ${error.message}`,
+    };
+  }
+}
+
+/**
+ * Fetch seguro para URLs externas:
+ * - valida protocolo/host/IP literal;
+ * - resolve DNS antes de conectar;
+ * - desabilita redirect automatico e valida cada Location manualmente;
+ * - bloqueia redirect de POST/PUT/PATCH/DELETE para evitar vazamento de payload.
+ */
+export async function fetchExternalUrl(
+  urlString: string,
+  options: SafeExternalFetchOptions = {}
+): Promise<Response> {
+  const {
+    maxRedirects = 3,
+    timeoutMs,
+    dnsLookup,
+    signal,
+    ...fetchOptions
+  } = options;
+
+  const controller = new AbortController();
+  const timeout = timeoutMs
+    ? setTimeout(() => controller.abort(), timeoutMs)
+    : undefined;
+
+  if (signal) {
+    if (signal.aborted) {
+      controller.abort();
+    } else {
+      signal.addEventListener('abort', () => controller.abort(), { once: true });
+    }
+  }
+
+  let currentUrl = urlString;
+  let redirects = 0;
+
+  try {
+    while (true) {
+      const validation = await validateExternalUrlResolved(currentUrl, dnsLookup);
+      if (!validation.valid) {
+        throw new Error(`Unsafe external URL: ${validation.error}`);
+      }
+
+      const response = await fetch(currentUrl, {
+        ...fetchOptions,
+        redirect: 'manual',
+        signal: controller.signal,
+      });
+
+      if (![301, 302, 303, 307, 308].includes(response.status)) {
+        return response;
+      }
+
+      const location = response.headers.get('location');
+      if (!location) {
+        throw new Error(`External URL redirect without Location header (${response.status})`);
+      }
+
+      if (redirects >= maxRedirects) {
+        throw new Error(`External URL exceeded ${maxRedirects} redirects`);
+      }
+
+      const method = String(fetchOptions.method || 'GET').toUpperCase();
+      if (method !== 'GET' && method !== 'HEAD') {
+        throw new Error('External URL redirects are not allowed for non-idempotent requests');
+      }
+
+      currentUrl = new URL(location, currentUrl).toString();
+      redirects += 1;
+    }
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+/**
  * Verifica se hostname é IPv6 loopback/privado/link-local.
  * Cobre ::1 (loopback), :: (unspecified), fc00::/7 (ULA, prefixos fc/fd) e
  * fe80::/10 (link-local). Recebe o hostname já sem colchetes.
@@ -115,6 +264,10 @@ function isPrivateIPv6(hostname: string): boolean {
   if (!hostname.includes(':')) return false;
   const h = hostname.toLowerCase();
   if (h === '::1' || h === '::') return true;
+  if (h.startsWith('::ffff:')) {
+    const mapped = h.slice('::ffff:'.length);
+    return isPrivateIP(mapped);
+  }
   // ULA fc00::/7 -> primeiro hextet começa com fc ou fd
   if (/^f[cd][0-9a-f]{0,2}:/.test(h)) return true;
   // link-local fe80::/10 -> fe8x..feb x

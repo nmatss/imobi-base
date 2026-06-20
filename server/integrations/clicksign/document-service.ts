@@ -5,7 +5,7 @@
 
 import { getClickSignClient } from './clicksign-client';
 import type { ClickSignError } from './clicksign-client';
-import { validateUrlWithWhitelist } from '../../security/url-validator';
+import { fetchExternalUrl, validateUrlWithWhitelist } from '../../security/url-validator';
 
 // ClickSign API Response Types
 interface ClickSignDocument {
@@ -318,7 +318,10 @@ export class DocumentService {
       // SSRF Protection
       this.validateDownloadUrl(document.downloads.original_file_url, 'original document download');
 
-      const response = await fetch(document.downloads.original_file_url);
+      const response = await fetchExternalUrl(document.downloads.original_file_url, {
+        maxRedirects: 0,
+        timeoutMs: 30_000,
+      });
       if (!response.ok) {
         throw new Error('Failed to download original document');
       }
@@ -345,7 +348,10 @@ export class DocumentService {
       // SSRF Protection
       this.validateDownloadUrl(document.downloads.signed_file_url, 'signed document download');
 
-      const response = await fetch(document.downloads.signed_file_url);
+      const response = await fetchExternalUrl(document.downloads.signed_file_url, {
+        maxRedirects: 0,
+        timeoutMs: 30_000,
+      });
       if (!response.ok) {
         throw new Error('Failed to download signed document');
       }

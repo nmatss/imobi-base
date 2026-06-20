@@ -122,12 +122,12 @@ export function RepassesTab({
         <Card className="rounded-xl border-2">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-orange-100 flex items-center justify-center">
-                <Clock className="h-6 w-6 text-orange-600" />
+              <div className="h-12 w-12 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                <Clock className="h-6 w-6 text-orange-600 dark:text-orange-400" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs text-muted-foreground font-medium">Pendentes</p>
-                <p className="text-lg sm:text-xl font-bold text-orange-600 truncate">{formatPrice(totalPending)}</p>
+                <p className="text-lg sm:text-xl font-bold text-orange-600 dark:text-orange-400 truncate">{formatPrice(totalPending)}</p>
               </div>
             </div>
           </CardContent>
@@ -135,12 +135,12 @@ export function RepassesTab({
         <Card className="rounded-xl border-2">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-green-100 flex items-center justify-center">
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
+              <div className="h-12 w-12 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs text-muted-foreground font-medium">Pagos</p>
-                <p className="text-lg sm:text-xl font-bold text-green-600 truncate">{formatPrice(totalPaid)}</p>
+                <p className="text-lg sm:text-xl font-bold text-green-600 dark:text-green-400 truncate">{formatPrice(totalPaid)}</p>
               </div>
             </div>
           </CardContent>
@@ -159,12 +159,12 @@ export function RepassesTab({
               className="pl-9 min-h-[44px]"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter || "__all__"} onValueChange={(value) => setStatusFilter(value === "__all__" ? "" : value)}>
             <SelectTrigger className="w-full sm:w-[150px] min-h-[44px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="__all__">Todos</SelectItem>
               <SelectItem value="pending">Pendentes</SelectItem>
               <SelectItem value="paid">Pagos</SelectItem>
             </SelectContent>
@@ -220,10 +220,10 @@ export function RepassesTab({
                     <TableCell className="text-right">
                       {formatPrice(transfer.grossAmount)}
                     </TableCell>
-                    <TableCell className="text-right text-red-600">
+                    <TableCell className="text-right text-red-600 dark:text-red-400">
                       -{formatPrice(transfer.administrationFee)}
                     </TableCell>
-                    <TableCell className="text-right text-red-600">
+                    <TableCell className="text-right text-red-600 dark:text-red-400">
                       -{formatPrice(
                         Number(transfer.maintenanceDeductions || 0) +
                           Number(transfer.otherDeductions || 0)
@@ -245,7 +245,7 @@ export function RepassesTab({
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Abrir ações do repasse">
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -336,14 +336,14 @@ export function RepassesTab({
                 </div>
 
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between p-2 bg-blue-50 rounded-lg">
-                    <span className="text-xs text-blue-700 font-medium">Valor Bruto</span>
-                    <span className="text-base font-bold text-blue-600">{formatPrice(transfer.grossAmount)}</span>
+                  <div className="flex items-center justify-between p-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
+                    <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">Valor Bruto</span>
+                    <span className="text-base font-bold text-blue-600 dark:text-blue-400">{formatPrice(transfer.grossAmount)}</span>
                   </div>
 
-                  <div className="flex items-center justify-between p-2 bg-red-50 rounded-lg">
-                    <span className="text-xs text-red-700 font-medium">Total Deduções</span>
-                    <span className="text-base font-bold text-red-600">
+                  <div className="flex items-center justify-between p-2 bg-red-50 dark:bg-red-950/30 rounded-lg">
+                    <span className="text-xs text-red-700 dark:text-red-300 font-medium">Total Deduções</span>
+                    <span className="text-base font-bold text-red-600 dark:text-red-400">
                       -{formatPrice(
                         Number(transfer.administrationFee || 0) +
                           Number(transfer.maintenanceDeductions || 0) +
@@ -352,9 +352,9 @@ export function RepassesTab({
                     </span>
                   </div>
 
-                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border-2 border-green-200">
-                    <span className="text-sm text-green-700 font-semibold">Valor Líquido</span>
-                    <span className="text-xl font-bold text-green-600">
+                  <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border-2 border-green-200 dark:border-green-800">
+                    <span className="text-sm text-green-700 dark:text-green-300 font-semibold">Valor Líquido</span>
+                    <span className="text-xl font-bold text-green-600 dark:text-green-400">
                       {formatPrice(transfer.netAmount)}
                     </span>
                   </div>

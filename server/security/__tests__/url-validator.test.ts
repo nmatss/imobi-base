@@ -3,10 +3,19 @@
  * Tests for SSRF protection
  */
 
-import { describe, it, expect } from 'vitest';
-import { validateExternalUrl, validateUrlWithWhitelist } from '../url-validator';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import {
+  fetchExternalUrl,
+  validateExternalUrl,
+  validateExternalUrlResolved,
+  validateUrlWithWhitelist,
+} from '../url-validator';
 
 describe('URL Validator - SSRF Protection', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   describe('validateExternalUrl', () => {
     it('should allow valid HTTPS URLs', () => {
       const result = validateExternalUrl('https://example.com/file.pdf');
@@ -88,6 +97,47 @@ describe('URL Validator - SSRF Protection', () => {
       const result = validateExternalUrl('http://127.0.0.2/file.pdf');
       expect(result.valid).toBe(false);
       expect(result.error).toContain('private IP addresses');
+    });
+  });
+
+  describe('validateExternalUrlResolved', () => {
+    it('should block DNS records that resolve to private IPs', async () => {
+      const result = await validateExternalUrlResolved(
+        'https://safe.example/file.pdf',
+        async () => [{ address: '127.0.0.1', family: 4 }]
+      );
+
+      expect(result.valid).toBe(false);
+      expect(result.error).toContain('DNS resolves to private IP');
+    });
+
+    it('should allow DNS records that resolve to public IPs', async () => {
+      const result = await validateExternalUrlResolved(
+        'https://safe.example/file.pdf',
+        async () => [{ address: '93.184.216.34', family: 4 }]
+      );
+
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  describe('fetchExternalUrl', () => {
+    it('should block redirects to private targets before following them', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response(null, {
+          status: 302,
+          headers: { Location: 'http://127.0.0.1/admin' },
+        })
+      );
+      vi.stubGlobal('fetch', mockFetch);
+
+      await expect(
+        fetchExternalUrl('https://safe.example/start', {
+          dnsLookup: async () => [{ address: '93.184.216.34', family: 4 }],
+        })
+      ).rejects.toThrow(/Unsafe external URL|private/);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
   });
 

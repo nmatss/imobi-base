@@ -568,18 +568,48 @@ export async function sendSecurityAlert(
  */
 export function checkForAnomalies(): void {
   const metrics = getSecurityMetrics();
+  const alertRecipients = process.env.SECURITY_ALERT_EMAILS?.split(',') || [];
 
   // Alert on high number of critical events
   if (metrics.recentCriticalEvents > 5) {
-    console.warn(`[SECURITY] Anomaly detected: ${metrics.recentCriticalEvents} critical events in last 24 hours`);
-    // TODO: Send alert to security team
+    const message = `Anomaly detected: ${metrics.recentCriticalEvents} critical events in last 24 hours`;
+    console.warn(`[SECURITY] ${message}`);
+
+    if (alertRecipients.length > 0) {
+      const syntheticEvent: SecurityEvent = {
+        id: nanoid(),
+        type: SecurityEventType.BRUTE_FORCE_DETECTED,
+        severity: SecurityEventSeverity.CRITICAL,
+        timestamp: new Date(),
+        message,
+        metadata: { anomaly: 'critical_event_spike', recentCriticalEvents: metrics.recentCriticalEvents },
+      };
+      sendSecurityAlert(syntheticEvent, alertRecipients).catch(err => {
+        console.error('[SECURITY] Failed to send anomaly alert:', err);
+      });
+    }
   }
 
   // Alert on high number of failed logins from single IP
   metrics.topThreats.forEach(threat => {
     if (threat.count > 20) {
-      console.warn(`[SECURITY] Anomaly detected: ${threat.count} security events from ${threat.ip}`);
-      // TODO: Send alert to security team
+      const message = `Anomaly detected: ${threat.count} security events from ${threat.ip}`;
+      console.warn(`[SECURITY] ${message}`);
+
+      if (alertRecipients.length > 0) {
+        const syntheticEvent: SecurityEvent = {
+          id: nanoid(),
+          type: SecurityEventType.BRUTE_FORCE_DETECTED,
+          severity: SecurityEventSeverity.CRITICAL,
+          timestamp: new Date(),
+          ip: threat.ip,
+          message,
+          metadata: { anomaly: 'ip_event_spike', ip: threat.ip, count: threat.count },
+        };
+        sendSecurityAlert(syntheticEvent, alertRecipients).catch(err => {
+          console.error('[SECURITY] Failed to send anomaly alert:', err);
+        });
+      }
     }
   });
 }

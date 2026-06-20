@@ -348,7 +348,7 @@ export const createBoletoPaymentSchema = z.object({
 // ============== E-SIGNATURE SCHEMAS ==============
 
 export const uploadDocumentSchema = z.object({
-  tenantId: z.string().uuid('Invalid tenant ID'),
+  tenantId: z.string().uuid('Invalid tenant ID').optional(),
   filename: z.string().min(1, 'Filename is required'),
   contentBase64: z.string().min(1, 'Document content is required'),
   deadline: z.string().datetime().optional(),
@@ -357,7 +357,7 @@ export const uploadDocumentSchema = z.object({
 });
 
 export const createSignatureRequestSchema = z.object({
-  tenantId: z.string().uuid('Invalid tenant ID'),
+  tenantId: z.string().uuid('Invalid tenant ID').optional(),
   documentKey: z.string().min(1, 'Document key is required'),
   listName: z.string().optional(),
   signers: z.array(z.object({
@@ -365,10 +365,12 @@ export const createSignatureRequestSchema = z.object({
     email: z.string().email('Invalid signer email'),
     phone: z.string().optional(),
     cpf: z.string().optional(),
+    role: z.string().optional(),
   })).min(1, 'At least one signer is required'),
   signingConfig: z.object({
     order: z.enum(['parallel', 'sequential']).optional(),
     refusable: z.boolean().optional(),
+    customMessage: z.string().optional(),
   }).optional(),
 });
 
@@ -381,11 +383,13 @@ export const addSignerSchema = z.object({
     email: z.string().email('Invalid signer email'),
     phone: z.string().optional(),
     cpf: z.string().optional(),
+    role: z.string().optional(),
   }),
 });
 
 export const sendSignatureSchema = z.object({
   tenantId: z.string().uuid().optional(),
+  documentKey: z.string().min(1, 'Document key is required'),
   listKey: z.string().min(1, 'List key is required'),
   message: z.string().optional(),
 });
@@ -396,7 +400,7 @@ export const cancelDocumentSchema = z.object({
 });
 
 export const generateContractSchema = z.object({
-  tenantId: z.string().uuid('Invalid tenant ID'),
+  tenantId: z.string().uuid('Invalid tenant ID').optional(),
   contractType: z.enum(['rental', 'sale']),
   contractData: z.any(), // Validated per contract type
   contractId: z.string().uuid().optional(),

@@ -3,6 +3,7 @@
 import { eq, and, desc, gte, sql, like, or, inArray } from "drizzle-orm";
 import { db, schema, isSqlite } from "./db";
 import { activeRowsFilter } from "./utils/soft-delete";
+import { normalizeWhatsAppIntegrationConfig } from "./integrations/whatsapp/phone-number-id";
 import { nanoid } from "nanoid";
 import type {
   Tenant, InsertTenant,
@@ -32,7 +33,14 @@ import type {
   NotificationPreference, InsertNotificationPreference,
   SavedReport, InsertSavedReport,
   ClientPortalAccess, InsertClientPortalAccess,
-  AnalyticsEvent, InsertAnalyticsEvent
+  AnalyticsEvent, InsertAnalyticsEvent,
+  BuyerSelection, InsertBuyerSelection,
+  BuyerSelectionItem, InsertBuyerSelectionItem,
+  AiAction, InsertAiAction,
+  AiActionAudit, InsertAiActionAudit,
+  LeadScoreWeights, InsertLeadScoreWeights,
+  LeadAssignmentState,
+  SignatureCertificate, InsertSignatureCertificate
 } from "@shared/schema-sqlite";
 
 // These types exist in the PG schema but not in schema-sqlite.
@@ -78,6 +86,40 @@ const fromJson = <T>(str: string | null | undefined): T[] | null => {
 
 // Helper to get current timestamp
 const now = () => new Date().toISOString();
+
+const IMMUTABLE_PERSISTENCE_FIELDS = new Set([
+  "id",
+  "tenantId",
+  "tenant_id",
+  "integrationName",
+  "integration_name",
+  "createdAt",
+  "created_at",
+  "updatedAt",
+  "updated_at",
+]);
+
+function stripImmutablePersistenceFields<T extends Record<string, unknown>>(data: T): Partial<T> {
+  const sanitized: Partial<T> = {};
+  for (const [key, value] of Object.entries(data || {})) {
+    if (!IMMUTABLE_PERSISTENCE_FIELDS.has(key)) {
+      sanitized[key as keyof T] = value as T[keyof T];
+    }
+  }
+  return sanitized;
+}
+
+function sanitizeIntegrationPersistenceData(data: Record<string, unknown>, integrationName: string): Record<string, unknown> {
+  const safeData = stripImmutablePersistenceFields(data) as Record<string, unknown>;
+  if (integrationName === "whatsapp" && "config" in safeData) {
+    safeData.config = normalizeWhatsAppIntegrationConfig(safeData.config);
+  }
+  return safeData;
+}
+
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+const newsletterEmailFilter = (email: string) =>
+  sql`lower(${schema.newsletterSubscriptions.email}) = ${normalizeEmail(email)}`;
 
 // ============================================================================
 // FINANCIAL CALCULATION HELPERS (pure functions, unit-tested em
@@ -219,6 +261,7 @@ export interface IStorage {
   countLeadsByTenant(tenantId: string): Promise<number>;
   createLead(lead: InsertLead): Promise<Lead>;
   updateLead(id: string, lead: Partial<InsertLead>): Promise<Lead | undefined>;
+  touchLead(id: string): Promise<Lead | undefined>;
   deleteLead(id: string): Promise<boolean>;
   getInteractionsByLead(leadId: string): Promise<Interaction[]>;
   createInteraction(interaction: InsertInteraction): Promise<Interaction>;
@@ -233,7 +276,8 @@ export interface IStorage {
   createContract(contract: InsertContract): Promise<Contract>;
   updateContract(id: string, contract: Partial<InsertContract>): Promise<Contract | undefined>;
   subscribeNewsletter(subscription: InsertNewsletter): Promise<Newsletter>;
-  unsubscribeNewsletter(email: string): Promise<boolean>;
+  unsubscribeNewsletter(email: string, reason?: string): Promise<boolean>;
+  isNewsletterOptedOut(email: string): Promise<boolean>;
   globalSearch(tenantId: string, query: string): Promise<{ properties: Property[]; leads: Lead[]; contracts: Contract[] }>;
   getDashboardStats(tenantId: string): Promise<{ totalProperties: number; totalLeads: number; totalContracts: number; totalVisits: number }>;
   getOwner(id: string): Promise<Owner | undefined>;
@@ -514,7 +558,42 @@ export interface IStorage {
   // Analytics
   createAnalyticsEvent(event: InsertAnalyticsEvent): Promise<AnalyticsEvent>;
   getAnalyticsEventsByTenant(tenantId: string, filters?: { eventType?: string; startDate?: string; endDate?: string; limit?: number }): Promise<AnalyticsEvent[]>;
-  getAnalyticsSummary(tenantId: string, period: 'today' | 'week' | 'month'): Promise<any>;}
+  getAnalyticsSummary(tenantId: string, period: 'today' | 'week' | 'month'): Promise<any>;
+  // ==================== BUYER SELECTIONS (Portal) ====================
+  createBuyerSelection(data: InsertBuyerSelection): Promise<BuyerSelection>;
+  getBuyerSelectionByToken(token: string): Promise<(BuyerSelection & { items: Array<BuyerSelectionItem & { property: Property | undefined }> }) | undefined>;
+  getBuyerSelectionsByTenant(tenantId: string): Promise<BuyerSelection[]>;
+  getBuyerSelection(id: string): Promise<BuyerSelection | undefined>;
+  addSelectionItems(items: InsertBuyerSelectionItem[]): Promise<BuyerSelectionItem[]>;
+  updateSelectionItemResponse(itemId: string, response: string, comment?: string): Promise<BuyerSelectionItem | undefined>;
+  closeBuyerSelection(id: string): Promise<BuyerSelection | undefined>;
+  // ==================== AI ACTIONS ====================
+  createAiAction(data: InsertAiAction): Promise<AiAction>;
+  getAiActionsByTenant(tenantId: string, filters?: { status?: string; targetType?: string; targetId?: string; actionType?: string }): Promise<AiAction[]>;
+  getAiActionsByLead(tenantId: string, leadId: string): Promise<AiAction[]>;
+  getAiAction(id: string): Promise<AiAction | undefined>;
+  updateAiActionStatus(id: string, patch: Partial<InsertAiAction>): Promise<AiAction | undefined>;
+  appendAiActionAudit(data: InsertAiActionAudit): Promise<AiActionAudit>;
+  getAiActionAudit(actionId: string): Promise<AiActionAudit[]>;
+  // ==================== AGENDA / CRM ====================
+  getVisitByConfirmationToken(token: string): Promise<Visit | undefined>;
+  updateVisitConfirmation(id: string, status: string): Promise<Visit | undefined>;
+  createRescheduledVisit(oldId: string, data: Partial<InsertVisit>): Promise<Visit>;
+  getUpcomingVisitsForReminder(windowStart: Date, windowEnd: Date): Promise<Visit[]>;
+  markVisitReminderSent(id: string): Promise<Visit | undefined>;
+  saveVisitChecklist(id: string, checklistJson: unknown): Promise<Visit | undefined>;
+  saveVisitFeedback(id: string, rating: number, notes: string | undefined, nextActionType: string | undefined, nextActionDueAt: Date | string | undefined): Promise<Visit | undefined>;
+  findLeadByDedup(tenantId: string, normalizedPhone: string | undefined, normalizedEmail: string | undefined): Promise<Lead | undefined>;
+  getLeadScoreWeights(tenantId: string): Promise<LeadScoreWeights>;
+  upsertLeadScoreWeights(tenantId: string, weights: Partial<InsertLeadScoreWeights>): Promise<LeadScoreWeights>;
+  getLeadAssignmentState(tenantId: string): Promise<LeadAssignmentState | undefined>;
+  advanceLeadAssignment(tenantId: string, nextUserId: string): Promise<LeadAssignmentState>;
+  getActiveBrokers(tenantId: string): Promise<User[]>;
+  // ==================== SIGNATURE CERTIFICATES (Legal) ====================
+  storeCertificate(data: InsertSignatureCertificate): Promise<SignatureCertificate>;
+  getCertificate(id: string): Promise<SignatureCertificate | undefined>;
+  getUserCertificates(tenantId: string, userId: string): Promise<SignatureCertificate[]>;
+}
 
 export class DbStorage implements IStorage {
   // Tenants
@@ -722,6 +801,11 @@ export class DbStorage implements IStorage {
     return updated;
   }
 
+  async touchLead(id: string): Promise<Lead | undefined> {
+    const [updated] = await db.update(schema.leads).set({ updatedAt: now() }).where(eq(schema.leads.id, id)).returning();
+    return updated;
+  }
+
   async deleteLead(id: string): Promise<boolean> {
     await db.delete(schema.leads).where(eq(schema.leads.id, id));
     return true;
@@ -802,19 +886,73 @@ export class DbStorage implements IStorage {
   // Newsletter
   async subscribeNewsletter(subscription: InsertNewsletter): Promise<Newsletter> {
     const id = generateId();
+    const email = normalizeEmail(subscription.email);
+    const payload = { ...subscription, email };
     // Check if already exists
-    const existing = await db.select().from(schema.newsletterSubscriptions).where(eq(schema.newsletterSubscriptions.email, subscription.email));
+    const existing = await db.select().from(schema.newsletterSubscriptions).where(newsletterEmailFilter(email));
     if (existing.length > 0) {
-      const [updated] = await db.update(schema.newsletterSubscriptions).set({ active: true }).where(eq(schema.newsletterSubscriptions.email, subscription.email)).returning();
+      const current = existing[0];
+      if (current.active === false) {
+        return current;
+      }
+
+      const [updated] = await db
+        .update(schema.newsletterSubscriptions)
+        .set({
+          ...payload,
+          active: true,
+          resubscribedAt: current.unsubscribedAt ? now() : current.resubscribedAt,
+          unsubscribedAt: null,
+          unsubscribeReason: null,
+        })
+        .where(newsletterEmailFilter(email))
+        .returning();
       return updated;
     }
-    const [created] = await db.insert(schema.newsletterSubscriptions).values({ ...subscription, id, subscribedAt: now() }).returning();
+    const [created] = await db.insert(schema.newsletterSubscriptions).values({ ...payload, id, subscribedAt: now(), active: true }).returning();
     return created;
   }
 
-  async unsubscribeNewsletter(email: string): Promise<boolean> {
-    await db.update(schema.newsletterSubscriptions).set({ active: false }).where(eq(schema.newsletterSubscriptions.email, email));
+  async unsubscribeNewsletter(email: string, reason = "unsubscribe_link"): Promise<boolean> {
+    const normalizedEmail = normalizeEmail(email);
+    const existing = await db
+      .select()
+      .from(schema.newsletterSubscriptions)
+      .where(newsletterEmailFilter(normalizedEmail));
+
+    const unsubscribedAt = now();
+    if (existing.length > 0) {
+      await db
+        .update(schema.newsletterSubscriptions)
+        .set({
+          active: false,
+          unsubscribedAt,
+          unsubscribeReason: reason,
+        })
+        .where(newsletterEmailFilter(normalizedEmail));
+      return true;
+    }
+
+    await db.insert(schema.newsletterSubscriptions).values({
+      id: generateId(),
+      email: normalizedEmail,
+      tenantId: null,
+      subscribedAt: unsubscribedAt,
+      active: false,
+      unsubscribedAt,
+      unsubscribeReason: reason,
+    });
     return true;
+  }
+
+  async isNewsletterOptedOut(email: string): Promise<boolean> {
+    const normalizedEmail = normalizeEmail(email);
+    const [subscription] = await db
+      .select()
+      .from(schema.newsletterSubscriptions)
+      .where(newsletterEmailFilter(normalizedEmail));
+
+    return Boolean(subscription && subscription.active === false);
   }
 
   // Global search
@@ -1934,7 +2072,8 @@ export class DbStorage implements IStorage {
       const rentalRevenue = filteredRentalPayments.reduce((sum, p) => sum + toNumber(p.paidValue), 0);
       const salesRevenue = filteredSales.reduce((sum, s) => sum + toNumber(s.saleValue), 0);
       const operationalExpenses = allEntries
-        .filter(e => e.flow === 'out' && e.status === 'completed' && inWindow(e.entryDate, from, to))
+        // Fluxo canônico é 'expense'; aceita 'out' legado por compatibilidade.
+        .filter(e => (e.flow === 'expense' || e.flow === 'out') && e.status === 'completed' && inWindow(e.entryDate, from, to))
         .reduce((sum, e) => sum + toNumber(e.amount), 0);
 
       const totalRevenue = commissionsReceived + (rentalRevenue - ownerTransfers);
@@ -2012,7 +2151,7 @@ export class DbStorage implements IStorage {
     return entries.map(entry => ({
       ...entry,
       category: entry.categoryId ? categoriesMap.get(entry.categoryId) : null,
-      type: entry.flow === 'in' ? 'receita' : 'despesa',
+      type: (entry.flow === 'income' || entry.flow === 'in') ? 'receita' : 'despesa',
     }));
   }
 
@@ -2056,7 +2195,9 @@ export class DbStorage implements IStorage {
         byMonthMap.set(monthKey, { revenue: 0, expenses: 0 });
       }
       const monthData = byMonthMap.get(monthKey)!;
-      if (entry.flow === 'in') {
+      // Fluxo canônico 'income'/'expense' (aceita 'in'/'out' legado).
+      const isIncome = entry.flow === 'income' || entry.flow === 'in';
+      if (isIncome) {
         monthData.revenue += Number(entry.amount || 0);
       } else {
         monthData.expenses += Number(entry.amount || 0);
@@ -2068,7 +2209,7 @@ export class DbStorage implements IStorage {
         if (category) {
           const categoryKey = category.name;
           if (!byCategoryMap.has(categoryKey)) {
-            byCategoryMap.set(categoryKey, { amount: 0, type: entry.flow });
+            byCategoryMap.set(categoryKey, { amount: 0, type: (entry.flow === 'income' || entry.flow === 'in') ? 'income' : 'expense' });
           }
           const categoryData = byCategoryMap.get(categoryKey)!;
           categoryData.amount += Number(entry.amount || 0);
@@ -2326,10 +2467,11 @@ export class DbStorage implements IStorage {
 
   async createOrUpdateIntegrationConfig(tenantId: string, integrationType: string, data: any): Promise<IntegrationConfig> {
     const existing = await this.getIntegrationConfig(tenantId, integrationType);
+    const safeData = sanitizeIntegrationPersistenceData(data, integrationType);
 
     if (existing) {
       const [updated] = await db.update(schema.integrationConfigs)
-        .set({ ...data, updatedAt: now() })
+        .set({ ...safeData, updatedAt: now() })
         .where(and(
           eq(schema.integrationConfigs.tenantId, tenantId),
           eq(schema.integrationConfigs.integrationName, integrationType)
@@ -2339,7 +2481,7 @@ export class DbStorage implements IStorage {
     } else {
       const id = generateId();
       const [created] = await db.insert(schema.integrationConfigs)
-        .values({ ...data, id, tenantId, integrationName: integrationType, updatedAt: now() } as any)
+        .values({ ...safeData, id, tenantId, integrationName: integrationType, updatedAt: now() } as any)
         .returning();
       return created;
     }
@@ -2361,10 +2503,11 @@ export class DbStorage implements IStorage {
 
   async createOrUpdateIntegration(tenantId: string, name: string, data: any): Promise<IntegrationConfig> {
     const existing = await this.getIntegrationByName(tenantId, name);
+    const safeData = sanitizeIntegrationPersistenceData(data, name);
 
     if (existing) {
       const [updated] = await db.update(schema.integrationConfigs)
-        .set({ ...data, updatedAt: now() })
+        .set({ ...safeData, updatedAt: now() })
         .where(and(
           eq(schema.integrationConfigs.tenantId, tenantId),
           eq(schema.integrationConfigs.integrationName, name)
@@ -2374,7 +2517,7 @@ export class DbStorage implements IStorage {
     } else {
       const id = generateId();
       const [created] = await db.insert(schema.integrationConfigs)
-        .values({ ...data, id, tenantId, integrationName: name, updatedAt: now() } as any)
+        .values({ ...safeData, id, tenantId, integrationName: name, updatedAt: now() } as any)
         .returning();
       return created;
     }
@@ -3602,7 +3745,7 @@ export class DbStorage implements IStorage {
 
   // File management methods
   async createFile(file: any): Promise<any> {
-    const id = generateId();
+    const id = file.id || generateId();
     const [created] = await db.insert(schema.files).values({ ...file, id, createdAt: now(), updatedAt: now() }).returning();
     return created;
   }
@@ -3612,12 +3755,17 @@ export class DbStorage implements IStorage {
     return file;
   }
 
-  async getFilesByTenant(tenantId: string): Promise<any[]> {
-    return db.select().from(schema.files).where(eq(schema.files.tenantId, tenantId));
+  async getFilesByTenant(tenantId: string, bucket?: string, category?: string): Promise<any[]> {
+    const conditions: any[] = [eq(schema.files.tenantId, tenantId)];
+    if (bucket) conditions.push(eq(schema.files.bucket, bucket));
+    if (category) conditions.push(eq(schema.files.category, category));
+    return db.select().from(schema.files).where(and(...conditions));
   }
 
-  async getFilesByUser(userId: string): Promise<any[]> {
-    return db.select().from(schema.files).where(eq(schema.files.userId, userId));
+  async getFilesByUser(userId: string, bucket?: string): Promise<any[]> {
+    const conditions: any[] = [eq(schema.files.userId, userId)];
+    if (bucket) conditions.push(eq(schema.files.bucket, bucket));
+    return db.select().from(schema.files).where(and(...conditions));
   }
 
   async deleteFile(id: string): Promise<boolean> {
@@ -3629,14 +3777,16 @@ export class DbStorage implements IStorage {
    * Get properties for sitemap generation (SEO)
    * Returns public properties (available for sale/rent) with minimal data
    */
-  async getPropertiesForSitemap(): Promise<Array<{ id: string; createdAt: Date; updatedAt: Date | null }>> {
+  async getPropertiesForSitemap(): Promise<Array<{ id: string; tenantSlug: string; createdAt: Date | string; updatedAt: Date | string | null }>> {
     const properties = await db
       .select({
         id: schema.properties.id,
+        tenantSlug: schema.tenants.slug,
         createdAt: schema.properties.createdAt,
         updatedAt: schema.properties.updatedAt,
       })
       .from(schema.properties)
+      .innerJoin(schema.tenants, eq(schema.properties.tenantId, schema.tenants.id))
       .where(eq(schema.properties.status, 'available'))
       .orderBy(desc(schema.properties.updatedAt));
 
@@ -3938,6 +4088,407 @@ export class DbStorage implements IStorage {
     const uniqueSessions = Number(sessResult?.count || 0);
     const pageviewsByDay = await db.select({ date: sql<string>`date(${(schema as any).analyticsEvents.createdAt})`, count: sql<number>`count(*)` }).from((schema as any).analyticsEvents).where(and(baseCondition, eq((schema as any).analyticsEvents.eventType, 'pageview'))).groupBy(sql`date(${(schema as any).analyticsEvents.createdAt})`).orderBy(sql`date(${(schema as any).analyticsEvents.createdAt})`);
     return { totalPageviews, topPages: topPages.map((p: any) => ({ path: p.path || '/', count: Number(p.count) })), webVitals, errorCount, uniqueSessions, pageviewsByDay: pageviewsByDay.map((d: any) => ({ date: d.date, count: Number(d.count) })) };
+  }
+
+  // ==================== BUYER SELECTIONS (Portal) ====================
+  async createBuyerSelection(data: InsertBuyerSelection): Promise<BuyerSelection> {
+    const id = generateId();
+    const [created] = await db
+      .insert((schema as any).buyerSelections)
+      .values({ ...data, id, createdAt: now(), updatedAt: now() } as any)
+      .returning();
+    return created;
+  }
+
+  async getBuyerSelectionByToken(
+    token: string,
+  ): Promise<(BuyerSelection & { items: Array<BuyerSelectionItem & { property: Property | undefined }> }) | undefined> {
+    const [selection] = await db
+      .select()
+      .from((schema as any).buyerSelections)
+      .where(eq((schema as any).buyerSelections.publicToken, token));
+    if (!selection) return undefined;
+
+    const items = await db
+      .select()
+      .from((schema as any).buyerSelectionItems)
+      .where(eq((schema as any).buyerSelectionItems.selectionId, selection.id))
+      .orderBy((schema as any).buyerSelectionItems.sortOrder);
+
+    const propertyIds = items.map((i: any) => i.propertyId).filter(Boolean);
+    const propertiesList = propertyIds.length
+      ? await db.select().from(schema.properties).where(inArray(schema.properties.id, propertyIds))
+      : [];
+    const propertyMap = new Map<string, Property>(propertiesList.map((p: any) => [p.id, p]));
+
+    return {
+      ...(selection as any),
+      items: items.map((item: any) => ({ ...item, property: propertyMap.get(item.propertyId) })),
+    };
+  }
+
+  async getBuyerSelectionsByTenant(tenantId: string): Promise<BuyerSelection[]> {
+    return db
+      .select()
+      .from((schema as any).buyerSelections)
+      .where(eq((schema as any).buyerSelections.tenantId, tenantId))
+      .orderBy(desc((schema as any).buyerSelections.createdAt));
+  }
+
+  async getBuyerSelection(id: string): Promise<BuyerSelection | undefined> {
+    const [selection] = await db
+      .select()
+      .from((schema as any).buyerSelections)
+      .where(eq((schema as any).buyerSelections.id, id));
+    return selection;
+  }
+
+  async addSelectionItems(items: InsertBuyerSelectionItem[]): Promise<BuyerSelectionItem[]> {
+    if (!items.length) return [];
+    const values = items.map((item) => ({ ...item, id: generateId(), createdAt: now() }));
+    const created = await db.insert((schema as any).buyerSelectionItems).values(values as any).returning();
+    return created;
+  }
+
+  async updateSelectionItemResponse(
+    itemId: string,
+    response: string,
+    comment?: string,
+  ): Promise<BuyerSelectionItem | undefined> {
+    const [updated] = await db
+      .update((schema as any).buyerSelectionItems)
+      .set({ response, comment, respondedAt: now() } as any)
+      .where(eq((schema as any).buyerSelectionItems.id, itemId))
+      .returning();
+    return updated;
+  }
+
+  async closeBuyerSelection(id: string): Promise<BuyerSelection | undefined> {
+    const [updated] = await db
+      .update((schema as any).buyerSelections)
+      .set({ status: "closed", updatedAt: now() } as any)
+      .where(eq((schema as any).buyerSelections.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ==================== AI ACTIONS ====================
+  async createAiAction(data: InsertAiAction): Promise<AiAction> {
+    const id = generateId();
+    const values = {
+      ...data,
+      id,
+      payload: isSqlite ? JSON.stringify(data.payload ?? null) : data.payload,
+      result: isSqlite && (data as any).result !== undefined ? JSON.stringify((data as any).result) : (data as any).result,
+      createdAt: now(),
+      updatedAt: now(),
+    };
+    const [created] = await db.insert((schema as any).aiActions).values(values as any).returning();
+    return created;
+  }
+
+  async getAiActionsByTenant(
+    tenantId: string,
+    filters?: { status?: string; targetType?: string; targetId?: string; actionType?: string },
+  ): Promise<AiAction[]> {
+    const conditions: any[] = [eq((schema as any).aiActions.tenantId, tenantId)];
+    if (filters?.status) conditions.push(eq((schema as any).aiActions.status, filters.status));
+    if (filters?.targetType) conditions.push(eq((schema as any).aiActions.targetType, filters.targetType));
+    if (filters?.targetId) conditions.push(eq((schema as any).aiActions.targetId, filters.targetId));
+    if (filters?.actionType) conditions.push(eq((schema as any).aiActions.actionType, filters.actionType));
+    return db
+      .select()
+      .from((schema as any).aiActions)
+      .where(and(...conditions))
+      .orderBy(desc((schema as any).aiActions.createdAt));
+  }
+
+  async getAiActionsByLead(tenantId: string, leadId: string): Promise<AiAction[]> {
+    return db
+      .select()
+      .from((schema as any).aiActions)
+      .where(
+        and(
+          eq((schema as any).aiActions.tenantId, tenantId),
+          eq((schema as any).aiActions.targetType, "lead"),
+          eq((schema as any).aiActions.targetId, leadId),
+        ),
+      )
+      .orderBy(desc((schema as any).aiActions.createdAt));
+  }
+
+  async getAiAction(id: string): Promise<AiAction | undefined> {
+    const [action] = await db
+      .select()
+      .from((schema as any).aiActions)
+      .where(eq((schema as any).aiActions.id, id));
+    return action;
+  }
+
+  async updateAiActionStatus(id: string, patch: Partial<InsertAiAction>): Promise<AiAction | undefined> {
+    const data: any = { ...patch, updatedAt: now() };
+    if (isSqlite) {
+      if (data.payload !== undefined) data.payload = JSON.stringify(data.payload);
+      if (data.result !== undefined) data.result = JSON.stringify(data.result);
+    }
+    const [updated] = await db
+      .update((schema as any).aiActions)
+      .set(data)
+      .where(eq((schema as any).aiActions.id, id))
+      .returning();
+    return updated;
+  }
+
+  async appendAiActionAudit(data: InsertAiActionAudit): Promise<AiActionAudit> {
+    const id = generateId();
+    const values: any = { ...data, id, createdAt: now() };
+    if (isSqlite) {
+      if (values.beforeState !== undefined) values.beforeState = JSON.stringify(values.beforeState);
+      if (values.afterState !== undefined) values.afterState = JSON.stringify(values.afterState);
+      if (values.details !== undefined) values.details = JSON.stringify(values.details);
+    }
+    const [created] = await db.insert((schema as any).aiActionAudit).values(values).returning();
+    return created;
+  }
+
+  async getAiActionAudit(actionId: string): Promise<AiActionAudit[]> {
+    return db
+      .select()
+      .from((schema as any).aiActionAudit)
+      .where(eq((schema as any).aiActionAudit.actionId, actionId))
+      .orderBy(desc((schema as any).aiActionAudit.createdAt));
+  }
+
+  // ==================== AGENDA / CRM ====================
+  async getVisitByConfirmationToken(token: string): Promise<Visit | undefined> {
+    const [visit] = await db
+      .select()
+      .from(schema.visits)
+      .where(eq((schema.visits as any).confirmationToken, token));
+    return visit;
+  }
+
+  async updateVisitConfirmation(id: string, status: string): Promise<Visit | undefined> {
+    const [updated] = await db
+      .update(schema.visits)
+      .set({ confirmationStatus: status, confirmedAt: now() } as any)
+      .where(eq(schema.visits.id, id))
+      .returning();
+    return updated;
+  }
+
+  async createRescheduledVisit(oldId: string, data: Partial<InsertVisit>): Promise<Visit> {
+    const id = generateId();
+    const scheduledFor =
+      data.scheduledFor && typeof data.scheduledFor === "object"
+        ? (data.scheduledFor as Date).toISOString()
+        : data.scheduledFor;
+    const values: any = {
+      ...data,
+      id,
+      scheduledFor,
+      rescheduledFromId: oldId,
+      status: "scheduled",
+      confirmationStatus: "pending",
+      createdAt: now(),
+    };
+    const [created] = await db.insert(schema.visits).values(values).returning();
+    return created;
+  }
+
+  async getUpcomingVisitsForReminder(windowStart: Date, windowEnd: Date): Promise<Visit[]> {
+    const start = windowStart instanceof Date ? windowStart.toISOString() : windowStart;
+    const end = windowEnd instanceof Date ? windowEnd.toISOString() : windowEnd;
+    return db
+      .select()
+      .from(schema.visits)
+      .where(
+        and(
+          gte(schema.visits.scheduledFor, start as any),
+          sql`${schema.visits.scheduledFor} <= ${end}`,
+          sql`${(schema.visits as any).reminderSentAt} is null`,
+        ),
+      )
+      .orderBy(schema.visits.scheduledFor);
+  }
+
+  async markVisitReminderSent(id: string): Promise<Visit | undefined> {
+    const [updated] = await db
+      .update(schema.visits)
+      .set({ reminderSentAt: now() } as any)
+      .where(eq(schema.visits.id, id))
+      .returning();
+    return updated;
+  }
+
+  async saveVisitChecklist(id: string, checklistJson: unknown): Promise<Visit | undefined> {
+    const serialized = typeof checklistJson === "string" ? checklistJson : JSON.stringify(checklistJson);
+    const [updated] = await db
+      .update(schema.visits)
+      .set({ checklistJson: serialized } as any)
+      .where(eq(schema.visits.id, id))
+      .returning();
+    return updated;
+  }
+
+  async saveVisitFeedback(
+    id: string,
+    rating: number,
+    notes: string | undefined,
+    nextActionType: string | undefined,
+    nextActionDueAt: Date | string | undefined,
+  ): Promise<Visit | undefined> {
+    const dueAt =
+      nextActionDueAt && typeof nextActionDueAt === "object"
+        ? (nextActionDueAt as Date).toISOString()
+        : nextActionDueAt;
+    const [updated] = await db
+      .update(schema.visits)
+      .set({
+        feedbackRating: rating,
+        feedbackNotes: notes,
+        feedbackAt: now(),
+        nextActionType,
+        nextActionDueAt: dueAt,
+      } as any)
+      .where(eq(schema.visits.id, id))
+      .returning();
+    return updated;
+  }
+
+  async findLeadByDedup(
+    tenantId: string,
+    normalizedPhone: string | undefined,
+    normalizedEmail: string | undefined,
+  ): Promise<Lead | undefined> {
+    const matchers: any[] = [];
+    if (normalizedPhone) matchers.push(eq(schema.leads.phone, normalizedPhone));
+    if (normalizedEmail) matchers.push(eq(schema.leads.email, normalizedEmail));
+    if (!matchers.length) return undefined;
+    const conditions: any[] = [eq(schema.leads.tenantId, tenantId), or(...matchers)];
+    const active = activeRowsFilter(schema.leads);
+    if (active) conditions.push(active);
+    const [lead] = await db
+      .select()
+      .from(schema.leads)
+      .where(and(...conditions))
+      .orderBy(desc(schema.leads.createdAt));
+    return lead;
+  }
+
+  async getLeadScoreWeights(tenantId: string): Promise<LeadScoreWeights> {
+    const [row] = await db
+      .select()
+      .from((schema as any).leadScoreWeights)
+      .where(eq((schema as any).leadScoreWeights.tenantId, tenantId));
+    if (row) return row;
+    return {
+      id: "",
+      tenantId,
+      budgetWeight: 25,
+      engagementWeight: 25,
+      profileWeight: 20,
+      urgencyWeight: 15,
+      behaviorWeight: 15,
+      hotThreshold: 70,
+      warmThreshold: 40,
+      updatedAt: now(),
+    } as any;
+  }
+
+  async upsertLeadScoreWeights(
+    tenantId: string,
+    weights: Partial<InsertLeadScoreWeights>,
+  ): Promise<LeadScoreWeights> {
+    const [existing] = await db
+      .select()
+      .from((schema as any).leadScoreWeights)
+      .where(eq((schema as any).leadScoreWeights.tenantId, tenantId));
+    if (existing) {
+      const [updated] = await db
+        .update((schema as any).leadScoreWeights)
+        .set({ ...weights, tenantId, updatedAt: now() } as any)
+        .where(eq((schema as any).leadScoreWeights.tenantId, tenantId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db
+      .insert((schema as any).leadScoreWeights)
+      .values({ ...weights, id: generateId(), tenantId, updatedAt: now() } as any)
+      .returning();
+    return created;
+  }
+
+  async getLeadAssignmentState(tenantId: string): Promise<LeadAssignmentState | undefined> {
+    const [row] = await db
+      .select()
+      .from((schema as any).leadAssignmentState)
+      .where(eq((schema as any).leadAssignmentState.tenantId, tenantId));
+    return row;
+  }
+
+  async advanceLeadAssignment(tenantId: string, nextUserId: string): Promise<LeadAssignmentState> {
+    const [existing] = await db
+      .select()
+      .from((schema as any).leadAssignmentState)
+      .where(eq((schema as any).leadAssignmentState.tenantId, tenantId));
+    if (existing) {
+      const [updated] = await db
+        .update((schema as any).leadAssignmentState)
+        .set({ lastAssignedUserId: nextUserId, updatedAt: now() } as any)
+        .where(eq((schema as any).leadAssignmentState.tenantId, tenantId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db
+      .insert((schema as any).leadAssignmentState)
+      .values({ id: generateId(), tenantId, lastAssignedUserId: nextUserId, updatedAt: now() } as any)
+      .returning();
+    return created;
+  }
+
+  async getActiveBrokers(tenantId: string): Promise<User[]> {
+    return db
+      .select()
+      .from(schema.users)
+      .where(
+        and(
+          eq(schema.users.tenantId, tenantId),
+          inArray(schema.users.role, ["broker", "agent", "corretor", "admin", "manager", "owner"]),
+        ),
+      )
+      .orderBy(schema.users.name);
+  }
+
+  // ==================== SIGNATURE CERTIFICATES (Legal) ====================
+  async storeCertificate(data: InsertSignatureCertificate): Promise<SignatureCertificate> {
+    const id = generateId();
+    const values: any = { ...data, id, createdAt: now() };
+    if (values.validFrom && typeof values.validFrom === "object") values.validFrom = (values.validFrom as Date).toISOString();
+    if (values.validTo && typeof values.validTo === "object") values.validTo = (values.validTo as Date).toISOString();
+    const [created] = await db.insert((schema as any).signatureCertificates).values(values).returning();
+    return created;
+  }
+
+  async getCertificate(id: string): Promise<SignatureCertificate | undefined> {
+    const [cert] = await db
+      .select()
+      .from((schema as any).signatureCertificates)
+      .where(eq((schema as any).signatureCertificates.id, id));
+    return cert;
+  }
+
+  async getUserCertificates(tenantId: string, userId: string): Promise<SignatureCertificate[]> {
+    return db
+      .select()
+      .from((schema as any).signatureCertificates)
+      .where(
+        and(
+          eq((schema as any).signatureCertificates.tenantId, tenantId),
+          eq((schema as any).signatureCertificates.userId, userId),
+        ),
+      )
+      .orderBy(desc((schema as any).signatureCertificates.createdAt));
   }
 
   // Table accessors for direct database access (needed by compliance and other modules)

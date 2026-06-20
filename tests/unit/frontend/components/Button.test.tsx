@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { Button } from '../../../../client/src/components/ui/button';
 
 describe('Button Component', () => {
@@ -56,21 +55,19 @@ describe('Button Component', () => {
     expect(button).toBeInTheDocument();
   });
 
-  it('should handle click events', async () => {
+  it('should handle click events', () => {
     const handleClick = vi.fn();
-    const user = userEvent.setup();
 
     render(<Button onClick={handleClick}>Click me</Button>);
     const button = screen.getByRole('button', { name: /click me/i });
 
-    await user.click(button);
+    fireEvent.click(button);
 
     expect(handleClick).toHaveBeenCalledTimes(1);
   });
 
-  it('should be disabled when disabled prop is true', async () => {
+  it('should be disabled when disabled prop is true', () => {
     const handleClick = vi.fn();
-    const user = userEvent.setup();
 
     render(
       <Button disabled onClick={handleClick}>
@@ -82,7 +79,7 @@ describe('Button Component', () => {
     expect(button).toBeDisabled();
 
     // Click should not trigger handler
-    await user.click(button);
+    fireEvent.click(button);
     expect(handleClick).not.toHaveBeenCalled();
   });
 
@@ -94,9 +91,8 @@ describe('Button Component', () => {
     expect(button).toHaveTextContent('Loading Button');
   });
 
-  it('should be disabled when loading', async () => {
+  it('should be disabled when loading', () => {
     const handleClick = vi.fn();
-    const user = userEvent.setup();
 
     render(
       <Button isLoading onClick={handleClick}>
@@ -108,7 +104,7 @@ describe('Button Component', () => {
     expect(button).toBeDisabled();
 
     // Click should not trigger handler when loading
-    await user.click(button);
+    fireEvent.click(button);
     expect(handleClick).not.toHaveBeenCalled();
   });
 

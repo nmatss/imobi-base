@@ -1,7 +1,7 @@
 import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { useImobi, Property } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -132,11 +132,11 @@ const PROPERTY_TYPES: Record<string, string> = {
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  available: { label: "Disponível", color: "text-green-700", bg: "bg-green-100" },
-  reserved: { label: "Reservado", color: "text-yellow-700", bg: "bg-yellow-100" },
-  sold: { label: "Vendido", color: "text-blue-700", bg: "bg-blue-100" },
-  rented: { label: "Alugado", color: "text-purple-700", bg: "bg-purple-100" },
-  pending: { label: "Pendente", color: "text-gray-700", bg: "bg-gray-100" },
+  available: { label: "Disponível", color: "text-green-700 dark:text-green-300", bg: "bg-green-100 dark:bg-green-900/30" },
+  reserved: { label: "Reservado", color: "text-yellow-700 dark:text-yellow-300", bg: "bg-yellow-100 dark:bg-yellow-900/30" },
+  sold: { label: "Vendido", color: "text-blue-700 dark:text-blue-300", bg: "bg-blue-100 dark:bg-blue-900/30" },
+  rented: { label: "Alugado", color: "text-purple-700 dark:text-purple-300", bg: "bg-purple-100 dark:bg-purple-900/30" },
+  pending: { label: "Pendente", color: "text-gray-700 dark:text-gray-300", bg: "bg-gray-100 dark:bg-gray-800" },
 };
 
 // Property enriquecida com metadados de qualidade/visitas calculados em PropertiesList.
@@ -274,6 +274,7 @@ export default function PropertiesList() {
   usePageTitle("Imóveis");
   const { properties, tenant, visits, leads, refetchProperties, loading } = useImobi();
   const [, setLocation] = useLocation();
+  const search = useSearch();
 
   // View & Filter State
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -435,6 +436,20 @@ export default function PropertiesList() {
     setFormStep(1);
     setIsModalOpen(true);
   };
+
+  // Deep-link de edição: /properties?edit=<id> (usado pelo botão Editar do detalhe).
+  // Abre o modal de edição quando a property correspondente já estiver carregada e
+  // limpa o query param para não reabrir ao fechar.
+  const editParam = new URLSearchParams(search).get("edit");
+  useEffect(() => {
+    if (!editParam || properties.length === 0) return;
+    const target = properties.find((p) => p.id === editParam);
+    if (target) {
+      openEditModal(target);
+      setLocation("/properties", { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editParam, properties]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -629,10 +644,10 @@ export default function PropertiesList() {
               <p className="text-lg sm:text-xl font-bold mt-0.5 sm:mt-1">{portfolioStats.rented}</p>
             </CardContent>
           </Card>
-          <Card className={`border-l-4 ${portfolioStats.incomplete > 0 ? "border-l-red-500" : "border-l-gray-300"}`}>
+          <Card className={`border-l-4 ${portfolioStats.incomplete > 0 ? "border-l-red-500" : "border-l-gray-300 dark:border-l-gray-700"}`}>
             <CardContent className="p-2 sm:p-3">
               <div className="flex items-center gap-1.5 sm:gap-2">
-                <AlertTriangle className={`h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 ${portfolioStats.incomplete > 0 ? "text-red-500" : "text-gray-400"}`} />
+                <AlertTriangle className={`h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 ${portfolioStats.incomplete > 0 ? "text-red-500" : "text-gray-400 dark:text-gray-400"}`} />
                 <span className="text-[10px] sm:text-xs text-muted-foreground truncate">Incompletos</span>
               </div>
               <p className="text-lg sm:text-xl font-bold mt-0.5 sm:mt-1">{portfolioStats.incomplete}</p>

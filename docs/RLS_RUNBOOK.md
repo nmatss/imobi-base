@@ -7,6 +7,14 @@
 
 Arquivo de migração: [`migrations/RLS_enable.sql`](../migrations/RLS_enable.sql)
 
+O runner padrão `npm run db:migrate` pula essa migration por segurança. Aplique
+RLS somente pelo comando explícito:
+
+```bash
+npm run db:rls:apply
+npm run db:rls:verify
+```
+
 ---
 
 ## 1. O que isto resolve
@@ -45,12 +53,12 @@ troque para `::uuid` para evitar comparação de texto e ganhar uso de índice.
 
 ### Tabelas com `tenant_id` anulável
 
-Cinco tabelas têm `tenant_id` opcional (`newsletter_subscriptions`,
-`usage_logs`, `user_consents`, `compliance_audit_log`, `cookie_preferences`).
-Para elas a política também permite `tenant_id IS NULL` (linhas globais/sem
-tenant), evitando que registros legítimos sumam. Reavalie caso a caso se isso é
-desejável — pode ser preferível backfillar o `tenant_id` e remover o
-`IS NULL`.
+Sete tabelas têm `tenant_id` opcional (`newsletter_subscriptions`,
+`usage_logs`, `user_sessions`, `user_consents`, `compliance_audit_log`,
+`cookie_preferences`, `webhook_events`). Para elas a política também permite
+`tenant_id IS NULL` (linhas globais/sem tenant), evitando que registros
+legítimos sumam. Reavalie caso a caso se isso é desejável — pode ser preferível
+backfillar o `tenant_id` e remover o `IS NULL`.
 
 ## 3. Pré-requisito CRÍTICO: papel de conexão da aplicação
 
@@ -73,61 +81,92 @@ um role `BYPASSRLS`. Configuração recomendada:
 
 ## 4. Onde setar `app.tenant_id` por request
 
-O `SET LOCAL` só vale dentro de uma transação. Há duas opções:
+O `SET LOCAL` só vale dentro de uma transação.
 
-### Opção A (recomendada) — transação por request com `SET LOCAL`
+### Implementado no runtime
 
-Envolver cada request autenticado numa transação e setar a GUC nela. Esboço de
-helper a ser adicionado em `server/db.ts` (fora do escopo desta entrega — só
-referência):
+O runtime possui uma base de contexto RLS em:
 
-```ts
-// Pseudocódigo — implementar no track de db/storage, não aplicar agora.
-export async function withTenant<T>(tenantId: string, fn: (tx) => Promise<T>) {
-  return db.transaction(async (tx) => {
-    // set_config(name, value, is_local=true) === SET LOCAL
-    await tx.execute(sql`SELECT set_config('app.tenant_id', ${tenantId}, true)`);
-    return fn(tx);
-  });
-}
-```
+- `server/db-rls.ts`: `AsyncLocalStorage` para carregar o tenant corrente e
+  patch do `pg.Pool`;
+- `server/db.ts`: instala o patch no pool Postgres;
+- `server/middleware/auth.ts`: ativa o contexto em `requireAuth` comum;
+- `server/routes.ts`: ativa o contexto no `requireAuth` local das rotas
+  centrais.
 
-Use `set_config(..., true)` (parametrizável) em vez de interpolar `SET LOCAL`
-com string, para evitar SQL injection no valor do tenant.
+O patch cobre:
 
-Um middleware Express extrai o `tenantId` da sessão autenticada e roda o handler
-dentro de `withTenant`.
+- `Pool.query(...)`: abre transação curta, chama
+  `select set_config(...)` para o contexto ativo, executa a query e faz
+  `commit`/`rollback`;
+- `Pool.connect()` + transação explícita: ao detectar `begin`, seta
+  o contexto RLS dentro da mesma transação antes das queries de negócio.
 
-### Opção B — `SET` (sessão) com pool dedicado
+Os valores de contexto são sempre passados como parâmetro (`$1`), não
+interpolados.
 
-Só viável se cada conexão atender um tenant por vez e for resetada antes de
-voltar ao pool (`DISCARD ALL` / `RESET app.tenant_id`). Em pool compartilhado
-serverless isso é frágil — **prefira a Opção A**.
+### Contextos suportados
+
+Além de `app.tenant_id`, o runtime suporta contextos públicos estreitos para
+fluxos que legitimamente acontecem antes de existir uma sessão autenticada:
+
+- `app.user_id`: deserialize de sessão;
+- `app.auth_email`: login, registro e OAuth por email normalizado;
+- `app.password_reset_token_hash`: reset de senha;
+- `app.email_verification_token_hash`: verificação de email;
+- `app.clicksign_document_key`: webhook ClickSign assinado;
+- `app.digital_signature_token`: assinatura pública por token;
+- `app.public_property_ids`: comparação pública de imóveis disponíveis;
+- `app.property_comparison_id`: leitura pública de comparação salva.
+
+Esses contextos têm policies específicas em `migrations/RLS_enable.sql` e são
+cobertos por `tests/unit/db-rls-context.test.ts`,
+`tests/unit/rls-migration-parity.test.ts` e
+`tests/unit/auth-rls-context.test.ts`.
+
+### Lacunas restantes
+
+O runtime está pronto para validação de staging com RLS ativo, mas ainda **não**
+deve ser promovido direto para produção sem:
+
+- aplicar em staging com role de aplicação não-owner e sem `BYPASSRLS`;
+- executar testes de isolamento multi-tenant contra Postgres real;
+- definir a estratégia operacional de `super_admin`/cross-tenant. A policy atual
+  não abre bypass genérico; isso preserva isolamento, mas limita rotas que
+  precisem enxergar todos os tenants.
 
 > Atenção ao pool serverless: em modo Vercel o pool é pequeno e efêmero (ver
-> `server/db.ts`). `SET LOCAL` dentro de transação é seguro nesse cenário
-> porque o escopo morre com a transação. `SET` de sessão não é.
+> `server/db.ts`). `set_config(..., true)` dentro de transação é seguro nesse
+> cenário porque o escopo morre com a transação. `SET` de sessão não deve ser
+> usado em pool compartilhado.
 
 ## 5. Ordem segura de rollout
 
 1. **Staging primeiro.** Nunca aplique direto em produção.
 2. **Crie o role de aplicação** (não-owner, sem BYPASSRLS) e aponte a
    `DATABASE_URL` do app para ele. Garanta os GRANTs de DML nas tabelas.
-3. **Implemente e faça deploy do middleware `withTenant`** que seta
-   `app.tenant_id` em toda request autenticada — **antes** de habilitar o RLS.
-   Sem isso, ao habilitar o RLS o app retornará 0 linhas (falha fechado).
-4. **Smoke test em staging** com o middleware ativo, mas RLS ainda desligado:
+3. **Valide cobertura do contexto RLS** para requests autenticadas, auth/OAuth,
+   webhooks, rotas públicas e fluxos super_admin — **antes** de habilitar RLS em
+   produção. Sem isso, ao habilitar RLS o app retorna 0 linhas (falha fechado).
+4. **Smoke test em staging** com o contexto ativo, mas RLS ainda desligado:
    confirme que a GUC está sendo setada (logar `current_setting('app.tenant_id', true)`).
-5. **Aplique `migrations/RLS_enable.sql` em staging** (`psql -f` ou via tooling
-   de migração). É idempotente (`DROP POLICY IF EXISTS`).
-6. **Teste de isolamento em staging:**
+5. **Aplique `migrations/RLS_enable.sql` em staging** com
+   `npm run db:rls:apply`. É idempotente (`DROP POLICY IF EXISTS`).
+6. **Rode o verificador automatizado**:
+   ```bash
+   RLS_VERIFY_TENANT_ID=<tenant-id-de-staging> npm run db:rls:verify
+   ```
+   O comando falha se o role runtime for superuser, tiver `BYPASSRLS`, for owner
+   das tabelas protegidas, se `ENABLE/FORCE ROW LEVEL SECURITY` estiver ausente
+   ou se uma tabela da migration nao tiver policy.
+7. **Teste de isolamento em staging:**
    - Autenticado como tenant A: só vê dados de A.
    - Forçar acesso a um id de B (IDOR): retorna 404/0 linhas.
    - Sem GUC setada (simular bug): retorna 0 linhas (não vaza).
    - Jobs/admin com role privilegiado: ainda enxergam cross-tenant.
-7. **Janela de produção:** repita passos 2–3 (role + middleware) em produção,
+8. **Janela de produção:** repita passos 2–3 (role + middleware) em produção,
    valide, e só então aplique o `RLS_enable.sql`.
-8. **Monitore** taxa de respostas vazias/erros logo após aplicar; tenha o
+9. **Monitore** taxa de respostas vazias/erros logo após aplicar; tenha o
    rollback pronto.
 
 ## 6. Rollback
@@ -155,7 +194,7 @@ toda query. Garanta índice em `tenant_id` (ou índices compostos
 
 ## 8. Tabelas cobertas
 
-44 tabelas com `tenant_id` recebem RLS (ver `migrations/RLS_enable.sql`).
+56 tabelas com `tenant_id` recebem RLS (ver `migrations/RLS_enable.sql`).
 Tabelas-filhas **sem** coluna `tenant_id` própria (ex.: `interactions`,
 `lead_tag_links`, `user_permissions`, `property_coordinates`) herdam o
 isolamento via FK para a tabela-pai já protegida; se quiser RLS direto nelas,

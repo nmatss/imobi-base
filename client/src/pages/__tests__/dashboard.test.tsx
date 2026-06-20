@@ -17,6 +17,9 @@ vi.mock('wouter');
 vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({ toast: vi.fn() }),
 }));
+vi.mock('@/hooks/use-first-access-tour', () => ({
+  useFirstAccessTour: vi.fn(),
+}));
 vi.mock('@/hooks/useDashboardData', () => ({
   useDashboardData: vi.fn(() => ({
     metrics: {

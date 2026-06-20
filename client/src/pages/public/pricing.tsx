@@ -122,22 +122,23 @@ export default function PricingPage() {
           </nav>
 
           <div className="hidden md:flex items-center gap-4">
-            <Link href="/login">
-              <Button variant="ghost" className="hover:bg-primary/5">
+            <Button asChild variant="ghost" className="hover:bg-primary/5">
+              <Link href="/login">
                 Entrar
-              </Button>
-            </Link>
-            <Link href="/login">
-              <Button className="rounded-full px-6 shadow-lg shadow-primary/20">
+              </Link>
+            </Button>
+            <Button asChild className="rounded-full px-6 shadow-lg shadow-primary/20">
+              <Link href="/login">
                 Começar Grátis
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
 
           <button
             className="md:hidden"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Menu"
+            aria-label={mobileMenuOpen ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={mobileMenuOpen}
           >
             {mobileMenuOpen ? <X /> : <Menu />}
           </button>
@@ -146,7 +147,7 @@ export default function PricingPage() {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="fixed top-14 left-0 w-full bg-background border-b z-40 md:hidden">
+        <div className="fixed top-16 left-0 w-full bg-background border-b z-40 md:hidden">
           <div className="p-4 flex flex-col gap-4">
             <Link
               href="/"
@@ -163,14 +164,16 @@ export default function PricingPage() {
               Preços
             </Link>
             <div className="h-px bg-border my-2" />
-            <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-              <Button variant="outline" className="w-full justify-start">
+            <Button asChild variant="outline" className="w-full justify-start">
+              <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
                 Entrar
-              </Button>
-            </Link>
-            <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-              <Button className="w-full">Criar Conta</Button>
-            </Link>
+              </Link>
+            </Button>
+            <Button asChild className="w-full">
+              <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
+                Criar Conta
+              </Link>
+            </Button>
           </div>
         </div>
       )}
@@ -206,6 +209,7 @@ export default function PricingPage() {
                 Mensal
               </span>
               <Switch
+                aria-label="Alternar cobrança anual"
                 checked={billingCycle === "yearly"}
                 onCheckedChange={(c) =>
                   setBillingCycle(c ? "yearly" : "monthly")
@@ -273,7 +277,7 @@ export default function PricingPage() {
                             {price === 0 ? "Grátis" : `R$ ${price}`}
                           </span>
                           {price > 0 && (
-                            <span className="text-muted-foreground">/mes</span>
+                            <span className="text-muted-foreground">/mês</span>
                           )}
                         </div>
                       )}
@@ -291,26 +295,27 @@ export default function PricingPage() {
                     </div>
 
                     {isExternal ? (
-                      <a
-                        href={plan.ctaLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <Button variant={plan.variant} className="w-full mb-6">
-                          {plan.cta}
-                        </Button>
-                      </a>
-                    ) : (
-                      <Link href={plan.ctaLink}>
-                        <Button
-                          variant={plan.variant}
-                          className={`w-full mb-6 ${
-                            plan.popular ? "shadow-lg shadow-primary/20" : ""
-                          }`}
+                      <Button asChild variant={plan.variant} className="w-full mb-6">
+                        <a
+                          href={plan.ctaLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
                         >
                           {plan.cta}
-                        </Button>
-                      </Link>
+                        </a>
+                      </Button>
+                    ) : (
+                      <Button
+                        asChild
+                        variant={plan.variant}
+                        className={`w-full mb-6 ${
+                          plan.popular ? "shadow-lg shadow-primary/20" : ""
+                        }`}
+                      >
+                        <Link href={plan.ctaLink}>
+                          {plan.cta}
+                        </Link>
+                      </Button>
                     )}
 
                     <div className="space-y-3 text-sm flex-1">
@@ -382,17 +387,17 @@ export default function PricingPage() {
                 },
                 {
                   icon: BarChart3,
-                  title: "Relatorios",
-                  desc: "Dashboards em tempo real e analytics avancados.",
+                  title: "Relatórios",
+                  desc: "Dashboards em tempo real e analytics avançados.",
                 },
                 {
                   icon: Brain,
-                  title: "Inteligencia Artificial",
-                  desc: "Descricoes, avaliacao de mercado e atendimento IA.",
+                  title: "Inteligência Artificial",
+                  desc: "Descrições, avaliação de mercado e atendimento IA.",
                 },
                 {
                   icon: Shield,
-                  title: "Seguranca",
+                  title: "Segurança",
                   desc: "Dados criptografados e backups automáticos diários.",
                 },
               ].map((item) => (
@@ -546,26 +551,28 @@ export default function PricingPage() {
               plano e tirar todas as suas dúvidas.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a
-                href={`mailto:${CONTACT_EMAIL}?subject=Dúvidas sobre os planos do ImobiBase`}
+              <Button
+                asChild
+                size="lg"
+                className="h-14 px-10 text-lg rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-2xl shadow-primary/30"
               >
-                <Button
-                  size="lg"
-                  className="h-14 px-10 text-lg rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-2xl shadow-primary/30"
+                <a
+                  href={`mailto:${CONTACT_EMAIL}?subject=Dúvidas sobre os planos do ImobiBase`}
                 >
                   <MessageSquare className="mr-2 w-5 h-5" /> Falar com um
                   consultor
-                </Button>
-              </a>
-              <Link href="/login">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="h-14 px-10 text-lg rounded-full border-background/30 text-background hover:bg-background/10"
-                >
+                </a>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
+                className="h-14 px-10 text-lg rounded-full border-background/30 text-background hover:bg-background/10"
+              >
+                <Link href="/login">
                   Começar grátis <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </div>
           </div>
         </section>

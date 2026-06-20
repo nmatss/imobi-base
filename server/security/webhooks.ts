@@ -7,6 +7,7 @@
 import crypto from 'crypto';
 import type { SecurityEvent } from './security-monitor';
 import { SecurityEventType, SecurityEventSeverity } from './security-monitor';
+import { fetchExternalUrl } from './url-validator';
 
 export interface WebhookConfig {
   /**
@@ -213,11 +214,8 @@ export class WebhookManager {
     const payloadStr = JSON.stringify(payload);
     const signature = this.generateSignature(payloadStr, config.secret);
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), config.timeoutMs || 5000);
-
     try {
-      const response = await fetch(config.url, {
+      const response = await fetchExternalUrl(config.url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -227,10 +225,9 @@ export class WebhookManager {
           'User-Agent': 'ImobiBase-Security-Webhook/1.0',
         },
         body: payloadStr,
-        signal: controller.signal,
+        maxRedirects: 0,
+        timeoutMs: config.timeoutMs || 5000,
       });
-
-      clearTimeout(timeout);
 
       if (!response.ok) {
         throw new Error(`Webhook returned status ${response.status}`);
@@ -251,8 +248,6 @@ export class WebhookManager {
       }
 
       throw error;
-    } finally {
-      clearTimeout(timeout);
     }
   }
 

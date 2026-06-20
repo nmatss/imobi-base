@@ -1,5 +1,6 @@
 import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
 import { useImobi, Visit, Lead, Property } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -86,42 +87,42 @@ import { apiRequest } from "@/lib/queryClient";
 // Status colors and labels
 const STATUS_CONFIG = {
   scheduled: {
-    bg: "bg-blue-100",
+    bg: "bg-blue-100 dark:bg-blue-900/30",
     border: "border-blue-500",
     borderColor: "#3b82f6",
-    text: "text-blue-700",
+    text: "text-blue-700 dark:text-blue-300",
     label: "Agendada",
     icon: CalendarIcon
   },
   completed: {
-    bg: "bg-green-100",
+    bg: "bg-green-100 dark:bg-green-900/30",
     border: "border-green-500",
     borderColor: "#22c55e",
-    text: "text-green-700",
+    text: "text-green-700 dark:text-green-300",
     label: "Realizada",
     icon: CheckCircle
   },
   cancelled: {
-    bg: "bg-red-100",
+    bg: "bg-red-100 dark:bg-red-900/30",
     border: "border-red-500",
     borderColor: "#ef4444",
-    text: "text-red-700",
+    text: "text-red-700 dark:text-red-300",
     label: "Cancelada",
     icon: XCircle
   },
   rescheduled: {
-    bg: "bg-amber-100",
+    bg: "bg-amber-100 dark:bg-amber-900/30",
     border: "border-amber-500",
     borderColor: "#f59e0b",
-    text: "text-amber-700",
+    text: "text-amber-700 dark:text-amber-300",
     label: "Reagendada",
     icon: RefreshCw
   },
   noshow: {
-    bg: "bg-gray-100",
+    bg: "bg-gray-100 dark:bg-gray-800",
     border: "border-gray-500",
     borderColor: "#6b7280",
-    text: "text-gray-700",
+    text: "text-gray-700 dark:text-gray-300",
     label: "Não Compareceu",
     icon: UserX
   },
@@ -145,9 +146,9 @@ const VISIT_CHANNELS = [
 
 // Feedback options
 const FEEDBACK_OPTIONS = [
-  { value: "interested", label: "Interessado", icon: ThumbsUp, color: "text-green-600" },
-  { value: "not_interested", label: "Não Interessado", icon: ThumbsDown, color: "text-red-600" },
-  { value: "thinking", label: "Pensando", icon: Clock, color: "text-amber-600" },
+  { value: "interested", label: "Interessado", icon: ThumbsUp, color: "text-green-600 dark:text-green-400" },
+  { value: "not_interested", label: "Não Interessado", icon: ThumbsDown, color: "text-red-600 dark:text-red-400" },
+  { value: "thinking", label: "Pensando", icon: Clock, color: "text-amber-600 dark:text-amber-400" },
 ];
 
 // AI Prompt templates for agenda
@@ -433,12 +434,14 @@ export default function CalendarPage() {
   const getAvailableSlots = useCallback((date: Date) => {
     const dateVisits = visits.filter(v =>
       v.status === "scheduled" &&
-      isSameDay(new Date(v.scheduledFor), date)
+      isSameDay(new Date(v.scheduledFor), date) &&
+      // Não exclui o horário da própria visita em edição (senão o Select fica em branco ao reagendar).
+      v.id !== editingVisit?.id
     );
 
     const bookedTimes = dateVisits.map(v => format(new Date(v.scheduledFor), "HH:mm"));
     return TIME_SLOTS.filter(slot => !bookedTimes.includes(slot));
-  }, [visits]);
+  }, [visits, editingVisit]);
 
   // Swipe handlers for date navigation
   const minSwipeDistance = 50;
@@ -481,7 +484,7 @@ export default function CalendarPage() {
     if (viewMode === "day" || viewMode === "list") {
       setSelectedDate(addDays(selectedDate, -1));
     } else if (viewMode === "week") {
-      setSelectedDate(subWeeks(selectedDate, -1));
+      setSelectedDate(subWeeks(selectedDate, 1));
     } else if (viewMode === "month") {
       setCurrentMonth(subMonths(currentMonth, 1));
     }
@@ -886,13 +889,13 @@ export default function CalendarPage() {
         </div>
 
         {isDelayed && (
-          <div className="mt-2 text-xs text-red-600 font-medium flex items-center gap-1">
+          <div className="mt-2 text-xs text-red-600 dark:text-red-400 font-medium flex items-center gap-1">
             <AlertTriangle className="h-3.5 w-3.5" />
             Atrasada
           </div>
         )}
         {isSoon && (
-          <div className="mt-2 text-xs text-amber-600 font-medium flex items-center gap-1">
+          <div className="mt-2 text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
             <Bell className="h-3.5 w-3.5" />
             Começa em breve
           </div>
@@ -905,6 +908,7 @@ export default function CalendarPage() {
               size="sm"
               variant="outline"
               className="h-8 flex-1 text-xs"
+              aria-label="Ligar para o lead"
               onClick={(e) => {
                 e.stopPropagation();
                 window.open(`tel:${details.lead?.phone}`, "_blank");
@@ -918,6 +922,7 @@ export default function CalendarPage() {
               size="sm"
               variant="outline"
               className="h-8 flex-1 text-xs"
+              aria-label="Abrir endereço no mapa"
               onClick={(e) => {
                 e.stopPropagation();
                 const address = encodeURIComponent(details.property?.address || "");
@@ -932,6 +937,7 @@ export default function CalendarPage() {
               size="sm"
               variant="outline"
               className="h-8 px-2 text-xs"
+              aria-label="Reagendar visita"
               onClick={(e) => {
                 e.stopPropagation();
                 openEditModal(visit);
@@ -983,12 +989,15 @@ export default function CalendarPage() {
 
                   <div className="space-y-2">
                     <Label>Tipo de Visita</Label>
-                    <Select value={filters.visitType} onValueChange={(v) => setFilters(f => ({ ...f, visitType: v }))}>
+                    <Select
+                      value={filters.visitType || "__all__"}
+                      onValueChange={(v) => setFilters(f => ({ ...f, visitType: v === "__all__" ? "" : v }))}
+                    >
                       <SelectTrigger className="h-11">
                         <SelectValue placeholder="Todos os tipos" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos os tipos</SelectItem>
+                        <SelectItem value="__all__">Todos os tipos</SelectItem>
                         {VISIT_TYPES.map(t => (
                           <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                         ))}
@@ -998,12 +1007,15 @@ export default function CalendarPage() {
 
                   <div className="space-y-2">
                     <Label>Canal/Origem</Label>
-                    <Select value={filters.channel} onValueChange={(v) => setFilters(f => ({ ...f, channel: v }))}>
+                    <Select
+                      value={filters.channel || "__all__"}
+                      onValueChange={(v) => setFilters(f => ({ ...f, channel: v === "__all__" ? "" : v }))}
+                    >
                       <SelectTrigger className="h-11">
                         <SelectValue placeholder="Todos os canais" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos os canais</SelectItem>
+                        <SelectItem value="__all__">Todos os canais</SelectItem>
                         {VISIT_CHANNELS.map(c => (
                           <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                         ))}
@@ -1045,85 +1057,85 @@ export default function CalendarPage() {
         {/* Stats counters - Horizontal scroll on mobile */}
         <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
           <div className="flex gap-6 sm:gap-8 min-w-max sm:grid sm:grid-cols-3 lg:grid-cols-6">
-            <Card className="min-w-[120px] sm:min-w-0 bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-200">
+            <Card className="min-w-[120px] sm:min-w-0 bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20 border-blue-200 dark:border-blue-800">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-blue-500 rounded-lg">
                     <CalendarIcon className="h-4 w-4 text-white" />
                   </div>
                   <div>
-                    <p className="text-xs text-blue-600 font-medium">Agendadas</p>
-                    <p className="text-xl font-bold text-blue-700">{stats.scheduled}</p>
+                    <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">Agendadas</p>
+                    <p className="text-xl font-bold text-blue-700 dark:text-blue-300">{stats.scheduled}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="min-w-[120px] sm:min-w-0 bg-gradient-to-br from-green-50 to-green-100/50 border-green-200">
+            <Card className="min-w-[120px] sm:min-w-0 bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/30 dark:to-green-900/20 border-green-200 dark:border-green-800">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-green-500 rounded-lg">
                     <CheckCircle className="h-4 w-4 text-white" />
                   </div>
                   <div>
-                    <p className="text-xs text-green-600 font-medium">Realizadas</p>
-                    <p className="text-xl font-bold text-green-700">{stats.completed}</p>
+                    <p className="text-xs text-green-600 dark:text-green-400 font-medium">Realizadas</p>
+                    <p className="text-xl font-bold text-green-700 dark:text-green-300">{stats.completed}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="min-w-[120px] sm:min-w-0 bg-gradient-to-br from-red-50 to-red-100/50 border-red-200">
+            <Card className="min-w-[120px] sm:min-w-0 bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/30 dark:to-red-900/20 border-red-200 dark:border-red-800">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-red-500 rounded-lg">
                     <XCircle className="h-4 w-4 text-white" />
                   </div>
                   <div>
-                    <p className="text-xs text-red-600 font-medium">Canceladas</p>
-                    <p className="text-xl font-bold text-red-700">{stats.cancelled}</p>
+                    <p className="text-xs text-red-600 dark:text-red-400 font-medium">Canceladas</p>
+                    <p className="text-xl font-bold text-red-700 dark:text-red-300">{stats.cancelled}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="min-w-[120px] sm:min-w-0 bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-200">
+            <Card className="min-w-[120px] sm:min-w-0 bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/30 dark:to-amber-900/20 border-amber-200 dark:border-amber-800">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-amber-500 rounded-lg">
                     <AlertTriangle className="h-4 w-4 text-white" />
                   </div>
                   <div>
-                    <p className="text-xs text-amber-600 font-medium">Atrasadas</p>
-                    <p className="text-xl font-bold text-amber-700">{stats.delayed}</p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">Atrasadas</p>
+                    <p className="text-xl font-bold text-amber-700 dark:text-amber-300">{stats.delayed}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="min-w-[120px] sm:min-w-0 bg-gradient-to-br from-purple-50 to-purple-100/50 border-purple-200">
+            <Card className="min-w-[120px] sm:min-w-0 bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950/30 dark:to-purple-900/20 border-purple-200 dark:border-purple-800">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-purple-500 rounded-lg">
                     <Clock className="h-4 w-4 text-white" />
                   </div>
                   <div>
-                    <p className="text-xs text-purple-600 font-medium">Hoje</p>
-                    <p className="text-xl font-bold text-purple-700">{stats.today}</p>
+                    <p className="text-xs text-purple-600 dark:text-purple-400 font-medium">Hoje</p>
+                    <p className="text-xl font-bold text-purple-700 dark:text-purple-300">{stats.today}</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="min-w-[120px] sm:min-w-0 bg-gradient-to-br from-indigo-50 to-indigo-100/50 border-indigo-200">
+            <Card className="min-w-[120px] sm:min-w-0 bg-gradient-to-br from-indigo-50 to-indigo-100/50 dark:from-indigo-950/30 dark:to-indigo-900/20 border-indigo-200 dark:border-indigo-800">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2">
                   <div className="p-2 bg-indigo-500 rounded-lg">
                     <CalendarPlus className="h-4 w-4 text-white" />
                   </div>
                   <div>
-                    <p className="text-xs text-indigo-600 font-medium">Semana</p>
-                    <p className="text-xl font-bold text-indigo-700">{stats.week}</p>
+                    <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">Semana</p>
+                    <p className="text-xl font-bold text-indigo-700 dark:text-indigo-300">{stats.week}</p>
                   </div>
                 </div>
               </CardContent>
@@ -1140,9 +1152,9 @@ export default function CalendarPage() {
                   key={i}
                   className={cn(
                     "flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium shrink-0",
-                    alert.type === "soon" && "bg-amber-100 text-amber-800",
-                    alert.type === "delayed" && "bg-red-100 text-red-800",
-                    alert.type === "feedback" && "bg-blue-100 text-blue-800"
+                    alert.type === "soon" && "bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300",
+                    alert.type === "delayed" && "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300",
+                    alert.type === "feedback" && "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300"
                   )}
                 >
                   {alert.type === "soon" && <Bell className="h-4 w-4" />}
@@ -1214,6 +1226,7 @@ export default function CalendarPage() {
                       variant="ghost"
                       size="icon"
                       className="h-9 w-9"
+                      aria-label="Ver dia anterior"
                       onClick={() => setSelectedDate(addDays(selectedDate, -1))}
                     >
                       <ChevronLeft className="h-5 w-5" />
@@ -1222,6 +1235,7 @@ export default function CalendarPage() {
                       variant="ghost"
                       size="icon"
                       className="h-9 w-9"
+                      aria-label="Ver próximo dia"
                       onClick={() => setSelectedDate(addDays(selectedDate, 1))}
                     >
                       <ChevronRight className="h-5 w-5" />
@@ -1282,6 +1296,7 @@ export default function CalendarPage() {
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9"
+                    aria-label="Ver dia anterior"
                     onClick={() => setSelectedDate(addDays(selectedDate, -1))}
                   >
                     <ChevronLeft className="h-5 w-5" />
@@ -1290,6 +1305,7 @@ export default function CalendarPage() {
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9"
+                    aria-label="Ver próximo dia"
                     onClick={() => setSelectedDate(addDays(selectedDate, 1))}
                   >
                     <ChevronRight className="h-5 w-5" />
@@ -1367,6 +1383,7 @@ export default function CalendarPage() {
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9"
+                    aria-label="Ver semana anterior"
                     onClick={() => setSelectedDate(addDays(selectedDate, -7))}
                   >
                     <ChevronLeft className="h-5 w-5" />
@@ -1375,6 +1392,7 @@ export default function CalendarPage() {
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9"
+                    aria-label="Ver próxima semana"
                     onClick={() => setSelectedDate(addDays(selectedDate, 7))}
                   >
                     <ChevronRight className="h-5 w-5" />
@@ -1430,6 +1448,7 @@ export default function CalendarPage() {
                                 e.stopPropagation();
                                 openCreateModal(day);
                               }}
+                              aria-label={`Criar visita em ${format(day, "dd/MM/yyyy")}`}
                               className="w-full py-3 text-xs text-muted-foreground hover:bg-accent rounded-lg transition-colors"
                             >
                               <Plus className="h-4 w-4 mx-auto" />
@@ -1485,6 +1504,7 @@ export default function CalendarPage() {
                             e.stopPropagation();
                             openCreateModal(day);
                           }}
+                          aria-label={`Criar visita em ${format(day, "dd/MM/yyyy")}`}
                           className="w-full h-full min-h-[60px] flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
                         >
                           <Plus className="h-5 w-5 text-muted-foreground" />
@@ -1512,6 +1532,7 @@ export default function CalendarPage() {
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9"
+                    aria-label="Ver mês anterior"
                     onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
                   >
                     <ChevronLeft className="h-5 w-5" />
@@ -1523,6 +1544,7 @@ export default function CalendarPage() {
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9"
+                    aria-label="Ver próximo mês"
                     onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
                   >
                     <ChevronRight className="h-5 w-5" />
@@ -1664,6 +1686,7 @@ export default function CalendarPage() {
       <Button
         size="lg"
         className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 h-14 w-14 rounded-full shadow-lg z-40"
+        aria-label="Criar visita"
         onClick={() => openCreateModal()}
       >
         <Plus className="h-6 w-6" />
@@ -1876,10 +1899,10 @@ export default function CalendarPage() {
                         <div className="flex items-center justify-between">
                           <span className="font-medium">{selectedVisit.lead?.name || "Não informado"}</span>
                           <Button variant="ghost" size="sm" className="h-8 text-xs" asChild>
-                            <a href={`/leads`}>
+                            <Link href="/leads">
                               <ExternalLink className="h-3 w-3 mr-1" />
                               Ver no CRM
-                            </a>
+                            </Link>
                           </Button>
                         </div>
                         {selectedVisit.lead?.phone && (
@@ -1909,7 +1932,7 @@ export default function CalendarPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-11 text-green-600"
+                            className="h-11 text-green-600 dark:text-green-400"
                             onClick={() => {
                               if (selectedVisit.lead?.phone) {
                                 const phone = selectedVisit.lead.phone.replace(/\D/g, "");
@@ -1936,10 +1959,10 @@ export default function CalendarPage() {
                         <div className="flex items-center justify-between">
                           <span className="font-medium">{selectedVisit.property?.title || "Não informado"}</span>
                           <Button variant="ghost" size="sm" className="h-8 text-xs" asChild>
-                            <a href={`/properties/${selectedVisit.propertyId}`}>
+                            <Link href={`/properties/${selectedVisit.propertyId}`}>
                               <ExternalLink className="h-3 w-3 mr-1" />
                               Ver detalhes
-                            </a>
+                            </Link>
                           </Button>
                         </div>
                         {selectedVisit.property?.address && (
@@ -1994,7 +2017,7 @@ export default function CalendarPage() {
                         <div className="grid grid-cols-2 gap-2">
                           <Button
                             variant="outline"
-                            className="h-11 text-xs text-green-600"
+                            className="h-11 text-xs text-green-600 dark:text-green-400"
                             onClick={() => {
                               handleUpdateVisitStatus(selectedVisit.id, "completed");
                               setIsDetailOpen(false);
@@ -2005,7 +2028,7 @@ export default function CalendarPage() {
                           </Button>
                           <Button
                             variant="outline"
-                            className="h-11 text-xs text-gray-600"
+                            className="h-11 text-xs text-gray-600 dark:text-gray-400"
                             onClick={() => {
                               handleUpdateVisitStatus(selectedVisit.id, "noshow");
                               setIsDetailOpen(false);
@@ -2027,7 +2050,7 @@ export default function CalendarPage() {
                           </Button>
                           <Button
                             variant="outline"
-                            className="h-11 text-xs text-red-600"
+                            className="h-11 text-xs text-red-600 dark:text-red-400"
                             onClick={() => {
                               handleUpdateVisitStatus(selectedVisit.id, "cancelled");
                               setIsDetailOpen(false);
@@ -2058,8 +2081,8 @@ export default function CalendarPage() {
                   <TabsContent value="history" className="p-4 sm:p-6 space-y-3 mt-0">
                     <div className="space-y-4">
                       <div className="flex items-start gap-3">
-                        <div className="p-2 bg-blue-100 rounded-full">
-                          <CalendarIcon className="h-4 w-4 text-blue-600" />
+                        <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                          <CalendarIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                         </div>
                         <div>
                           <p className="text-sm font-medium">Visita agendada</p>
@@ -2071,8 +2094,8 @@ export default function CalendarPage() {
 
                       {selectedVisit.status === "completed" && (
                         <div className="flex items-start gap-3">
-                          <div className="p-2 bg-green-100 rounded-full">
-                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full">
+                            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                           </div>
                           <div>
                             <p className="text-sm font-medium">Visita realizada</p>
@@ -2085,8 +2108,8 @@ export default function CalendarPage() {
 
                       {selectedVisit.status === "cancelled" && (
                         <div className="flex items-start gap-3">
-                          <div className="p-2 bg-red-100 rounded-full">
-                            <XCircle className="h-4 w-4 text-red-600" />
+                          <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
+                            <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
                           </div>
                           <div>
                             <p className="text-sm font-medium">Visita cancelada</p>

@@ -18,6 +18,9 @@ export default function PortalLogin() {
   const [isLoading, setIsLoading] = useState(false);
   const [forgotMode, setForgotMode] = useState(false);
   const [forgotMessage, setForgotMessage] = useState("");
+  // Enquanto verificamos a sessão por cookie, evita o flash do formulário
+  // para quem já está logado (seria redirecionado em seguida).
+  const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
     // Check if already authenticated via httpOnly cookie
@@ -33,10 +36,13 @@ export default function PortalLogin() {
           setLocation("/portal/owner");
         } else if (data.user?.clientType === "renter") {
           setLocation("/portal/renter");
+        } else {
+          setCheckingSession(false);
         }
       })
       .catch(() => {
         // Not authenticated, stay on login page
+        setCheckingSession(false);
       });
   }, [setLocation]);
 
@@ -98,6 +104,15 @@ export default function PortalLogin() {
       setIsLoading(false);
     }
   };
+
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100" role="status" aria-live="polite">
+        <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+        <span className="sr-only">Verificando sessão...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
@@ -212,6 +227,7 @@ export default function PortalLogin() {
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>

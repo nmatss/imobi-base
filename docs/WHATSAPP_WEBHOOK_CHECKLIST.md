@@ -74,7 +74,7 @@ Use este checklist para configurar o webhook do WhatsApp Business API de forma r
 
 - [ ] **Redeploy da aplicação**
   ```bash
-  vercel --prod
+  npm run deploy:production
   ```
 
 - [ ] **Verificar URL de produção**

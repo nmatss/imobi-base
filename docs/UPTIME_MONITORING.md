@@ -49,7 +49,7 @@ Configure the following monitors in UptimeRobot:
 ```
 Monitor Type: HTTP(s)
 Friendly Name: ImobiBase - Health Check
-URL: https://imobibase.com/api/health
+URL: https://imobibase.com.br/api/health
 Monitoring Interval: 5 minutes
 Monitor Timeout: 30 seconds
 HTTP Method: GET
@@ -80,7 +80,7 @@ Expected Status Code: 200
 ```
 Monitor Type: HTTP(s)
 Friendly Name: ImobiBase - Homepage
-URL: https://imobibase.com
+URL: https://imobibase.com.br
 Monitoring Interval: 5 minutes
 Monitor Timeout: 30 seconds
 HTTP Method: GET
@@ -99,7 +99,7 @@ Expected Status Code: 200
 ```
 Monitor Type: HTTP(s)
 Friendly Name: ImobiBase - Properties API
-URL: https://imobibase.com/api/properties?limit=1
+URL: https://imobibase.com.br/api/properties?limit=1
 Monitoring Interval: 5 minutes
 Monitor Timeout: 30 seconds
 HTTP Method: GET
@@ -117,7 +117,7 @@ Note: 401 is acceptable if authentication is required (means API is responding)
 ```
 Monitor Type: HTTP(s)
 Friendly Name: ImobiBase - Public Properties
-URL: https://imobibase.com/public/properties
+URL: https://imobibase.com.br/public/properties
 Monitoring Interval: 5 minutes
 Monitor Timeout: 30 seconds
 HTTP Method: GET
@@ -133,7 +133,7 @@ Expected Status Code: 200
 ```
 Monitor Type: HTTP(s)
 Friendly Name: ImobiBase - Database Health
-URL: https://imobibase.com/api/health
+URL: https://imobibase.com.br/api/health
 Monitoring Interval: 5 minutes
 Monitor Timeout: 30 seconds
 HTTP Method: GET
@@ -153,7 +153,7 @@ Expected Status Code: 200
 ```
 Monitor Type: HTTP(s)
 Friendly Name: ImobiBase - Static Assets
-URL: https://imobibase.com/assets/logo.png (or any critical static file)
+URL: https://imobibase.com.br/assets/logo.png (or any critical static file)
 Monitoring Interval: 15 minutes
 Monitor Timeout: 30 seconds
 HTTP Method: GET
@@ -169,7 +169,7 @@ Expected Status Code: 200
 ```
 Monitor Type: HTTP(s)
 Friendly Name: ImobiBase - Login Page
-URL: https://imobibase.com/login
+URL: https://imobibase.com.br/login
 Monitoring Interval: 10 minutes
 Monitor Timeout: 30 seconds
 HTTP Method: GET
@@ -271,7 +271,7 @@ When you receive an alert:
 
 ```bash
 # Step 1: Verify the issue
-curl -I https://imobibase.com/api/health
+curl -I https://imobibase.com.br/api/health
 
 # Step 2: Check deployment status
 # GitHub → Actions → Latest workflow run
@@ -314,7 +314,7 @@ curl -I https://imobibase.com/api/health
 # Go to: Actions → Re-run previous successful deployment
 
 # Option 2: Via Vercel CLI
-vercel rollback https://imobibase.com --token=$VERCEL_TOKEN
+vercel rollback https://imobibase.com.br --token=$VERCEL_TOKEN
 
 # Option 3: Via Vercel Dashboard
 # Deployments → Previous deployment → Promote to Production
@@ -462,7 +462,7 @@ Let users know the system status in real-time.
 ```
 1. UptimeRobot Dashboard → Status Pages → Add Status Page
 2. Configure:
-   - Custom URL: status.imobibase.com (or subdomain)
+   - Custom URL: status.imobibase.com.br (or subdomain)
    - Select monitors to display
    - Customize design
    - Enable incident history
@@ -552,7 +552,7 @@ jobs:
     steps:
       - name: Check API Health
         run: |
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://imobibase.com/api/health)
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://imobibase.com.br/api/health)
           if [ $RESPONSE -ne 200 ]; then
             echo "::error::Health check failed with status $RESPONSE"
             exit 1

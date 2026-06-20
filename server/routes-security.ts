@@ -7,9 +7,12 @@
 import type { Express, Request, Response } from "express";
 import { randomBytes, createHash, timingSafeEqual } from "crypto";
 import { nanoid } from "nanoid";
+import QRCode from "qrcode";
 import { db } from "./db";
 import { twoFactorAuth, auditLogs } from "@shared/schema-sqlite";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
+import { runWithTenantRlsContext } from "./db-rls";
+import { getRedisClient } from "./cache/redis-client";
 
 // TOTP implementation (RFC 6238)
 const BASE32_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -185,12 +188,70 @@ function timingSafeCompare(a: string, b: string): boolean {
   return timingSafeEqual(Buffer.from(a), Buffer.from(b));
 }
 
-// Simple in-memory rate limiter for 2FA endpoints
+// 2FA rate limiter. Uses Redis when REDIS_URL is configured; falls back to
+// process-local memory only for dev/test or explicit Redis outage.
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
 const RATE_LIMIT_MAX_ATTEMPTS = 5;
 
-function checkRateLimit(key: string): { allowed: boolean; remainingAttempts: number; resetIn: number } {
+function getTwoFactorRedis() {
+  if (!process.env.REDIS_URL) {
+    return null;
+  }
+
+  try {
+    return getRedisClient();
+  } catch (error) {
+    console.warn(
+      "[2FA] Redis rate limiter unavailable; falling back to process-local memory",
+      error,
+    );
+    return null;
+  }
+}
+
+function redisRateLimitKey(key: string): string {
+  return `2fa:rate-limit:${key}`;
+}
+
+async function checkRateLimit(key: string): Promise<{
+  allowed: boolean;
+  remainingAttempts: number;
+  resetIn: number;
+}> {
+  const redis = getTwoFactorRedis();
+  if (redis) {
+    try {
+      const redisKey = redisRateLimitKey(key);
+      const count = await redis.incr(redisKey);
+      if (count === 1) {
+        await redis.pexpire(redisKey, RATE_LIMIT_WINDOW);
+      }
+
+      const ttl = await redis.pttl(redisKey);
+      const resetIn = ttl > 0 ? ttl : RATE_LIMIT_WINDOW;
+
+      return {
+        allowed: count <= RATE_LIMIT_MAX_ATTEMPTS,
+        remainingAttempts: Math.max(0, RATE_LIMIT_MAX_ATTEMPTS - count),
+        resetIn,
+      };
+    } catch (error) {
+      console.warn(
+        "[2FA] Redis rate limiter failed; falling back to process-local memory",
+        error,
+      );
+    }
+  }
+
+  return checkMemoryRateLimit(key);
+}
+
+function checkMemoryRateLimit(key: string): {
+  allowed: boolean;
+  remainingAttempts: number;
+  resetIn: number;
+} {
   const now = Date.now();
   const record = rateLimitStore.get(key);
 
@@ -214,8 +275,98 @@ function checkRateLimit(key: string): { allowed: boolean; remainingAttempts: num
   return { allowed: true, remainingAttempts: RATE_LIMIT_MAX_ATTEMPTS - record.count, resetIn: record.resetAt - now };
 }
 
-function resetRateLimit(key: string): void {
+async function resetRateLimit(key: string): Promise<void> {
   rateLimitStore.delete(key);
+
+  const redis = getTwoFactorRedis();
+  if (!redis) {
+    return;
+  }
+
+  try {
+    await redis.del(redisRateLimitKey(key));
+  } catch (error) {
+    console.warn("[2FA] Failed to reset Redis rate limiter key", error);
+  }
+}
+
+export async function isTwoFactorEnabledForUser(userId: string): Promise<boolean> {
+  const tfa = await db.select().from(twoFactorAuth).where(eq(twoFactorAuth.userId, userId));
+  return tfa.length > 0 && Boolean(tfa[0].isEnabled);
+}
+
+export async function verifyTwoFactorChallenge(
+  userId: string,
+  input: { token?: unknown; backupCode?: unknown },
+  rateLimitPrefix = "2fa_validate",
+): Promise<
+  | { ok: true; required: boolean }
+  | {
+      ok: false;
+      status: number;
+      error: string;
+      remainingAttempts?: number;
+      retryAfter?: number;
+    }
+> {
+  const tfa = await db.select().from(twoFactorAuth).where(eq(twoFactorAuth.userId, userId));
+  if (tfa.length === 0 || !tfa[0].isEnabled) {
+    return { ok: true, required: false };
+  }
+
+  const token = typeof input.token === "string" ? input.token.trim() : "";
+  const backupCode = typeof input.backupCode === "string" ? input.backupCode.trim() : "";
+
+  if (!token && !backupCode) {
+    return { ok: false, status: 400, error: "Código de 2FA obrigatório" };
+  }
+
+  if (token && !isValidToken(token)) {
+    return { ok: false, status: 400, error: "Token inválido. Deve conter 6 dígitos." };
+  }
+
+  if (backupCode && !isValidBackupCode(backupCode)) {
+    return { ok: false, status: 400, error: "Código de backup inválido" };
+  }
+
+  const rateLimitKey = `${rateLimitPrefix}:${userId}`;
+  const rateLimit = await checkRateLimit(rateLimitKey);
+  if (!rateLimit.allowed) {
+    return {
+      ok: false,
+      status: 429,
+      error: "Muitas tentativas. Tente novamente mais tarde.",
+      retryAfter: Math.ceil(rateLimit.resetIn / 1000),
+    };
+  }
+
+  let isValid = false;
+  if (token) {
+    isValid = verifyTOTP(tfa[0].secret, token);
+  } else if (backupCode) {
+    const hashedCode = hashBackupCode(backupCode);
+    const storedCodes = JSON.parse(tfa[0].backupCodes || "[]");
+    isValid = storedCodes.some((c: string) => timingSafeCompare(c, hashedCode));
+
+    if (isValid) {
+      const newCodes = storedCodes.filter((c: string) => !timingSafeCompare(c, hashedCode));
+      await db.update(twoFactorAuth)
+        .set({ backupCodes: JSON.stringify(newCodes), updatedAt: new Date().toISOString() })
+        .where(eq(twoFactorAuth.userId, userId));
+    }
+  }
+
+  if (!isValid) {
+    return {
+      ok: false,
+      status: 401,
+      error: "Código inválido",
+      remainingAttempts: rateLimit.remainingAttempts,
+    };
+  }
+
+  await resetRateLimit(rateLimitKey);
+  return { ok: true, required: true };
 }
 
 export function registerSecurityRoutes(app: Express) {
@@ -224,7 +375,10 @@ export function registerSecurityRoutes(app: Express) {
     if (!req.isAuthenticated?.() || !req.user) {
       return res.status(401).json({ error: "Não autenticado" });
     }
-    next();
+    if (!req.user.tenantId) {
+      return res.status(403).json({ error: "Sessão inválida" });
+    }
+    runWithTenantRlsContext(req.user.tenantId, () => next());
   };
 
   // ==================== 2FA ROUTES ====================
@@ -270,12 +424,18 @@ export function registerSecurityRoutes(app: Express) {
       const issuer = 'ImobiBase';
       const accountName = req.user!.email;
       const otpauthUrl = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(accountName)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+      const qrCodeData = await QRCode.toDataURL(otpauthUrl, {
+        errorCorrectionLevel: "M",
+        margin: 2,
+        width: 200,
+      });
 
       res.json({
         secret,
         otpauthUrl,
         backupCodes, // Show only once during setup
-        qrCodeData: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpauthUrl)}`,
+        qrCode: qrCodeData,
+        qrCodeData,
       });
 
       await createAuditLog(req.user!.tenantId, userId, 'setup_2fa', 'user', userId, null, { enabled: false }, req);
@@ -293,7 +453,7 @@ export function registerSecurityRoutes(app: Express) {
 
       // Rate limiting
       const rateLimitKey = `2fa_verify:${userId}`;
-      const rateLimit = checkRateLimit(rateLimitKey);
+      const rateLimit = await checkRateLimit(rateLimitKey);
       if (!rateLimit.allowed) {
         return res.status(429).json({
           error: "Muitas tentativas. Tente novamente mais tarde.",
@@ -319,7 +479,7 @@ export function registerSecurityRoutes(app: Express) {
       }
 
       // Success - reset rate limit
-      resetRateLimit(rateLimitKey);
+      await resetRateLimit(rateLimitKey);
 
       // Enable 2FA
       await db.update(twoFactorAuth)
@@ -347,7 +507,7 @@ export function registerSecurityRoutes(app: Express) {
 
       // Rate limiting
       const rateLimitKey = `2fa_disable:${userId}`;
-      const rateLimit = checkRateLimit(rateLimitKey);
+      const rateLimit = await checkRateLimit(rateLimitKey);
       if (!rateLimit.allowed) {
         return res.status(429).json({
           error: "Muitas tentativas. Tente novamente mais tarde.",
@@ -400,7 +560,7 @@ export function registerSecurityRoutes(app: Express) {
       }
 
       // Success - reset rate limit
-      resetRateLimit(rateLimitKey);
+      await resetRateLimit(rateLimitKey);
 
       // Disable 2FA
       await db.update(twoFactorAuth)
@@ -444,41 +604,24 @@ export function registerSecurityRoutes(app: Express) {
     }
   });
 
-  // Validate 2FA token (for login flow)
-  app.post("/api/auth/2fa/validate", async (req, res) => {
+  // Validate 2FA token for an already-authenticated session.
+  // Login challenges are handled by POST /api/auth/login to avoid public userId oracles.
+  app.post("/api/auth/2fa/validate", requireAuth, async (req, res) => {
     try {
-      const { userId, token, backupCode } = req.body;
-
-      if (!userId) {
-        return res.status(400).json({ error: "Usuário não informado" });
+      const { token, backupCode } = req.body;
+      const result = await verifyTwoFactorChallenge(req.user!.id, { token, backupCode });
+      if (!result.ok) {
+        return res.status(result.status).json({
+          error: result.error,
+          remainingAttempts: result.remainingAttempts,
+          retryAfter: result.retryAfter,
+        });
       }
-
-      const tfa = await db.select().from(twoFactorAuth).where(eq(twoFactorAuth.userId, userId));
-      if (tfa.length === 0 || !tfa[0].isEnabled) {
+      if (!result.required) {
         return res.json({ required: false });
       }
 
-      if (!token && !backupCode) {
-        return res.json({ required: true });
-      }
-
-      let isValid = false;
-      if (token) {
-        isValid = verifyTOTP(tfa[0].secret, token);
-      } else if (backupCode) {
-        const hashedCode = hashBackupCode(backupCode);
-        const storedCodes = JSON.parse(tfa[0].backupCodes || '[]');
-        isValid = storedCodes.includes(hashedCode);
-
-        if (isValid) {
-          const newCodes = storedCodes.filter((c: string) => c !== hashedCode);
-          await db.update(twoFactorAuth)
-            .set({ backupCodes: JSON.stringify(newCodes) })
-            .where(eq(twoFactorAuth.userId, userId));
-        }
-      }
-
-      res.json({ valid: isValid, required: true });
+      res.json({ valid: true, required: true });
     } catch (error: any) {
       console.error('2FA validate error:', error);
       res.status(500).json({ error: "Erro ao validar 2FA" });

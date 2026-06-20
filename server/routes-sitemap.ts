@@ -3,7 +3,7 @@
  * Generates dynamic sitemap.xml with all public pages and properties
  */
 
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
 
 interface SitemapUrl {
@@ -43,9 +43,9 @@ ${urlset}
 }
 
 export function registerSitemapRoutes(app: Express): void {
-  const baseUrl = process.env.BASE_URL || 'https://imobibase.com';
+  const baseUrl = (process.env.BASE_URL || process.env.SITE_URL || 'https://imobibase.com.br').replace(/\/$/, '');
 
-  app.get('/sitemap.xml', async (req, res) => {
+  const dynamicSitemapHandler = async (_req: Request, res: Response): Promise<void> => {
     try {
       const urls: SitemapUrl[] = [];
 
@@ -58,35 +58,72 @@ export function registerSitemapRoutes(app: Express): void {
           lastmod: new Date().toISOString().split('T')[0],
         },
         {
-          loc: `${baseUrl}/properties`,
-          changefreq: 'hourly',
-          priority: 0.9,
-          lastmod: new Date().toISOString().split('T')[0],
+          loc: `${baseUrl}/sistema-imobiliario-completo`,
+          changefreq: 'weekly',
+          priority: 0.95,
         },
         {
-          loc: `${baseUrl}/sobre`,
-          changefreq: 'monthly',
-          priority: 0.5,
+          loc: `${baseUrl}/crm-imobiliario`,
+          changefreq: 'weekly',
+          priority: 0.95,
+        },
+        {
+          loc: `${baseUrl}/software-de-agendamento-imobiliario`,
+          changefreq: 'weekly',
+          priority: 0.95,
+        },
+        {
+          loc: `${baseUrl}/site-para-imobiliaria`,
+          changefreq: 'weekly',
+          priority: 0.9,
+        },
+        {
+          loc: `${baseUrl}/crm-imobiliario-com-ia`,
+          changefreq: 'weekly',
+          priority: 0.9,
+        },
+        {
+          loc: `${baseUrl}/pricing`,
+          changefreq: 'weekly',
+          priority: 0.85,
         },
         {
           loc: `${baseUrl}/contato`,
           changefreq: 'monthly',
-          priority: 0.5,
+          priority: 0.6,
         }
       );
 
       // Buscar imóveis públicos (disponíveis para venda/aluguel)
       const properties = await storage.getPropertiesForSitemap();
+      const tenantUrls = new Map<string, string>();
 
       for (const property of properties) {
+        const tenantBase = `${baseUrl}/e/${property.tenantSlug}`;
+        tenantUrls.set(property.tenantSlug, tenantBase);
         urls.push({
-          loc: `${baseUrl}/properties/${property.id}`,
+          loc: `${tenantBase}/imovel/${property.id}`,
           lastmod: property.updatedAt
             ? new Date(property.updatedAt).toISOString().split('T')[0]
             : new Date(property.createdAt).toISOString().split('T')[0],
           changefreq: 'weekly',
           priority: 0.8,
         });
+      }
+
+      for (const tenantBase of tenantUrls.values()) {
+        urls.push(
+          {
+            loc: tenantBase,
+            changefreq: 'weekly',
+            priority: 0.75,
+          },
+          {
+            loc: `${tenantBase}/imoveis`,
+            changefreq: 'daily',
+            priority: 0.8,
+          },
+        );
       }
 
       const xml = generateSitemapXml(urls);
@@ -98,7 +135,10 @@ export function registerSitemapRoutes(app: Express): void {
       console.error('Error generating sitemap:', error);
       res.status(500).send('Internal Server Error');
     }
-  });
+  };
+
+  app.get('/sitemap.xml', dynamicSitemapHandler);
+  app.get('/sitemap-dynamic.xml', dynamicSitemapHandler);
 
   // Sitemap index para múltiplos sitemaps (se necessário no futuro)
   app.get('/sitemap-index.xml', async (req, res) => {

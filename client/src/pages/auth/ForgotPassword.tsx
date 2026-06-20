@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { Logo } from "@/components/brand/logo";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, ArrowLeft } from "lucide-react";
 
@@ -62,24 +63,25 @@ export default function ForgotPassword() {
 
   if (sent) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+      <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
         <Card className="w-full max-w-md space-y-8 p-8">
+          <div className="flex justify-center"><Logo wordmarkClassName="text-xl" iconClassName="h-9 w-9" /></div>
           <div className="text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-              <Mail className="h-8 w-8 text-green-600" />
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+              <Mail className="h-8 w-8 text-green-600 dark:text-green-400" />
             </div>
-            <h2 className="mt-6 text-3xl font-bold tracking-tight text-gray-900">
+            <h1 className="mt-6 text-3xl font-bold tracking-tight text-foreground">
               Verifique seu email
-            </h2>
-            <p className="mt-2 text-sm text-gray-600">
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
               Se o email <strong>{email}</strong> estiver cadastrado, você receberá
               instruções para redefinir sua senha.
             </p>
-            <p className="mt-4 text-sm text-gray-600">
+            <p className="mt-4 text-sm text-muted-foreground">
               Não recebeu o email? Verifique sua pasta de spam ou{" "}
               <button
                 onClick={() => setSent(false)}
-                className="font-medium text-blue-600 hover:text-blue-500"
+                className="font-medium text-primary hover:text-primary/80"
               >
                 tente novamente
               </button>
@@ -103,13 +105,14 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md space-y-8 p-8">
+        <div className="flex justify-center"><Logo wordmarkClassName="text-xl" iconClassName="h-9 w-9" /></div>
         <div>
-          <h2 className="text-center text-3xl font-bold tracking-tight text-gray-900">
+          <h1 className="text-center text-3xl font-bold tracking-tight text-foreground">
             Esqueceu sua senha?
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          </h1>
+          <p className="mt-2 text-center text-sm text-muted-foreground">
             Não se preocupe, enviaremos instruções para redefinir sua senha.
           </p>
         </div>
@@ -139,7 +142,7 @@ export default function ForgotPassword() {
           <div className="text-center">
             <Link
               href="/login"
-              className="text-sm font-medium text-blue-600 hover:text-blue-500"
+              className="text-sm font-medium text-primary hover:text-primary/80"
             >
               <ArrowLeft className="mr-1 inline h-4 w-4" />
               Voltar para login

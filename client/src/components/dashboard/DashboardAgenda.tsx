@@ -56,12 +56,12 @@ export function DashboardAgenda({
             <Calendar className="h-5 w-5 text-muted-foreground" />
             <CardTitle className="text-lg">Agenda de Hoje</CardTitle>
           </div>
-          <Link href="/calendar">
-            <Button variant="ghost" size="sm" className="text-xs -mr-2">
+          <Button asChild variant="ghost" size="sm" className="text-xs -mr-2">
+            <Link href="/calendar">
               Ver agenda completa
               <ChevronRight className="h-3 w-3 ml-1" />
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </CardHeader>
 

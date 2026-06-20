@@ -602,7 +602,7 @@ WHATSAPP_VERIFY_TOKEN=your_custom_verify_token
 Run migration:
 
 ```bash
-npm run db:push
+npm run db:migrate
 ```
 
 ### Meta Business Platform Setup

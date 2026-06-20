@@ -21,6 +21,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 import type { Express } from "express";
 import bcrypt from "bcryptjs";
+import { createHash } from "crypto";
 import {
   prepareTestEnv,
   setupFreshDatabase,
@@ -92,6 +93,118 @@ describe("Auth Integration Tests (HTTP) — REAL app + REAL storage", () => {
     expect(res.body.user.email).toBe(ADMIN_EMAIL);
     expect(res.body.user.tenantId).toBe(adminTenantId);
     expect(res.body.csrfToken).toBeTruthy();
+  });
+
+  it("GET /api/tenants retorna apenas o tenant do usuário comum", async () => {
+    await storage.createTenant({
+      name: "Tenant Vizinho",
+      slug: `vizinho-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+      email: "vizinho@example.com",
+    });
+
+    const agent = request.agent(app);
+    const login = await agent
+      .post("/api/auth/login")
+      .send({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
+    expect(login.status).toBe(200);
+
+    const res = await agent.get("/api/tenants");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].id).toBe(adminTenantId);
+  });
+
+  it("GET /api/tenants preserva visão global para super_admin", async () => {
+    const otherTenant = await storage.createTenant({
+      name: "Tenant Global",
+      slug: `global-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+      email: "global@example.com",
+    });
+    const email = `super-${Date.now()}@example.com`;
+    const hashed = await bcrypt.hash(ADMIN_PASSWORD, 10);
+    await storage.createUser({
+      tenantId: adminTenantId,
+      name: "Super Admin",
+      email,
+      password: hashed,
+      role: "super_admin",
+    });
+
+    const agent = request.agent(app);
+    const login = await agent
+      .post("/api/auth/login")
+      .send({ email, password: ADMIN_PASSWORD });
+    expect(login.status).toBe(200);
+
+    const res = await agent.get("/api/tenants");
+
+    expect(res.status).toBe(200);
+    expect(res.body.map((t: { id: string }) => t.id)).toContain(adminTenantId);
+    expect(res.body.map((t: { id: string }) => t.id)).toContain(otherTenant.id);
+  });
+
+  it("login com 2FA ativo exige segundo fator antes de criar sessão", async () => {
+    const tenant = await storage.createTenant({
+      name: "Tenant 2FA",
+      slug: `tenant-2fa-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+      email: "tenant-2fa@example.com",
+    });
+    const email = `two-factor-${Date.now()}@example.com`;
+    const hashed = await bcrypt.hash(ADMIN_PASSWORD, 10);
+    const user = await storage.createUser({
+      tenantId: tenant.id,
+      name: "Usuário 2FA",
+      email,
+      password: hashed,
+      role: "admin",
+    });
+
+    const backupCode = "ABCD1234";
+    const backupHash = createHash("sha256").update(backupCode).digest("hex");
+    const { db } = await import("../../server/db");
+    const { twoFactorAuth } = await import("../../shared/schema-sqlite");
+    await db.insert(twoFactorAuth).values({
+      id: `2fa-${Date.now()}`,
+      userId: user.id,
+      secret: "JBSWY3DPEHPK3PXP",
+      backupCodes: JSON.stringify([backupHash]),
+      isEnabled: true,
+      verifiedAt: new Date().toISOString(),
+    });
+
+    const missingCode = await request(app)
+      .post("/api/auth/login")
+      .send({ email, password: ADMIN_PASSWORD });
+
+    expect(missingCode.status).toBe(200);
+    expect(missingCode.body.twoFactorRequired).toBe(true);
+    expect(missingCode.body.user).toBeUndefined();
+
+    const badCode = await request(app)
+      .post("/api/auth/login")
+      .send({ email, password: ADMIN_PASSWORD, backupCode: "BADCODE1" });
+
+    expect(badCode.status).toBe(401);
+    expect(badCode.body.twoFactorRequired).toBe(true);
+
+    const agent = request.agent(app);
+    const goodCode = await agent
+      .post("/api/auth/login")
+      .send({ email, password: ADMIN_PASSWORD, backupCode });
+
+    expect(goodCode.status).toBe(200);
+    expect(goodCode.body.user.email).toBe(email);
+    expect(goodCode.body.csrfToken).toBeTruthy();
+
+    const me = await agent.get("/api/auth/me");
+    expect(me.status).toBe(200);
+
+    const reusedCode = await request(app)
+      .post("/api/auth/login")
+      .send({ email, password: ADMIN_PASSWORD, backupCode });
+
+    expect(reusedCode.status).toBe(401);
   });
 
   it("login com senha errada retorna 401", async () => {
