@@ -40,14 +40,11 @@ describe("email unsubscribe tokens", () => {
     expect(validateUnsubscribeToken(legacyToken)).toBeNull();
   });
 
-  it("keeps legacy valid tokens working during the expiry window", () => {
+  it("rejects legacy unsigned tokens even with a valid email payload", () => {
     const legacyToken = Buffer.from(
       `user-1:client@example.com:${Date.now()}`,
     ).toString("base64url");
 
-    expect(validateUnsubscribeToken(legacyToken)).toEqual({
-      userId: "user-1",
-      email: "client@example.com",
-    });
+    expect(validateUnsubscribeToken(legacyToken)).toBeNull();
   });
 });

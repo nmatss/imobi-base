@@ -54,6 +54,17 @@ describe('go-live readiness gate', () => {
     expect(source).toContain('await checkRedisConnectivity();');
     expect(source).toContain('await checkDatabaseReadiness();');
     expect(source).toContain('RLS runtime verification');
+    expect(source).toContain('webhook_events RLS');
+    expect(source).toContain('newsletter opt-out columns');
+    expect(source).toContain('newsletter active email index');
+    expect(source).toContain('newsletter opt-out migration record');
+    expect(source).toContain('WhatsApp phoneNumberId uniqueness migration');
+    expect(source).toContain('WhatsApp phoneNumberId unique index');
+    expect(source).toContain('WhatsApp phoneNumberId migration record');
+    expect(source).toContain('migrations audit table');
+    expect(source).toContain('_migrations must exist');
+    expect(source).toContain('critical migration missing from _migrations audit table');
+    expect(source).toContain('summarizeCommandOutput(output)');
   });
 
   it('static mode verifies repo wiring without requiring production secrets', () => {
@@ -62,8 +73,18 @@ describe('go-live readiness gate', () => {
     expect(source).toContain('const mode = getMode();');
     expect(source).toContain('if (mode !== "static")');
     expect(source).toContain('20260617_002_newsletter_opt_out.sql');
+    expect(source).toContain('20260618_001_whatsapp_phone_number_unique.sql');
     expect(source).toContain('npm run ops:go-live:verify:strict');
     expect(source).toContain('await runCommand("Cron manifest"');
+  });
+
+  it('requires a partial unique index for WhatsApp phoneNumberId routing', () => {
+    const migration = read('migrations/20260618_001_whatsapp_phone_number_unique.sql');
+
+    expect(migration).toContain('uq_integration_configs_whatsapp_phone_number_id');
+    expect(migration).toContain("integration_name = 'whatsapp'");
+    expect(migration).toContain("config->>'phoneNumberId'");
+    expect(migration).toContain('IS NOT NULL');
   });
 
   it('executes the static gate without production secrets', () => {

@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => {
     runCleanupTempFiles: vi.fn(async () => undefined),
     runCleanupSoftDeletes: vi.fn(async () => undefined),
     runEnforcePlanLimits: vi.fn(async () => undefined),
+    runVisitReminders: vi.fn(async () => undefined),
   };
   return { redis, jobs };
 });

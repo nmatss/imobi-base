@@ -31,4 +31,25 @@ describe('upload route hardening source guards', () => {
     expect(source).toContain('Bucket is not allowed for this file type');
     expect(source).not.toContain('const bucket = req.body.bucket || STORAGE_BUCKETS.DOCUMENTS;');
   });
+
+  it('validates generic upload entity ownership before persisting entity references', () => {
+    expect(source).toContain('async function resolveUploadEntity');
+    expect(source).toContain('const UPLOAD_ENTITY_TYPE_ALIASES');
+    expect(source).toContain('const UPLOAD_ENTITY_LOADERS');
+    expect(source).toContain('entityType and entityId must be provided together');
+    expect(source).toContain('Unsupported entity type for upload');
+    expect(source).toContain('if (!entity || entity.tenantId !== tenantId)');
+    expect(source).toContain('entityType: entity.entityType');
+    expect(source).toContain('entityId: entity.entityId');
+    expect(source).not.toContain('entityType: req.body.entityType');
+    expect(source).not.toContain('entityId: req.body.entityId');
+  });
+
+  it('bounds file URL expiry values for private signed URLs', () => {
+    expect(source).toContain('const FILE_URL_MIN_EXPIRES_IN_SECONDS = 60;');
+    expect(source).toContain('const FILE_URL_MAX_EXPIRES_IN_SECONDS = 3600;');
+    expect(source).toContain('Number.isNaN(requestedExpiresIn) ? 3600 : requestedExpiresIn');
+    expect(source).toContain('Math.max(\n          Number.isNaN(requestedExpiresIn) ? 3600 : requestedExpiresIn,\n          FILE_URL_MIN_EXPIRES_IN_SECONDS,\n        )');
+    expect(source).toContain('Math.min(\n        Math.max(\n          Number.isNaN(requestedExpiresIn) ? 3600 : requestedExpiresIn,');
+  });
 });

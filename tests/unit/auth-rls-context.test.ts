@@ -52,7 +52,7 @@ describe("Auth RLS contexts", () => {
     expect(routes).toContain("runWithTenantRlsContext(data.tenantId");
 
     expect(whatsappRoutes).toContain('app.post("/api/webhooks/whatsapp"');
-    expect(whatsappRoutes).toContain("webhookHandler.resolveTenantId(phoneNumberId)");
+    expect(whatsappRoutes).toContain("webhookHandler.resolveTenantId(normalizedPhoneNumberId)");
     expect(whatsappRoutes).toContain("runWithTenantRlsContext(tenantId");
     expect(whatsappRoutes).toContain("webhookHandler.processWebhook(");
   });

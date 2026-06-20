@@ -21,11 +21,7 @@ const mocks = vi.hoisted(() => {
     contractDocuments: table("contract_documents", ["id"]),
     contracts: table("contracts", ["id", "tenantId"]),
     dashboardLayouts: table("dashboard_layouts", ["tenantId", "userId"]),
-    digitalSignatures: table("digital_signatures", [
-      "id",
-      "contractId",
-      "token",
-    ]),
+    digitalSignatures: table("digital_signatures", ["id", "contractId", "token"]),
     dripCampaigns: table("drip_campaigns", ["id", "tenantId"]),
     followUps: table("follow_ups", ["leadId"]),
     interactions: table("interactions", ["leadId"]),
@@ -40,16 +36,30 @@ const mocks = vi.hoisted(() => {
 
   const state = {
     contractExistsForTenant: false,
+    signatureExpired: false,
     insertValues: [] as unknown[],
+    updateValues: [] as unknown[],
     selectedTables: [] as string[],
   };
+  const digitalSignaturesTableName = "digital_signatures";
 
   const rowsForTable = (tableName: string) => {
     if (tableName === "contracts" && state.contractExistsForTenant) {
       return [{ id: "contract-1", tenantId: "tenant-a" }];
     }
-    if (tableName === "digital_signatures") {
-      return [{ id: "signature-1", contractId: "contract-1" }];
+    if (tableName === digitalSignaturesTableName) {
+      return [
+        {
+          id: "signature-1",
+          contractId: "contract-1",
+          token: "signature-token-1",
+          expiresAt: state.signatureExpired
+            ? new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+            : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          viewedAt: null,
+          status: "pending",
+        },
+      ];
     }
     return [];
   };
@@ -79,10 +89,15 @@ const mocks = vi.hoisted(() => {
     return { returning };
   });
 
+  const set = vi.fn((value: unknown) => {
+    state.updateValues.push(value);
+    return { where: vi.fn(async () => []) };
+  });
+
   const db = {
     select: vi.fn(() => makeSelectQuery()),
     insert: vi.fn(() => ({ values })),
-    update: vi.fn(() => ({ set: vi.fn(() => ({ where: vi.fn(async () => []) })) })),
+    update: vi.fn(() => ({ set })),
     delete: vi.fn(() => ({ where: vi.fn(async () => []) })),
   };
 
@@ -132,7 +147,9 @@ describe("feature digital signatures tenant isolation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.state.contractExistsForTenant = false;
+    mocks.state.signatureExpired = false;
     mocks.state.insertValues = [];
+    mocks.state.updateValues = [];
     mocks.state.selectedTables = [];
   });
 
@@ -175,5 +192,63 @@ describe("feature digital signatures tenant isolation", () => {
     expect(res.status).toBe(404);
     expect(res.body.error).toBe("Contrato não encontrado");
     expect(mocks.state.selectedTables).not.toContain("digital_signatures");
+  });
+
+  it("does not expose expired signature token data in public token lookup", async () => {
+    mocks.state.signatureExpired = true;
+    const app = buildApp();
+
+    const res = await request(app).get("/api/signatures/token/signature-token-1");
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Link expirado");
+    expect(mocks.state.selectedTables).toContain("digital_signatures");
+    expect(mocks.state.selectedTables).not.toContain("contracts");
+    expect(mocks.db.update).not.toHaveBeenCalled();
+  });
+
+  it("does not allow signing with an expired signature token", async () => {
+    mocks.state.signatureExpired = true;
+    const app = buildApp();
+
+    const res = await request(app).post("/api/signatures/token/signature-token-1/sign").send({
+      signatureData: "signed-by-customer",
+      ipAddress: "127.0.0.1",
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Link expirado");
+    expect(mocks.db.update).not.toHaveBeenCalled();
+  });
+
+  it("returns public signature data for a valid token after marking it viewed", async () => {
+    mocks.state.contractExistsForTenant = true;
+    const app = buildApp();
+
+    const res = await request(app).get("/api/signatures/token/signature-token-1");
+
+    expect(res.status).toBe(200);
+    expect(res.body.signature).toEqual(
+      expect.objectContaining({
+        id: "signature-1",
+        contractId: "contract-1",
+        token: "signature-token-1",
+      }),
+    );
+    expect(res.body.contract).toEqual(
+      expect.objectContaining({
+        id: "contract-1",
+        tenantId: "tenant-a",
+      }),
+    );
+    expect(mocks.state.updateValues).toEqual([
+      expect.objectContaining({
+        viewedAt: expect.any(String),
+        status: "viewed",
+      }),
+    ]);
+    expect(mocks.state.selectedTables.indexOf("digital_signatures")).toBeLessThan(
+      mocks.state.selectedTables.indexOf("contracts"),
+    );
   });
 });
