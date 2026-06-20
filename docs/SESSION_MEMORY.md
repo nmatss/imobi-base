@@ -124,6 +124,11 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
   - respostas calculadas agora incluem `calculated`, `calculatedAt`, `lastCalculated`, `trend` e `scoreHistory` normalizado;
   - `LeadScoreDisplay` trata `{ calculated:false }` como estado vazio e nao tenta renderizar score inexistente;
   - adicionado teste `lead-score-contract-source`.
+- Bloco segurança hardening em 17/06/2026:
+  - unsubscribe público passou a exigir token com assinatura HMAC (fallback legado sem assinatura foi removido);
+  - rota pública `/api/signatures/token/:token` passou a recusar vínculo com contratos vencidos antes de marcar como visualizado;
+  - assinatura pública inválida/expirada retorna `Link expirado` e não vaza metadados de contrato;
+  - `/api/files/:id/url` agora limita `expiresIn` entre 60s e 3600s.
 
 ## Validacoes executadas
 
@@ -200,6 +205,25 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
   - `npx vitest run tests/unit/backend/newsletter-opt-out-storage.test.ts tests/unit/newsletter-opt-out-source.test.ts tests/unit/backend/email-unsubscribe-token.test.ts --reporter=verbose`: passou, 9 testes.
 - Validacao focada do bloco CRM/lead score em 17/06/2026:
   - `npx vitest run tests/unit/lead-score-contract-source.test.ts tests/unit/lead-sla.test.ts tests/unit/feature-routes-map-tenant.test.ts --reporter=verbose`: passou, 15 testes.
+- Validacao focada de segurança em 17/06/2026:
+  - `tests/unit/backend/email-unsubscribe-token.test.ts`: validando rejeicao de token legado sem assinatura;
+  - `tests/unit/feature-routes-signatures-tenant.test.ts`: validade de token de assinatura pública antes de leitura;
+  - `tests/unit/feature-routes-signatures-tenant.test.ts`: validade de token de assinatura antes de assinar (`POST /api/signatures/token/:token/sign`) com token vencido;
+  - `tests/unit/upload-hardening-source.test.ts`: cobertura de limite de `expiresIn` em `/api/files/:id/url`.
+  - `npm run lint -- --quiet`: passou, sem erros bloqueantes.
+  - `npx vitest run tests/unit/backend/email-unsubscribe-token.test.ts tests/unit/feature-routes-signatures-tenant.test.ts tests/unit/upload-hardening-source.test.ts tests/unit/lead-score-contract-source.test.ts --reporter=verbose`: passou, 30 testes.
+  - `npm run test`: 96 arquivos passaram; 1448 testes passaram, 1 ignorado.
+  - `npm run test:smoke:e2e`: 8 testes passaram em Chromium.
+  - `npm run ops:go-live:verify:static`: passou, 12 checks.
+
+## Revisão de prontidão e score 17/06/2026
+
+- Nota global consolidada: **7.9 / 10 (79/100)**.
+- O score por processo está documentado em `docs/qa/GO_LIVE_SCORECARD_2026-06-17.md`.
+- Progresso para meta enterprise 99/100: faltam **20 pontos** e os 3 bloqueadores com maior impacto são:
+  - validação de RLS em staging/producao com role de aplicação sem `BYPASSRLS`;
+  - cobertura de testes com meta >= 80% em branches/functions/lines/statements;
+  - execução de pentest externo/manual e evidência de restore drill em ambiente real.
 
 ## Pendencias relevantes
 
@@ -216,3 +240,183 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
 - SEO de rotas publicas conhecidas ja possui HTML estatico no build; ainda faltam prerender/SSR ou geracao estatica para vitrines dinamicas de tenant/imovel/cidade/bairro.
 - `/sitemap-dynamic.xml` foi roteado para o backend; ainda precisa ser validado no deploy Vercel real.
 - Portal comprador/lead, acoes de IA auditaveis, persistencia real de opt-out/unsubscribe e extensao do ledger para WhatsApp ainda estao pendentes.
+
+## Revisao e hardening local 18/06/2026
+
+- Contexto consultado antes das alteracoes:
+  - `docs/PROJECT_MEMORY.md`;
+  - `docs/SESSION_MEMORY.md`;
+  - `docs/ROADMAP.md`;
+  - `docs/KNOWN_ISSUES.md`;
+  - `docs/TECH_DEBT.md`;
+  - `docs/qa/GO_LIVE_SCORECARD_2026-06-17.md`;
+  - README, docs de seguranca/testes/deploy e codigo-fonte afetado.
+- Fase seguranca/backend concluida localmente:
+  - ClickSign document downloads, backup duravel e restore drill remoto agora usam `fetchExternalUrl`.
+  - WhatsApp templates/auto-responses e storage de integracoes sanitizam campos imutaveis de payload externo.
+  - `/api/files/:id/url` ganhou teste comportamental para clamp 60s-3600s e cross-tenant 403.
+  - Unsubscribe publico ganhou teste HTTP para token assinado e rejeicao de token legado.
+  - Lookup publico de assinatura ganhou teste de token valido apos validacao/`viewedAt`.
+- Fase frontend/layout/formularios concluida localmente:
+  - Removidos todos os `SelectItem value=""` em `client/src`.
+  - Ajustados botoes de senha sem nome acessivel em signup/reset/portal.
+  - Ajustada hierarquia de `h1` em auth e estado visivel para reset de senha com token invalido.
+  - Corrigidos links aninhados da vitrine publica `/e/:slug/imoveis`.
+  - Corrigido match de rota da vitrine publica `/e/:slug/imoveis`.
+  - Corrigido drawer de filtros de `/vendas`.
+  - Adicionados labels/autocomplete em newsletter publica.
+- Validacoes executadas em 18/06/2026:
+  - `npm run check`: passou.
+  - `npx vitest run tests/unit/immutable-payload-sanitization-source.test.ts tests/unit/ssrf-fetch-adoption-source.test.ts tests/integration/security/ssrf-protection.test.ts tests/unit/backup-pitr-readiness.test.ts tests/unit/file-url-expiry-route.test.ts tests/unit/email-unsubscribe-route.test.ts tests/unit/feature-routes-signatures-tenant.test.ts --reporter=verbose`: 65 testes passaram.
+  - `npm run test`: 99 arquivos passaram; 1462 testes passaram, 1 ignorado.
+  - `npm run build`: passou; gerou HTML estatico para 11 rotas publicas.
+  - `npm run test:smoke:e2e`: 8 testes passaram em Chromium.
+  - `npm run lint`: passou com 0 erros e 5179 warnings.
+  - Playwright manual inicial: 64 combinacoes rota/viewport; identificou reset invalido em branco e `<a>` aninhado em `/e/sol/imoveis`.
+  - Playwright manual apos correcoes: 24 combinacoes rota/viewport; 0 achado acionavel.
+- Limites da revisao:
+  - Rotas autenticadas internas redirecionaram para `/login` na varredura Playwright manual sem sessao; smoke E2E cobriu login/dashboard/navegacao basica, mas revisao visual completa autenticada ainda precisa de fixture/sessao dedicada.
+  - Nao e correto declarar 100% enterprise ate executar RLS, Redis, restore drill, pentest e gate strict em staging/producao real.
+
+## Ajuste de produto 18/06/2026 - balao do assistente IA
+
+- Pedido: disponibilizar o assistente de IA como um balao no sistema.
+- Implementado:
+  - `client/src/components/AIAssistantBubble.tsx` adiciona botao flutuante no canto inferior direito do layout autenticado.
+  - `client/src/components/layout/dashboard-layout.tsx` renderiza o balao em telas protegidas e super admin, sem aparecer nas paginas publicas/login.
+  - `client/src/components/AIAssistant.tsx` recebeu `aria-label` no modo icone, label de modulo em portugues e nome acessivel para o botao de copiar resultado.
+  - Botao de logout icon-only da sidebar recebeu `aria-label`.
+- Validacoes:
+  - `npm run check`: passou.
+  - Playwright autenticado no dashboard: balao visivel, popover abre, badge em portugues aparece, nenhum botao sem nome com o popover aberto.
+  - `npm run test:smoke:e2e`: 8 testes passaram em Chromium.
+- Deploy:
+  - Nao executado nesta rodada porque a condicao "100%" ainda nao esta cumprida; permanecem bloqueios de staging/producao documentados.
+
+## Gate final de deploy 18/06/2026
+
+- Pedido: revisar se o sistema estava 100% funcionando e executar deploy se estivesse 100%.
+- Resultado: deploy **nao executado**. A condicao "100%" nao foi comprovada e os gates de producao bloquearam a liberacao.
+- Evidencias locais aprovadas:
+  - `npm run check`: passou.
+  - `npm run check:scripts`: passou.
+  - `npm run ops:go-live:verify:static`: passou, 12 checks.
+  - `git diff --check`: passou.
+  - `npm run test`: 99 arquivos passaram; 1462 testes passaram, 1 ignorado.
+  - `npm run build`: passou; gerou HTML estatico para 11 rotas publicas.
+  - `npm run lint -- --quiet`: passou sem erros.
+  - `npm run lint`: passou com 0 erros e 5180 warnings.
+  - `npm run test:smoke:e2e`: 8 testes passaram em Chromium.
+- Evidencias bloqueadoras:
+  - `npm run ops:go-live:verify:strict`: falhou com 11 falhas, incluindo URL canonica ausente, chaves Stripe/WhatsApp ausentes, estrategia de backup ausente, autenticacao do banco falhando, RLS runtime sem sucesso e ausencia de evidencia de restore drill/pentest.
+  - `npm run test:coverage:enterprise`: falhou contra gate 80%; linhas 12,90%, statements 12,44%, functions 10,11%, branches 9,50%.
+  - `git status --short`: worktree segue com alteracoes nao commitadas e arquivos novos, o que impede um deploy de producao rastreavel.
+  - Revisao paralela de seguranca/deploy confirmou bloqueios de RLS real, gates operacionais, migrations sem prova em staging/producao, upload generico por `entityType/entityId` e roteamento WhatsApp por `phoneNumberId`.
+  - Revisao paralela de documentacao confirmou que a documentacao sustenta pre-go-live local, nao Go Live enterprise 100%.
+
+## Hardening pos-gate 18/06/2026
+
+- Pedido: continuar revisando ate obter garantias totais.
+- Posicionamento tecnico: garantia "1000%" nao e promessa honesta; a revisao foi transformada em gates objetivos e bloqueios rastreaveis.
+- Correcoes locais aplicadas:
+  - `scripts/deploy.sh` passou a executar `npm run check:scripts`, `npm run lint -- --quiet` e, em producao, `npm run ops:go-live:verify:strict` antes de publicar.
+  - `scripts/deploy.sh` e `scripts/rollback.sh` foram alinhados para `https://imobibase.com.br`.
+  - Push automatico de tag no deploy manual virou opt-in por `PUSH_RELEASE_TAG=true`.
+  - Upload generico/documentos passou a validar ownership de `entityType`/`entityId` antes de chamar upload/storage; tipos desconhecidos, campos incompletos e entidades de outro tenant falham fechado.
+  - Resolucao de tenant do webhook WhatsApp por `phoneNumberId` passou a acumular matches e retornar `null` quando houver mais de um tenant, evitando roteamento silencioso ao primeiro tenant.
+- Testes adicionados/atualizados:
+  - `tests/unit/file-upload-entity-ownership-route.test.ts`;
+  - `tests/unit/upload-hardening-source.test.ts`;
+  - `tests/unit/whatsapp-webhook-ledger-source.test.ts`;
+  - `tests/unit/deploy-workflow-policy.test.ts`.
+- Validacoes executadas:
+  - `npm run check`: passou.
+  - `npm run check:scripts`: passou.
+  - `npm run lint -- --quiet`: passou.
+  - `npx vitest run tests/unit/deploy-workflow-policy.test.ts tests/unit/upload-hardening-source.test.ts tests/unit/whatsapp-webhook-ledger-source.test.ts --reporter=verbose`: 14 testes passaram.
+  - `npx vitest run tests/unit/file-upload-entity-ownership-route.test.ts tests/unit/file-url-expiry-route.test.ts --reporter=verbose`: 7 testes passaram.
+  - `npm run test`: 100 arquivos passaram; 1468 testes passaram, 1 ignorado.
+  - `npm run ops:go-live:verify:static`: passou, 12 checks.
+  - `bash -n scripts/deploy.sh && bash -n scripts/rollback.sh`: passou.
+  - `npm run build`: passou; ainda exibiu chunk circular e bundles grandes.
+  - `git diff --check`: passou.
+  - `npm run ops:go-live:verify:strict`: falhou novamente com 11 falhas de ambiente/evidencia real.
+  - `npm run test:coverage:enterprise`: falhou contra gate 80%; linhas 12,90%, statements 12,44%, functions 10,11%, branches 9,50%.
+- Estado apos hardening:
+  - Bloqueios locais de deploy manual, upload generico e roteamento WhatsApp duplicado foram reduzidos.
+  - Producao continua bloqueada ate `ops:go-live:verify:strict`, cobertura enterprise, RLS/backup/restore/pentest e evidencias de staging/producao passarem.
+
+## Readiness consolidado 18/06/2026
+
+- Relatorio criado: `docs/qa/PRODUCTION_READINESS_WORKLOG_2026-06-18.md`.
+- Melhorias adicionais aplicadas:
+  - Deploy manual de Vercel passou a usar `vercel build` + `vercel deploy --prebuilt`.
+  - Deploy manual passou a falhar quando nenhum target de deploy for executado.
+  - Migrations automaticas em producao foram desabilitadas no deploy manual.
+  - `script/verify-go-live-readiness.ts` passou a validar RLS forçado de `webhook_events`, colunas/indice de opt-out e registros de migrations criticas no banco real.
+  - `migrations/20260618_001_whatsapp_phone_number_unique.sql` adicionou indice unico parcial para impedir `phoneNumberId` WhatsApp duplicado em integracoes configuradas.
+  - Saida de erro de subcomandos do gate strict passou a priorizar linhas de falha.
+  - `vite.config.ts` agrupou overlays Radix em `vendor-ui-overlays`, removendo o alerta de chunk circular no build.
+- Validacoes adicionais:
+  - `npm run check`: passou.
+  - `npm run check:scripts`: passou.
+  - `npm run lint -- --quiet`: passou.
+  - `npx vitest run tests/unit/go-live-readiness-gate.test.ts tests/unit/deploy-workflow-policy.test.ts --reporter=verbose`: 11 testes passaram.
+  - `npx vitest run tests/unit/go-live-readiness-gate.test.ts tests/unit/whatsapp-webhook-ledger-source.test.ts --reporter=verbose`: 13 testes passaram.
+  - `npm run ops:go-live:verify:static`: passou, 13 checks.
+  - `npm run test`: 100 arquivos passaram; 1471 testes passaram, 1 ignorado.
+  - `npm run build`: passou sem alerta de chunk circular.
+  - `npm run ops:go-live:verify:strict`: ainda falhou com 11 falhas de ambiente/evidencia real.
+  - `npm run test:smoke:e2e`: 8 testes passaram em Chromium apos o pacote final de deploy/backend.
+
+## Revisao paralela final 18/06/2026
+
+- Revisores paralelos apontaram achados locais corrigiveis e bloqueios externos restantes.
+- Correcoes aplicadas apos a revisao:
+  - `phoneNumberId` do WhatsApp passou a ser normalizado em helper compartilhado, na persistencia de integracoes e no roteamento do webhook oficial.
+  - Balao global da IA passou a evitar conflito com a pagina de settings e a subir em rotas mobile com barras/FABs fixos.
+  - CTAs publicos foram convertidos para `Button asChild`; menus mobile, botoes icon-only e swatches de cor receberam atributos acessiveis.
+  - `scripts/rollback.sh` passou a exigir alvo explicito no Vercel e removeu fallback por `git checkout`.
+  - Workflow de producao passou a notificar Sentry apenas depois de deploy e health check bem-sucedidos.
+  - Gate strict passou a exigir `_migrations` e registros das migrations criticas em banco real.
+- Validacoes finais:
+  - `npm run check`: passou.
+  - `npm run check:scripts`: passou.
+  - `npm run lint -- --quiet`: passou.
+  - `npx vitest run tests/unit/whatsapp-webhook-ledger-source.test.ts tests/unit/deploy-workflow-policy.test.ts tests/unit/go-live-readiness-gate.test.ts --reporter=verbose`: 19 testes passaram.
+  - `npm run build`: passou; HTML estatico gerado para 11 rotas publicas.
+  - `npm run ops:go-live:verify:static`: passou, 13 checks.
+  - `npm run test`: 100 arquivos passaram; 1471 testes passaram, 1 ignorado.
+  - `npm run test:smoke:e2e`: 8 testes passaram em Chromium.
+  - `git diff --check`: passou.
+  - `npm run ops:go-live:verify:strict`: falhou com 18 checks aprovados e 11 falhas de ambiente/evidencia real.
+  - `npm run test:coverage:enterprise`: falhou contra gate 80%; lines 12,90%, statements 12,44%, functions 10,11%, branches 9,50%.
+
+## Continuidade rumo a 100% - 18/06/2026
+
+- Correcoes locais adicionais:
+  - Adicionados testes unitarios para `server/utils/pagination.ts`, `server/utils/pii-mask.ts`, `server/utils/log-sanitizer.ts` e `server/utils/api-response.ts`.
+  - `scripts/setup-production.sh` deixou de recomendar `db:push`, `vercel --prod` direto e "Codigo: 100% pronto"; agora aponta para migrations revisadas, RLS runbook e `ops:go-live:verify:strict`.
+  - README passou a tratar Redis como obrigatorio em producao e CI/CD de producao como dependente do gate strict, sem migrations automaticas.
+  - README, `docs/DEPLOYMENT_RUNBOOK.md`, guias de WhatsApp e storage foram alinhados para evitar deploy/migrations diretos em producao; instrucoes atuais apontam para `npm run deploy:production` e migrations revisadas.
+  - Resultado do assistente de IA passou a quebrar linhas longas com `whitespace-pre-wrap`, `break-words` e `overflow-wrap:anywhere`.
+  - Lightbox, calendario, Kanban de leads, contratos, upload, cookies, financeiro e CTAs publicos/help receberam nomes acessiveis ou semantica `Button asChild` para remover controles interativos aninhados.
+  - Card publico de imovel deixou de renderizar um `Button` dentro do link do card; o CTA visual agora e elemento nao interativo.
+- Varreduras locais:
+  - `rg -U "<Link...><Button|<Link...><button|<a...><Button" client/src`: 0 ocorrencias apos correcoes.
+  - `git diff --check`: passou.
+- Validacao focada:
+  - `npx vitest run tests/unit/server-utils.test.ts --reporter=verbose`: 9 testes passaram.
+- Validacoes completas da rodada:
+  - `npm run check`: passou.
+  - `npm run check:scripts`: passou.
+  - `npm run lint -- --quiet`: passou.
+  - `npm run ops:go-live:verify:static`: passou, 13 checks.
+  - `npm run ops:cron:verify`: passou, 11 jobs alinhados com `vercel.json`.
+  - `npm run test`: 101 arquivos passaram; 1480 testes passaram, 1 ignorado.
+  - `npm run build`: passou; HTML estatico gerado para 11 rotas publicas.
+  - `npm run test:smoke:e2e`: 8 testes passaram em Chromium.
+  - `npm run ops:go-live:verify:strict`: falhou com 18 checks aprovados e 11 falhas de ambiente/evidencia real.
+  - `npm run test:coverage:enterprise`: falhou contra gate 80%; lines 12,90%, statements 12,44%, functions 10,11%, branches 9,50%.
+- Estado:
+  - O codigo local ficou mais forte e validado, mas producao continua **NO-GO** ate ambiente real, cobertura/evidencias e gate strict passarem.

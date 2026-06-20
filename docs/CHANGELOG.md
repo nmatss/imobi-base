@@ -1,5 +1,119 @@
 # Changelog
 
+## 2026-06-20
+
+### Added
+
+- **Portal de atendimento ao comprador** (P1): tabelas `buyer_selections`/`buyer_selection_items`, rotas públicas por token (`/api/portal/selection/:token` + página `/s/:token`) com rate-limit e sem vazar PII do lead, respostas aceitar/recusar/comentar e agendamento de visita registrando no CRM; rotas admin tenant-scoped para criar/listar/fechar seleções (`server/routes-buyer-portal.ts`).
+- **IA acionável auditável** (P1): tabelas `ai_actions` + `ai_action_audit` (append-only); registry/planner/executor (`server/services/ai-actions/*`) com aprovação humana para `move_stage`/`reactivate_contacts`, idempotência e auditoria before/after; rotas `server/routes-ai-actions.ts` e UI `AIActionReview`.
+- **Agenda completa + CRM** (P1): colunas de confirmação/ficha/feedback/próxima-ação em `visits`; confirmação/remarcação por token (`/v/confirm/:token`) com WhatsApp+email; cron `visit-reminders`; deduplicação de leads com índices únicos parciais e resposta 409 em `POST /api/leads`; roleta de distribuição (round-robin/least-loaded); score de oportunidade com pesos por tenant (`lead_score_weights`) mantendo o contrato atual como default.
+- **Assinatura digital — bloqueadores legais**: trilha de auditoria com **HMAC-SHA256 real** + `verifyAuditTrailIntegrity` (tamper-evidence); `signature_certificates` persistido e `parseCertificate` via `node:crypto` X509Certificate (subject/serial/validade reais, fim do `MOCK_SERIAL`).
+- 80 testes novos: `buyer-portal` (18), `ai-actions` (21), `agenda-crm` (29), `signature-legal` (12). Suíte unit: 745 testes / 67 arquivos.
+- Migrations `20260620_001..005` + políticas RLS `tenant_isolation`/`FORCE` para as 6 tabelas novas multi-tenant em `RLS_enable.sql`.
+
+### Verificação
+
+- `tsc` 0 erros, `schema-parity` 3/3, `npm run build` OK, `ops:cron:verify` 12 jobs, `check:scripts` 0.
+
+## 2026-06-18
+
+### Added
+
+- Testes unitarios de utilitarios de servidor em `tests/unit/server-utils.test.ts` cobrindo paginacao, mascara de PII, sanitizacao de logs e envelope de resposta.
+- Testes unitarios/comportamentais para:
+  - clamp de `expiresIn` e bloqueio cross-tenant em `/api/files/:id/url`;
+  - unsubscribe publico assinado, rejeitando token legado sem assinatura;
+  - lookup publico de assinatura com token valido apos marcacao de visualizacao;
+  - sanitizacao de payloads imutaveis em WhatsApp e integracoes;
+  - adocao obrigatoria de `fetchExternalUrl` em ClickSign, backup duravel e restore drill remoto.
+- Relatorio QA de fases da revisao 18/06/2026 em `docs/qa/PHASE_REVIEW_2026-06-18.md`.
+- Relatorio consolidado de readiness/producao em `docs/qa/PRODUCTION_READINESS_WORKLOG_2026-06-18.md`.
+- Balao global do assistente de IA no layout autenticado do sistema.
+- Teste comportamental para impedir upload generico associado a entidade de outro tenant.
+- Helper para normalizar `phoneNumberId` do WhatsApp em configuracao salva e webhook recebido.
+
+### Changed
+
+- Ajustes adicionais de acessibilidade/layout:
+  - resultado do assistente de IA passou a quebrar conteudo longo sem overflow horizontal;
+  - lightbox recebeu `aria-label` em fechar, zoom, navegacao, dots e miniaturas;
+  - calendario, Kanban de leads, contratos, upload, cookies e tabela financeira receberam nomes acessiveis em botoes icon-only;
+  - paginas publicas/help/dashboard/checkout trocaram `Link` envolvendo `Button` por `Button asChild`;
+  - card publico de imovel deixou de conter botao real dentro do link do card.
+- `scripts/setup-production.sh` deixou de sugerir `db:push`, `vercel --prod` direto e declaracao de codigo "100% pronto"; agora aponta para migrations revisadas, RLS runbook, gate strict e `scripts/deploy.sh production`.
+- README passou a documentar Redis como requisito de producao e deploy de producao como dependente de gate strict, sem migrations automaticas.
+- README, `docs/DEPLOYMENT_RUNBOOK.md`, guias de WhatsApp e storage passaram a evitar deploy/migrations diretos em producao e a apontar para `npm run deploy:production` e migrations revisadas.
+- Downloads de documentos ClickSign, upload duravel de backup e download remoto de restore drill passaram a usar `fetchExternalUrl` com validacao anti-SSRF central.
+- Rotas e servicos de WhatsApp passaram a remover campos imutaveis enviados pelo cliente antes de criar/atualizar templates e auto-respostas.
+- Persistencia de configuracoes de integracao passou a ignorar campos imutaveis como `id`, `tenantId`, `integrationName`, `createdAt` e `updatedAt` vindos de payload externo.
+- Persistencia e resolucao de WhatsApp passaram a normalizar `phoneNumberId` com trim antes de salvar, comparar e abrir contexto RLS.
+- Formularios e filtros React/Radix deixaram de usar `SelectItem value=""`, substituindo vazio por sentinelas explicitas.
+- CTAs publicos trocaram `Link/a` envolvendo `Button` por `Button asChild`; menus/FABs/swatches receberam nomes e estados acessiveis adicionais.
+- Paginas publicas/auth/portal receberam ajustes de acessibilidade em botoes de senha, labels de newsletter, hierarquia de `h1` e estado visivel para token invalido em reset de senha.
+- Vitrine publica `/e/:slug/imoveis` deixou de renderizar `<a>` aninhado em links do header/footer.
+- Drawer de filtros de `/vendas` deixou de usar classe inexistente `sm:side-right` e passou a abrir como painel lateral responsivo.
+- Assistente de IA contextual passou a ter gatilho circular flutuante, labels acessiveis e badges de modulo em portugues.
+- Botao icon-only de logout na sidebar passou a ter nome acessivel.
+- Deploy manual de producao passou a executar `check:scripts`, lint sem erros e `ops:go-live:verify:strict` antes de publicar; push de tag passou a exigir `PUSH_RELEASE_TAG=true`.
+- Deploy manual de Vercel passou a usar artifact prebuilt (`vercel build` + `vercel deploy --prebuilt`) e a falhar quando nenhum target de deploy for executado.
+- Migrations automaticas em producao foram desabilitadas no deploy manual; aplicar migrations revisadas deve seguir `docs/DEPLOYMENT_RUNBOOK.md`.
+- Scripts manuais de deploy/rollback passaram a usar o dominio canonico `imobibase.com.br`.
+- Rollback manual Vercel passou a exigir deployment URL/ID explicito e removeu fallback com `git checkout`; workflow de producao passou a notificar Sentry apenas apos health check aprovado.
+- Upload generico/documentos passou a validar ownership de `entityType`/`entityId` antes de fazer upload ou gravar metadados.
+- Resolucao de tenant do WhatsApp por `phoneNumberId` passou a falhar fechado quando houver duplicidade entre tenants.
+- Gate strict passou a validar RLS de `webhook_events`, campos/indice de opt-out persistente, tabela `_migrations` e registros das migrations criticas quando conectado ao banco real.
+- Migration `20260618_001_whatsapp_phone_number_unique.sql` adicionou indice unico parcial para evitar `phoneNumberId` WhatsApp duplicado entre tenants configurados.
+- Saida de erro de subcomandos do gate strict passou a priorizar linhas de falha.
+- Manual chunking do Vite agrupou overlays Radix em `vendor-ui-overlays`, removendo o alerta de chunk circular no build.
+- Sitemap gerado atualizou `lastmod` para 2026-06-18.
+
+### Validated
+
+- Rodada incremental rumo a producao em 18/06/2026:
+  - `npx vitest run tests/unit/server-utils.test.ts`: 9 testes passaram.
+  - `rg -U "<Link...><Button|<Link...><button|<a...><Button" client/src`: 0 ocorrencias apos correcoes.
+  - `npm run check`: passou.
+  - `npm run check:scripts`: passou.
+  - `npm run lint -- --quiet`: passou.
+  - `git diff --check`: passou.
+  - `npm run ops:go-live:verify:static`: passou, 13 checks.
+  - `npm run ops:cron:verify`: passou, 11 jobs alinhados com `vercel.json`.
+  - `npm run test`: 101 arquivos passaram; 1480 testes passaram, 1 ignorado.
+  - `npm run build`: passou; HTML estatico gerado para 11 rotas publicas.
+  - `npm run test:smoke:e2e`: 8 testes passaram em Chromium.
+  - `npm run ops:go-live:verify:strict`: falhou com 18 checks aprovados e 11 falhas de ambiente/evidencia real.
+  - `npm run test:coverage:enterprise`: falhou contra gate 80% com linhas 12,90%, statements 12,44%, functions 10,11%, branches 9,50%.
+- `npm run check`: passou.
+- `npm run test`: 100 arquivos passaram; 1471 testes passaram, 1 ignorado.
+- Testes focados de seguranca/rotas: 65 testes passaram.
+- `npm run build`: passou e gerou HTML estatico para 11 rotas publicas.
+- `npm run test:smoke:e2e`: 8 testes passaram em Chromium.
+- `npm run lint`: passou com 0 erros; warnings conhecidos permanecem como debito tecnico.
+- Playwright manual focado: 24 combinacoes rota/viewport, 0 achado acionavel apos correcoes.
+- Playwright autenticado focado confirmou o balao do assistente no dashboard, popover funcional e nenhum botao sem nome com o balao aberto.
+- Testes focados pos-gate:
+  - `npx vitest run tests/unit/deploy-workflow-policy.test.ts tests/unit/upload-hardening-source.test.ts tests/unit/whatsapp-webhook-ledger-source.test.ts --reporter=verbose`: 14 testes passaram.
+  - `npx vitest run tests/unit/file-upload-entity-ownership-route.test.ts tests/unit/file-url-expiry-route.test.ts --reporter=verbose`: 7 testes passaram.
+- `bash -n scripts/deploy.sh && bash -n scripts/rollback.sh`: passou.
+- `npm run check:scripts`: passou.
+- `npm run lint -- --quiet`: passou sem erros.
+- `npm run test`: 100 arquivos passaram; 1471 testes passaram, 1 ignorado.
+- `npm run ops:go-live:verify:static`: passou, 13 checks.
+- `npm run build`: passou sem alerta de chunk circular.
+- Gate final de deploy em 18/06/2026:
+  - `npm run check`: passou.
+  - `npm run check:scripts`: passou.
+  - `npm run ops:go-live:verify:static`: passou, 13 checks.
+  - `git diff --check`: passou.
+  - `npm run lint -- --quiet`: passou sem erros.
+  - `npm run lint`: passou com 0 erros e 5180 warnings.
+  - `npm run test`: 100 arquivos passaram; 1471 testes passaram, 1 ignorado.
+  - `npm run build`: passou sem alerta de chunk circular.
+  - `npm run test:smoke:e2e`: 8 testes passaram em Chromium.
+  - `npm run ops:go-live:verify:strict`: falhou com 18 checks aprovados e 11 falhas.
+  - `npm run test:coverage:enterprise`: falhou contra gate 80% com linhas 12,90%, statements 12,44%, functions 10,11%, branches 9,50%.
+- Deploy de producao nao foi executado porque os gates estritos e a condicao "100%" nao foram cumpridos.
+
 ## 2026-06-17
 
 ### Added
@@ -99,6 +213,9 @@
 - Checklist/runbooks de Go Live passaram a apontar para o gate unificado em modo estatico/deploy/strict.
 - Descadastro publico passou a persistir opt-out real, bloquear reativacao silenciosa por subscribe publico e filtrar bulk email para destinatarios optados-out.
 - Lead score passou a expor a rota `/api/leads/:leadId/score/calculate` consumida pela UI, com resposta normalizada (`calculatedAt`, `lastCalculated`, `trend`, `calculated`).
+- Unsubscribe agora rejeita token não assinado e contratos vencidos em `/api/signatures/token/:token` passam a retornar `Link expirado` antes de expor contrato.
+- URL de download privado em `/api/files/:id/url` passou a validar `expiresIn` com teto de 3600s e piso de 60s.
+- `/api/signatures/token/:token/sign` passou a validar expiração antes de permitir assinatura, alinhando regra com o fluxo de leitura do token.
 
 ### Validated
 

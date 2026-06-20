@@ -103,7 +103,7 @@ Via script na API Stripe (exemplo em `script/stripe-catalog.json`):
 ### 3.4 Deploy inicial
 
 ```bash
-vercel --prod --token=$VERCEL_TOKEN --yes
+npm run deploy:production
 ```
 
 ### 3.5 Hidratar banco
@@ -117,10 +117,10 @@ npm run setup:first-run
 ```
 
 Isso roda em sequência:
-1. `drizzle-kit push` → cria 47 tabelas
-2. `server/seed-plans.ts` → 5 planos (free/starter/pro/business/enterprise)
-3. `script/seed-stripe-prices.ts` → liga os `stripe_price_id`
-4. `script/seed-super-admin.ts` → cria tenant `imobibase-ops` + user `role=super_admin`
+1. migrations revisadas aplicadas conforme este runbook;
+2. `server/seed-plans.ts` → 5 planos (free/starter/pro/business/enterprise);
+3. `script/seed-stripe-prices.ts` → liga os `stripe_price_id`;
+4. `script/seed-super-admin.ts` → cria tenant `imobibase-ops` + user `role=super_admin`.
 
 ### 3.6 Validação
 
@@ -141,7 +141,7 @@ curl https://imobibase.com.br/api/plans | jq 'length'
 ```bash
 git push origin main          # CI/CD (se conectado)
 # OU
-npx vercel --prod --token=$VERCEL_TOKEN --yes  # manual
+npm run deploy:production     # manual com gates
 ```
 
 Build pipeline:
@@ -166,10 +166,10 @@ DATABASE_URL='postgres://prod...' npx drizzle-kit push
 Supabase faz backup automático diário no free tier (7 dias retention).
 
 > **⚠️ NUNCA rode `npm run db:migrate` cego contra produção.** O runner
-> (`script/migrate.ts`) executa TODAS as `migrations/*.sql` em ordem
-> alfabética — incluindo `RLS_enable.sql` (RLS não deve ser ativada sem o app
-> preparado) e os pares duplicados `001_*`/`20241225_001_*`. Migrations novas
-> devem ser aplicadas individualmente, cada uma em transação. Atenção ao
+> (`script/migrate.ts`) executa as `migrations/*.sql` pendentes em ordem
+> alfabética e hoje pula `RLS_enable.sql` por padrão; RLS deve ser aplicada
+> explicitamente por `npm run db:rls:apply` somente depois do runbook de RLS.
+> Migrations novas devem ser aplicadas individualmente, cada uma em transação. Atenção ao
 > pooler transaction-mode: ele não define `search_path` — use
 > `SET LOCAL search_path TO public` antes de DDL sem qualificação.
 > Procedimento de referência (aplicado em 2026-06-10, 47→70 tabelas, zero
@@ -348,7 +348,7 @@ Console logs do serverless ficam no Vercel Logs (dashboard → Deployment → Ru
 
 1. Revogar imediatamente no provider
 2. Gerar nova, atualizar env Vercel
-3. Redeploy (automático se git push; manual via `vercel --prod`)
+3. Redeploy (automático se git push; manual via `npm run deploy:production`)
 4. Revisar logs/audit para uso indevido
 5. Se sessão comprometida: rotacionar `SESSION_SECRET` (desloga todos)
 

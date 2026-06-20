@@ -640,7 +640,7 @@ In Supabase Dashboard > Storage > Settings:
 ### 5. Push Database Schema
 
 ```bash
-npm run db:push
+npm run db:migrate
 ```
 
 ## Best Practices
