@@ -375,13 +375,19 @@ export async function comprehensiveFileValidation(
     detectedType = magicBytesResult.detectedType;
   }
 
-  // 6. Check for embedded scripts in images (basic check)
+  // 6. A4: bloquear (nao apenas avisar) script-in-image. Polyglots e SVG XSS escondem
+  // payload em qualquer offset, entao varremos ate 256KB (cobre o cabecalho + corpo de
+  // qualquer imagem legitima) em vez de so os primeiros 1024 bytes.
   if (declaredMimeType.startsWith('image/')) {
-    const bufferStr = buffer.toString('utf8', 0, Math.min(1024, buffer.length));
+    const scanWindow = Math.min(256 * 1024, buffer.length);
+    const bufferStr = buffer.toString('utf8', 0, scanWindow).toLowerCase();
     const scriptPatterns = [
       '<?php',
       '<%',
       '<script',
+      'javascript:',
+      'onload=',
+      'onerror=',
       'eval(',
       'base64_decode',
       'system(',
@@ -392,7 +398,8 @@ export async function comprehensiveFileValidation(
 
     for (const pattern of scriptPatterns) {
       if (bufferStr.includes(pattern)) {
-        warnings.push(`Suspicious content detected in image file: ${pattern}`);
+        // Bloqueante: conteudo executavel embutido em imagem e vetor de web-shell/XSS.
+        errors.push(`Conteudo executavel detectado em arquivo de imagem (padrao: ${pattern})`);
       }
     }
   }

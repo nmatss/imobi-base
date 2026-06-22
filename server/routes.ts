@@ -1838,6 +1838,9 @@ export async function registerRoutes(
           storage.countPropertiesByTenant(tenantId, filters),
         ]),
       );
+      // PERF-2/3: catalogo publico e cacheavel no CDN. ETag (weak) e emitido pelo
+      // Express; s-maxage permite cache de borda da Vercel (carve-out no vercel.json).
+      res.set("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=600");
       res.json({ data: rows, pagination: { page: p, limit: l, total } });
     } catch (error: unknown) {
       res.status(500).json({ error: "Erro ao buscar imóveis" });
@@ -1856,6 +1859,8 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Imóvel não encontrado" });
       if (property.status !== "available")
         return res.status(404).json({ error: "Imóvel não disponível" });
+      // PERF-2/3: detalhe publico cacheavel no CDN (ETag weak via Express).
+      res.set("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=600");
       res.json(property);
     } catch (error: unknown) {
       res.status(500).json({ error: "Erro ao buscar imóvel" });

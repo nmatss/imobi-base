@@ -87,6 +87,16 @@ const fromJson = <T>(str: string | null | undefined): T[] | null => {
 // Helper to get current timestamp
 const now = () => new Date().toISOString();
 
+// ACT-6: teto de paginacao na camada de storage (defesa em profundidade, alem do Zod).
+// O teto user-facing (100) e aplicado nos schemas/sanitizePagination das rotas; aqui ficamos
+// com um teto DURO anti-patologico que protege contra ?limit=999999 de qualquer caller que
+// contorne os schemas, sem quebrar callers internos legitimos (ex.: SLA summary usa ate 2000).
+export const STORAGE_MAX_LIMIT = 2000;
+export function clampLimit(limit: number | undefined, max: number = STORAGE_MAX_LIMIT): number | undefined {
+  if (limit === undefined || Number.isNaN(limit)) return undefined;
+  return Math.min(Math.max(1, Math.floor(limit)), max);
+}
+
 const IMMUTABLE_PERSISTENCE_FIELDS = new Set([
   "id",
   "tenantId",
@@ -641,7 +651,7 @@ export class DbStorage implements IStorage {
       .select()
       .from(schema.users)
       .where(eq(schema.users.tenantId, tenantId));
-    if (pagination?.limit !== undefined) q = q.limit(pagination.limit);
+    if (pagination?.limit !== undefined) q = q.limit(clampLimit(pagination.limit)!);
     if (pagination?.offset !== undefined) q = q.offset(pagination.offset);
     return q;
   }
@@ -689,7 +699,7 @@ export class DbStorage implements IStorage {
       .from(schema.properties)
       .where(and(...conditions))
       .orderBy(desc(schema.properties.createdAt));
-    if (pagination?.limit !== undefined) q = q.limit(pagination.limit);
+    if (pagination?.limit !== undefined) q = q.limit(clampLimit(pagination.limit)!);
     if (pagination?.offset !== undefined) q = q.offset(pagination.offset);
     return q;
   }
@@ -762,7 +772,7 @@ export class DbStorage implements IStorage {
       .from(schema.leads)
       .where(and(...conditions))
       .orderBy(desc(schema.leads.createdAt));
-    if (pagination?.limit !== undefined) q = q.limit(pagination.limit);
+    if (pagination?.limit !== undefined) q = q.limit(clampLimit(pagination.limit)!);
     if (pagination?.offset !== undefined) q = q.offset(pagination.offset);
     return q;
   }
@@ -994,17 +1004,24 @@ export class DbStorage implements IStorage {
 
   // Dashboard stats
   async getDashboardStats(tenantId: string): Promise<{ totalProperties: number; totalLeads: number; totalContracts: number; totalVisits: number }> {
-    const properties = await db.select().from(schema.properties).where(eq(schema.properties.tenantId, tenantId));
-    const leads = await db.select().from(schema.leads).where(eq(schema.leads.tenantId, tenantId));
-    const contracts = await db.select().from(schema.contracts).where(eq(schema.contracts.tenantId, tenantId));
-    const visits = await db.select().from(schema.visits).where(eq(schema.visits.tenantId, tenantId));
-
-    return {
-      totalProperties: properties.length,
-      totalLeads: leads.length,
-      totalContracts: contracts.length,
-      totalVisits: visits.length,
+    // PERF-1: agregar com count(*) no banco em vez de carregar tabelas inteiras
+    // em memoria so para contar. count(*) sem cast ::int para manter compat SQLite.
+    const countOf = async (table: any): Promise<number> => {
+      const [row] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(table)
+        .where(eq(table.tenantId, tenantId));
+      return Number(row?.count ?? 0);
     };
+
+    const [totalProperties, totalLeads, totalContracts, totalVisits] = await Promise.all([
+      countOf(schema.properties),
+      countOf(schema.leads),
+      countOf(schema.contracts),
+      countOf(schema.visits),
+    ]);
+
+    return { totalProperties, totalLeads, totalContracts, totalVisits };
   }
 
   // Owners

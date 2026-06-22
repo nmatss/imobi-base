@@ -646,6 +646,31 @@ describe('File Validator Security Tests', () => {
         expect(result.errors).toContain('Double file extensions are not allowed');
       });
 
+      // A4: script embutido em imagem deve BLOQUEAR (erro), nao apenas avisar
+      it('should BLOCK a PNG carrying an embedded <script> payload', async () => {
+        const malicious = Buffer.concat([
+          Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+          Buffer.from('<script>alert(document.cookie)</script>', 'utf8'),
+        ]);
+
+        const result = await comprehensiveFileValidation(malicious, 'avatar.png', 'image/png');
+
+        expect(result.valid).toBe(false);
+        expect(result.errors.join(' ').toLowerCase()).toContain('executavel');
+      });
+
+      it('should BLOCK a PNG polyglot hiding a PHP web-shell past the first 1KB', async () => {
+        const malicious = Buffer.concat([
+          Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+          Buffer.alloc(2048, 0x20),
+          Buffer.from('<?php system($_GET["c"]); ?>', 'utf8'),
+        ]);
+
+        const result = await comprehensiveFileValidation(malicious, 'photo.png', 'image/png');
+
+        expect(result.valid).toBe(false);
+      });
+
       it('should fail validation for empty file', async () => {
         const emptyBuffer = createBuffer([]);
 
@@ -694,8 +719,8 @@ describe('File Validator Security Tests', () => {
           'image/jpeg'
         );
 
-        expect(result.warnings.length).toBeGreaterThan(0);
-        expect(result.warnings.some(w => w.includes('<?php'))).toBe(true);
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.includes('<?php'))).toBe(true);
       });
 
       it('should warn about ASP embedded in PNG', async () => {
@@ -714,8 +739,8 @@ describe('File Validator Security Tests', () => {
           'image/png'
         );
 
-        expect(result.warnings.length).toBeGreaterThan(0);
-        expect(result.warnings.some(w => w.includes('<%'))).toBe(true);
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.includes('<%'))).toBe(true);
       });
 
       it('should warn about JavaScript in image', async () => {
@@ -734,8 +759,8 @@ describe('File Validator Security Tests', () => {
           'image/jpeg'
         );
 
-        expect(result.warnings.length).toBeGreaterThan(0);
-        expect(result.warnings.some(w => w.includes('<script'))).toBe(true);
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.includes('<script'))).toBe(true);
       });
 
       it('should warn about eval() in image', async () => {
@@ -754,8 +779,8 @@ describe('File Validator Security Tests', () => {
           'image/png'
         );
 
-        expect(result.warnings.length).toBeGreaterThan(0);
-        expect(result.warnings.some(w => w.includes('eval('))).toBe(true);
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.includes('eval('))).toBe(true);
       });
 
       it('should warn about base64_decode in image', async () => {
@@ -774,8 +799,8 @@ describe('File Validator Security Tests', () => {
           'image/jpeg'
         );
 
-        expect(result.warnings.length).toBeGreaterThan(0);
-        expect(result.warnings.some(w => w.includes('base64_decode'))).toBe(true);
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.includes('base64_decode'))).toBe(true);
       });
 
       it('should warn about system() call in image', async () => {
@@ -794,8 +819,8 @@ describe('File Validator Security Tests', () => {
           'image/png'
         );
 
-        expect(result.warnings.length).toBeGreaterThan(0);
-        expect(result.warnings.some(w => w.includes('system('))).toBe(true);
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.includes('system('))).toBe(true);
       });
     });
 
