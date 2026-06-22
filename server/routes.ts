@@ -26,7 +26,6 @@ import {
   insertLeadSchema,
   insertVisitSchema,
   insertContractSchema,
-  insertNewsletterSchema,
   insertInteractionSchema,
   insertOwnerSchema,
   insertRenterSchema,
@@ -85,53 +84,33 @@ const { Pool } = pkg;
 import { generateRateLimitKey } from "./middleware/rate-limit-key-generator";
 import { subscriptionGuard } from "./middleware/subscription-guard";
 import { validateResourceTenant } from "./middleware/tenant-resource";
+import {
+  toHttpError,
+  createHttpError,
+  isValidEmail,
+  isValidPhone,
+  isValidDate,
+  sanitizePagination,
+  validateTenantUserReference,
+  validateLeadReference,
+  validatePropertyReference,
+  validateOwnerReference,
+  validateRenterReference,
+  validateRentalContractReference,
+  validateFinanceCategoryReference,
+  validateLeadAssignment,
+  validateContractReferences,
+  validateRentalContractReferences,
+  validatePropertySaleReferences,
+  validateFollowUpReferences,
+} from "./routes/_shared";
+import { registerNewsletterRoutes } from "./routes/newsletter";
 import { assertVisitSchedulePolicy } from "./services/visit-scheduling";
 import { summarizeLeadSla } from "./services/lead-sla";
 import { applyLeadDedupAndAssign, createLeadDeduped } from "./services/lead-intake";
 
-// ===== ERROR HELPER =====
-function toHttpError(error: unknown): { status: number; message: string } {
-  const err = error as { status?: number; message?: string } | undefined;
-  return {
-    status: err?.status || 500,
-    message: err?.message || "Erro interno do servidor",
-  };
-}
-
-function createHttpError(status: number, message: string): Error & { status: number } {
-  const error = new Error(message) as Error & { status: number };
-  error.status = status;
-  return error;
-}
-
-// ===== VALIDATION HELPERS =====
-const isValidEmail = (email: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
-const isValidPhone = (phone: string): boolean => {
-  const cleaned = phone.replace(/\D/g, "");
-  return cleaned.length >= 10 && cleaned.length <= 15;
-};
-
-const isValidDate = (dateString: string): boolean => {
-  const date = new Date(dateString);
-  return !isNaN(date.getTime());
-};
-
-const sanitizePagination = (
-  page: string | number | undefined,
-  limit: string | number | undefined,
-  maxLimit: number = 100,
-): { page: number; limit: number } => {
-  const parsedPage = Math.max(1, parseInt(String(page)) || 1);
-  const parsedLimit = Math.min(
-    maxLimit,
-    Math.max(1, parseInt(String(limit)) || 50),
-  );
-  return { page: parsedPage, limit: parsedLimit };
-};
+// Helpers de erro, validacao e tenant-isolation movidos para ./routes/_shared.ts
+// (arch-1). Importados no topo deste arquivo.
 
 const scryptAsync = promisify(scrypt);
 
@@ -205,107 +184,7 @@ async function safeHandleSuccessfulLogin(
   }
 }
 
-// ===== TENANT ISOLATION HELPERS (IDOR Prevention) =====
-// validateResourceTenant agora centralizado em middleware/tenant-resource.ts.
-// Mantido import acima para preservar os ~11 call-sites existentes sem quebrar.
-// Novas rotas devem preferir `withTenantResource` (mesmo modulo) que combina
-// carregamento, validacao e anexacao a req.resource em uma unica middleware.
-
-async function validateTenantUserReference(
-  tenantId: string,
-  userId?: string | null,
-  resourceName = "Usuário",
-): Promise<void> {
-  if (!userId) return;
-  const user = await storage.getUser(userId);
-  await validateResourceTenant(user, tenantId, resourceName);
-}
-
-async function validateLeadReference(tenantId: string, leadId?: string | null): Promise<void> {
-  if (!leadId) return;
-  const lead = await storage.getLead(leadId);
-  await validateResourceTenant(lead, tenantId, "Lead");
-}
-
-async function validatePropertyReference(tenantId: string, propertyId?: string | null): Promise<void> {
-  if (!propertyId) return;
-  const property = await storage.getProperty(propertyId);
-  await validateResourceTenant(property, tenantId, "Imóvel");
-}
-
-async function validateOwnerReference(tenantId: string, ownerId?: string | null): Promise<void> {
-  if (!ownerId) return;
-  const owner = await storage.getOwner(ownerId);
-  await validateResourceTenant(owner, tenantId, "Locador");
-}
-
-async function validateRenterReference(tenantId: string, renterId?: string | null): Promise<void> {
-  if (!renterId) return;
-  const renter = await storage.getRenter(renterId);
-  await validateResourceTenant(renter, tenantId, "Inquilino");
-}
-
-async function validateRentalContractReference(
-  tenantId: string,
-  rentalContractId?: string | null,
-): Promise<void> {
-  if (!rentalContractId) return;
-  const contract = await storage.getRentalContract(rentalContractId);
-  await validateResourceTenant(contract, tenantId, "Contrato de aluguel");
-}
-
-async function validateFinanceCategoryReference(
-  tenantId: string,
-  categoryId?: string | null,
-): Promise<void> {
-  if (!categoryId) return;
-  const category = await storage.getFinanceCategory(categoryId);
-  await validateResourceTenant(category, tenantId, "Categoria financeira");
-}
-
-async function validateLeadAssignment(tenantId: string, assignedTo?: string | null): Promise<void> {
-  await validateTenantUserReference(tenantId, assignedTo, "Corretor");
-}
-
-async function validateContractReferences(
-  tenantId: string,
-  contract: { propertyId?: string | null; leadId?: string | null },
-): Promise<void> {
-  await validatePropertyReference(tenantId, contract.propertyId);
-  await validateLeadReference(tenantId, contract.leadId);
-}
-
-async function validateRentalContractReferences(
-  tenantId: string,
-  contract: { propertyId?: string | null; ownerId?: string | null; renterId?: string | null },
-): Promise<void> {
-  await validatePropertyReference(tenantId, contract.propertyId);
-  await validateOwnerReference(tenantId, contract.ownerId);
-  await validateRenterReference(tenantId, contract.renterId);
-}
-
-async function validatePropertySaleReferences(
-  tenantId: string,
-  sale: {
-    propertyId?: string | null;
-    buyerLeadId?: string | null;
-    sellerId?: string | null;
-    brokerId?: string | null;
-  },
-): Promise<void> {
-  await validatePropertyReference(tenantId, sale.propertyId);
-  await validateLeadReference(tenantId, sale.buyerLeadId);
-  await validateOwnerReference(tenantId, sale.sellerId);
-  await validateTenantUserReference(tenantId, sale.brokerId, "Corretor");
-}
-
-async function validateFollowUpReferences(
-  tenantId: string,
-  followUp: { leadId?: string | null; assignedTo?: string | null },
-): Promise<void> {
-  await validateLeadReference(tenantId, followUp.leadId);
-  await validateTenantUserReference(tenantId, followUp.assignedTo, "Responsável");
-}
+// Família validate*Reference (IDOR prevention) movida para ./routes/_shared.ts (arch-1).
 
 // ===== CSRF PROTECTION (Double Submit Cookie Pattern) =====
 /**
@@ -2369,25 +2248,8 @@ export async function registerRoutes(
     }
   });
 
-  // ===== NEWSLETTER ROUTES =====
-  app.post("/api/newsletter/subscribe", publicLimiter, async (req, res) => {
-    try {
-      // Validate email format
-      if (!req.body.email || !isValidEmail(req.body.email)) {
-        return res.status(400).json({ error: "Email inválido" });
-      }
-      const data = insertNewsletterSchema.parse(req.body);
-      const subscription = await storage.subscribeNewsletter(data);
-      res.status(201).json(subscription);
-    } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro ao inscrever newsletter",
-      });
-    }
-  });
+  // ===== NEWSLETTER ROUTES ===== (extraidas para ./routes/newsletter.ts — arch-1)
+  registerNewsletterRoutes(app, { publicLimiter });
 
   // ===== CONTATO PÚBLICO (form da landing) =====
   app.post("/api/public/contact", publicLimiter, async (req, res) => {
