@@ -4,6 +4,47 @@ All notable changes to ImobiBase are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.4.0] - 2026-06-22 — Execução do Plano de Excelência (Ondas 0-3 parciais)
+
+> Execução do backlog priorizado em `docs/reports/PLANO_EXCELENCIA_2026-06-22.md`
+> (auditoria multi-agente das 10 dimensões). Ações de infra que exigem credenciais
+> de produção ficam em `docs/RUNBOOK_EXCELENCIA_DONO.md`.
+
+### Added
+
+- **`server/db-tx.ts`** — `withTenantTransaction(tenantId, fn)`: uma transação com contexto RLS (`SET LOCAL app.tenant_id`), base para mutações atômicas (`FOR UPDATE`/`ON CONFLICT`). (ACT-1)
+- **`server/utils/db-errors.ts`** — `isUniqueViolation` agnóstico de driver (PG 23505 / SQLite), compartilhado com `webhook-ledger`. (ACT-2)
+- **Decomposição de `routes.ts` iniciada (arch-1)** — `server/routes/_shared.ts` (helpers de erro/validação + família `validate*Reference` de IDOR + tipo `RouteDeps`) e domínios `server/routes/newsletter.ts` e `server/routes/interactions.ts`. `routes.ts`: 4523 → 4349 LOC.
+- **`getChartColor`/`getChartPalette`** em `client/src/lib/design-helpers.ts`, ancorados nas CSS vars `--chart-*` (light/dark). (UI-1)
+- **Governança/planejamento** — `CLAUDE.md`, `docs/prompts/PROMPT_MASTER_AUDITORIA.md`, `docs/reports/PLANO_EXCELENCIA_2026-06-22.md`, `docs/RUNBOOK_EXCELENCIA_DONO.md`.
+
+### Performance
+
+- **`getDashboardStats`** agrega com `COUNT(*)` no banco (era 4 full-table scans + `.length`) e passa a servir do cache Redis (TTL 60s, invalidado nos creates de lead/property/contract/visit). (PERF-1, ESC-1/PERF-4)
+- **`query-cache` ativado** (estava morto, nunca invocado) e tornado **no-op seguro sem `REDIS_URL`** (antes cairia para `localhost:6379`, gerando latência em serverless). (arch-4)
+- **Idempotência de pagamento durável** em Redis (`SET NX` + TTL 7d, 409 em concorrência in-flight, fallback observável via Sentry) — antes era `Map` in-process (risco de dupla cobrança em multi-instância). (ACT-3/ESC-2)
+- **CDN nos endpoints públicos** de catálogo: carve-out do `no-store` no `vercel.json` + `Cache-Control`/`ETag` em `/api/properties/public/*`. (PERF-2/3)
+- **Clamp de paginação** na camada de storage (defesa além do Zod). (ACT-6)
+
+### Fixed / Security
+
+- **Upload**: script/web-shell/SVG-XSS embutido em imagem agora **bloqueia** (era apenas warning); varredura até 256KB. (A4)
+- **Race de de-dup de lead** resolvido deterministicamente: violação do índice único parcial → 409 limpo (era 400/500 genérico). (ACT-2)
+- **Isolamento de tenant no client**: `logout` e `switchTenant` limpam o cache do React Query; `switchTenant` só aceita tenant autorizado. (FE-1/FE-2)
+- **Onboarding** não falha mais silenciosamente — erro vira toast e o fluxo não avança fingindo sucesso. (U1)
+- **Leak de timers** no prefetch on-hover (`useRef` + cleanup no unmount). (PERF-8)
+- **`db:rls:apply`** passa a cobrir parent + child tables na ordem correta (antes o child vazava para o `db:migrate` normal). (DB-2)
+- **Observabilidade**: alerta Sentry quando o rate-limit degrada para store em memória. (ESC-6)
+
+### Removed
+
+- `server/storage-cached.ts` (exemplo de integração morto, substituído pelo cache real). (arch-4)
+
+### Notas
+
+- Confirmado já correto (sem mudança): dedup de webhook atômico em `webhook-ledger.ts` (ACT-4) e contexto RLS nos `POST /api/leads` (ACT-5).
+- Todo o trabalho com tsc + build verdes e 759 testes passando (+ novos: idempotência, `db-tx`, dedup de lead, cores de chart, segurança do cache). Permanece 1 falha **pré-existente** em `data-export.test.ts` (fixture).
+
 ## [2.3.0] - 2026-06-12 — Nova identidade visual & polimento profissional
 
 ### Added

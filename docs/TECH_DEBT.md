@@ -1,6 +1,30 @@
 # Technical Debt
 
-Atualizado em: 20/06/2026
+Atualizado em: 22/06/2026
+
+## Plano de Excelência 2026-06-22 (execução em andamento)
+
+Backlog completo em `docs/reports/PLANO_EXCELENCIA_2026-06-22.md`. Owner-gated em
+`docs/RUNBOOK_EXCELENCIA_DONO.md`.
+
+### Resolvido nesta leva
+
+- Idempotência de pagamento agora durável em Redis (era `Map` in-process). (ACT-3/ESC-2)
+- Cache `query-cache.ts` ativado no `getDashboardStats` (estava morto); `storage-cached.ts` (demo) removido. (ESC-1/PERF-4/arch-4)
+- `getDashboardStats` agrega com `COUNT(*)` (era full-table scans). (PERF-1)
+- Race de de-dup de lead resolvido via índice único → 409. (ACT-2)
+- Leak de timers no prefetch on-hover corrigido. (PERF-8)
+- `db:rls:apply` cobre child tables. (DB-2)
+- Decomposição de `routes.ts` iniciada (`server/routes/_shared.ts` + domínios newsletter/interactions). (arch-1)
+
+### Remanescente (priorizado)
+
+- **arch-1**: extrair as ~35 seções restantes de `routes.ts` (4349 LOC) para `server/routes/<dominio>.ts`. Padrão já provado.
+- **Frontend**: decompor os 6 mega-componentes (dashboard/vendas/kanban/calendar/contracts/reports); migrar fetch para React Query (FE-3); reduzir `any` (~305 → <50, FE-6).
+- **ACT-2b**: cursor round-robin de lead ainda tem janela read-then-advance (fairness) — precisa `SELECT FOR UPDATE` no `lead_assignment_state` via `withTenantTransaction`.
+- **ACT-4 (full)**: envolver update-de-negócio + `markWebhookEventProcessed` na MESMA transação (a reserva/dedup já é atômica).
+- **UI-2**: migrar ~7 páginas de chart restantes para `getChartColor` (atenção: cores de estágio do kanban são semânticas, não mapear cego a `--chart-*`).
+- **UI-6**: guard-rail ESLint contra hex em `fill`/`stroke` (só após concluir UI-2).
 
 ## Features P1 2026-06-20 (premissas a revisar)
 

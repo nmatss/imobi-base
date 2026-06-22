@@ -1,6 +1,36 @@
 # Session Memory
 
-Atualizado em: 17/06/2026
+Atualizado em: 22/06/2026
+
+## Sessão 2026-06-22 — Auditoria + Execução do Plano de Excelência
+
+### Solicitação
+
+Rodar uma auditoria 360 multi-agente (Prompt Master), montar plano para levar as 10
+dimensões acima de 9, e executar com "time completo" o que for código.
+
+### Entregue
+
+1. **Governança/planejamento**: `CLAUDE.md`, `docs/prompts/PROMPT_MASTER_AUDITORIA.md`,
+   auditoria multi-agente (21 agentes) → `docs/reports/PLANO_EXCELENCIA_2026-06-22.md`
+   (notas atuais ~6,9; metas ~9,1), e `docs/RUNBOOK_EXCELENCIA_DONO.md`.
+2. **Execução (código, ~11 commits, tsc+build verdes, 759 testes)** na branch
+   `fix/csrf-hardening`:
+   - Onda 0-1: idempotência durável (Redis), `withTenantTransaction`, dedup de lead
+     atômico, DB-2, isolamento de tenant no cache do client, A4 (script-in-image).
+   - Onda 2: `COUNT(*)` no dashboard, clamp de paginação, CDN nos públicos, cache
+     ativado (no-op seguro sem Redis), leak de prefetch, alerta de rate-limit.
+   - Onda 3: decomposição de `routes.ts` iniciada (`server/routes/_shared.ts` +
+     domínios newsletter/interactions); `routes.ts` 4523→4349 LOC.
+3. **Descobertas**: ACT-4 (dedup de webhook) e ACT-5 (RLS nos leads) já estavam corretos.
+
+### Pendências
+
+- Código: concluir arch-1 (~35 domínios), mega-componentes React, ACT-2b/ACT-4-full, UI-2.
+- Infra (dono): role não-owner, aplicar+provar RLS, secrets/`REDIS_URL`, restore drill.
+- Nada pushado; sem PR aberto. 1 falha pré-existente em `data-export.test.ts` (fixture).
+
+---
 
 ## Solicitacao atendida
 

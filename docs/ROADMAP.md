@@ -1,6 +1,22 @@
 # Roadmap Enterprise - ImobiBase
 
-Atualizado em: 18/06/2026
+Atualizado em: 22/06/2026
+
+## Plano de Excelência 2026-06-22 (10 dimensões → 9+)
+
+Backlog priorizado em ondas: `docs/reports/PLANO_EXCELENCIA_2026-06-22.md`.
+Pré-requisitos de infra (dono): `docs/RUNBOOK_EXCELENCIA_DONO.md`.
+
+- **Executado (código)**: idempotência durável (ACT-3), `withTenantTransaction` (ACT-1),
+  dedup de lead atômico (ACT-2), cache ativado (ESC-1/PERF-4), `COUNT(*)` no dashboard
+  (PERF-1), CDN nos públicos (PERF-2/3), clamp de paginação (ACT-6), bloqueio
+  script-in-image (A4), isolamento de tenant no cache do client (FE-1/FE-2), onboarding
+  sem falha silenciosa (U1), cores de chart (UI-1), DB-2, e início da decomposição de
+  `routes.ts` (arch-1).
+- **Próximo (código)**: concluir arch-1 (~35 domínios), mega-componentes React (Frontend),
+  ACT-2b (cursor `FOR UPDATE`), ACT-4 full (webhook na mesma tx), UI-2 (charts).
+- **Owner-gated**: role não-owner + aplicar/provar RLS, secrets no Vercel, `REDIS_URL`,
+  restore drill, load baseline.
 
 ## P0 - Enterprise readiness
 

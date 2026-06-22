@@ -1,6 +1,12 @@
 # Known Issues
 
-Atualizado em: 20/06/2026
+Atualizado em: 22/06/2026
+
+## Resolvido em 2026-06-22 (Plano de Excelência)
+
+- Idempotência de pagamento agora é durável em Redis (`SET NX`+TTL 7d), eliminando a janela de dupla cobrança que existia com o `Map` in-process em multi-instância. Requer `REDIS_URL` em produção; sem ela, degrada para dedup intra-instância e emite alerta Sentry ("Idempotency em modo degradado").
+- Corrida de de-dup de lead sob concorrência agora resolve para 409 (via índice único), não mais 400/500 genérico. (Não resolve duplicatas PRÉ-existentes — ver item do `20260620_005` abaixo.)
+- Cache de leitura ativado no `getDashboardStats` com no-op seguro sem Redis.
 
 ## CRITICO
 
