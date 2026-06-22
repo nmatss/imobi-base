@@ -26,7 +26,6 @@ import {
   insertLeadSchema,
   insertVisitSchema,
   insertContractSchema,
-  insertInteractionSchema,
   insertOwnerSchema,
   insertRenterSchema,
   insertRentalContractSchema,
@@ -105,6 +104,7 @@ import {
   validateFollowUpReferences,
 } from "./routes/_shared";
 import { registerNewsletterRoutes } from "./routes/newsletter";
+import { registerInteractionRoutes } from "./routes/interactions";
 import { assertVisitSchedulePolicy } from "./services/visit-scheduling";
 import { summarizeLeadSla } from "./services/lead-sla";
 import { applyLeadDedupAndAssign, createLeadDeduped } from "./services/lead-intake";
@@ -2045,44 +2045,8 @@ export async function registerRoutes(
     },
   );
 
-  // ===== INTERACTION ROUTES =====
-  app.get("/api/leads/:leadId/interactions", requireAuth, async (req, res) => {
-    try {
-      // IDOR Protection: validate the parent lead belongs to the tenant
-      const lead = await storage.getLead(req.params.leadId);
-      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
-      const interactions = await storage.getInteractionsByLead(
-        req.params.leadId,
-      );
-      res.json(interactions);
-    } catch (error: unknown) {
-      const httpErr = toHttpError(error);
-      const message = httpErr.message || "Erro ao buscar interações";
-      res.status(httpErr.status).json({ error: message });
-    }
-  });
-
-  app.post("/api/interactions", requireAuth, async (req, res) => {
-    try {
-      const data = insertInteractionSchema.parse({
-        ...req.body,
-        userId: req.user!.id,
-      });
-      // IDOR Protection: validate the target lead belongs to the tenant
-      // before attaching an interaction to it.
-      const lead = await storage.getLead(data.leadId);
-      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
-      const interaction = await storage.createInteraction(data);
-      await storage.touchLead(data.leadId);
-      res.status(201).json(interaction);
-    } catch (error: unknown) {
-      const httpErr = toHttpError(error);
-      // Erros de validacao do Zod / corpo invalido continuam como 400.
-      const status = httpErr.status === 500 ? 400 : httpErr.status;
-      const message = httpErr.message || "Erro ao criar interação";
-      res.status(status).json({ error: message });
-    }
-  });
+  // ===== INTERACTION ROUTES ===== (extraidas para ./routes/interactions.ts — arch-1)
+  registerInteractionRoutes(app, { requireAuth });
 
   // ===== VISIT ROUTES =====
   app.get("/api/visits", requireAuth, async (req, res) => {
