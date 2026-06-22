@@ -1,6 +1,6 @@
 # Documentacao — ImobiBase
 
-**Ultima atualizacao:** 14 de Marco de 2026
+**Ultima atualizacao:** 22 de Junho de 2026
 
 Indice central de toda a documentacao do projeto.
 
@@ -16,6 +16,17 @@ Indice central de toda a documentacao do projeto.
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Como contribuir com o projeto                      |
 | [CHANGELOG.md](CHANGELOG.md)       | Historico de versoes                               |
 | [LICENSE](LICENSE)                 | Licenca MIT                                        |
+
+---
+
+## Governanca de Agentes de IA
+
+| Arquivo                                                                          | Conteudo                                              |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| [CLAUDE.md](CLAUDE.md)                                                           | Entrada para Claude Code (aponta para AGENTS.md)      |
+| [AGENTS.md](AGENTS.md)                                                           | Regras permanentes, papel multidisciplinar, workflow  |
+| [PROMPT_MASTER_AUDITORIA.md](docs/prompts/PROMPT_MASTER_AUDITORIA.md)            | Prompt mestre de auditoria/evolucao 360 (16 fases)    |
+| [PLANO_EXCELENCIA_2026-06-22.md](docs/reports/PLANO_EXCELENCIA_2026-06-22.md)    | Plano-mestre: 10 dimensoes para nota 9+ (backlog ondas) |
 
 ---
 
@@ -104,3 +115,5 @@ Relatorios historicos de implementacao estao em `docs/reports/`.
 **Deploy?** → [DEPLOYMENT.md](DEPLOYMENT.md)
 
 **Seguranca?** → [SECURITY.md](SECURITY.md) → [docs/SECURITY.md](docs/SECURITY.md)
+
+**Auditoria / evolucao completa?** → [AGENTS.md](AGENTS.md) → [Prompt Master](docs/prompts/PROMPT_MASTER_AUDITORIA.md)

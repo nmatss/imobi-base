@@ -301,6 +301,10 @@ GitHub Actions pipelines:
 | [docs/TESTING.md](docs/TESTING.md)                                       | Framework de testes     |
 | [docs/MONITORING_ANALYTICS_GUIDE.md](docs/MONITORING_ANALYTICS_GUIDE.md) | Monitoramento           |
 | [docs/PLANS.md](docs/PLANS.md)                                           | Planos e enforcement    |
+| [AGENTS.md](AGENTS.md)                                                   | Regras para agentes IA  |
+| [docs/prompts/PROMPT_MASTER_AUDITORIA.md](docs/prompts/PROMPT_MASTER_AUDITORIA.md) | Auditoria/evolucao 360 (16 fases) |
+
+Indice completo em [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md).
 
 ---
 
