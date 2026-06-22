@@ -1,5 +1,6 @@
 import { usePageTitle } from "@/hooks/use-page-title";
 import React, { Suspense, lazy, useMemo, useState } from "react";
+import { getChartColor } from "@/lib/design-helpers";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useImobi } from "@/lib/imobi-context";
 import {
@@ -839,8 +840,8 @@ export default function Dashboard() {
                             return [value, name];
                           }}
                         />
-                        <Bar dataKey="sale" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} name="Venda" />
-                        <Bar dataKey="rent" stackId="a" fill="#22c55e" radius={[0, 4, 4, 0]} name="Aluguel" />
+                        <Bar dataKey="sale" stackId="a" fill={getChartColor(0)} radius={[0, 0, 0, 0]} name="Venda" />
+                        <Bar dataKey="rent" stackId="a" fill={getChartColor(1)} radius={[0, 4, 4, 0]} name="Aluguel" />
                       </BarChart>
                     </ResponsiveContainer>
                   </Suspense>

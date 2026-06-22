@@ -1,6 +1,7 @@
 import React from "react";
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { useAuth } from "./auth-context";
+import { queryClient } from "./queryClient";
 
 // ==================== TYPES ====================
 
@@ -78,12 +79,14 @@ export function TenantProvider({ children }: { children: ReactNode }) {
    * Troca o tenant ativo
    */
   async function switchTenant(tenantId: string) {
+    // FE-1: só troca para tenant autorizado (lista ja escopada pelo servidor) e
+    // limpa o cache do React Query para nao vazar dados do tenant anterior.
     const newTenant = tenants.find((t) => t.id === tenantId);
-    if (newTenant) {
-      setTenant(newTenant);
-      // Em produção, deveria atualizar no servidor também
-      // await fetch("/api/auth/switch-tenant", { method: "POST", ... });
+    if (!newTenant || newTenant.id === tenant?.id) {
+      return;
     }
+    queryClient.clear();
+    setTenant(newTenant);
   }
 
   /**

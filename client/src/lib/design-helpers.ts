@@ -432,3 +432,37 @@ export function getGapClassName(size: keyof typeof spacing): string {
   };
   return sizeMap[size];
 }
+
+// ==================== CHART COLORS (UI-1) ====================
+// Fonte unica de verdade para cores de grafico (recharts). Ancorada nas CSS vars
+// --chart-1..5 definidas em :root e .dark (client/src/index.css), para que charts
+// respeitem o tema. Substitui hex hardcoded espalhados pelas paginas de chart.
+
+/** Fallbacks concretos (SSR/sem DOM) — espelham os valores HSL de :root. */
+export const CHART_FALLBACKS = [
+  "hsl(217 91% 50%)", // --chart-1 azul
+  "hsl(160 84% 39%)", // --chart-2 verde
+  "hsl(38 92% 50%)", // --chart-3 ambar
+  "hsl(280 68% 60%)", // --chart-4 roxo
+  "hsl(0 72% 51%)", // --chart-5 vermelho
+] as const;
+
+/**
+ * Resolve a cor canonica do slot de chart (0-based) lendo a CSS var em runtime,
+ * de modo a refletir light/dark. Faz wrap em 5 slots. Sem DOM, usa o fallback.
+ */
+export function getChartColor(index: number): string {
+  const slot = ((index % CHART_FALLBACKS.length) + CHART_FALLBACKS.length) % CHART_FALLBACKS.length;
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return CHART_FALLBACKS[slot];
+  }
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue(`--chart-${slot + 1}`)
+    .trim();
+  return raw ? `hsl(${raw})` : CHART_FALLBACKS[slot];
+}
+
+/** Paleta resolvida (N cores) para passar a series/Cells do recharts. */
+export function getChartPalette(count: number = CHART_FALLBACKS.length): string[] {
+  return Array.from({ length: count }, (_, i) => getChartColor(i));
+}

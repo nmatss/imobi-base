@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useImobi } from "@/lib/imobi-context";
 import { apiRequest } from "@/lib/queryClient";
+import { toast } from "@/lib/toast-helpers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -114,12 +115,13 @@ export default function OnboardingPage() {
         phone: brandData.phone,
         address: brandData.address,
       });
+      // U1: so avanca quando o salvamento realmente teve sucesso.
+      goNext();
     } catch {
-      // silently continue
+      toast.errors.operation("salvar as informações da empresa");
     } finally {
       setIsSaving(false);
     }
-    goNext();
   };
 
   const handleCreateProperty = async () => {
@@ -138,12 +140,13 @@ export default function OnboardingPage() {
         area: propertyData.area ? parseInt(propertyData.area) : null,
         status: "active",
       });
+      // U1: so avanca quando o imovel foi realmente criado.
+      goNext();
     } catch {
-      // silently continue
+      toast.errors.operation("cadastrar o imóvel");
     } finally {
       setIsSaving(false);
     }
-    goNext();
   };
 
   const handleFinish = () => {
@@ -157,8 +160,16 @@ export default function OnboardingPage() {
       // catch abaixo absorve o erro e seguimos para o dashboard de qualquer
       // forma — o painel estará populado nos dois cenários.
       await apiRequest("POST", "/api/onboarding/demo-data");
-    } catch {
-      // silently continue — fluxo de onboarding não deve travar
+    } catch (err) {
+      // 409 = dados de exemplo ja existem (esperado, segue normal). Outros erros
+      // viram aviso nao-bloqueante: o painel funciona mesmo sem os dados de demo.
+      const isConflict = err instanceof Error && err.message.startsWith("409");
+      if (!isConflict) {
+        toast.warning(
+          "Não foi possível gerar todos os dados de exemplo",
+          "Você ainda pode explorar o painel normalmente.",
+        );
+      }
     } finally {
       setIsSeedingDemo(false);
     }

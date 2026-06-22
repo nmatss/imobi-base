@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import { useLocation } from "wouter";
-import { setCSRFToken, clearCSRFToken } from "@/lib/queryClient";
+import { setCSRFToken, clearCSRFToken, queryClient } from "@/lib/queryClient";
 import { unwrapList, unwrapData, getPaginationTotal } from "@/lib/api-envelope";
 
 // --- Types ---
@@ -427,6 +427,10 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
     // Clear CSRF token on logout
     clearCSRFToken();
 
+    // FE-1/FE-2: limpar o cache do React Query no logout impede que dados do
+    // tenant/usuario anterior vazem para a proxima conta antes do refetch.
+    queryClient.clear();
+
     setUser(null);
     setTenant(null);
     setTenants([]);
@@ -438,12 +442,25 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
   }
 
   async function switchTenant(tenantId: string) {
+    // Só permite trocar para um tenant que o usuario realmente possui acesso
+    // (a lista `tenants` ja vem escopada pelo servidor: proprio tenant, ou todos
+    // para superadmin). Trocar para qualquer outro id e ignorado.
     const newTenant = tenants.find((t) => t.id === tenantId);
-    if (newTenant) {
-      setTenant(newTenant);
-      // In a real app, we'd need to switch the user's tenant on the server
-      // For now, we just switch locally
+    if (!newTenant || newTenant.id === tenant?.id) {
+      return;
     }
+
+    // FE-1: ao mudar o contexto de tenant, descartar TODO o cache do React Query
+    // e o estado local derivado, para nao exibir dados do tenant anterior sob a
+    // identidade do novo. O servidor continua escopando por sessao (RLS), entao
+    // os dados sao re-buscados ja no contexto correto.
+    queryClient.clear();
+    setProperties([]);
+    setLeads([]);
+    setVisits([]);
+    setContracts([]);
+    setTenant(newTenant);
+    // O useEffect [user, tenant] dispara fetchAllData() no novo contexto.
   }
 
   const value = {
