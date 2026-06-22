@@ -533,6 +533,65 @@ async function handleCheckoutSessionCompleted(
   }
 }
 
+/**
+ * Handle charge.refunded event.
+ *
+ * Um reembolso (total) deve revogar o acesso: sem isso, um cliente reembolsado
+ * mantém a assinatura ativa indefinidamente. Reembolso PARCIAL não revoga, mas
+ * é registrado/alertado para revisão manual.
+ */
+async function handleChargeRefunded(charge: Stripe.Charge): Promise<void> {
+  try {
+    const customerId = typeof charge.customer === 'string'
+      ? charge.customer
+      : charge.customer?.id;
+
+    if (!customerId) {
+      console.warn(`[stripe-webhook] charge.refunded sem customer (charge ${charge.id}); ignorando.`);
+      return;
+    }
+
+    const customer = await StripeService.getCustomer(customerId);
+    if ('deleted' in customer) {
+      throw new Error('Customer has been deleted');
+    }
+
+    const tenantId = customer.metadata?.tenantId;
+    if (!tenantId) {
+      throw new Error('Tenant ID not found in customer metadata');
+    }
+
+    const fullyRefunded = charge.amount_refunded >= charge.amount;
+
+    if (fullyRefunded) {
+      await runWithTenantRlsContext(tenantId, () =>
+        storage.updateTenantSubscription(tenantId, {
+          status: 'cancelled',
+          cancelledAt: new Date(),
+        }),
+      );
+      console.log(`✅ Charge fully refunded → assinatura cancelada para tenant ${tenantId} (charge ${charge.id})`);
+    } else {
+      console.warn(
+        `⚠️ Reembolso PARCIAL para tenant ${tenantId} (charge ${charge.id}: ${charge.amount_refunded}/${charge.amount}). Revisão manual recomendada.`,
+      );
+    }
+
+    // Alerta para o time financeiro/observabilidade revisar o reembolso.
+    Sentry.captureMessage(`Stripe charge.refunded (tenant ${tenantId})`, {
+      level: 'warning',
+      tags: { webhook: 'stripe', event: 'charge.refunded', fullyRefunded: String(fullyRefunded) },
+      extra: { chargeId: charge.id, amount: charge.amount, amountRefunded: charge.amount_refunded },
+    });
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { webhook: 'stripe', event: 'charge.refunded' },
+      extra: { chargeId: charge.id },
+    });
+    throw error;
+  }
+}
+
 async function dispatchEvent(event: Stripe.Event): Promise<void> {
   switch (event.type) {
     case 'checkout.session.completed':
@@ -563,6 +622,10 @@ async function dispatchEvent(event: Stripe.Event): Promise<void> {
 
     case 'customer.subscription.trial_will_end':
       await handleTrialWillEnd(event.data.object as Stripe.Subscription);
+      break;
+
+    case 'charge.refunded':
+      await handleChargeRefunded(event.data.object as Stripe.Charge);
       break;
 
     default:

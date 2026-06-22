@@ -153,7 +153,16 @@ class SecretManager {
         console.error('Application cannot start in production with invalid secrets');
         process.exit(1);
       } else if (isServerless) {
-        console.error('⚠️  Secret validation errors in serverless - continuing with warnings');
+        // Serverless (Vercel): process.exit não é apropriado, mas NÃO podemos
+        // seguir com secrets obrigatórios ausentes/fracos (ex.: SESSION_SECRET).
+        // Lançamos para falhar fechado — o handler serverless captura como
+        // startupError e responde 503, em vez de subir com secret inseguro.
+        // (Apenas secrets REQUIRED/malformados geram `errors`; opcionais
+        // ausentes viram `warnings` e não chegam aqui.)
+        console.error('🚨 Secret validation errors in serverless — failing closed.');
+        throw new Error(
+          `Secret validation failed in serverless: ${errors.length} issue(s). See logs above.`,
+        );
       }
     }
 

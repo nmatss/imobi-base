@@ -569,7 +569,7 @@ export interface IStorage {
   closeBuyerSelection(id: string): Promise<BuyerSelection | undefined>;
   // ==================== AI ACTIONS ====================
   createAiAction(data: InsertAiAction): Promise<AiAction>;
-  getAiActionsByTenant(tenantId: string, filters?: { status?: string; targetType?: string; targetId?: string; actionType?: string }): Promise<AiAction[]>;
+  getAiActionsByTenant(tenantId: string, filters?: { status?: string; targetType?: string; targetId?: string; actionType?: string; limit?: number }): Promise<AiAction[]>;
   getAiActionsByLead(tenantId: string, leadId: string): Promise<AiAction[]>;
   getAiAction(id: string): Promise<AiAction | undefined>;
   updateAiActionStatus(id: string, patch: Partial<InsertAiAction>): Promise<AiAction | undefined>;
@@ -4189,18 +4189,22 @@ export class DbStorage implements IStorage {
 
   async getAiActionsByTenant(
     tenantId: string,
-    filters?: { status?: string; targetType?: string; targetId?: string; actionType?: string },
+    filters?: { status?: string; targetType?: string; targetId?: string; actionType?: string; limit?: number },
   ): Promise<AiAction[]> {
     const conditions: any[] = [eq((schema as any).aiActions.tenantId, tenantId)];
     if (filters?.status) conditions.push(eq((schema as any).aiActions.status, filters.status));
     if (filters?.targetType) conditions.push(eq((schema as any).aiActions.targetType, filters.targetType));
     if (filters?.targetId) conditions.push(eq((schema as any).aiActions.targetId, filters.targetId));
     if (filters?.actionType) conditions.push(eq((schema as any).aiActions.actionType, filters.actionType));
+    // Teto defensivo: evita varredura/serialização ilimitada (DoS) caso o
+    // tenant acumule milhares de ações. Default 200, máximo 500.
+    const limit = Math.min(Math.max(filters?.limit ?? 200, 1), 500);
     return db
       .select()
       .from((schema as any).aiActions)
       .where(and(...conditions))
-      .orderBy(desc((schema as any).aiActions.createdAt));
+      .orderBy(desc((schema as any).aiActions.createdAt))
+      .limit(limit);
   }
 
   async getAiActionsByLead(tenantId: string, leadId: string): Promise<AiAction[]> {

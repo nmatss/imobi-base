@@ -30,7 +30,6 @@ import {
   generateRiskAssessment,
   getComplianceDashboard,
 } from "./dpo-tools";
-import { createReadStream } from "fs";
 import { generateRateLimitKey } from "../middleware/rate-limit-key-generator";
 import { runWithTenantRlsContext } from "../db-rls";
 
@@ -133,7 +132,7 @@ export function registerComplianceRoutes(app: Express) {
     try {
       const { certificateNumber } = req.params;
 
-      const filePath = await getDeletionCertificate(certificateNumber);
+      const fileBuffer = await getDeletionCertificate(certificateNumber);
 
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader(
@@ -141,8 +140,7 @@ export function registerComplianceRoutes(app: Express) {
         `attachment; filename="certificado-exclusao-${certificateNumber}.pdf"`
       );
 
-      const stream = createReadStream(filePath);
-      stream.pipe(res);
+      res.end(fileBuffer);
     } catch (error: any) {
       res.status(404).json({ error: error.message });
     }
@@ -282,13 +280,12 @@ export function registerComplianceRoutes(app: Express) {
       const { requestId } = req.params;
       const userId = req.user.id;
 
-      const filePath = await downloadExport(requestId, userId);
+      const fileBuffer = await downloadExport(requestId, userId);
 
       res.setHeader("Content-Type", "application/zip");
       res.setHeader("Content-Disposition", `attachment; filename="my-data-export.zip"`);
 
-      const stream = createReadStream(filePath);
-      stream.pipe(res);
+      res.end(fileBuffer);
     } catch (error: any) {
       res.status(404).json({ error: error.message });
     }

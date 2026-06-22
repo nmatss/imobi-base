@@ -12,6 +12,7 @@ import { ROLES } from "@shared/constants/roles";
 import { eq, or, and } from "drizzle-orm";
 import { createAuditLog } from "../routes-security";
 import { runWithAuthEmailRlsContext, runWithTenantRlsContext } from "../db-rls";
+import { issueOAuthState, consumeOAuthState } from "./oauth-state";
 
 // Google OAuth configuration
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
@@ -46,9 +47,6 @@ interface GoogleUserInfo {
 
 type OAuthUser = typeof users.$inferSelect;
 
-// State storage for OAuth flow (in production, use Redis)
-const oauthStateStore = new Map<string, { createdAt: number; redirectUrl?: string }>();
-
 function sanitizeRedirectUrl(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   if (!value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return undefined;
@@ -65,36 +63,6 @@ async function getAutoProvisionTenantId(): Promise<string | null> {
   return tenant?.id ?? null;
 }
 
-function generateState(): string {
-  const state = nanoid(32);
-  oauthStateStore.set(state, { createdAt: Date.now() });
-
-  // Clean up old states (older than 10 minutes)
-  setTimeout(() => {
-    const now = Date.now();
-    oauthStateStore.forEach((value, key) => {
-      if (now - value.createdAt > 10 * 60 * 1000) {
-        oauthStateStore.delete(key);
-      }
-    });
-  }, 1000);
-
-  return state;
-}
-
-function verifyState(state: string): boolean {
-  const record = oauthStateStore.get(state);
-  if (!record) return false;
-
-  // Check if state is not expired (10 minutes)
-  if (Date.now() - record.createdAt > 10 * 60 * 1000) {
-    oauthStateStore.delete(state);
-    return false;
-  }
-
-  return true;
-}
-
 export function registerGoogleOAuthRoutes(app: Express) {
 
   // Initiate Google OAuth flow
@@ -104,16 +72,9 @@ export function registerGoogleOAuthRoutes(app: Express) {
         return res.status(500).json({ error: "Google OAuth não configurado" });
       }
 
-      const state = generateState();
-
-      // Store redirect URL if provided
+      // State stateless via cookie assinado (serverless-safe).
       const redirectUrl = sanitizeRedirectUrl(req.query.redirect);
-      if (redirectUrl) {
-        const stateData = oauthStateStore.get(state);
-        if (stateData) {
-          stateData.redirectUrl = redirectUrl;
-        }
-      }
+      const state = issueOAuthState(res, "google", redirectUrl);
 
       const params = new URLSearchParams({
         client_id: GOOGLE_CLIENT_ID,
@@ -149,9 +110,11 @@ export function registerGoogleOAuthRoutes(app: Express) {
         return res.redirect(`/auth/login?error=missing_code`);
       }
 
-      if (!state || typeof state !== 'string' || !verifyState(state)) {
+      const stateResult = consumeOAuthState(req, res, "google", state);
+      if (!stateResult.valid) {
         return res.redirect(`/auth/login?error=invalid_state`);
       }
+      const oauthRedirectUrl = stateResult.redirectUrl;
 
       if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
         return res.redirect(`/auth/login?error=oauth_not_configured`);
@@ -224,7 +187,6 @@ export function registerGoogleOAuthRoutes(app: Express) {
         isNewUser = true;
         const tenantId = await getAutoProvisionTenantId();
         if (!tenantId) {
-          oauthStateStore.delete(state as string);
           return res.redirect(`/auth/login?error=oauth_account_not_found&provider=google`);
         }
 
@@ -306,12 +268,8 @@ export function registerGoogleOAuthRoutes(app: Express) {
               return res.redirect('/auth/login?error=login_failed');
             }
 
-            // Get redirect URL from state
-            const stateData = oauthStateStore.get(state as string);
-            const redirectUrl = stateData?.redirectUrl || '/dashboard';
-            oauthStateStore.delete(state as string);
-
-            res.redirect(redirectUrl);
+            // Redirect URL veio do state assinado (cookie), já consumido.
+            res.redirect(oauthRedirectUrl || '/dashboard');
           });
         });
       } else {

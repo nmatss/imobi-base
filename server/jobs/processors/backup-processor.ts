@@ -98,6 +98,19 @@ export async function runBackup(data: BackupJobData): Promise<BackupResult> {
     };
   }
 
+  // No runtime serverless da Vercel o binário pg_dump NÃO existe na imagem.
+  // Se chegamos aqui (sem ter assumido a postura de PITR gerenciado acima),
+  // qualquer tentativa de spawn resultaria num críptico "spawn pg_dump ENOENT".
+  // Falhamos com uma mensagem acionável apontando as duas estratégias válidas.
+  if (process.env.VERCEL) {
+    throw new Error(
+      'database-backup não pode executar pg_dump no runtime serverless da Vercel. ' +
+        'Use o Supabase PITR como DR oficial (SUPABASE_PITR_ENABLED=true + BACKUP_OPTIONAL=true) ' +
+        'ou rode um worker fora da Vercel com BACKUP_BUCKET + BACKUP_UPLOAD_URL_TEMPLATE. ' +
+        'Ver docs/DEPLOYMENT_RUNBOOK.md (seção de backup/DR).',
+    );
+  }
+
   const pgDumpArgs = [
     '-h',
     dbUrl.hostname,

@@ -20,6 +20,8 @@ import {
   interactions, followUps, contracts
 } from "@shared/schema-sqlite";
 import { eq, desc, and, inArray, sql } from "drizzle-orm";
+import rateLimit from "express-rate-limit";
+import { generateRateLimitKey } from "./middleware/rate-limit-key-generator";
 import { createAuditLog } from "./routes-security";
 import {
   runWithDigitalSignatureTokenRlsContext,
@@ -181,6 +183,17 @@ function formatLeadScoreResponse(
 }
 
 export function registerFeatureRoutes(app: Express) {
+  // Endpoints públicos de assinatura por token (sem auth): limitam enumeração
+  // de tokens e flood. Por IP (keyGenerator IPv6-safe).
+  const publicSignatureLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 30, // 30 req/15min por IP
+    message: { error: "Muitas tentativas. Tente novamente mais tarde." },
+    keyGenerator: generateRateLimitKey,
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   const requireAuth = (req: Request, res: Response, next: Function) => {
     if (!req.isAuthenticated?.() || !req.user) {
       return res.status(401).json({ error: "Não autenticado" });
@@ -864,7 +877,7 @@ export function registerFeatureRoutes(app: Express) {
   });
 
   // Get signature by token (public)
-  app.get("/api/signatures/token/:token", async (req, res) => {
+  app.get("/api/signatures/token/:token", publicSignatureLimiter, async (req, res) => {
     try {
       const { token } = req.params;
 
@@ -902,7 +915,7 @@ export function registerFeatureRoutes(app: Express) {
   });
 
   // Sign document
-  app.post("/api/signatures/token/:token/sign", async (req, res) => {
+  app.post("/api/signatures/token/:token/sign", publicSignatureLimiter, async (req, res) => {
     try {
       const { token } = req.params;
       const { signatureData, ipAddress, userAgent, geoLocation } = req.body;

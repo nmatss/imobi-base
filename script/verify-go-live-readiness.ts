@@ -202,6 +202,21 @@ function checkEnvironmentReadiness(): void {
     isPublicServiceUrl(value, ["redis:", "rediss:"]),
   );
   requireEnv("CRON_SECRET", "32+ char bearer secret for /api/cron/*", isStrongSecret);
+  requireEnv("PORTAL_JWT_SECRET", "32+ char secret for buyer/renter portal JWT (boot falha sem ele)", isStrongSecret);
+
+  // CORS_ORIGINS precisa estar explícito e SEM localhost em produção. O default
+  // do .env.example inclui localhost; copiá-lo cru abriria CORS para dev hosts.
+  const corsOrigins = process.env.CORS_ORIGINS;
+  const corsHasLocalhost = corsOrigins ? /localhost|127\.0\.0\.1|0\.0\.0\.0/i.test(corsOrigins) : false;
+  addResult(
+    "CORS origins",
+    corsOrigins && !corsHasLocalhost ? "pass" : "fail",
+    !corsOrigins
+      ? "CORS_ORIGINS ausente — defina origens de produção explicitamente"
+      : corsHasLocalhost
+        ? "CORS_ORIGINS não pode incluir localhost/loopback em produção"
+        : `configured: ${corsOrigins}`,
+  );
 
   const appUrl = process.env.APP_URL || process.env.SITE_URL || process.env.VITE_APP_URL;
   addResult(

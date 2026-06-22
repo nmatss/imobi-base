@@ -1981,8 +1981,17 @@ export async function registerRoutes(
 
       res.status(201).json({ success: true, lead: outcome.lead });
     } catch (error: unknown) {
+      // Endpoint PÚBLICO: nunca vazar a mensagem crua do erro em produção
+      // (pode conter detalhes de schema/DB). Log completo fica no servidor.
+      console.error("[/api/leads/public] error:", error);
+      const isProduction = process.env.NODE_ENV === "production";
       res.status(400).json({
-        error: error instanceof Error ? error.message : "Erro ao criar lead",
+        error:
+          isProduction
+            ? "Erro ao criar lead"
+            : error instanceof Error
+              ? error.message
+              : "Erro ao criar lead",
       });
     }
   });

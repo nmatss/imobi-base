@@ -81,12 +81,14 @@ export function registerAiActionRoutes(app: Express): void {
    */
   app.get("/api/ai/actions", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { status, targetType, targetId, actionType } = req.query;
+      const { status, targetType, targetId, actionType, limit } = req.query;
+      const parsedLimit = limit ? Number.parseInt(limit as string, 10) : undefined;
       const actions = await storage.getAiActionsByTenant(tenantOf(req), {
         status: status as string | undefined,
         targetType: targetType as string | undefined,
         targetId: targetId as string | undefined,
         actionType: actionType as string | undefined,
+        limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
       });
       res.json(actions);
     } catch (error: any) {

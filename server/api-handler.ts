@@ -13,6 +13,7 @@ import { registerAutoMarketingRoutes } from "./routes-auto-marketing";
 import { registerAVMRoutes as registerAvmRoutes } from "./routes-avm";
 import { registerIsaRoutes } from "./routes-isa";
 import { registerInspectionRoutes } from "./routes-inspections";
+import { registerOnboardingRoutes } from "./routes-onboarding";
 import { registerPortalRoutes } from "./routes-portal";
 import { registerExtensionRoutes } from "./routes-extensions";
 import { registerDocsRoutes } from "./routes-docs";
@@ -31,8 +32,16 @@ import { getCorsOrigins, isCorsOriginAllowed } from "./config/cors";
 const app = express();
 const httpServer = createServer(app);
 
-// Initialize and validate secrets FIRST (critical security)
-secretManager.initialize(process.env);
+// Initialize and validate secrets FIRST (critical security). Em serverless o
+// secret-manager lança se houver secret obrigatório ausente/fraco — capturamos
+// para o handler responder 503 (fail-closed) em vez de crashar o module load.
+let secretInitError: Error | null = null;
+try {
+  secretManager.initialize(process.env);
+} catch (err) {
+  secretInitError = err instanceof Error ? err : new Error(String(err));
+  console.error('Secret validation failed at startup:', secretInitError.message);
+}
 
 // Initialize Sentry (before any other middleware)
 initializeSentry(app);
@@ -188,6 +197,9 @@ const appReadyPromise: Promise<void> = (async () => {
   // Register inspection routes (vistoria digital)
   registerInspectionRoutes(app);
 
+  // Register onboarding routes (dados de exemplo pós-onboarding)
+  registerOnboardingRoutes(app);
+
   // Register portal routes (owner/renter self-service)
   registerPortalRoutes(app);
 
@@ -245,6 +257,18 @@ appReadyPromise
   });
 
 const handler = async (req: Request, res: Response, next: NextFunction) => {
+  // Fail-closed: secrets obrigatórios ausentes/fracos no boot → 503.
+  if (secretInitError) {
+    captureException(secretInitError, { phase: 'startup-secrets' });
+    const isProduction = process.env.NODE_ENV === "production";
+    res.status(503).json(
+      isProduction
+        ? { message: "Service temporarily unavailable" }
+        : { error: 'Secret validation failed', message: secretInitError.message },
+    );
+    return;
+  }
+
   try {
     // Block until routes are registered (cold-start race fix).
     await appReadyPromise;

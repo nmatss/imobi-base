@@ -162,6 +162,7 @@ echo ""
 
 SESSION_SECRET=$(openssl rand -base64 64 | tr -d '\n')
 CRON_SECRET=$(openssl rand -base64 48 | tr -d '\n')
+PORTAL_JWT_SECRET=$(openssl rand -base64 48 | tr -d '\n')
 CSRF_SECRET=$(openssl rand -base64 32 | tr -d '\n')
 ENCRYPTION_KEY=$(openssl rand -base64 32 | tr -d '\n')
 CLICKSIGN_WEBHOOK_SECRET=$(openssl rand -hex 32)
@@ -177,6 +178,7 @@ cat > "$SECRETS_FILE" << EOF
 
 SESSION_SECRET=$SESSION_SECRET
 CRON_SECRET=$CRON_SECRET
+PORTAL_JWT_SECRET=$PORTAL_JWT_SECRET
 CSRF_SECRET=$CSRF_SECRET
 ENCRYPTION_KEY=$ENCRYPTION_KEY
 CLICKSIGN_WEBHOOK_SECRET=$CLICKSIGN_WEBHOOK_SECRET
