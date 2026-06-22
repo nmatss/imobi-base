@@ -34,7 +34,15 @@ interface MigrationRecord {
   executed_at: Date;
 }
 
-const RLS_MIGRATION_FILENAME = 'RLS_enable.sql';
+// DB-2: o RLS e aplicado explicitamente (db:rls:apply), apos os pre-requisitos do
+// runbook (role nao-owner). Tanto o parent quanto as child tables ficam gated; antes
+// o child_tables vazava para o fluxo normal de db:migrate, podendo aplicar RLS nas
+// tabelas-filho antes do parent/policies. A ordem alfabetica garante parent primeiro
+// ("RLS_enable.sql" < "RLS_enable_child_tables.sql").
+const RLS_MIGRATION_FILENAMES = ['RLS_enable.sql', 'RLS_enable_child_tables.sql'];
+function isRlsMigration(filename: string): boolean {
+  return RLS_MIGRATION_FILENAMES.includes(filename);
+}
 
 async function runMigrations(options: { includeRls?: boolean; onlyRls?: boolean } = {}) {
   const databaseUrl = process.env.DATABASE_URL;
@@ -81,13 +89,16 @@ async function runMigrations(options: { includeRls?: boolean; onlyRls?: boolean 
     const sqlFiles = files
       .filter(f => f.endsWith('.sql'))
       .filter(f => !f.includes('README'))
-      .filter(f => options.includeRls || f !== RLS_MIGRATION_FILENAME)
-      .filter(f => !options.onlyRls || f === RLS_MIGRATION_FILENAME)
+      .filter(f => options.includeRls || !isRlsMigration(f))
+      .filter(f => !options.onlyRls || isRlsMigration(f))
       .sort(); // Alphabetical order ensures chronological execution
 
     log(`📁 Found ${sqlFiles.length} migration files`, 'blue');
-    if (!options.includeRls && files.includes(RLS_MIGRATION_FILENAME)) {
-      log(`🛡️  Skipping ${RLS_MIGRATION_FILENAME}; apply explicitly with "npm run db:rls:apply" after the RLS runbook prerequisites`, 'yellow');
+    if (!options.includeRls) {
+      const skipped = RLS_MIGRATION_FILENAMES.filter(f => files.includes(f));
+      if (skipped.length > 0) {
+        log(`🛡️  Skipping ${skipped.join(', ')}; apply explicitly with "npm run db:rls:apply" after the RLS runbook prerequisites`, 'yellow');
+      }
     }
 
     // Filter out already executed migrations
@@ -233,7 +244,7 @@ Database Migration Tool
 
 Usage:
   npm run db:migrate              - Run all pending migrations
-  npm run db:rls:apply            - Apply RLS_enable.sql explicitly
+  npm run db:rls:apply            - Apply RLS (parent + child tables) explicitly
   npm run db:migrate rollback     - Rollback last migration
   npm run db:migrate rollback FILENAME.sql - Rollback specific migration
   npm run db:migrate help         - Show this help
