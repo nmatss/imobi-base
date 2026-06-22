@@ -4,6 +4,14 @@ import { eq, and, desc, gte, sql, like, or, inArray } from "drizzle-orm";
 import { db, schema, isSqlite } from "./db";
 import { activeRowsFilter } from "./utils/soft-delete";
 import { normalizeWhatsAppIntegrationConfig } from "./integrations/whatsapp/phone-number-id";
+// ESC-1/PERF-4/arch-4: wire da camada de cache (antes morta). Degrada para no-op
+// quando Redis indisponivel (dev/test), entao e transparente para a suite.
+import {
+  getCachedDashboardStats,
+  InvalidateCache,
+  deleteCached,
+  CacheKeys,
+} from "./cache/query-cache";
 import { nanoid } from "nanoid";
 import type {
   Tenant, InsertTenant,
@@ -734,6 +742,7 @@ export class DbStorage implements IStorage {
       updatedAt: now(),
     };
     const [created] = await db.insert(schema.properties).values(data as any).returning();
+    await InvalidateCache.onPropertyChange(created.tenantId, created.id);
     return created;
   }
 
@@ -798,6 +807,7 @@ export class DbStorage implements IStorage {
       updatedAt: now(),
     };
     const [created] = await db.insert(schema.leads).values(data as any).returning();
+    await InvalidateCache.onLeadChange(created.tenantId, created.id);
     return created;
   }
 
@@ -855,6 +865,7 @@ export class DbStorage implements IStorage {
       createdAt: now(),
     };
     const [created] = await db.insert(schema.visits).values(data as any).returning();
+    await deleteCached(CacheKeys.dashboardStats(created.tenantId));
     return created;
   }
 
@@ -885,6 +896,7 @@ export class DbStorage implements IStorage {
   async createContract(contract: InsertContract): Promise<Contract> {
     const id = generateId();
     const [created] = await db.insert(schema.contracts).values({ ...contract, id, createdAt: now(), updatedAt: now() }).returning();
+    await deleteCached(CacheKeys.dashboardStats(created.tenantId));
     return created;
   }
 
@@ -1004,24 +1016,28 @@ export class DbStorage implements IStorage {
 
   // Dashboard stats
   async getDashboardStats(tenantId: string): Promise<{ totalProperties: number; totalLeads: number; totalContracts: number; totalVisits: number }> {
-    // PERF-1: agregar com count(*) no banco em vez de carregar tabelas inteiras
-    // em memoria so para contar. count(*) sem cast ::int para manter compat SQLite.
-    const countOf = async (table: any): Promise<number> => {
-      const [row] = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(table)
-        .where(eq(table.tenantId, tenantId));
-      return Number(row?.count ?? 0);
-    };
+    // PERF-4/ESC-1: cache com TTL 60s (staleness limitada e aceitavel para o
+    // dashboard); invalidado nos creates de lead/property/contract/visit.
+    return getCachedDashboardStats(tenantId, async () => {
+      // PERF-1: agregar com count(*) no banco em vez de carregar tabelas inteiras
+      // em memoria so para contar. count(*) sem cast ::int para manter compat SQLite.
+      const countOf = async (table: any): Promise<number> => {
+        const [row] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(table)
+          .where(eq(table.tenantId, tenantId));
+        return Number(row?.count ?? 0);
+      };
 
-    const [totalProperties, totalLeads, totalContracts, totalVisits] = await Promise.all([
-      countOf(schema.properties),
-      countOf(schema.leads),
-      countOf(schema.contracts),
-      countOf(schema.visits),
-    ]);
+      const [totalProperties, totalLeads, totalContracts, totalVisits] = await Promise.all([
+        countOf(schema.properties),
+        countOf(schema.leads),
+        countOf(schema.contracts),
+        countOf(schema.visits),
+      ]);
 
-    return { totalProperties, totalLeads, totalContracts, totalVisits };
+      return { totalProperties, totalLeads, totalContracts, totalVisits };
+    });
   }
 
   // Owners

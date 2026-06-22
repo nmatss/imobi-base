@@ -54,9 +54,16 @@ function getRedisClient(): Redis | null {
     return null;
   }
 
+  // Sem REDIS_URL: cache desabilitado (no-op). NUNCA cair para localhost:6379, que
+  // em serverless/test/dev-sem-redis geraria reconexao/latencia a cada query em vez
+  // de simplesmente nao cachear. Defina REDIS_URL para ligar o cache.
+  if (!process.env.REDIS_URL) {
+    return null;
+  }
+
   if (!redisClient) {
     try {
-      const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+      const redisUrl = process.env.REDIS_URL;
 
       redisClient = new Redis(redisUrl, {
         maxRetriesPerRequest: 3,
