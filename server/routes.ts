@@ -48,6 +48,7 @@ import connectPg from "connect-pg-simple";
 import pkg from "pg";
 import rateLimit from "express-rate-limit";
 import RedisStore from "rate-limit-redis";
+import * as Sentry from "@sentry/node";
 import helmet from "helmet";
 import cors from "cors";
 import {
@@ -629,8 +630,18 @@ export async function registerRoutes(
           prefix,
         });
       console.log("[RateLimit] Using Redis store");
-    } catch {
+    } catch (error) {
+      // ESC-6: REDIS_URL configurada mas o store Redis falhou — degradacao para
+      // memoria (limite por instancia => multiplicado em multi-instancia). Isso e
+      // um incidente operacional, nao um estado de config esperado: alerta no Sentry.
       console.log("[RateLimit] Redis not available, using in-memory store");
+      Sentry.captureMessage(
+        "RateLimit degradado para store em memoria: REDIS_URL setada mas Redis indisponivel. Limite efetivo se multiplica entre instancias serverless.",
+        "warning",
+      );
+      Sentry.captureException(error, {
+        tags: { component: "rate-limit", action: "redis-store-init" },
+      });
     }
   } else {
     console.log("[RateLimit] REDIS_URL not set, using in-memory store");
