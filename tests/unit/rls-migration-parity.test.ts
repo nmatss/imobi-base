@@ -155,9 +155,13 @@ describe("RLS migration parity", () => {
     expect(comparisonsPolicy).toContain("WITH CHECK (\n        tenant_id = current_setting('app.tenant_id', true)");
   });
 
-  it("keeps RLS migration out of the default migration run", () => {
-    expect(migrateScript).toContain("RLS_MIGRATION_FILENAME");
-    expect(migrateScript).toContain("options.includeRls || f !== RLS_MIGRATION_FILENAME");
+  it("keeps RLS migrations (parent + child) out of the default migration run", () => {
+    // DB-2: parent e child tables sao gatilhados juntos e aplicados via db:rls:apply.
+    expect(migrateScript).toContain("RLS_MIGRATION_FILENAMES");
+    expect(migrateScript).toContain("RLS_enable.sql");
+    expect(migrateScript).toContain("RLS_enable_child_tables.sql");
+    expect(migrateScript).toContain("options.includeRls || !isRlsMigration(f)");
+    expect(migrateScript).toContain("!options.onlyRls || isRlsMigration(f)");
     expect(migrateScript).toContain("runMigrations({ includeRls: true, onlyRls: true })");
   });
 });

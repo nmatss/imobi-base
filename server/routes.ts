@@ -86,7 +86,7 @@ import { subscriptionGuard } from "./middleware/subscription-guard";
 import { validateResourceTenant } from "./middleware/tenant-resource";
 import { assertVisitSchedulePolicy } from "./services/visit-scheduling";
 import { summarizeLeadSla } from "./services/lead-sla";
-import { applyLeadDedupAndAssign } from "./services/lead-intake";
+import { applyLeadDedupAndAssign, createLeadDeduped } from "./services/lead-intake";
 
 // ===== ERROR HELPER =====
 function toHttpError(error: unknown): { status: number; message: string } {
@@ -1965,7 +1965,12 @@ export async function registerRoutes(
           return { status: "duplicate" as const, existingLead: intake.existingLead };
         }
 
-        return { status: "created" as const, lead: await storage.createLead(intake.leadData) };
+        // ACT-2: resolve a corrida de de-dup (indice unico) como duplicata.
+        const result = await createLeadDeduped(data.tenantId, intake.leadData);
+        if (result.duplicate) {
+          return { status: "duplicate" as const, existingLead: result.existingLead };
+        }
+        return { status: "created" as const, lead: result.lead };
       });
 
       if (outcome.status === "limit") {
@@ -2072,8 +2077,15 @@ export async function registerRoutes(
           existingLeadId: intake.existingLead?.id,
         });
       }
-      const lead = await storage.createLead(intake.leadData);
-      apiResponse(res, lead, undefined, 201);
+      // ACT-2: resolve a corrida de de-dup (indice unico) como duplicata 409,
+      // em vez de deixar a violacao virar 400/500 generico sob concorrencia.
+      const result = await createLeadDeduped(req.user!.tenantId, intake.leadData);
+      if (result.duplicate) {
+        return apiError(res, 409, "Lead duplicado para este telefone/email", "LEAD_DUPLICATE", {
+          existingLeadId: result.existingLead?.id,
+        });
+      }
+      apiResponse(res, result.lead, undefined, 201);
     } catch (error: unknown) {
       apiError(
         res,

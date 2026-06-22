@@ -20,6 +20,7 @@
 import { storage } from "../storage";
 import { normalizePhone, normalizeEmail } from "./lead-dedup";
 import { getNextBroker, type LeadDistributionPort } from "./lead-distribution";
+import { isUniqueViolation } from "../utils/db-errors";
 
 // Use the storage's own lead row type (pg-vs-sqlite agnostic) rather than the
 // `@shared/schema` row type, whose timestamp typing (Date) diverges from what the
@@ -92,4 +93,37 @@ export async function applyLeadDedupAndAssign<T extends LeadIntakeInput>(
   }
 
   return { duplicate: false, leadData: enriched, assignedBrokerId };
+}
+
+/**
+ * ACT-2 — Cria o lead resolvendo a corrida de de-dup de forma deterministica.
+ *
+ * `findLeadByDedup` + `createLead` em dois passos tem uma janela: duas requisicoes
+ * concorrentes (ex.: o mesmo lead submetido duas vezes no formulario publico) podem
+ * ambas passar o lookup e tentar inserir. O indice unico parcial
+ * (`leads_tenant_phone_uniq` / `leads_tenant_email_uniq`) e a fonte de verdade
+ * atomica: a segunda insercao falha com violacao de unicidade. Aqui capturamos essa
+ * violacao e a tratamos como duplicata (mesma resposta do caminho sem corrida),
+ * em vez de deixar virar um 500 generico.
+ */
+export async function createLeadDeduped<T extends LeadIntakeInput>(
+  tenantId: string,
+  leadData: T,
+): Promise<
+  | { duplicate: false; lead: StoredLead }
+  | { duplicate: true; existingLead?: StoredLead }
+> {
+  try {
+    const lead = (await storage.createLead(leadData as never)) as StoredLead;
+    return { duplicate: false, lead };
+  } catch (error) {
+    if (!isUniqueViolation(error)) throw error;
+    // Corrida perdida: outra requisicao criou o lead primeiro. Recupera o vencedor.
+    const existingLead = await storage.findLeadByDedup(
+      tenantId,
+      normalizePhone(leadData.phone),
+      normalizeEmail(leadData.email),
+    );
+    return { duplicate: true, existingLead };
+  }
 }

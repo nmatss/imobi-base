@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { db, isSqlite, schema } from "../db";
+import { isUniqueViolation } from "../utils/db-errors";
 
 export type WebhookProvider = "stripe" | "mercadopago" | "clicksign" | "whatsapp" | "twilio";
 export type WebhookEventStatus = "processing" | "processed" | "failed";
@@ -175,16 +176,6 @@ function normalizeStatus(status: string): WebhookEventStatus {
     return status;
   }
   return "processing";
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  const maybe = error as { code?: string; message?: string };
-  return (
-    maybe.code === "23505" ||
-    maybe.code === "SQLITE_CONSTRAINT_UNIQUE" ||
-    maybe.code === "SQLITE_CONSTRAINT" ||
-    /unique|duplicate/i.test(maybe.message ?? "")
-  );
 }
 
 function nowForDatabase(): Date | string {
