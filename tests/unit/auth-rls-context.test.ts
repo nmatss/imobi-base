@@ -19,12 +19,18 @@ describe("Auth RLS contexts", () => {
   it("uses auth email and tenant contexts in OAuth providers", () => {
     const google = readProjectFile("server/auth/oauth-google.ts");
     const microsoft = readProjectFile("server/auth/oauth-microsoft.ts");
+    const provisioning = readProjectFile("server/auth/oauth-provisioning.ts");
 
     for (const source of [google, microsoft]) {
       expect(source).toContain("runWithAuthEmailRlsContext(");
       expect(source).toContain("runWithTenantRlsContext(user.tenantId");
-      expect(source).toContain("runWithTenantRlsContext(tenantId");
     }
+    // Google: branch white-label cria membro em tenant fixo sob contexto RLS.
+    expect(google).toContain("runWithTenantRlsContext(overrideTenantId");
+    // Microsoft mantém o provisionamento legado por tenant id.
+    expect(microsoft).toContain("runWithTenantRlsContext(tenantId");
+    // Novo signup multi-tenant via SSO provisiona sob o contexto RLS do novo tenant.
+    expect(provisioning).toContain("runWithTenantRlsContext(tenant.id");
   });
 
   it("uses token hash contexts for password reset and email verification", () => {

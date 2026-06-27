@@ -64,8 +64,10 @@ export interface VisitNotificationContext {
 
 function buildWhatsAppBody(ctx: VisitNotificationContext): string {
   const propertyLabel = (ctx.property as any)?.title || (ctx.property as any)?.address || "o imóvel";
+  const meetUrl = (ctx.visit as any)?.googleMeetUrl as string | undefined;
   return [
     `Olá${ctx.lead?.name ? ` ${ctx.lead.name}` : ""}! Sua visita a ${propertyLabel} está agendada para ${ctx.scheduledForLabel}.`,
+    ...(meetUrl ? ["", `Link da videochamada (Google Meet): ${meetUrl}`] : []),
     "",
     `Confirmar: ${ctx.confirmUrl}`,
     `Reagendar: ${ctx.rescheduleUrl}`,
@@ -78,6 +80,7 @@ function buildEmailHtml(ctx: VisitNotificationContext): string {
     <div style="font-family:Arial,sans-serif;font-size:15px;color:#1f2937">
       <p>Olá${ctx.lead?.name ? ` ${ctx.lead.name}` : ""},</p>
       <p>Sua visita a <strong>${propertyLabel}</strong> está agendada para <strong>${ctx.scheduledForLabel}</strong>.</p>
+      ${(ctx.visit as any)?.googleMeetUrl ? `<p>Videochamada (Google Meet): <a href="${(ctx.visit as any).googleMeetUrl}">${(ctx.visit as any).googleMeetUrl}</a></p>` : ""}
       <p>
         <a href="${ctx.confirmUrl}" style="display:inline-block;padding:10px 18px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none;margin-right:8px">Confirmar visita</a>
         <a href="${ctx.rescheduleUrl}" style="display:inline-block;padding:10px 18px;background:#e5e7eb;color:#111827;border-radius:8px;text-decoration:none">Reagendar</a>

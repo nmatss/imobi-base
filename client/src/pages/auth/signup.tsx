@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { Logo, LogoIcon } from "@/components/brand/logo";
 import { SeoHead } from "@/components/seo/SeoHead";
+import { OAuthButtons } from "@/components/auth/OAuthButtons";
 
 function slugify(text: string): string {
   return text
@@ -339,6 +340,8 @@ export default function SignupPage() {
               <span className="bg-background px-2 text-muted-foreground">ou</span>
             </div>
           </div>
+
+          <OAuthButtons action="signup" />
 
           <p className="text-center text-sm text-muted-foreground">
             Já tem uma conta?{" "}

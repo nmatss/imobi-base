@@ -78,6 +78,21 @@ const SECRET_CONFIGS: Record<string, SecretConfig> = {
     minLength: 32,
     description: 'Secret for authenticating Vercel Cron job requests',
   },
+  ENCRYPTION_KEY: {
+    required: false,
+    minLength: 32,
+    description: 'AES-256-GCM key for encrypting OAuth/integration tokens at rest',
+  },
+  GOOGLE_CLIENT_ID: {
+    required: false,
+    pattern: /\.apps\.googleusercontent\.com$/,
+    description: 'Google OAuth 2.0 client ID (SSO + Calendar/Meet)',
+  },
+  GOOGLE_CLIENT_SECRET: {
+    required: false,
+    pattern: /^GOCSPX-/,
+    description: 'Google OAuth 2.0 client secret',
+  },
 };
 
 class SecretManager {

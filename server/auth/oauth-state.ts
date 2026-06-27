@@ -44,22 +44,27 @@ function cookieName(provider: string): string {
 interface StatePayload {
   state: string;
   redirectUrl?: string;
+  /** Metadados assinados (ex.: userId/tenantId no connect de Calendar). */
+  meta?: Record<string, string>;
   exp: number;
 }
 
 /**
  * Gera o state, grava o cookie assinado e retorna o valor do `state` para a URL
- * de autorização do provedor.
+ * de autorização do provedor. `meta` é assinado junto (não confiar em dados não
+ * assinados no callback).
  */
 export function issueOAuthState(
   res: Response,
   provider: string,
   redirectUrl?: string,
+  meta?: Record<string, string>,
 ): string {
   const state = randomBytes(24).toString("base64url");
   const payload: StatePayload = {
     state,
     redirectUrl,
+    meta,
     exp: Date.now() + STATE_TTL_MS,
   };
   const body = base64url(JSON.stringify(payload));
@@ -85,7 +90,7 @@ export function consumeOAuthState(
   res: Response,
   provider: string,
   state: unknown,
-): { valid: boolean; redirectUrl?: string } {
+): { valid: boolean; redirectUrl?: string; meta?: Record<string, string> } {
   const name = cookieName(provider);
   const raw = (req as any).cookies?.[name] as string | undefined;
   // Limpa o cookie independentemente do resultado (single-use).
@@ -118,5 +123,5 @@ export function consumeOAuthState(
     return { valid: false };
   }
 
-  return { valid: true, redirectUrl: payload.redirectUrl };
+  return { valid: true, redirectUrl: payload.redirectUrl, meta: payload.meta };
 }

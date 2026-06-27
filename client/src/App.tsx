@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Toaster } from "@/components/ui/sonner";
 import { Logo, LogoIcon } from "@/components/brand/logo";
 import { SeoHead } from "@/components/seo/SeoHead";
+import { OAuthButtons } from "@/components/auth/OAuthButtons";
 import { isSuperAdminRole } from "@shared/constants/roles";
 
 // Lazy-loaded components for better code splitting
@@ -33,6 +34,7 @@ const PublicProperties = lazy(() => import("@/pages/public/properties"));
 const ProductLanding = lazy(() => import("@/pages/public/product-landing"));
 const SolutionPage = lazy(() => import("@/pages/public/solution-page"));
 const SignupPage = lazy(() => import("@/pages/auth/signup"));
+const AgencyOnboardingPage = lazy(() => import("@/pages/onboarding/agency"));
 const ForgotPasswordPage = lazy(() => import("@/pages/auth/ForgotPassword"));
 const ResetPasswordPage = lazy(() => import("@/pages/auth/ResetPassword"));
 const VerifyEmailPage = lazy(() => import("@/pages/auth/VerifyEmail"));
@@ -257,7 +259,9 @@ function LoginPage() {
               <span className="bg-background px-2 text-muted-foreground">ou</span>
             </div>
           </div>
-          
+
+          <OAuthButtons action="login" />
+
           <p className="text-center text-sm text-muted-foreground">
             Não tem uma conta?{" "}
             <Link href="/signup" className="text-primary font-medium hover:underline">Criar conta grátis</Link>
@@ -359,6 +363,7 @@ function Router() {
         <Route key="forgot-password" path="/auth/forgot-password" component={() => <ErrorBoundary><ForgotPasswordPage /></ErrorBoundary>} />
         <Route key="reset-password" path="/auth/reset-password" component={() => <ErrorBoundary><ResetPasswordPage /></ErrorBoundary>} />
         <Route key="verify-email" path="/auth/verify-email" component={() => <ErrorBoundary><VerifyEmailPage /></ErrorBoundary>} />
+        <Route key="onboarding-agency" path="/onboarding/agency" component={() => <ErrorBoundary><AgencyOnboardingPage /></ErrorBoundary>} />
         <Route key="pricing" path="/pricing" component={() => <ErrorBoundary><PricingPage /></ErrorBoundary>} />
         <Route key="termos" path="/termos" component={() => <ErrorBoundary><TermsPage /></ErrorBoundary>} />
         <Route key="privacidade" path="/privacidade" component={() => <ErrorBoundary><PrivacyPage /></ErrorBoundary>} />

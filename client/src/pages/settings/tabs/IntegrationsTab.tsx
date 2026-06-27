@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
+import { GoogleCalendarCard } from "./GoogleCalendarCard";
 
 interface IntegrationConfig {
   name: string;
@@ -227,6 +228,9 @@ export function IntegrationsTab() {
           </div>
         </div>
       </div>
+
+      {/* Google Agenda + Meet (fluxo OAuth por corretor) */}
+      <GoogleCalendarCard />
 
       {/* Integrations Grid */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">

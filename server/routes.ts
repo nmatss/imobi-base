@@ -76,6 +76,8 @@ import { registerFeatureRoutes } from "./routes-features";
 import { registerPaymentRoutes } from "./routes-payments";
 import { registerAdminBootstrapRoutes } from "./routes-admin-bootstrap";
 import { registerCronRoutes } from "./routes-cron";
+import { registerGoogleCalendarRoutes } from "./routes-google-calendar";
+import { syncVisitToGoogle, removeVisitFromGoogle } from "./integrations/google-calendar/service";
 import mapsRouter from "./routes-maps";
 import analyticsRouter from "./routes-analytics";
 import { secretManager } from "./security/secret-manager";
@@ -1580,6 +1582,56 @@ export async function registerRoutes(
     }
   });
 
+  // Completa o onboarding de uma imobiliária criada via SSO (Google/Microsoft).
+  // O usuário já está autenticado (sessão criada no callback OAuth); aqui ele
+  // refina nome/slug da empresa e marca onboarding_completed = true.
+  app.post("/api/auth/complete-onboarding", requireAuth, async (req, res) => {
+    try {
+      const user = req.user!;
+      if (user.role !== "admin") {
+        return apiError(res, 403, "Apenas o administrador pode concluir o cadastro da imobiliária", "FORBIDDEN");
+      }
+
+      const { companyName, slug, phone } = req.body ?? {};
+      if (!companyName || typeof companyName !== "string" || companyName.trim().length < 2) {
+        return apiError(res, 400, "Informe o nome da imobiliária", "INVALID_NAME");
+      }
+
+      const normalizedSlug = String(slug || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "");
+      if (normalizedSlug.length < 3) {
+        return apiError(res, 400, "O identificador (slug) deve ter pelo menos 3 caracteres", "INVALID_SLUG");
+      }
+
+      // Slug único (permitindo o slug atual do próprio tenant).
+      const slugOwner = await storage.getTenantBySlug(normalizedSlug);
+      if (slugOwner && slugOwner.id !== user.tenantId) {
+        return apiError(res, 409, "Este identificador já está em uso. Escolha outro.", "SLUG_TAKEN");
+      }
+
+      const updated = await runWithTenantRlsContext(user.tenantId, () =>
+        storage.updateTenant(user.tenantId, {
+          name: companyName.trim(),
+          slug: normalizedSlug,
+          phone: typeof phone === "string" && phone.trim() ? phone.trim() : undefined,
+          onboardingCompleted: true,
+        }),
+      );
+
+      if (!updated) {
+        return apiError(res, 404, "Tenant não encontrado", "TENANT_NOT_FOUND");
+      }
+
+      apiResponse(res, { tenant: updated });
+    } catch (error: unknown) {
+      console.error("Error in /api/auth/complete-onboarding:", error);
+      apiError(res, 500, "Erro ao concluir cadastro da imobiliária", "INTERNAL_ERROR");
+    }
+  });
+
   // Session refresh endpoint
   app.post("/api/auth/refresh", requireAuth, async (req, res) => {
     try {
@@ -2072,6 +2124,8 @@ export async function registerRoutes(
         status: data.status,
       }, storage);
       const visit = await storage.createVisit(data);
+      // Sincroniza com o Google Agenda do corretor (best-effort; nunca lança).
+      await syncVisitToGoogle(visit.id);
       res.status(201).json(visit);
     } catch (error: unknown) {
       const httpErr = toHttpError(error);
@@ -2122,6 +2176,8 @@ export async function registerRoutes(
       const visit = await storage.updateVisit(req.params.id, updateData);
       if (!visit)
         return res.status(404).json({ error: "Visita não encontrada" });
+      // Reflete a mudança no Google Agenda do corretor (best-effort).
+      await syncVisitToGoogle(visit.id);
       res.json(visit);
     } catch (error: unknown) {
       const httpErr = toHttpError(error);
@@ -2139,6 +2195,8 @@ export async function registerRoutes(
       const success = await storage.deleteVisit(req.params.id);
       if (!success)
         return res.status(404).json({ error: "Visita não encontrada" });
+      // Remove o evento espelhado no Google Agenda (best-effort).
+      if (visit) await removeVisitFromGoogle(visit);
       res.json({ success: true });
     } catch (error: unknown) {
       const httpErr = toHttpError(error);
@@ -4304,6 +4362,9 @@ export async function registerRoutes(
 
   // Register analytics routes
   app.use("/api/analytics", analyticsRouter);
+
+  // Register Google Calendar (per-corretor) connection + sync routes
+  registerGoogleCalendarRoutes(app, { requireAuth });
 
   // Register Vercel Cron endpoints (protected by CRON_SECRET)
   registerCronRoutes(app);

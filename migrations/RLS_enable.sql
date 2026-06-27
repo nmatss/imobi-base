@@ -888,4 +888,17 @@ CREATE POLICY tenant_isolation ON "signature_certificates"
         tenant_id = current_setting('app.tenant_id', true)
     );
 
+-- ---- user_calendar_connections -------------------------------------------------------------------
+ALTER TABLE "user_calendar_connections" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "user_calendar_connections" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "user_calendar_connections";
+CREATE POLICY tenant_isolation ON "user_calendar_connections"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
 COMMIT;

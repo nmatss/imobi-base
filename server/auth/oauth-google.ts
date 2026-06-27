@@ -13,6 +13,8 @@ import { eq, or, and } from "drizzle-orm";
 import { createAuditLog } from "../routes-security";
 import { runWithAuthEmailRlsContext, runWithTenantRlsContext } from "../db-rls";
 import { issueOAuthState, consumeOAuthState } from "./oauth-state";
+import { encryptSecret } from "../security/token-encryption";
+import { provisionOAuthTenantAndOwner } from "./oauth-provisioning";
 
 // Google OAuth configuration
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
@@ -156,8 +158,13 @@ export function registerGoogleOAuthRoutes(app: Express) {
           .limit(1),
       );
 
+      // Tokens de terceiros são criptografados em repouso (AES-256-GCM).
+      const encAccessToken = encryptSecret(access_token);
+      const encRefreshToken = encryptSecret(refresh_token || null);
+
       let user: OAuthUser;
       let isNewUser = false;
+      let needsOnboarding = false;
 
       if (existingUserList.length > 0) {
         user = existingUserList[0];
@@ -167,8 +174,8 @@ export function registerGoogleOAuthRoutes(app: Express) {
           await runWithTenantRlsContext(user.tenantId, () =>
             db.update(users)
               .set({
-                oauthAccessToken: access_token,
-                oauthRefreshToken: refresh_token || user.oauthRefreshToken,
+                oauthAccessToken: encAccessToken,
+                oauthRefreshToken: encRefreshToken || user.oauthRefreshToken,
                 lastLogin: new Date().toISOString(),
                 lastLoginIp: req.ip || req.headers['x-forwarded-for']?.toString() || null,
                 avatar: googleUser.picture || user.avatar,
@@ -183,49 +190,75 @@ export function registerGoogleOAuthRoutes(app: Express) {
         }
 
       } else {
-        // Create new user only when an explicit tenant was configured and verified.
         isNewUser = true;
-        const tenantId = await getAutoProvisionTenantId();
-        if (!tenantId) {
-          return res.redirect(`/auth/login?error=oauth_account_not_found&provider=google`);
-        }
+        const overrideTenantId = await getAutoProvisionTenantId();
 
-        const userId = nanoid();
+        if (overrideTenantId) {
+          // Modo white-label: usuário entra como MEMBER em um tenant fixo.
+          const userId = nanoid();
+          user = await runWithTenantRlsContext(overrideTenantId, async () => {
+            await db.insert(users).values({
+              id: userId,
+              tenantId: overrideTenantId,
+              name: googleUser.name,
+              email: googleUser.email,
+              password: '', // No password for OAuth users
+              role: ROLES.MEMBER,
+              avatar: googleUser.picture,
+              emailVerified: googleUser.verified_email,
+              oauthProvider: 'google',
+              oauthId: googleUser.id,
+              oauthAccessToken: encAccessToken,
+              oauthRefreshToken: encRefreshToken || null,
+              lastLogin: new Date().toISOString(),
+              lastLoginIp: req.ip || req.headers['x-forwarded-for']?.toString() || null,
+            });
 
-        user = await runWithTenantRlsContext(tenantId, async () => {
-          await db.insert(users).values({
-            id: userId,
-            tenantId,
+            const createdUser = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0];
+
+            await createAuditLog(
+              createdUser.tenantId,
+              createdUser.id,
+              'account_created',
+              'user',
+              createdUser.id,
+              null,
+              { provider: 'google', email: createdUser.email },
+              req
+            );
+
+            return createdUser;
+          });
+        } else {
+          // SaaS multi-tenant: provisiona nova imobiliária + admin e leva ao
+          // onboarding para refinar nome/slug da empresa.
+          const { userId } = await provisionOAuthTenantAndOwner({
             name: googleUser.name,
             email: googleUser.email,
-            password: '', // No password for OAuth users
-            role: ROLES.MEMBER,
             avatar: googleUser.picture,
-            emailVerified: googleUser.verified_email,
             oauthProvider: 'google',
             oauthId: googleUser.id,
-            oauthAccessToken: access_token,
-            oauthRefreshToken: refresh_token || null,
-            lastLogin: new Date().toISOString(),
-            lastLoginIp: req.ip || req.headers['x-forwarded-for']?.toString() || null,
+            oauthAccessToken: encAccessToken,
+            oauthRefreshToken: encRefreshToken,
+            emailVerified: googleUser.verified_email,
           });
 
-          const createdUser = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0];
+          user = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0];
+          needsOnboarding = true;
 
-          // Audit log for new account
-          await createAuditLog(
-            createdUser.tenantId,
-            createdUser.id,
-            'account_created',
-            'user',
-            createdUser.id,
-            null,
-            { provider: 'google', email: createdUser.email },
-            req
+          await runWithTenantRlsContext(user.tenantId, () =>
+            createAuditLog(
+              user.tenantId,
+              user.id,
+              'account_created',
+              'user',
+              user.id,
+              null,
+              { provider: 'google', email: user.email, onboarding: true },
+              req
+            ),
           );
-
-          return createdUser;
-        });
+        }
       }
 
       await runWithTenantRlsContext(user.tenantId, async () => {
@@ -268,8 +301,9 @@ export function registerGoogleOAuthRoutes(app: Express) {
               return res.redirect('/auth/login?error=login_failed');
             }
 
-            // Redirect URL veio do state assinado (cookie), já consumido.
-            res.redirect(oauthRedirectUrl || '/dashboard');
+            // Novo tenant via SSO: leva ao onboarding antes do dashboard.
+            // Caso contrário, usa o redirect do state assinado (cookie).
+            res.redirect(needsOnboarding ? '/onboarding/agency' : (oauthRedirectUrl || '/dashboard'));
           });
         });
       } else {

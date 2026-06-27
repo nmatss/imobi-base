@@ -15,6 +15,7 @@ export const tenants = sqliteTable("tenants", {
   phone: text("phone"),
   email: text("email"),
   address: text("address"),
+  onboardingCompleted: integer("onboarding_completed", { mode: "boolean" }).notNull().default(true),
   createdAt: text("created_at").notNull().default(now()),
   deletedAt: text("deleted_at"), // soft delete (paridade com schema.ts/PG)
 });
@@ -142,12 +143,40 @@ export const visits = sqliteTable("visits", {
   feedbackAt: text("feedback_at"),
   nextActionType: text("next_action_type"),
   nextActionDueAt: text("next_action_due_at"),
+  // Google Calendar / Meet sync (paridade com schema.ts/PG)
+  googleCalendarEventId: text("google_calendar_event_id"),
+  googleMeetUrl: text("google_meet_url"),
+  googleSyncState: text("google_sync_state"),
+  googleSyncError: text("google_sync_error"),
+  lastSyncedAt: text("last_synced_at"),
   createdAt: text("created_at").notNull().default(now()),
 });
 
 export const insertVisitSchema = createInsertSchema(visits).omit({ id: true, createdAt: true });
 export type InsertVisit = z.infer<typeof insertVisitSchema>;
 export type Visit = typeof visits.$inferSelect;
+
+// Conexão Google Calendar por usuário/corretor (paridade com schema.ts/PG).
+export const userCalendarConnections = sqliteTable("user_calendar_connections", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id").notNull().references(() => users.id),
+  provider: text("provider").notNull().default("google"),
+  googleEmail: text("google_email"),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  tokenExpiresAt: text("token_expires_at"),
+  scope: text("scope"),
+  calendarId: text("calendar_id").notNull().default("primary"),
+  syncEnabled: integer("sync_enabled", { mode: "boolean" }).notNull().default(true),
+  lastError: text("last_error"),
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertUserCalendarConnectionSchema = createInsertSchema(userCalendarConnections).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserCalendarConnection = z.infer<typeof insertUserCalendarConnectionSchema>;
+export type UserCalendarConnection = typeof userCalendarConnections.$inferSelect;
 
 export const contracts = sqliteTable("contracts", {
   id: text("id").primaryKey(),

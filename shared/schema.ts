@@ -13,6 +13,7 @@ export const tenants = pgTable("tenants", {
   phone: text("phone"),
   email: text("email"),
   address: text("address"),
+  onboardingCompleted: boolean("onboarding_completed").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   deletedAt: timestamp("deleted_at"),
 });
@@ -141,12 +142,41 @@ export const visits = pgTable("visits", {
   feedbackAt: timestamp("feedback_at"),
   nextActionType: text("next_action_type"),
   nextActionDueAt: timestamp("next_action_due_at"),
+  // Google Calendar / Meet sync (preenchido pelo corretor conectado em Configurações)
+  googleCalendarEventId: text("google_calendar_event_id"),
+  googleMeetUrl: text("google_meet_url"),
+  googleSyncState: text("google_sync_state"), // synced | failed | skipped | null
+  googleSyncError: text("google_sync_error"),
+  lastSyncedAt: timestamp("last_synced_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const insertVisitSchema = createInsertSchema(visits).omit({ id: true, createdAt: true });
 export type InsertVisit = z.infer<typeof insertVisitSchema>;
 export type Visit = typeof visits.$inferSelect;
+
+// Conexão Google Calendar por usuário/corretor (token com scope calendar.events,
+// separado do login SSO). Tokens armazenados criptografados (token-encryption).
+export const userCalendarConnections = pgTable("user_calendar_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  provider: text("provider").notNull().default("google"),
+  googleEmail: text("google_email"),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  scope: text("scope"),
+  calendarId: text("calendar_id").notNull().default("primary"),
+  syncEnabled: boolean("sync_enabled").notNull().default(true),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertUserCalendarConnectionSchema = createInsertSchema(userCalendarConnections).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserCalendarConnection = z.infer<typeof insertUserCalendarConnectionSchema>;
+export type UserCalendarConnection = typeof userCalendarConnections.$inferSelect;
 
 export const contracts = pgTable("contracts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
