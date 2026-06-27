@@ -28,6 +28,7 @@ Indice central de toda a documentacao do projeto.
 | [PROMPT_MASTER_AUDITORIA.md](docs/prompts/PROMPT_MASTER_AUDITORIA.md)            | Prompt mestre de auditoria/evolucao 360 (16 fases)    |
 | [PLANO_EXCELENCIA_2026-06-22.md](docs/reports/PLANO_EXCELENCIA_2026-06-22.md)    | Plano-mestre: 10 dimensoes para nota 9+ (backlog ondas) |
 | [RUNBOOK_EXCELENCIA_DONO.md](docs/RUNBOOK_EXCELENCIA_DONO.md)                    | Acoes de infra do dono (RLS, secrets, restore drill)  |
+| [GOOGLE_SSO_CALENDAR_2026-06-27.md](docs/reports/GOOGLE_SSO_CALENDAR_2026-06-27.md) | Google SSO + Agenda/Meet: implementacao, arquitetura e gates do dono |
 
 ---
 

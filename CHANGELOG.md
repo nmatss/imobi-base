@@ -4,6 +4,43 @@ All notable changes to ImobiBase are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.5.0] - 2026-06-27 — Google SSO + Google Calendar/Meet
+
+> Relatório completo em `docs/reports/GOOGLE_SSO_CALENDAR_2026-06-27.md`.
+> PR [#5](https://github.com/nmatss/imobi-base/pull/5) (`feat/google-sso-calendar`).
+> Código **dormente** até o dono configurar credenciais Google + verificação do app
+> (scope `calendar.events` é sensível). `tsc` verde; 765/766 testes (a 1 falha
+> `data-export` é pré-existente).
+
+### Added
+
+- **Google SSO ligado (Onda 1)** — `OAuthButtons` montado em login/signup; **onboarding
+  pós-Google** (`server/auth/oauth-provisioning.ts`): usuário Google novo cria nova
+  imobiliária + admin (`onboarding_completed=false`) e segue para `/onboarding/agency`
+  (`client/src/pages/onboarding/agency.tsx`); endpoint `POST /api/auth/complete-onboarding`.
+- **Criptografia de tokens at-rest** — `server/security/token-encryption.ts` (AES-256-GCM
+  via `ENCRYPTION_KEY`, fail-closed em produção, retrocompatível com texto puro). Aplicada
+  aos tokens OAuth do Google. Novo `tests/unit/token-encryption.test.ts` (6 casos).
+- **Google Agenda + Meet por corretor (Onda 2)** — conexão por usuário (scope
+  `calendar.events`), tabela `user_calendar_connections` (dual schema + RLS), cliente REST
+  `axios` (`server/integrations/google-calendar/client.ts`, sem dep `googleapis`) com
+  `conferenceData`=Meet, serviço de sync best-effort, rotas
+  `server/routes-google-calendar.ts`, e UI `GoogleCalendarCard.tsx` em Configurações.
+- **Schema** — `tenants.onboarding_completed`; colunas de sync em `visits`
+  (`googleCalendarEventId/googleMeetUrl/googleSyncState/googleSyncError/lastSyncedAt`);
+  migrations `20260627_001_tenant_onboarding.sql` e `20260627_002_google_calendar.sql`
+  (+ política RLS em `RLS_enable.sql`).
+- **`oauth-state.ts`** estendido com `meta` assinado (HMAC) — carrega `userId/tenantId` no
+  callback do connect de Calendar sem depender do cookie de sessão.
+
+### Changed
+
+- **CSP** (`vercel.json`) libera `accounts.google.com`, `oauth2.googleapis.com`,
+  `www.googleapis.com` e `*.googleusercontent.com`.
+- **`secret-manager.ts`** valida `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ENCRYPTION_KEY`.
+- **Visitas** — `POST/PATCH/DELETE /api/visits` sincronizam com o Google Agenda do corretor;
+  link do Meet entra nas notificações WhatsApp/e-mail de visita.
+
 ## [2.4.0] - 2026-06-22 — Execução do Plano de Excelência (Ondas 0-3 parciais)
 
 > Execução do backlog priorizado em `docs/reports/PLANO_EXCELENCIA_2026-06-22.md`
