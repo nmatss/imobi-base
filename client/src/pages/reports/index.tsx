@@ -76,6 +76,7 @@ import {
 } from "recharts";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/lib/toast-helpers";
+import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 
 const COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
@@ -355,24 +356,25 @@ export default function ReportsPage() {
     }
   };
 
-  const loadSavedReports = () => {
-    // Mock saved reports - in production, fetch from backend
-    setSavedReports([
-      {
-        id: "1",
-        name: "Relatório Mensal Vendas",
-        type: "vendas",
-        filters: { period: "month" },
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: "2",
-        name: "Performance Trimestral",
-        type: "corretores",
-        filters: { period: "quarter" },
-        createdAt: new Date().toISOString()
-      }
-    ]);
+  const loadSavedReports = async () => {
+    // Persistência real via /api/reports/saved (gated por 'advanced_reports').
+    try {
+      const res = await apiRequest("GET", "/api/reports/saved");
+      const data = await res.json();
+      setSavedReports(
+        (Array.isArray(data) ? data : []).map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          type: r.reportType as ReportType,
+          filters: r.filters || {},
+          createdAt: r.createdAt,
+        })),
+      );
+    } catch {
+      // Plano sem 'advanced_reports' (403) ou erro de rede → lista vazia,
+      // sem exibir dados de exemplo fabricados.
+      setSavedReports([]);
+    }
   };
 
   const loadReportData = async (type: ReportType) => {
@@ -524,16 +526,32 @@ export default function ReportsPage() {
     return headers + rows.join('\n');
   };
 
-  const handleSaveReport = () => {
-    const newReport: SavedReport = {
-      id: Date.now().toString(),
-      name: `Relatório ${selectedReport} - ${new Date().toLocaleDateString('pt-BR')}`,
-      type: selectedReport!,
-      filters: { period, startDate, endDate, selectedBroker },
-      createdAt: new Date().toISOString()
-    };
-    setSavedReports([newReport, ...savedReports]);
-    toast.success("Relatório salvo", "Você pode acessá-lo rapidamente depois");
+  const handleSaveReport = async () => {
+    if (!selectedReport) return;
+    try {
+      const res = await apiRequest("POST", "/api/reports/saved", {
+        name: `Relatório ${selectedReport} - ${new Date().toLocaleDateString('pt-BR')}`,
+        reportType: selectedReport,
+        filters: { period, startDate, endDate, selectedBroker },
+      });
+      const saved = await res.json();
+      setSavedReports((prev) => [
+        {
+          id: saved.id,
+          name: saved.name,
+          type: saved.reportType as ReportType,
+          filters: saved.filters || {},
+          createdAt: saved.createdAt,
+        },
+        ...prev,
+      ]);
+      toast.success("Relatório salvo", "Você pode acessá-lo rapidamente depois");
+    } catch {
+      toast.error(
+        "Não foi possível salvar o relatório",
+        "Verifique se seu plano inclui relatórios avançados e tente novamente.",
+      );
+    }
   };
 
   // Date Picker Bottom Sheet (Mobile)
@@ -910,33 +928,8 @@ export default function ReportsPage() {
           })}
         </div>
 
-        {/* Quick Stats Preview */}
-        <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <Activity className="h-5 w-5 text-primary" />
-              <h3 className="font-semibold">Resumo Rápido do Mês</h3>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="text-center p-3 bg-background/50 rounded-lg">
-                <p className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400">12</p>
-                <p className="text-xs text-muted-foreground">Vendas</p>
-              </div>
-              <div className="text-center p-3 bg-background/50 rounded-lg">
-                <p className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400">38</p>
-                <p className="text-xs text-muted-foreground">Contratos</p>
-              </div>
-              <div className="text-center p-3 bg-background/50 rounded-lg">
-                <p className="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-400">156</p>
-                <p className="text-xs text-muted-foreground">Leads</p>
-              </div>
-              <div className="text-center p-3 bg-background/50 rounded-lg">
-                <p className="text-xl sm:text-2xl font-bold text-orange-600 dark:text-orange-400">87%</p>
-                <p className="text-xs text-muted-foreground">Meta</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Removido: "Resumo Rápido do Mês" com números fixos/fabricados (B4).
+            Os KPIs reais de cada relatório aparecem ao gerar o relatório abaixo. */}
       </div>
       </TooltipProvider>
     );
@@ -1196,13 +1189,11 @@ export default function ReportsPage() {
               title="Total de Vendas"
               value={data.kpis?.totalSales || 0}
               icon={BarChart3}
-              trend={{ value: 12, direction: 'up' }}
             />
             <KPICard
               title="Valor Total"
               value={formatCurrency(data.kpis?.totalValue || 0)}
               icon={DollarSign}
-              trend={{ value: 8, direction: 'up' }}
             />
             <KPICard
               title="Ticket Médio"
@@ -1213,7 +1204,6 @@ export default function ReportsPage() {
               title="Taxa de Conversão"
               value={formatPercent(data.kpis?.conversionRate || 0)}
               icon={Target}
-              trend={{ value: 3, direction: 'down' }}
             />
             <KPICard
               title="Top Corretor"
@@ -1234,7 +1224,6 @@ export default function ReportsPage() {
               title="Receita Recorrente"
               value={formatCurrency(data.totalReceived || 0)}
               icon={DollarSign}
-              trend={{ value: 5, direction: 'up' }}
             />
             <KPICard
               title="Taxa de Inadimplência"
@@ -1244,7 +1233,6 @@ export default function ReportsPage() {
                   : 0
               )}
               icon={AlertCircle}
-              trend={{ value: 2, direction: 'down' }}
             />
             <KPICard
               title="Taxa de Ocupação"
@@ -1265,13 +1253,11 @@ export default function ReportsPage() {
               title="Leads Ganhos"
               value={data.wonLeads || 0}
               icon={Check}
-              trend={{ value: 15, direction: 'up' }}
             />
             <KPICard
               title="Leads Perdidos"
               value={data.lostLeads || 0}
               icon={X}
-              trend={{ value: 5, direction: 'down' }}
             />
             <KPICard
               title="Taxa de Conversão"
@@ -1291,7 +1277,6 @@ export default function ReportsPage() {
               title="Receita Total"
               value={formatCurrency(data.dre?.totalRevenue || 0)}
               icon={DollarSign}
-              trend={{ value: 10, direction: 'up' }}
             />
             <KPICard
               title="Despesas"
@@ -1302,7 +1287,6 @@ export default function ReportsPage() {
               title="Lucro Líquido"
               value={formatCurrency(data.dre?.netProfit || 0)}
               icon={TrendingUp}
-              trend={{ value: 18, direction: 'up' }}
             />
             <KPICard
               title="Margem de Lucro"
