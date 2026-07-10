@@ -1,6 +1,131 @@
 # Known Issues
 
-Atualizado em: 27/06/2026
+Atualizado em: 10/07/2026
+
+## 2026-07-10 — Execucao Fase 2 (P0 de codigo B1–B8)
+
+Os 8 bloqueadores de codigo P0 do plano foram implementados e validados
+(tsc, 770/770 unit, build, gate estatico 13/13, smoke E2E 8/8). Resumo em
+`docs/reports/PLANO_GO_LIVE_360_2026-07-10.md` (secao "Execucao Fase 2").
+Destaques: funil de billing destravado (checkout ligado a onboarding/login,
+stripePriceId via env/admin); assinatura por token com pagina publica /sign/:token
+(ClickSign fica fast-follow, agora fail-closed); aba Seguranca real (novo endpoint
+POST /api/auth/change-password); dados falsos removidos (reports/contracts);
+guard financeiro por papel + comissao automatica; venda marca imovel 'sold' e
+recalcula comissao no servidor; redirects OAuth corrigidos para /login;
+prova social fabricada removida. Pendencias owner-gated (Frente 1) inalteradas.
+
+## 2026-07-10 — Plano Go-Live 360 + Comercializacao (fonte viva)
+
+Relatorio consolidado (substitui como fonte viva as revisoes anteriores):
+`docs/reports/PLANO_GO_LIVE_360_2026-07-10.md`. Auditoria multi-agente (25 agentes)
+por modulo + UX/UI de todas as paginas + estrategia SaaS. Estado local verde
+(tsc, 770/770 unit, gate estatico 13/13). Veredito: **NO-GO comercial destravavel**;
+recomendado lancamento em 2 ondas (piloto fechado -> self-service). Padrao dominante:
+"backend pronto, UI desconectada". Bloqueador comercial #1: **funil de billing quebrado**
+(nenhum cliente novo assina plano pago). Modulos mais frageis: Contratos/Assinatura (4,0),
+Financeiro/Comissoes (4,5), Integracoes credenciais-globais (4,5), Billing (5,0). Modulo
+faltante P0: NF-e/NFS-e. Ver o relatorio para o plano faseado completo.
+
+
+## 2026-06-30 — Revisao completa holistica
+
+Relatorio: `docs/reports/REVISAO_GO_LIVE_COMPLETA_2026-06-30.md`.
+
+Veredito permanece **NO-GO enterprise**. Nao foram identificados novos bloqueadores acima dos ja documentados em 2026-06-29; a auditoria confirmou que parte dos P0 tecnicos foi corrigida localmente, mas segue pendente de evidencia real:
+
+- RLS aplicado/verificado em staging/producao com role runtime nao-owner sem `BYPASSRLS`.
+- Secrets locais reais removidos e rotacionados.
+- Redis TLS (`rediss://`) provado em staging/producao para rate limit, locks, crons e 2FA.
+- `ops:oauth:encrypt-microsoft-tokens -- --apply` executado em ambiente real com `ENCRYPTION_KEY` para tokens Microsoft legados.
+- Backup/PITR, restore drill, pentest e `ops:go-live:verify:strict` verdes com evidencias.
+- Resolvido localmente: teste unitario `tests/unit/data-export.test.ts` corrigido em 2026-06-30; `npm run test:unit` passou com 770/770.
+
+### Atualizacao Fase 1 local
+
+Corrigido localmente:
+
+- Navegacao lateral sem `div role="link"`.
+- Lista de imoveis sem `div role="button"` nos pontos auditados.
+- Fluxos de imagem/caracteristica sem `prompt()` nativo.
+- Rotas driftadas nas suites Playwright ativas (`accessibility`, `mobile`, `responsive`).
+
+Ainda pendente:
+
+- Resolvido no ambiente local atual: o banco SQLite ignorado em `data/imobibase.db` foi alinhado de forma aditiva para `tenants.onboarding_completed` e colunas faltantes de `visits`; `npm run test:smoke:e2e` passou com 8/8.
+
+## 2026-06-29 — Revisao Go-Live Completa (NO-GO enterprise)
+
+Relatorio: `docs/reports/REVISAO_GO_LIVE_COMPLETA_2026-06-29.md`.
+
+### CRITICO
+
+- **Secrets reais em arquivo local ignorado pelo git (`.env.production`)**. Nao expor valores em logs/docs. Remover do workspace, mover para Vercel/GitHub Secrets e rotacionar credenciais.
+- **RLS ainda nao esta provado em staging/producao real** com role runtime nao-owner sem `BYPASSRLS`.
+- **Backup/PITR, restore drill e pentest real seguem sem evidencia suficiente** para go-live enterprise.
+
+### ALTO
+
+- `script/verify-rls.ts` nao verifica `migrations/RLS_enable_child_tables.sql`; o gate RLS atual pode deixar tabelas filhas sem prova.
+- A assinatura digital publica por token pode quebrar apos aplicar RLS das child tables porque `digital_signatures` exige `app.tenant_id`.
+- Microsoft OAuth grava tokens em texto puro; aplicar a mesma criptografia usada pelo Google.
+- Redis/rate limit/2FA/locks ainda podem degradar para memoria/fail-open; producao precisa Redis TLS validado.
+- Dominio canonico precisa ficar 100% alinhado em envs e CORS (`imobibase.com.br` vs valores legados).
+- Snyk pode ser pulado se o token estiver apenas em `secrets`, pois o workflow condiciona em `vars.SNYK_TOKEN`.
+- Rotas legadas retornam `403` para cross-tenant em vez de `404`, vazando existencia de recursos.
+- Migration `add-performance-indexes.sql` nao deve rodar como migration transacional comum em producao.
+
+### MEDIO
+
+- Playwright/a11y/responsividade tem rotas driftadas (`/financial`, `/properties/new`) e suites quarentenadas.
+- Busca global/atalho `Ctrl/Cmd+K` esta duplicado entre `GlobalSearch` e `DashboardLayout`.
+- Lista de imoveis e navegacao lateral ainda usam `div role=button/link` em fluxos centrais.
+- Bundles continuam grandes: charts, PDF, html2canvas, shell e product landing.
+- Vercel usa `npm install`; CI usa `npm ci`.
+
+### Atualizacao local — 2026-06-30
+
+Corrigido no codigo local:
+
+- `tests/unit/data-export.test.ts` passou a validar o contrato atual de
+  `downloadExport` como `Buffer`; suite unit completa passou 770/770.
+- Rotas Playwright driftadas foram atualizadas nos testes de acessibilidade,
+  mobile e responsividade; smoke E2E passou 8/8 apos alinhamento aditivo do
+  SQLite local ignorado.
+- `properties/list.tsx` e `dashboard-layout.tsx` deixaram de usar os pontos
+  auditados de `prompt()` e `div role=button/link`.
+- `server/routes/lead-tags.ts` foi extraido de `server/routes.ts`; tenant
+  isolation passou 27/27.
+
+Ainda pendente:
+
+- Suites E2E autenticadas completas ainda precisam de fixtures dedicadas.
+- Busca global ainda precisa de consolidacao visual/funcional completa.
+- `DELETE /api/leads/:leadId/tags/:tagId` ainda nao valida explicitamente
+  ownership do `tagId`; a extracao preservou o comportamento existente.
+- Baseline local de performance mobile em 2026-06-30 falhou em 7/21:
+  carregamento `/dashboard` 4575 ms (>3000 ms), peso total 8,09 MB (>2 MB),
+  CSS 258 KB (>100 KB), 100 requests (>50), crescimento de heap 391%, alem de
+  duas falhas de harness (`transitionend` e touch context).
+- Atualizacao: harness de performance agora roda contra build/preview de
+  producao e passou 19/21; falhas remanescentes sao budgets reais de JS
+  (~778 KB > 500 KB) e CSS (~194 KB > 100 KB).
+
+### Atualizacao Etapa 0 local — 2026-06-29
+
+Corrigido no codigo local:
+
+- `script/verify-rls.ts` agora verifica `RLS_enable.sql` + `RLS_enable_child_tables.sql`.
+- Assinatura publica por token agora tem policy publica estreita em `digital_signatures` e rotas sob contexto RLS adequado.
+- Microsoft OAuth agora criptografa novos tokens via `encryptSecret`.
+- Script `ops:oauth:encrypt-microsoft-tokens` criado para criptografar tokens Microsoft legados em ambiente real.
+- Gate de go-live exige Redis TLS (`rediss://`) e rate limit/2FA nao degradam fail-open em producao.
+
+Ainda pendente:
+
+- Remover/rotacionar secrets locais.
+- Rodar script de tokens legados com `ENCRYPTION_KEY` em staging/producao.
+- Provar Redis TLS, RLS e gates em staging real.
 
 ## 2026-06-27 — Google SSO + Calendar/Meet (PR #5, dormente)
 
