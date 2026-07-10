@@ -34,8 +34,6 @@ import {
   insertPropertySaleSchema,
   insertFinanceCategorySchema,
   insertFinanceEntrySchema,
-  insertLeadTagSchema,
-  insertLeadTagLinkSchema,
   insertFollowUpSchema,
   insertRentalTransferSchema,
   insertCommissionSchema,
@@ -107,6 +105,7 @@ import {
 } from "./routes/_shared";
 import { registerNewsletterRoutes } from "./routes/newsletter";
 import { registerInteractionRoutes } from "./routes/interactions";
+import { registerLeadTagRoutes } from "./routes/lead-tags";
 import { assertVisitSchedulePolicy } from "./services/visit-scheduling";
 import { summarizeLeadSla } from "./services/lead-sla";
 import { applyLeadDedupAndAssign, createLeadDeduped } from "./services/lead-intake";
@@ -536,10 +535,9 @@ export async function registerRoutes(
     standardHeaders: true,
     legacyHeaders: false,
     store: createRateLimitStore?.("rl:api:"),
-    // Fail-open: se o store Redis falhar (timeout, conexão caída), a request
-    // passa sem contar — melhor que o default (passOnStoreError:false), que
-    // transforma erro de store em 500 para TODO o /api/*.
-    passOnStoreError: true,
+    // Em producao, Redis e requisito operacional para limites distribuidos:
+    // falha do store deve bloquear em vez de multiplicar limite entre instancias.
+    passOnStoreError: process.env.NODE_ENV !== "production",
   });
 
   // Stricter rate limiting for auth routes
@@ -552,7 +550,7 @@ export async function registerRoutes(
     standardHeaders: true,
     legacyHeaders: false,
     store: createRateLimitStore?.("rl:auth:"),
-    passOnStoreError: true, // fail-open em erro do store Redis (ver apiLimiter)
+    passOnStoreError: process.env.NODE_ENV !== "production",
   });
 
   // Stricter rate limiting for public routes (lead creation, newsletter)
@@ -563,7 +561,7 @@ export async function registerRoutes(
     standardHeaders: true,
     legacyHeaders: false,
     store: createRateLimitStore?.("rl:public:"),
-    passOnStoreError: true, // fail-open em erro do store Redis (ver apiLimiter)
+    passOnStoreError: process.env.NODE_ENV !== "production",
   });
 
   // Rate limiter para endpoints administrativos
@@ -575,7 +573,7 @@ export async function registerRoutes(
     standardHeaders: true,
     legacyHeaders: false,
     store: createRateLimitStore?.("rl:admin:"),
-    passOnStoreError: true, // fail-open em erro do store Redis (ver apiLimiter)
+    passOnStoreError: process.env.NODE_ENV !== "production",
   });
 
   // Apply general rate limiting to all API routes
@@ -858,6 +856,21 @@ export async function registerRoutes(
     if (!isSuperAdminRole(req.user!.role)) {
       return res.status(403).json({
         error: "Acesso negado. Apenas superadmins podem acessar esta rota.",
+      });
+    }
+    next();
+  };
+
+  // B5: guard financeiro/comissoes. Apenas admin/gestor (admin, super_admin,
+  // owner) podem criar/editar lancamentos e aprovar/pagar comissoes. Corretor
+  // comum (member/viewer) recebe 403 — evita aprovar/pagar a propria comissao
+  // ou editar lancamentos financeiros de terceiros.
+  const requireFinanceManager = (req: Request, res: Response, next: Function) => {
+    const role = req.user?.role;
+    if (!isAdminRole(role) && role !== ROLES.OWNER) {
+      return res.status(403).json({
+        error:
+          "Acesso negado. Apenas administradores/gestores podem gerenciar dados financeiros.",
       });
     }
     next();
@@ -3062,7 +3075,44 @@ export async function registerRoutes(
         tenantId: req.user!.tenantId,
       });
       await validatePropertySaleReferences(req.user!.tenantId, data);
+
+      // B6: o valor de comissao e a FONTE DE VERDADE FINANCEIRA — recalcula no
+      // servidor a partir de saleValue x commissionRate, ignorando qualquer
+      // commissionValue vindo do payload do client (tamperavel).
+      const saleValueNum = Number((data as { saleValue: unknown }).saleValue);
+      const rateNum = Number((data as { commissionRate?: unknown }).commissionRate ?? "6");
+      const commissionValue = (saleValueNum * rateNum / 100).toFixed(2);
+      (data as { commissionValue?: string }).commissionValue = commissionValue;
+
       const sale = await storage.createPropertySale(data);
+
+      // B6: imovel vendido sai da vitrine publica e do sitemap (status !== 'available').
+      if (sale.propertyId) {
+        await storage.updateProperty(sale.propertyId, { status: "sold" });
+      }
+
+      // B5: cria a comissao automaticamente ao fechar a venda (quando ha corretor),
+      // eliminando lancamentos esquecidos e divergencia com o valor real da venda.
+      // Falha na comissao NAO aborta a venda (pode ser criada manualmente depois).
+      if (sale.brokerId) {
+        try {
+          await storage.createCommission({
+            tenantId: req.user!.tenantId,
+            saleId: sale.id,
+            brokerId: sale.brokerId,
+            transactionType: "sale",
+            transactionValue: sale.saleValue,
+            commissionRate: rateNum.toFixed(2),
+            grossCommission: commissionValue,
+            agencySplit: "50",
+            brokerCommission: (Number(commissionValue) * 0.5).toFixed(2),
+            status: "pending",
+          });
+        } catch (commErr) {
+          console.error("Falha ao criar comissao automatica da venda:", commErr);
+        }
+      }
+
       res.status(201).json(sale);
     } catch (error: unknown) {
       const httpErr = toHttpError(error);
@@ -3112,7 +3162,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/finance-categories", requireAuth, async (req, res) => {
+  app.post("/api/finance-categories", requireAuth, requireFinanceManager, async (req, res) => {
     try {
       const data = insertFinanceCategorySchema.parse({
         ...req.body,
@@ -3128,7 +3178,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/finance-categories/:id", requireAuth, async (req, res) => {
+  app.patch("/api/finance-categories/:id", requireAuth, requireFinanceManager, async (req, res) => {
     try {
       const existing = await storage.getFinanceCategory(req.params.id);
       if (!existing)
@@ -3157,7 +3207,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/finance-categories/:id", requireAuth, async (req, res) => {
+  app.delete("/api/finance-categories/:id", requireAuth, requireFinanceManager, async (req, res) => {
     try {
       const existing = await storage.getFinanceCategory(req.params.id);
       if (!existing)
@@ -3204,7 +3254,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/finance-entries", requireAuth, async (req, res) => {
+  app.post("/api/finance-entries", requireAuth, requireFinanceManager, async (req, res) => {
     try {
       const data = insertFinanceEntrySchema.parse({
         ...req.body,
@@ -3225,7 +3275,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/finance-entries/:id", requireAuth, async (req, res) => {
+  app.patch("/api/finance-entries/:id", requireAuth, requireFinanceManager, async (req, res) => {
     try {
       // IDOR Protection: 404 em mismatch de tenant (não vaza existência do ID).
       const existing = await storage.getFinanceEntry(req.params.id);
@@ -3254,7 +3304,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/finance-entries/:id", requireAuth, async (req, res) => {
+  app.delete("/api/finance-entries/:id", requireAuth, requireFinanceManager, async (req, res) => {
     try {
       // IDOR Protection: 404 em mismatch de tenant (não vaza existência do ID).
       const existing = await storage.getFinanceEntry(req.params.id);
@@ -3268,132 +3318,8 @@ export async function registerRoutes(
     }
   });
 
-  // ===== LEAD TAGS ROUTES =====
-  app.get("/api/lead-tags", requireAuth, async (req, res) => {
-    try {
-      const tags = await storage.getLeadTagsByTenant(req.user!.tenantId);
-      res.json(tags);
-    } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar tags" });
-    }
-  });
-
-  app.post("/api/lead-tags", requireAuth, async (req, res) => {
-    try {
-      const data = insertLeadTagSchema.parse({
-        ...req.body,
-        tenantId: req.user!.tenantId,
-      });
-      const tag = await storage.createLeadTag(data);
-      res.status(201).json(tag);
-    } catch (error: unknown) {
-      res.status(400).json({
-        error: error instanceof Error ? error.message : "Erro ao criar tag",
-      });
-    }
-  });
-
-  app.patch("/api/lead-tags/:id", requireAuth, async (req, res) => {
-    try {
-      const existing = await storage.getLeadTag(req.params.id);
-      if (!existing)
-        return res.status(404).json({ error: "Tag não encontrada" });
-      if (existing.tenantId !== req.user!.tenantId)
-        return res.status(403).json({ error: "Acesso negado" });
-      // Mass-assignment guard: strip immutable fields before update.
-      const {
-        tenantId: _t,
-        id: _id,
-        createdAt: _c,
-        ...allowedFields
-      } = req.body;
-      const tag = await storage.updateLeadTag(req.params.id, allowedFields);
-      res.json(tag);
-    } catch (error: unknown) {
-      res.status(400).json({
-        error: error instanceof Error ? error.message : "Erro ao atualizar tag",
-      });
-    }
-  });
-
-  app.delete("/api/lead-tags/:id", requireAuth, async (req, res) => {
-    try {
-      const existing = await storage.getLeadTag(req.params.id);
-      if (!existing)
-        return res.status(404).json({ error: "Tag não encontrada" });
-      if (existing.tenantId !== req.user!.tenantId)
-        return res.status(403).json({ error: "Acesso negado" });
-      await storage.deleteLeadTag(req.params.id);
-      res.json({ success: true });
-    } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao deletar tag" });
-    }
-  });
-
-  // ===== LEAD TAG LINKS ROUTES =====
-  app.get("/api/leads/tags/batch", requireAuth, async (req, res) => {
-    try {
-      const tagsMap = await storage.getTagsForAllLeads(req.user!.tenantId);
-      res.json(tagsMap);
-    } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar tags dos leads" });
-    }
-  });
-
-  app.get("/api/leads/:leadId/tags", requireAuth, async (req, res) => {
-    try {
-      // IDOR Protection: validate the parent lead belongs to the tenant
-      const lead = await storage.getLead(req.params.leadId);
-      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
-      const tags = await storage.getTagsByLead(req.params.leadId);
-      res.json(tags);
-    } catch (error: unknown) {
-      const httpErr = toHttpError(error);
-      const message = httpErr.message || "Erro ao buscar tags do lead";
-      res.status(httpErr.status).json({ error: message });
-    }
-  });
-
-  app.post("/api/leads/:leadId/tags", requireAuth, async (req, res) => {
-    try {
-      const data = insertLeadTagLinkSchema.parse({
-        leadId: req.params.leadId,
-        tagId: req.body.tagId,
-      });
-      // IDOR Protection: validate both the lead and the tag belong to the
-      // tenant before linking them.
-      const lead = await storage.getLead(req.params.leadId);
-      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
-      const tag = await storage.getLeadTag(data.tagId);
-      await validateResourceTenant(tag, req.user!.tenantId, "Tag");
-      const link = await storage.addTagToLead(data);
-      res.status(201).json(link);
-    } catch (error: unknown) {
-      const httpErr = toHttpError(error);
-      const status = httpErr.status === 500 ? 400 : httpErr.status;
-      const message = httpErr.message || "Erro ao adicionar tag";
-      res.status(status).json({ error: message });
-    }
-  });
-
-  app.delete(
-    "/api/leads/:leadId/tags/:tagId",
-    requireAuth,
-    async (req, res) => {
-      try {
-        // IDOR Protection: validate the parent lead belongs to the tenant
-        // before removing any tag link.
-        const lead = await storage.getLead(req.params.leadId);
-        await validateResourceTenant(lead, req.user!.tenantId, "Lead");
-        await storage.removeTagFromLead(req.params.leadId, req.params.tagId);
-        res.json({ success: true });
-      } catch (error: unknown) {
-        const httpErr = toHttpError(error);
-        const message = httpErr.message || "Erro ao remover tag";
-        res.status(httpErr.status).json({ error: message });
-      }
-    },
-  );
+  // ===== LEAD TAGS ROUTES ===== (extraidas para ./routes/lead-tags.ts — arch-2)
+  registerLeadTagRoutes(app, { requireAuth });
 
   // ===== FINANCIAL MODULE ROUTES =====
   app.get("/api/financial/metrics", requireAuth, async (req, res) => {
@@ -4253,7 +4179,7 @@ export async function registerRoutes(
   });
 
   // PATCH /api/commissions/:id/status - Update commission status
-  app.patch("/api/commissions/:id/status", requireAuth, checkFeatureAccess('commission_management'), async (req, res) => {
+  app.patch("/api/commissions/:id/status", requireAuth, checkFeatureAccess('commission_management'), requireFinanceManager, async (req, res) => {
     try {
       const { status } = req.body;
 
@@ -4288,7 +4214,7 @@ export async function registerRoutes(
   });
 
   // POST /api/commissions - Create new commission
-  app.post("/api/commissions", requireAuth, checkFeatureAccess('commission_management'), async (req, res) => {
+  app.post("/api/commissions", requireAuth, checkFeatureAccess('commission_management'), requireFinanceManager, async (req, res) => {
     try {
       // Validate using schema
       const data = insertCommissionSchema.parse({
@@ -4327,7 +4253,7 @@ export async function registerRoutes(
   });
 
   // DELETE /api/commissions/:id - Delete commission
-  app.delete("/api/commissions/:id", requireAuth, checkFeatureAccess('commission_management'), async (req, res) => {
+  app.delete("/api/commissions/:id", requireAuth, checkFeatureAccess('commission_management'), requireFinanceManager, async (req, res) => {
     try {
       const existing = await storage.getCommission(req.params.id);
       if (!existing) {
