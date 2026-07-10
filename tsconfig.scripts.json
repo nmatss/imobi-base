@@ -1,4 +1,9 @@
 {
   "extends": "./tsconfig.json",
-  "include": ["script/verify-go-live-readiness.ts"]
+  "include": [
+    "script/verify-go-live-readiness.ts",
+    "script/check-schema-drift.ts",
+    "script/check-file-size-budget.ts",
+    "script/check-fetch-budget.ts"
+  ]
 }

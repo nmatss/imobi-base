@@ -32,6 +32,9 @@ jobs:
       - name: ESLint (errors fail, warnings allowed)
         run: npm run lint
 
+      - name: Maintainability guards (schema drift, file-size & fetch ratchets)
+        run: npm run guard
+
   build:
     name: Build Application
     runs-on: ubuntu-latest

@@ -1,6 +1,42 @@
 # Technical Debt
 
-Atualizado em: 22/06/2026
+Atualizado em: 10/07/2026
+
+## 2026-07-10 — Guardas de manutenibilidade (Fase 4, "parar a sangria")
+
+Foram adicionadas 3 guardas de CI (ratchet) que **impedem novo débito** sem exigir
+a refatoração completa de imediato. Rodam via `npm run guard` (e no CI, job
+`lint-and-typecheck`). Ao reduzir um arquivo/contagem, **baixe o teto correspondente**.
+
+- **`guard:schema`** (`script/check-schema-drift.ts`) — falha em drift de TABELA
+  novo entre `shared/schema.ts` (PG) e `shared/schema-sqlite.ts`. Baseline aceito
+  hoje: 5 tabelas só-PG (`whatsapp_conversations`, `whatsapp_messages`,
+  `whatsapp_message_queue`, `whatsapp_auto_responses`, `whatsapp_templates`) e 1
+  só-SQLite (`legal_documents`). **Débito:** o domínio WhatsApp é estruturalmente
+  não-testável em dev/CT (SQLite) — migrar essas tabelas para o schema SQLite ou
+  documentar skip. Drift de COLUNA (não-bloqueante) existe em 14 tabelas
+  (account_deletion_requests, ai_settings, compliance_audit_log, cookie_preferences,
+  data_breach_incidents, data_export_requests, data_processing_activities,
+  finance_categories, notification_preferences, owners, renters, tenant_settings,
+  user_consents, user_roles) — inclui inconsistências de nome (ex.: `tenant_id` vs
+  `tenantId`) a reconciliar.
+- **`guard:size`** (`script/check-file-size-budget.ts`) — teto de linhas para os
+  monolitos e mega-páginas (routes.ts 4337, storage.ts 4550, schema 2000/1862,
+  vendas 2653, kanban 2416, calendar 2256, contracts 1971, reports 1866, rentals
+  1599). Só podem encolher. **Backlog de decomposição** abaixo.
+- **`guard:fetch`** (`script/check-fetch-budget.ts`) — teto de `fetch` cru em
+  pages/components = **174** (64 arquivos). Código novo deve usar
+  `apiRequest`/`getQueryFn` (CSRF + cache). Migrar os existentes oportunisticamente.
+
+### Backlog de decomposição (baixar os tetos ao concluir)
+- `server/routes.ts` e `server/storage.ts`: continuar arch-1 por domínio
+  (`register<Domain>Routes` + repositório), aproveitando para adicionar testes de
+  caracterização antes de extrair.
+- Mega-páginas (`vendas`, `leads/kanban`, `calendar`, `contracts`, `reports`,
+  `rentals`): quebrar em container + hooks + apresentacional (padrão já iniciado em
+  `vendas/`). Meta ~500–600 LOC/arquivo.
+
+## Revisao Completa 2026-06-30
 
 ## Revisao Completa 2026-06-30
 
