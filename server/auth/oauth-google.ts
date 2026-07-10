@@ -105,21 +105,21 @@ export function registerGoogleOAuthRoutes(app: Express) {
       // Handle OAuth errors
       if (error) {
         console.error('Google OAuth error:', error);
-        return res.redirect(`/auth/login?error=oauth_failed&provider=google`);
+        return res.redirect(`/login?error=oauth_failed&provider=google`);
       }
 
       if (!code || typeof code !== 'string') {
-        return res.redirect(`/auth/login?error=missing_code`);
+        return res.redirect(`/login?error=missing_code`);
       }
 
       const stateResult = consumeOAuthState(req, res, "google", state);
       if (!stateResult.valid) {
-        return res.redirect(`/auth/login?error=invalid_state`);
+        return res.redirect(`/login?error=invalid_state`);
       }
       const oauthRedirectUrl = stateResult.redirectUrl;
 
       if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-        return res.redirect(`/auth/login?error=oauth_not_configured`);
+        return res.redirect(`/login?error=oauth_not_configured`);
       }
 
       // Exchange code for tokens
@@ -184,9 +184,11 @@ export function registerGoogleOAuthRoutes(app: Express) {
               .where(eq(users.id, user.id)),
           );
         } else {
-          // User exists with same email but different provider
-          // This is a linking scenario - handled separately
-          return res.redirect(`/auth/link-account?email=${encodeURIComponent(googleUser.email)}&provider=google&pending=true`);
+          // Conta já existe com este email mas com outro provedor/senha.
+          // Não há fluxo de account-linking na UI ainda, então em vez de
+          // redirecionar para uma rota inexistente (404), mostramos um erro
+          // amigável na tela de login. Ver docs/reports/PLANO_GO_LIVE_360 (B7).
+          return res.redirect(`/login?error=email_in_use_other_provider`);
         }
 
       } else {
@@ -292,13 +294,13 @@ export function registerGoogleOAuthRoutes(app: Express) {
         req.session.regenerate(async (regenerateErr) => {
           if (regenerateErr) {
             console.error('OAuth session regeneration error:', regenerateErr);
-            return res.redirect('/auth/login?error=session_error');
+            return res.redirect('/login?error=session_error');
           }
 
           req.login(user, (err) => {
             if (err) {
               console.error('OAuth login error:', err);
-              return res.redirect('/auth/login?error=login_failed');
+              return res.redirect('/login?error=login_failed');
             }
 
             // Novo tenant via SSO: leva ao onboarding antes do dashboard.
@@ -308,12 +310,12 @@ export function registerGoogleOAuthRoutes(app: Express) {
         });
       } else {
         // If no session management, redirect with error
-        res.redirect('/auth/login?error=session_unavailable');
+        res.redirect('/login?error=session_unavailable');
       }
 
     } catch (error: any) {
       console.error('Google OAuth callback error:', error);
-      res.redirect(`/auth/login?error=oauth_callback_failed`);
+      res.redirect(`/login?error=oauth_callback_failed`);
     }
   });
 

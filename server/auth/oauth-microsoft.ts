@@ -13,6 +13,7 @@ import { eq, or, and } from "drizzle-orm";
 import { createAuditLog } from "../routes-security";
 import { runWithAuthEmailRlsContext, runWithTenantRlsContext } from "../db-rls";
 import { issueOAuthState, consumeOAuthState } from "./oauth-state";
+import { encryptSecret } from "../security/token-encryption";
 
 // Microsoft OAuth configuration
 const MICROSOFT_CLIENT_ID = process.env.MICROSOFT_CLIENT_ID || '';
@@ -104,21 +105,21 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
       // Handle OAuth errors
       if (error) {
         console.error('Microsoft OAuth error:', error, error_description);
-        return res.redirect(`/auth/login?error=oauth_failed&provider=microsoft&details=${encodeURIComponent(error_description as string || '')}`);
+        return res.redirect(`/login?error=oauth_failed&provider=microsoft&details=${encodeURIComponent(error_description as string || '')}`);
       }
 
       if (!code || typeof code !== 'string') {
-        return res.redirect(`/auth/login?error=missing_code`);
+        return res.redirect(`/login?error=missing_code`);
       }
 
       const stateResult = consumeOAuthState(req, res, "microsoft", state);
       if (!stateResult.valid) {
-        return res.redirect(`/auth/login?error=invalid_state`);
+        return res.redirect(`/login?error=invalid_state`);
       }
       const oauthRedirectUrl = stateResult.redirectUrl;
 
       if (!MICROSOFT_CLIENT_ID || !MICROSOFT_CLIENT_SECRET) {
-        return res.redirect(`/auth/login?error=oauth_not_configured`);
+        return res.redirect(`/login?error=oauth_not_configured`);
       }
 
       // Exchange code for tokens
@@ -154,8 +155,12 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
       const email = microsoftUser.mail || microsoftUser.userPrincipalName;
 
       if (!email) {
-        return res.redirect(`/auth/login?error=no_email_from_provider`);
+        return res.redirect(`/login?error=no_email_from_provider`);
       }
+
+      // Tokens de terceiros sao criptografados em repouso (AES-256-GCM).
+      const encAccessToken = encryptSecret(access_token);
+      const encRefreshToken = encryptSecret(refresh_token || null);
 
       // Check if user already exists (by email or OAuth ID)
       const existingUserList = await runWithAuthEmailRlsContext(email, () =>
@@ -184,8 +189,8 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
           await runWithTenantRlsContext(user.tenantId, () =>
             db.update(users)
               .set({
-                oauthAccessToken: access_token,
-                oauthRefreshToken: refresh_token || user.oauthRefreshToken,
+                oauthAccessToken: encAccessToken,
+                oauthRefreshToken: encRefreshToken || user.oauthRefreshToken,
                 lastLogin: new Date().toISOString(),
                 lastLoginIp: req.ip || req.headers['x-forwarded-for']?.toString() || null,
                 emailVerified: true, // Microsoft accounts are pre-verified
@@ -193,8 +198,10 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
               .where(eq(users.id, user.id)),
           );
         } else {
-          // User exists with same email but different provider
-          return res.redirect(`/auth/link-account?email=${encodeURIComponent(email)}&provider=microsoft&pending=true`);
+          // Conta já existe com este email mas com outro provedor/senha.
+          // Sem fluxo de account-linking na UI ainda: erro amigável no login
+          // em vez de rota inexistente (404). Ver PLANO_GO_LIVE_360 (B7).
+          return res.redirect(`/login?error=email_in_use_other_provider`);
         }
 
       } else {
@@ -202,7 +209,7 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
         isNewUser = true;
         const tenantId = await getAutoProvisionTenantId();
         if (!tenantId) {
-          return res.redirect(`/auth/login?error=oauth_account_not_found&provider=microsoft`);
+          return res.redirect(`/login?error=oauth_account_not_found&provider=microsoft`);
         }
 
         const userId = nanoid();
@@ -219,8 +226,8 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
             emailVerified: true,
             oauthProvider: 'microsoft',
             oauthId: microsoftUser.id,
-            oauthAccessToken: access_token,
-            oauthRefreshToken: refresh_token || null,
+            oauthAccessToken: encAccessToken,
+            oauthRefreshToken: encRefreshToken || null,
             lastLogin: new Date().toISOString(),
             lastLoginIp: req.ip || req.headers['x-forwarded-for']?.toString() || null,
           });
@@ -274,13 +281,13 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
         req.session.regenerate(async (regenerateErr) => {
           if (regenerateErr) {
             console.error('OAuth session regeneration error:', regenerateErr);
-            return res.redirect('/auth/login?error=session_error');
+            return res.redirect('/login?error=session_error');
           }
 
           req.login(user, (err) => {
             if (err) {
               console.error('OAuth login error:', err);
-              return res.redirect('/auth/login?error=login_failed');
+              return res.redirect('/login?error=login_failed');
             }
 
             // Redirect URL veio do state assinado (cookie), já consumido.
@@ -289,12 +296,12 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
         });
       } else {
         // If no session management, redirect with error
-        res.redirect('/auth/login?error=session_unavailable');
+        res.redirect('/login?error=session_unavailable');
       }
 
     } catch (error: any) {
       console.error('Microsoft OAuth callback error:', error);
-      res.redirect(`/auth/login?error=oauth_callback_failed`);
+      res.redirect(`/login?error=oauth_callback_failed`);
     }
   });
 
