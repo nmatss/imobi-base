@@ -90,6 +90,7 @@ import {
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { ContractSignaturePanel } from "./ContractSignaturePanel";
 
 // Format price to BRL
 function formatPrice(price: string | number) {
@@ -264,8 +265,18 @@ export default function ContractsPage() {
       ? approved.reduce((sum, c) => sum + parseFloat(c.value), 0) / approved.length
       : 0;
 
-    // Average time to close (mock - would need actual tracking)
-    const avgDays = 12; // Placeholder
+    // Tempo médio real até a assinatura: média de (signedAt - createdAt) dos
+    // contratos efetivamente assinados no período. Sem assinados = 0 (sem dado),
+    // em vez do valor fixo "12" que era exibido como se fosse real (B4).
+    const signedWithDates = periodContracts.filter((c) => c.signedAt && c.createdAt);
+    const avgDays = signedWithDates.length > 0
+      ? Math.round(
+          signedWithDates.reduce(
+            (sum, c) => sum + differenceInDays(new Date(c.signedAt!), new Date(c.createdAt!)),
+            0,
+          ) / signedWithDates.length,
+        )
+      : 0;
 
     return {
       proposalsCount: proposals.length,
@@ -1003,9 +1014,9 @@ export default function ContractsPage() {
                                       <Eye className="h-4 w-4 mr-2" />
                                       Ver Detalhes
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem>
+                                    <DropdownMenuItem disabled>
                                       <Download className="h-4 w-4 mr-2" />
-                                      Baixar PDF
+                                      Baixar PDF (em breve)
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicate(contract); }}>
                                       <Copy className="h-4 w-4 mr-2" />
@@ -1225,11 +1236,11 @@ export default function ContractsPage() {
                                       <Eye className="h-4 w-4 mr-2" />
                                       Ver Detalhes
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem>
+                                    <DropdownMenuItem disabled>
                                       <Download className="h-4 w-4 mr-2" />
-                                      Baixar PDF
+                                      Baixar PDF (em breve)
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem>
+                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDetailPanel(contract); }}>
                                       <History className="h-4 w-4 mr-2" />
                                       Ver Histórico
                                     </DropdownMenuItem>
@@ -1889,57 +1900,7 @@ export default function ContractsPage() {
                   </TabsContent>
 
                   <TabsContent value="document" className="p-4 space-y-4 mt-0">
-                    <Card className="bg-muted/30 border-dashed">
-                      <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                        <FileWarning className="h-12 w-12 text-muted-foreground/30 mb-4" />
-                        <h3 className="font-semibold mb-1 text-sm">Visualização do Documento</h3>
-                        <p className="text-xs text-muted-foreground mb-4 max-w-xs">
-                          A visualização do PDF será implementada com integração de assinatura digital.
-                        </p>
-                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                          <Button variant="outline" size="sm" className="h-9">
-                            <Download className="h-4 w-4 mr-2" />
-                            Baixar PDF
-                          </Button>
-                          <Button variant="outline" size="sm" className="h-9">
-                            <FileSignature className="h-4 w-4 mr-2" />
-                            Enviar para Assinatura
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Signature status (mock) */}
-                    <Card>
-                      <CardHeader className="p-3 pb-2">
-                        <CardTitle className="text-sm flex items-center gap-2">
-                          <PenLine className="h-4 w-4 text-primary" />
-                          Status da Assinatura
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-3 pt-0">
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Cliente</span>
-                            <Badge variant="outline" className={cn("text-xs", SIGNATURE_STATUS.pending.color)}>
-                              {SIGNATURE_STATUS.pending.label}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Proprietário</span>
-                            <Badge variant="outline" className={cn("text-xs", SIGNATURE_STATUS.pending.color)}>
-                              {SIGNATURE_STATUS.pending.label}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Imobiliária</span>
-                            <Badge variant="outline" className={cn("text-xs", SIGNATURE_STATUS.pending.color)}>
-                              {SIGNATURE_STATUS.pending.label}
-                            </Badge>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <ContractSignaturePanel contractId={selectedItem.id} />
                   </TabsContent>
 
                   <TabsContent value="ai" className="p-4 space-y-4 mt-0">
