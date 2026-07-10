@@ -1,6 +1,65 @@
 # Session Memory
 
-Atualizado em: 27/06/2026
+Atualizado em: 10/07/2026
+
+## Sessao 2026-07-10 — Auditoria Go-Live 360 + execucao Fase 2 (P0) + Fase 4 (guardas)
+
+### Solicitacao
+
+Analise completa do sistema, plano de Go-Live/comercializacao (o que falta e o que
+depende do dono), revisao de UX/UI de todas as paginas, notas por modulo e modulos
+faltantes; depois executar os proximos passos, commitar agrupado por bloqueador,
+documentar e guardar na memoria.
+
+### Entregue
+
+- **Auditoria 360 multi-agente (25 agentes)** por modulo + UX/UI de todas as paginas +
+  estrategia SaaS. Plano canonico (fonte viva): `docs/reports/PLANO_GO_LIVE_360_2026-07-10.md`.
+  Painel visual (Artifact) publicado. Veredito: **NO-GO comercial destravavel**, nota 6,6/10,
+  lancamento recomendado em 2 ondas. Padrao dominante: "backend pronto, UI desconectada".
+- **Fase 2 — 8 bloqueadores P0 de codigo** (1 commit por bloqueador):
+  - B1 `fix(billing)` — destrava o funil de assinatura (onboarding->checkout, ?plan= no login,
+    stripePriceId via env `STRIPE_PRICE_<SLUG>_MONTHLY/YEARLY`, campos no admin/plans).
+  - B2 `feat(contracts)` — assinatura por token com pagina publica `/sign/:token` +
+    `ContractSignaturePanel`; ClickSign fail-closed em producao.
+  - B3 `feat(security)` — aba Seguranca real: novo `POST /api/auth/change-password`,
+    2FA real, logout-all, logs de acesso reais.
+  - B4 `fix(reports)` — remove dados falsos (resumo do mes fixo, trends hardcoded); liga
+    relatorios salvos ao backend; avgDays real em contratos.
+  - B5/B6 `fix(financial)` — guard `requireFinanceManager` nas escritas financeiras/comissoes;
+    venda marca imovel `sold` + recalcula comissao no servidor + comissao automatica.
+  - B7 `fix(auth)` — corrige redirects de erro OAuth (iam para `/auth/login` inexistente = 404).
+  - B8 `fix(ui)` — remove prova social fabricada e assets hotlinked; placeholder local de imovel.
+- **Fase 4 — guardas de manutenibilidade (CI ratchet)** `chore(ci)` — `npm run guard`:
+  schema drift PG↔SQLite, file-size dos monolitos/mega-paginas, fetch cru (teto 174).
+  Documentado em `docs/TECH_DEBT.md`.
+- **Consolidacao** do trabalho pos-auditoria 06-30 que estava uncommitted (1 commit chore).
+- **PR #5 atualizado** (titulo + descricao para o escopo ampliado). Branch
+  `feat/google-sso-calendar`, 10 commits novos, pushed.
+
+### Validacoes
+
+- `npm run check` (tsc): passou.
+- `npm run lint -- --quiet`: passou.
+- `npm run test:unit`: 770/770 passaram.
+- `npm run build`: passou.
+- `npm run ops:go-live:verify:static`: passou, 13/13.
+- `npm run test:smoke:e2e`: passou, 8/8.
+- `npm run guard`: passou (schema/size/fetch).
+
+### Pendencias (proximas ondas)
+
+- **Frente 1 (owner-gated)** para o merge/Go-Live: Stripe live + `STRIPE_PRICE_*`, Redis TLS,
+  `ENCRYPTION_KEY`, dominio, e provas operacionais (RLS real, backup/restore, pentest).
+- **Fase 3 — modulos faltantes**: NF-e/NFS-e (P0), helpdesk/tickets, API keys+webhooks self-serve.
+- **Decomposicao real** de `routes.ts`/`storage.ts`/mega-paginas (guards protegem; baixar tetos).
+- B2 fast-follow: ClickSign profissional + PDF nativo (dependem de `CLICKSIGN_API_KEY`).
+
+### Nota de revisao
+
+6 arquivos entrelacados (`routes.ts`, `oauth-microsoft.ts`, `App.tsx`, `list.tsx`,
+`landing.tsx`, `login.tsx`) carregam tambem trabalho pos-auditoria de 06-30 que ja estava
+no working tree — anotado no corpo dos commits.
 
 ## Sessao 2026-06-30 — Revisao completa holistica
 

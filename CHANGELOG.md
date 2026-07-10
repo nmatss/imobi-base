@@ -4,6 +4,44 @@ All notable changes to ImobiBase are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.6.0] - 2026-07-10 — Go-Live Fase 2 (P0 B1–B8) + guardas de manutenibilidade
+
+> Plano canônico: `docs/reports/PLANO_GO_LIVE_360_2026-07-10.md` (auditoria multi-agente
+> de 25 agentes). PR [#5](https://github.com/nmatss/imobi-base/pull/5)
+> (`feat/google-sso-calendar`). Validado: `tsc`, 770/770 unit, `build`, gate estático
+> 13/13, smoke E2E 8/8, `npm run guard`. Merge → Go-Live ainda depende de credenciais e
+> provas operacionais owner-gated (ver `docs/GO_LIVE_CHECKLIST.md`).
+
+### Added
+
+- **Página pública de assinatura `/sign/:token`** (`client/src/pages/sign/`) +
+  `ContractSignaturePanel` — envio/assinatura via fluxo interno por token (sem ClickSign).
+- **`POST /api/auth/change-password`** — troca de senha autenticada (valida senha atual,
+  força, diferença, reuso e histórico); liga a aba Segurança real.
+- **Guardas de manutenibilidade** (`npm run guard`, no CI): `guard:schema` (drift PG↔SQLite),
+  `guard:size` (teto de linhas dos monolitos/mega-páginas), `guard:fetch` (teto de `fetch` cru).
+- **Provisionamento de `stripePriceId` por env** — `STRIPE_PRICE_<SLUG>_MONTHLY/YEARLY` no
+  `seed-plans`, sem sobrescrever valores da admin UI; novos campos Stripe/anual/leads/trial
+  em `admin/plans`. Placeholder local de foto de imóvel (`client/src/lib/placeholder.ts`).
+
+### Fixed
+
+- **Funil de billing (B1)** — onboarding leva plano pago a `/checkout/:slug` e login propaga
+  `?plan=`; antes nenhum cliente novo conseguia assinar plano pago.
+- **Redirects de erro OAuth (B7)** — apontavam para `/auth/login` (rota inexistente → 404);
+  corrigidos para `/login`; colisão de e-mail mostra mensagem amigável.
+- **Integridade financeira (B5/B6)** — controle de papel (`requireFinanceManager`) nas escritas
+  de financeiro/comissões; venda marca o imóvel como `sold` e recalcula a comissão no servidor.
+- **Dados falsos (B4)** — remove "Resumo do Mês" fixo, trends de KPI hardcoded e mock de
+  relatórios salvos; `avgDays` de contratos calculado de verdade.
+- **Aba Segurança (B3)** — deixa de ser mock (2FA/senha/sessões reais).
+- **Credibilidade (B8)** — remove avatares/depoimentos/estatísticas fabricados e assets
+  hotlinked de terceiros (login, signup, pricing, product-landing).
+
+### Changed
+
+- **ClickSign** passa a **fail-closed** em produção sem `CLICKSIGN_API_KEY` (evita 500 silencioso).
+
 ## [2.5.0] - 2026-06-27 — Google SSO + Google Calendar/Meet
 
 > Relatório completo em `docs/reports/GOOGLE_SSO_CALENDAR_2026-06-27.md`.

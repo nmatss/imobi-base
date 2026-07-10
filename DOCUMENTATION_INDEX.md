@@ -29,6 +29,7 @@ Indice central de toda a documentacao do projeto.
 | [PLANO_EXCELENCIA_2026-06-22.md](docs/reports/PLANO_EXCELENCIA_2026-06-22.md)    | Plano-mestre: 10 dimensoes para nota 9+ (backlog ondas) |
 | [RUNBOOK_EXCELENCIA_DONO.md](docs/RUNBOOK_EXCELENCIA_DONO.md)                    | Acoes de infra do dono (RLS, secrets, restore drill)  |
 | [GOOGLE_SSO_CALENDAR_2026-06-27.md](docs/reports/GOOGLE_SSO_CALENDAR_2026-06-27.md) | Google SSO + Agenda/Meet: implementacao, arquitetura e gates do dono |
+| [PLANO_GO_LIVE_360_2026-07-10.md](docs/reports/PLANO_GO_LIVE_360_2026-07-10.md) | **Fonte viva:** plano Go-Live/comercializacao (auditoria 25 agentes) + execucao Fase 2 (P0 B1-B8) |
 
 ---
 
