@@ -24,9 +24,7 @@ import {
   Shield,
   FileCheck,
   Lock,
-  Star,
   Award,
-  Quote,
 } from "lucide-react";
 import { plans, CONTACT_EMAIL } from "@/lib/plans-config";
 import { SeoHead, breadcrumbSchema } from "@/components/seo/SeoHead";
@@ -414,91 +412,48 @@ export default function PricingPage() {
           </div>
         </section>
 
-        {/* Social Proof — stats + testemunhos + selos */}
+        {/* Diferenciais — apenas alegacoes verdadeiras (sem stats/depoimentos fabricados) */}
         <section className="py-20 bg-background">
           <div className="container mx-auto px-4">
-            {/* Stats strip */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-8 sm:gap-16 text-center mb-16">
-              {[
-                { value: "1.500+", label: "Imóveis cadastrados" },
-                { value: "80+", label: "Imobiliárias ativas" },
-                { value: "5.000+", label: "Leads gerenciados" },
-                { value: "99%", label: "Satisfação dos clientes" },
-              ].map((stat) => (
-                <div key={stat.label} className="flex flex-col items-center">
-                  <div className="text-3xl md:text-4xl font-bold text-primary">
-                    {stat.value}
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {stat.label}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            {/* Testemunhos */}
             <div className="text-center mb-12">
               <h2 className="text-3xl font-heading font-bold mb-4">
-                Quem já usa, recomenda
+                Feito para o mercado imobiliário brasileiro
               </h2>
-              <p className="text-muted-foreground text-lg">
-                Corretores e imobiliárias que cresceram com o ImobiBase.
+              <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                Tudo o que uma imobiliária ou corretor precisa para operar — do
+                primeiro lead à assinatura do contrato.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto mb-16">
               {[
                 {
-                  text: "Reduzi em 60% o tempo para cadastrar imóveis e fechar contratos. O CRM integrado virou o cérebro da operação.",
-                  name: "Mariana Souza",
-                  role: "Diretora — Souza Imóveis",
-                  initials: "MS",
-                  color: "bg-primary/15 text-primary",
+                  title: "Comece sem custo",
+                  text: "Plano gratuito de verdade, sem cartão de crédito e sem prazo para expirar.",
                 },
                 {
-                  text: "Como corretor autônomo, o plano Gratuito já me atendeu muito bem. Subi para o Pro quando o volume de leads começou a crescer e não me arrependo.",
-                  name: "Rafael Lima",
-                  role: "Corretor autônomo — Campinas/SP",
-                  initials: "RL",
-                  color: "bg-emerald-500/15 text-emerald-600",
+                  title: "Sem fidelidade",
+                  text: "Assine mensal e cancele quando quiser, direto pelo painel.",
                 },
                 {
-                  text: "A automação de marketing e os relatórios avançados fizeram diferença real no fechamento de vendas. Suporte nota 10.",
-                  name: "Patrícia Alves",
-                  role: "Gerente Comercial — Alves Negócios",
-                  initials: "PA",
-                  color: "bg-orange-500/15 text-orange-600",
+                  title: "Seus dados no Brasil",
+                  text: "Hospedagem nacional e conformidade com a LGPD desde o primeiro dia.",
                 },
-              ].map((t) => (
-                <div
-                  key={t.name}
-                  className="bg-card p-6 rounded-2xl border hover:shadow-md transition-shadow flex flex-col"
-                >
-                  <Quote className="w-6 h-6 text-primary/40 mb-3" />
-                  <p className="text-sm text-foreground leading-relaxed mb-5">
-                    "{t.text}"
+              ].map((d) => (
+                <div key={d.title} className="bg-card p-6 rounded-2xl border">
+                  <h3 className="font-semibold text-lg mb-2">{d.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {d.text}
                   </p>
-                  <div className="flex items-center gap-3 mt-auto">
-                    <div
-                      className={`w-10 h-10 rounded-full ${t.color} flex items-center justify-center text-sm font-bold`}
-                    >
-                      {t.initials}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">{t.name}</p>
-                      <p className="text-xs text-muted-foreground">{t.role}</p>
-                    </div>
-                  </div>
                 </div>
               ))}
             </div>
 
-            {/* Selos de confiança */}
+            {/* Selos de confiança (apenas verdadeiros) */}
             <div className="flex flex-wrap items-center justify-center gap-6 md:gap-10 text-muted-foreground">
               {[
                 { icon: Lock, label: "SSL / TLS 1.3" },
                 { icon: Shield, label: "LGPD-compliant" },
                 { icon: Award, label: "Hospedado no Brasil" },
-                { icon: Star, label: "Uptime 99% SLA" },
               ].map((badge) => (
                 <div
                   key={badge.label}
@@ -539,7 +494,6 @@ export default function PricingPage() {
 
         {/* CTA */}
         <section className="py-24 bg-foreground text-background relative overflow-hidden">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5" />
           <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
 
           <div className="container mx-auto px-4 text-center relative z-10">

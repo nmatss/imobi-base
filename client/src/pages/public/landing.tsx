@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { PROPERTY_PLACEHOLDER } from "@/lib/placeholder";
 import { useRoute, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -317,6 +318,12 @@ export default function TenantLanding() {
             src="https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=2000"
             alt="Hero"
             className="absolute inset-0 w-full h-full object-cover"
+            width="2000"
+            height="1333"
+            sizes="100vw"
+            loading="eager"
+            fetchPriority="high"
+            decoding="async"
           />
           <div className="relative z-20 container mx-auto px-4 text-center text-white">
             <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-heading font-bold mb-4 sm:mb-6 drop-shadow-lg leading-tight">
@@ -392,7 +399,7 @@ export default function TenantLanding() {
                     <Link href={`/e/${tenantSlug}/imovel/${property.id}`}>
                       <div className="relative aspect-[4/3] overflow-hidden cursor-pointer">
                         <img
-                          src={property.images?.[0] || "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800"}
+                          src={property.images?.[0] || PROPERTY_PLACEHOLDER}
                           alt={property.title}
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                         />

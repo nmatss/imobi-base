@@ -1,4 +1,5 @@
 import { usePageTitle } from "@/hooks/use-page-title";
+import { PROPERTY_PLACEHOLDER } from "@/lib/placeholder";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { Link, useLocation, useSearch } from "wouter";
@@ -295,6 +296,10 @@ export default function PropertiesList() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const [featureDialogOpen, setFeatureDialogOpen] = useState(false);
+  const [pendingImageUrl, setPendingImageUrl] = useState("");
+  const [pendingFeature, setPendingFeature] = useState("");
 
   // Lightbox
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
@@ -550,10 +555,16 @@ export default function PropertiesList() {
   };
 
   const handleImageAdd = () => {
-    const url = prompt("Cole a URL da imagem:");
-    if (url && url.trim()) {
-      setFormData(prev => ({ ...prev, images: [...prev.images, url.trim()] }));
-    }
+    setPendingImageUrl("");
+    setImageDialogOpen(true);
+  };
+
+  const confirmImageAdd = () => {
+    const url = pendingImageUrl.trim();
+    if (!url) return;
+    setFormData(prev => ({ ...prev, images: [...prev.images, url] }));
+    setPendingImageUrl("");
+    setImageDialogOpen(false);
   };
 
   const handleImageRemove = (index: number) => {
@@ -561,10 +572,16 @@ export default function PropertiesList() {
   };
 
   const handleFeatureAdd = () => {
-    const feature = prompt("Digite a característica:");
-    if (feature && feature.trim()) {
-      setFormData(prev => ({ ...prev, features: [...prev.features, feature.trim()] }));
-    }
+    setPendingFeature("");
+    setFeatureDialogOpen(true);
+  };
+
+  const confirmFeatureAdd = () => {
+    const feature = pendingFeature.trim();
+    if (!feature) return;
+    setFormData(prev => ({ ...prev, features: [...prev.features, feature] }));
+    setPendingFeature("");
+    setFeatureDialogOpen(false);
   };
 
   const handleFeatureRemove = (index: number) => {
@@ -948,12 +965,14 @@ export default function PropertiesList() {
                 {/* Flex row that becomes more spacious on larger screens */}
                 <div className="flex gap-2.5 sm:gap-3 md:gap-4">
                   {/* Thumbnail - Responsive sizing */}
-                  <div
-                    className="w-16 h-16 xs:w-20 xs:h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-lg overflow-hidden shrink-0 cursor-pointer relative"
+                  <button
+                    type="button"
+                    className="w-16 h-16 xs:w-20 xs:h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-lg overflow-hidden shrink-0 cursor-pointer relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                     onClick={() => openLightbox(property.images || [])}
+                    aria-label={`Abrir galeria de imagens de ${property.title}`}
                   >
                     <img
-                      src={property.images?.[0] || "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=400"}
+                      src={property.images?.[0] || PROPERTY_PLACEHOLDER}
                       alt={property.title}
                       className="w-full h-full object-cover"
                       loading="lazy"
@@ -968,13 +987,16 @@ export default function PropertiesList() {
                         <Star className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-yellow-400 fill-yellow-400 drop-shadow" />
                       </div>
                     )}
-                  </div>
+                  </button>
 
                   {/* Info - Flexible content area */}
                   <div className="flex-1 min-w-0 flex flex-col">
                     {/* Header Row: Title + Actions */}
                     <div className="flex items-start justify-between gap-1.5 sm:gap-2">
-                      <div className="min-w-0 flex-1" onClick={() => setLocation(`/properties/${property.id}`)} role="button">
+                      <Link
+                        href={`/properties/${property.id}`}
+                        className="min-w-0 flex-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-sm"
+                      >
                         <h3 className="font-semibold text-xs sm:text-sm md:text-base line-clamp-1 hover:text-primary transition-colors cursor-pointer">
                           {property.title}
                         </h3>
@@ -983,7 +1005,7 @@ export default function PropertiesList() {
                           <span className="truncate">{property.city}</span>
                           <span className="hidden xs:inline truncate">, {property.address}</span>
                         </p>
-                      </div>
+                      </Link>
 
                       {/* Actions Dropdown - Touch-friendly (min 44px) */}
                       <DropdownMenu>
@@ -1415,6 +1437,80 @@ export default function PropertiesList() {
               </div>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={featureDialogOpen} onOpenChange={setFeatureDialogOpen}>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-md mx-auto rounded-lg">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg">Adicionar característica</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
+              Informe uma característica curta para destacar este imóvel.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="property-feature-input" className="text-xs sm:text-sm">
+              Característica
+            </Label>
+            <Input
+              id="property-feature-input"
+              value={pendingFeature}
+              onChange={(event) => setPendingFeature(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  confirmFeatureAdd();
+                }
+              }}
+              placeholder="Ex.: Varanda gourmet"
+              autoFocus
+            />
+          </div>
+          <DialogFooter className="flex-col-reverse xs:flex-row gap-2 mt-2">
+            <Button variant="outline" onClick={() => setFeatureDialogOpen(false)} className="w-full xs:w-auto">
+              Cancelar
+            </Button>
+            <Button onClick={confirmFeatureAdd} disabled={!pendingFeature.trim()} className="w-full xs:w-auto">
+              Adicionar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-md mx-auto rounded-lg">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg">Adicionar imagem</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
+              Cole a URL da imagem que deve aparecer na galeria do imóvel.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="property-image-url-input" className="text-xs sm:text-sm">
+              URL da imagem
+            </Label>
+            <Input
+              id="property-image-url-input"
+              value={pendingImageUrl}
+              onChange={(event) => setPendingImageUrl(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  confirmImageAdd();
+                }
+              }}
+              placeholder="https://..."
+              autoFocus
+            />
+          </div>
+          <DialogFooter className="flex-col-reverse xs:flex-row gap-2 mt-2">
+            <Button variant="outline" onClick={() => setImageDialogOpen(false)} className="w-full xs:w-auto">
+              Cancelar
+            </Button>
+            <Button onClick={confirmImageAdd} disabled={!pendingImageUrl.trim()} className="w-full xs:w-auto">
+              Adicionar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

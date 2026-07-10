@@ -1,4 +1,5 @@
 import React, { memo } from "react";
+import { PROPERTY_PLACEHOLDER } from "@/lib/placeholder";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -102,7 +103,7 @@ const PropertyCardComponent = ({
 }: PropertyCardProps) => {
   const statusConfig = STATUS_CONFIG[status] || STATUS_CONFIG.available;
   const typeLabel = type === 'sale' ? 'Venda' : 'Aluguel';
-  const defaultImage = "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800";
+  const defaultImage = PROPERTY_PLACEHOLDER;
 
   const handleCardClick = () => {
     onView(id);

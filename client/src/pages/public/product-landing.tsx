@@ -1,13 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Link } from "wouter";
-import {
-  motion,
-  AnimatePresence,
-  useInView,
-  useMotionValue,
-  useTransform,
-  animate,
-} from "framer-motion";
+import { motion, AnimatePresence, useInView } from "framer-motion";
 import {
 
   CheckCircle2,
@@ -21,7 +14,6 @@ import {
   Menu,
   X,
   Play,
-  Star,
   Smartphone,
   Brain,
   Plug,
@@ -78,45 +70,6 @@ function ScrollReveal({
     >
       {children}
     </motion.div>
-  );
-}
-
-function AnimatedCounter({
-  target,
-  suffix = "",
-  prefix = "",
-}: {
-  target: number;
-  suffix?: string;
-  prefix?: string;
-}) {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true });
-  const motionValue = useMotionValue(0);
-  const rounded = useTransform(motionValue, (v) => Math.round(v));
-  const [display, setDisplay] = useState(0);
-
-  useEffect(() => {
-    if (isInView) {
-      const controls = animate(motionValue, target, {
-        duration: 1.5,
-        ease: [0, 0, 0.2, 1],
-      });
-      return controls.stop;
-    }
-  }, [isInView, target, motionValue]);
-
-  useEffect(() => {
-    const unsubscribe = rounded.on("change", (v) => setDisplay(v));
-    return unsubscribe;
-  }, [rounded]);
-
-  return (
-    <span ref={ref}>
-      {prefix}
-      {display}
-      {suffix}
-    </span>
   );
 }
 
@@ -264,7 +217,7 @@ export default function ProductLanding() {
             {[
               { label: "Recursos", id: "recursos" },
               { label: "Como Funciona", id: "como-funciona" },
-              { label: "Depoimentos", id: "depoimentos" },
+              { label: "Diferenciais", id: "depoimentos" },
             ].map((item) => (
               <button
                 key={item.id}
@@ -321,7 +274,7 @@ export default function ProductLanding() {
               {[
                 { label: "Recursos", id: "recursos" },
                 { label: "Como Funciona", id: "como-funciona" },
-                { label: "Depoimentos", id: "depoimentos" },
+                { label: "Diferenciais", id: "depoimentos" },
               ].map((item) => (
                 <button
                   key={item.id}
@@ -522,27 +475,27 @@ export default function ProductLanding() {
           </div>
         </section>
 
-        {/* ══════ Social Proof Strip ══════ */}
+        {/* ══════ Faixa de valor (fatos, sem métricas fabricadas) ══════ */}
         <section className="py-12 bg-muted/30 border-y">
           <div className="container mx-auto px-4">
             <ScrollReveal>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-8 sm:gap-16 text-center">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-8 sm:gap-12 text-center">
                 {[
-                  { value: 1500, suffix: "+", label: "Imóveis cadastrados" },
-                  { value: 80, suffix: "+", label: "Imobiliárias ativas" },
-                  { value: 5000, suffix: "+", label: "Leads gerenciados" },
-                  { value: 99, suffix: "%", label: "Satisfação dos clientes" },
-                ].map((stat) => (
-                  <div key={stat.label} className="flex flex-col items-center">
-                    <div className="text-3xl md:text-4xl font-bold text-primary">
-                      <AnimatedCounter
-                        target={stat.value}
-                        suffix={stat.suffix}
-                      />
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {stat.label}
-                    </p>
+                  "Grátis para começar",
+                  "CRM + Site + Financeiro num só lugar",
+                  "Seus dados no Brasil (LGPD)",
+                  "Sem fidelidade — cancele quando quiser",
+                ].map((label) => (
+                  <div
+                    key={label}
+                    className="flex items-center gap-2 text-sm font-medium text-foreground"
+                  >
+                    <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                      <svg viewBox="0 0 20 20" className="w-3.5 h-3.5 fill-current" aria-hidden="true">
+                        <path d="M7.5 13.5 4 10l1.4-1.4 2.1 2.1 5.1-5.1L14 7z" />
+                      </svg>
+                    </span>
+                    {label}
                   </div>
                 ))}
               </div>
@@ -903,20 +856,22 @@ export default function ProductLanding() {
                     Otimizado para performance máxima. Carregamento instantâneo
                     de imóveis e fotos para não perder a atenção do cliente.
                   </p>
-                  <div className="flex gap-8">
-                    <div>
-                      <div className="text-4xl font-bold text-primary mb-1">
-                        <AnimatedCounter target={99} suffix="%" />
-                      </div>
-                      <div className="text-sm font-medium">
-                        Uptime Garantido
-                      </div>
+                  <div className="flex flex-wrap gap-x-8 gap-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <svg viewBox="0 0 20 20" className="w-3.5 h-3.5 fill-current" aria-hidden="true">
+                          <path d="M7.5 13.5 4 10l1.4-1.4 2.1 2.1 5.1-5.1L14 7z" />
+                        </svg>
+                      </span>
+                      Imagens otimizadas (WebP)
                     </div>
-                    <div>
-                      <div className="text-4xl font-bold text-primary mb-1">
-                        &lt;1s
-                      </div>
-                      <div className="text-sm font-medium">Carregamento</div>
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <svg viewBox="0 0 20 20" className="w-3.5 h-3.5 fill-current" aria-hidden="true">
+                          <path d="M7.5 13.5 4 10l1.4-1.4 2.1 2.1 5.1-5.1L14 7z" />
+                        </svg>
+                      </span>
+                      Carregamento sob demanda
                     </div>
                   </div>
                 </div>
@@ -1003,13 +958,14 @@ export default function ProductLanding() {
                   variant="outline"
                   className="mb-4 bg-primary/5 text-primary border-primary/20"
                 >
-                  Depoimentos
+                  Diferenciais
                 </Badge>
                 <h2 className="text-3xl md:text-5xl font-heading font-bold mb-6">
-                  Quem usa, recomenda
+                  Por que imobiliárias escolhem o ImobiBase
                 </h2>
                 <p className="text-lg text-muted-foreground">
-                  Veja o que nossos clientes dizem sobre o ImobiBase.
+                  Uma plataforma pensada para a rotina de quem vende e aluga
+                  imóveis no Brasil.
                 </p>
               </div>
             </ScrollReveal>
@@ -1017,59 +973,24 @@ export default function ProductLanding() {
             <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
               {[
                 {
-                  name: "Carla Mendes",
-                  role: "Diretora",
-                  company: "Mendes Imóveis",
-                  text: "O ImobiBase transformou nossa operação. Antes usávamos planilhas e perdíamos leads. Hoje temos controle total do funil e o site gerou 3x mais contatos.",
-                  initials: "CM",
-                  color: "bg-blue-100 text-blue-700",
+                  title: "Nenhum lead perdido",
+                  text: "Do primeiro contato ao fechamento: captação, qualificação, agenda de visitas e follow-up num funil só.",
                 },
                 {
-                  name: "Ricardo Alves",
-                  role: "Corretor Autônomo",
-                  company: "",
-                  text: "Como corretor autônomo, precisava de algo simples e profissional. O plano gratuito já me atende muito bem e o site ficou incrível.",
-                  initials: "RA",
-                  color: "bg-green-100 text-green-700",
+                  title: "Site que gera contato",
+                  text: "Vitrine profissional com SEO e portal do cliente, sem depender apenas de portais de terceiros.",
                 },
                 {
-                  name: "Patrícia Duarte",
-                  role: "Gerente Comercial",
-                  company: "Rede Habitar",
-                  text: "A inteligência artificial para descrições de imóveis economiza horas do nosso time. E o dashboard de comissões resolveu um problema que tínhamos há anos.",
-                  initials: "PD",
-                  color: "bg-purple-100 text-purple-700",
+                  title: "Operação no controle",
+                  text: "Contratos, financeiro, comissões e locações integrados — menos planilha, mais decisão.",
                 },
-              ].map((testimonial, i) => (
-                <ScrollReveal key={testimonial.name} delay={i * 0.1}>
+              ].map((d, i) => (
+                <ScrollReveal key={d.title} delay={i * 0.1}>
                   <div className="bg-card p-8 rounded-2xl border shadow-sm h-full flex flex-col">
-                    <div className="flex gap-1 mb-4">
-                      {[...Array(5)].map((_, j) => (
-                        <Star
-                          key={j}
-                          className="w-4 h-4 fill-yellow-400 text-yellow-400"
-                        />
-                      ))}
-                    </div>
-                    <p className="text-muted-foreground leading-relaxed mb-6 flex-1">
-                      "{testimonial.text}"
+                    <h3 className="text-lg font-semibold mb-3">{d.title}</h3>
+                    <p className="text-muted-foreground leading-relaxed flex-1">
+                      {d.text}
                     </p>
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-10 h-10 rounded-full ${testimonial.color} flex items-center justify-center text-sm font-bold`}
-                      >
-                        {testimonial.initials}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-sm">
-                          {testimonial.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {testimonial.role}
-                          {testimonial.company && ` — ${testimonial.company}`}
-                        </p>
-                      </div>
-                    </div>
                   </div>
                 </ScrollReveal>
               ))}
@@ -1300,7 +1221,6 @@ export default function ProductLanding() {
 
         {/* ══════ Final CTA ══════ */}
         <section className="py-32 bg-foreground text-background relative overflow-hidden">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5" />
           <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
 
           <div className="container mx-auto px-4 text-center relative z-10">

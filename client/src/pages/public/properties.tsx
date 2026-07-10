@@ -1,4 +1,5 @@
 import { Link, useRoute } from "wouter";
+import { PROPERTY_PLACEHOLDER } from "@/lib/placeholder";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -797,7 +798,7 @@ export default function PublicProperties() {
                                 : "aspect-[4/3]"
                             }`}>
                               <img
-                                src={property.images?.[0] || "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800"}
+                                src={property.images?.[0] || PROPERTY_PLACEHOLDER}
                                 alt={property.title}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                 loading="lazy"

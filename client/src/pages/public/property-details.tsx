@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { PROPERTY_PLACEHOLDER } from "@/lib/placeholder";
 import { useRoute, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -271,7 +272,7 @@ export default function PropertyDetails() {
   const images =
     property.images && property.images.length > 0
       ? property.images
-      : ["https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200"];
+      : [PROPERTY_PLACEHOLDER];
   const propertyPath = `/e/${slug}/imovel/${property.id}`;
   const propertyDescription =
     property.description ||
@@ -917,10 +918,7 @@ export default function PropertyDetails() {
                     <Card className="group cursor-pointer hover:shadow-xl transition-all duration-300 w-[280px] md:w-auto flex-shrink-0 snap-start">
                       <div className="relative aspect-[4/3] overflow-hidden rounded-t-xl">
                         <img
-                          src={
-                            prop.images?.[0] ||
-                            "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800"
-                          }
+                          src={prop.images?.[0] || PROPERTY_PLACEHOLDER}
                           alt={prop.title}
                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                           loading="lazy"
