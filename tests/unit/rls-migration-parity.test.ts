@@ -84,7 +84,9 @@ function policyBlockForTable(sql: string, table: string): string {
 describe("RLS migration parity", () => {
   const schema = readProjectFile("shared/schema.ts");
   const rlsSql = readProjectFile("migrations/RLS_enable.sql");
+  const childRlsSql = readProjectFile("migrations/RLS_enable_child_tables.sql");
   const migrateScript = readProjectFile("script/migrate.ts");
+  const verifyRlsScript = readProjectFile("script/verify-rls.ts");
 
   it("covers every pg schema table with tenant_id", () => {
     const schemaTenantTables = tenantTablesFromSchema(schema);
@@ -163,5 +165,25 @@ describe("RLS migration parity", () => {
     expect(migrateScript).toContain("options.includeRls || !isRlsMigration(f)");
     expect(migrateScript).toContain("!options.onlyRls || isRlsMigration(f)");
     expect(migrateScript).toContain("runMigrations({ includeRls: true, onlyRls: true })");
+  });
+
+  it("verifies parent and child RLS migrations in db:rls:verify", () => {
+    expect(verifyRlsScript).toContain('const RLS_MIGRATIONS = ["RLS_enable.sql", "RLS_enable_child_tables.sql"]');
+    expect(verifyRlsScript).toContain("migrationSqlByFile.flatMap");
+    expect(verifyRlsScript).toContain("SELECT filename FROM _migrations WHERE filename = ANY($1::text[])");
+    expect(verifyRlsScript).toContain("RLS verified for ${rlsTables.length} tables from ${RLS_MIGRATIONS.join");
+  });
+
+  it("allows valid public signature-token contexts to read and update digital signatures", () => {
+    const policy = policyBlockForTable(childRlsSql, "digital_signatures");
+
+    expect(policy).toContain("contract_id IN (SELECT id FROM contracts WHERE tenant_id = current_setting('app.tenant_id', true))");
+    expect(policy).toContain('CREATE POLICY public_signature_token_select ON "digital_signatures"');
+    expect(policy).toContain("FOR SELECT");
+    expect(policy).toContain('CREATE POLICY public_signature_token_update ON "digital_signatures"');
+    expect(policy).toContain("FOR UPDATE");
+    expect(policy).toContain("token = current_setting('app.digital_signature_token', true)");
+    expect(policy).toContain("expires_at IS NULL OR expires_at > now()");
+    expect(policy).toContain("WITH CHECK");
   });
 });

@@ -7,7 +7,7 @@ const pages = [
   { path: '/properties', name: 'Properties List' },
   { path: '/leads', name: 'Leads' },
   { path: '/calendar', name: 'Calendar' },
-  { path: '/financial', name: 'Financial' },
+  { path: '/financeiro', name: 'Financial' },
   { path: '/rentals', name: 'Rentals' },
   { path: '/vendas', name: 'Sales' },
 ];

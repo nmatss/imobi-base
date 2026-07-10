@@ -90,6 +90,9 @@ describe("Auth RLS contexts", () => {
     expect(featureRoutes).toContain("runWithDigitalSignatureTokenRlsContext(token");
     expect(featureRoutes).toContain("db.select().from(contracts)");
     expect(featureRoutes).toContain("db.update(contracts)");
+    expect(featureRoutes).toContain("db.select().from(digitalSignatures).where(eq(digitalSignatures.token, token))");
+    expect(featureRoutes).toContain("db.update(digitalSignatures)");
+    expect(featureRoutes).toContain("runWithTenantRlsContext(contract[0].tenantId");
   });
 
   it("uses narrow public contexts for anonymous property comparison flows", () => {

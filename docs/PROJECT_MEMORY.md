@@ -97,6 +97,17 @@ O diferencial recomendado e posicionar o produto como o sistema que nao perde vi
 - Snapshot de prontidão atual (17/06/2026): 79/100, com scorecard consolidado em `docs/qa/GO_LIVE_SCORECARD_2026-06-17.md`; meta enterprise permanece 99/100.
 - Validacao local mais recente (18/06/2026): `npm run check`, `npm run check:scripts`, `npm run test` (1480 passed, 1 skipped), `npm run build`, `npm run test:smoke:e2e`, `npm run lint -- --quiet`, `npm run ops:go-live:verify:static`, `npm run ops:cron:verify`, `git diff --check` e varredura de `Link/a > Button` passaram; ainda nao substitui provas de staging/producao. O gate strict (18 pass/11 fail) e a cobertura enterprise (12,90% lines) ainda bloqueiam producao sem evidencias reais.
 - Relatorio consolidado de readiness: `docs/qa/PRODUCTION_READINESS_WORKLOG_2026-06-18.md`.
+- Revisao go-live completa 2026-06-29: `docs/reports/REVISAO_GO_LIVE_COMPLETA_2026-06-29.md`. Veredito **NO-GO enterprise**. Validacoes locais: `check`, `lint -- --quiet`, `build`, `ops:go-live:verify:static`, `ops:cron:verify`; `test:unit` falhou apenas no caso pre-existente `data-export`. Novos bloqueadores: secrets reais em `.env.production` local, verifier RLS sem child tables, risco de quebra da assinatura publica sob RLS child tables, Microsoft OAuth sem criptografia de tokens, Redis/TLS/fail-open e Playwright/UX driftados.
+- Execucao pos-auditoria 2026-06-30: `data-export` corrigido e `npm run test:unit`
+  passou 770/770; UX/QA de propriedades/sidebar ajustado; rotas Playwright
+  driftadas foram alinhadas; SQLite local ignorado foi atualizado
+  aditivamente para smoke; `npm run test:smoke:e2e` passou 8/8; `lead-tags`
+  foi extraido para `server/routes/lead-tags.ts` com `tenant-isolation` 27/27,
+  `check`, `lint -- --quiet` e `git diff --check` verdes; `GlobalSearch` e
+  `TimeoutWarning` viraram lazy chunks apenas para rotas protegidas, reduzindo a
+  entry publica local de ~374 kB para ~348 kB; hero da vitrine `/e/:slug`
+  recebeu dimensoes/prioridade para LCP/CLS. ADR:
+  `docs/ADR/0002-modularizacao-incremental-routes.md`.
 
 ## Documentacao importante
 

@@ -881,7 +881,9 @@ export function registerFeatureRoutes(app: Express) {
     try {
       const { token } = req.params;
 
-      const signature = await db.select().from(digitalSignatures).where(eq(digitalSignatures.token, token));
+      const signature = await runWithDigitalSignatureTokenRlsContext(token, () =>
+        db.select().from(digitalSignatures).where(eq(digitalSignatures.token, token)),
+      );
 
       if (signature.length === 0) {
         return res.status(404).json({ error: "Assinatura não encontrada" });
@@ -894,9 +896,11 @@ export function registerFeatureRoutes(app: Express) {
 
       // Mark as viewed
       if (!signature[0].viewedAt) {
-        await db.update(digitalSignatures)
-          .set({ viewedAt: new Date().toISOString(), status: 'viewed' })
-          .where(eq(digitalSignatures.id, signature[0].id));
+        await runWithDigitalSignatureTokenRlsContext(token, () =>
+          db.update(digitalSignatures)
+            .set({ viewedAt: new Date().toISOString(), status: 'viewed' })
+            .where(eq(digitalSignatures.id, signature[0].id)),
+        );
       }
 
       // Get contract details
@@ -920,7 +924,9 @@ export function registerFeatureRoutes(app: Express) {
       const { token } = req.params;
       const { signatureData, ipAddress, userAgent, geoLocation } = req.body;
 
-      const signature = await db.select().from(digitalSignatures).where(eq(digitalSignatures.token, token));
+      const signature = await runWithDigitalSignatureTokenRlsContext(token, () =>
+        db.select().from(digitalSignatures).where(eq(digitalSignatures.token, token)),
+      );
 
       if (signature.length === 0) {
         return res.status(404).json({ error: "Assinatura não encontrada" });
@@ -929,6 +935,14 @@ export function registerFeatureRoutes(app: Express) {
       const expiresAt = signature[0].expiresAt ? new Date(signature[0].expiresAt) : null;
       if (!expiresAt || Number.isNaN(expiresAt.getTime()) || expiresAt < new Date()) {
         return res.status(400).json({ error: "Link expirado" });
+      }
+
+      const contract = await runWithDigitalSignatureTokenRlsContext(token, () =>
+        db.select().from(contracts).where(eq(contracts.id, signature[0].contractId)),
+      );
+
+      if (!contract[0]) {
+        return res.status(404).json({ error: "Contrato não encontrado" });
       }
 
       if (signature[0].status === 'signed') {
@@ -940,28 +954,32 @@ export function registerFeatureRoutes(app: Express) {
         .update(signatureData + signature[0].id + Date.now())
         .digest('hex');
 
-      await db.update(digitalSignatures)
-        .set({
-          signatureData,
-          signatureHash,
-          ipAddress: ipAddress || req.ip,
-          userAgent: userAgent || req.headers['user-agent'],
-          geoLocation: geoLocation ? JSON.stringify(geoLocation) : null,
-          status: 'signed',
-          signedAt: new Date().toISOString(),
-        })
-        .where(eq(digitalSignatures.id, signature[0].id));
+      await runWithDigitalSignatureTokenRlsContext(token, () =>
+        db.update(digitalSignatures)
+          .set({
+            signatureData,
+            signatureHash,
+            ipAddress: ipAddress || req.ip,
+            userAgent: userAgent || req.headers['user-agent'],
+            geoLocation: geoLocation ? JSON.stringify(geoLocation) : null,
+            status: 'signed',
+            signedAt: new Date().toISOString(),
+          })
+          .where(eq(digitalSignatures.id, signature[0].id)),
+      );
 
       // Check if all signatures are complete
-      const allSignatures = await db.select()
-        .from(digitalSignatures)
-        .where(eq(digitalSignatures.contractId, signature[0].contractId));
+      const allSignatures = await runWithTenantRlsContext(contract[0].tenantId, () =>
+        db.select()
+          .from(digitalSignatures)
+          .where(eq(digitalSignatures.contractId, signature[0].contractId)),
+      );
 
       type SignatureType = typeof allSignatures[number];
       const allSigned = allSignatures.every((s: SignatureType) => s.status === 'signed');
 
       if (allSigned) {
-        await runWithDigitalSignatureTokenRlsContext(token, () =>
+        await runWithTenantRlsContext(contract[0].tenantId, () =>
           db.update(contracts)
             .set({ status: 'signed', signedAt: new Date().toISOString() })
             .where(eq(contracts.id, signature[0].contractId)),

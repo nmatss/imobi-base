@@ -37,7 +37,7 @@ test.describe('Portrait Mode', () => {
 
   test('Forms scrollable in portrait', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('/properties/new');
+    await page.goto('/properties');
     await page.waitForLoadState('networkidle');
 
     // Page should be scrollable to access all form fields
@@ -111,7 +111,7 @@ test.describe('Landscape Mode', () => {
 
   test('Horizontal scroll used effectively in landscape', async ({ page }) => {
     await page.setViewportSize({ width: 667, height: 375 });
-    await page.goto('/leads/kanban');
+    await page.goto('/leads');
     await page.waitForLoadState('networkidle');
 
     // Kanban board should utilize horizontal space
@@ -309,7 +309,7 @@ test.describe('Form Usability on Rotation', () => {
   test('Form inputs accessible in both orientations', async ({ page }) => {
     // Portrait
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('/properties/new');
+    await page.goto('/properties');
     await page.waitForLoadState('networkidle');
 
     const input = page.locator('input').first();
@@ -335,7 +335,7 @@ test.describe('Form Usability on Rotation', () => {
     }
 
     await page.setViewportSize({ width: 667, height: 375 });
-    await page.goto('/properties/new');
+    await page.goto('/properties');
     await page.waitForLoadState('networkidle');
 
     const input = page.locator('input[type="text"]').first();

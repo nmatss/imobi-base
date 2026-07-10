@@ -106,7 +106,7 @@ for (const bp of breakpoints) {
     });
 
     test('Forms are usable', async ({ page }) => {
-      await page.goto('/properties/new');
+      await page.goto('/properties');
       await page.waitForLoadState('networkidle');
 
       // Check if form inputs are properly sized

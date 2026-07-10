@@ -57,6 +57,9 @@ function makeSelectChain(table: any) {
 const mocks = vi.hoisted(() => ({
   archiveAppend: vi.fn(),
   logComplianceAudit: vi.fn(async () => undefined),
+  storageConfigured: false,
+  uploadObject: vi.fn(async () => true),
+  downloadObject: vi.fn(async () => Buffer.from("mock-export-zip")),
 }));
 
 vi.mock("../../server/db", () => {
@@ -87,6 +90,13 @@ vi.mock("../../server/db", () => {
 
 vi.mock("../../server/compliance/audit-logger", () => ({
   logComplianceAudit: mocks.logComplianceAudit,
+}));
+
+vi.mock("../../server/storage/supabase-client", () => ({
+  STORAGE_BUCKETS: { EXPORTS: "exports" },
+  isStorageConfigured: () => mocks.storageConfigured,
+  uploadObject: mocks.uploadObject,
+  downloadObject: mocks.downloadObject,
 }));
 
 // Capture the JSON payload appended to the export archive without real IO.
@@ -171,6 +181,7 @@ function resetState() {
   updated.length = 0;
   for (const k of Object.keys(selectResults)) delete selectResults[k];
   vi.clearAllMocks();
+  mocks.storageConfigured = false;
 }
 
 // Wait for the fire-and-forget processDataExport() chain to settle.
@@ -467,7 +478,8 @@ describe("downloadExport — ownership, readiness and expiry", () => {
     ).rejects.toThrow("expired");
   });
 
-  it("returns the file path, bumps download count and audits a valid download", async () => {
+  it("returns the file content, bumps download count and audits a valid download", async () => {
+    mocks.storageConfigured = true;
     selectResults["dataExportRequests"] = [
       {
         id: "req-1",
@@ -480,8 +492,13 @@ describe("downloadExport — ownership, readiness and expiry", () => {
       },
     ];
 
-    const path = await dataExport.downloadExport("req-1", "user-1");
-    expect(path).toContain("data-export-abc.zip");
+    const buffer = await dataExport.downloadExport("req-1", "user-1");
+    expect(Buffer.isBuffer(buffer)).toBe(true);
+    expect(buffer.toString()).toBe("mock-export-zip");
+    expect(mocks.downloadObject).toHaveBeenCalledWith(
+      "exports",
+      "tenant-a/data-export-abc.zip",
+    );
 
     const dlUpdate = updated.find(
       (u) => u.table === "dataExportRequests" && u.values.downloadCount === 3,

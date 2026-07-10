@@ -3,13 +3,25 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Pool } from "pg";
 
-const RLS_MIGRATION = "RLS_enable.sql";
-const migrationPath = path.resolve(process.cwd(), "migrations", RLS_MIGRATION);
-const migrationSql = await readFile(migrationPath, "utf8");
-const rlsTables = [...new Set([...migrationSql.matchAll(/ALTER TABLE "([^"]+)" ENABLE ROW LEVEL SECURITY/g)].map((match) => match[1]))].sort();
+const RLS_MIGRATIONS = ["RLS_enable.sql", "RLS_enable_child_tables.sql"];
+const migrationSqlByFile = await Promise.all(
+  RLS_MIGRATIONS.map(async (filename) => {
+    const filePath = path.resolve(process.cwd(), "migrations", filename);
+    return { filename, filePath, sql: await readFile(filePath, "utf8") };
+  }),
+);
+const rlsTables = [
+  ...new Set(
+    migrationSqlByFile.flatMap(({ sql }) =>
+      [...sql.matchAll(/ALTER TABLE "([^"]+)" ENABLE ROW LEVEL SECURITY/g)].map(
+        (match) => match[1],
+      ),
+    ),
+  ),
+].sort();
 
 if (rlsTables.length === 0) {
-  console.error(`No RLS tables found in ${migrationPath}.`);
+  console.error(`No RLS tables found in ${RLS_MIGRATIONS.join(", ")}.`);
   process.exit(1);
 }
 
@@ -52,12 +64,15 @@ try {
     ) AS exists
   `);
   if (migrationsTable.rows[0]?.exists) {
-    const migrationRecord = await pool.query<{ exists: boolean }>(
-      "SELECT EXISTS (SELECT 1 FROM _migrations WHERE filename = $1) AS exists",
-      [RLS_MIGRATION],
+    const migrationRecords = await pool.query<{ filename: string }>(
+      "SELECT filename FROM _migrations WHERE filename = ANY($1::text[])",
+      [RLS_MIGRATIONS],
     );
-    if (!migrationRecord.rows[0]?.exists) {
-      warnings.push(`${RLS_MIGRATION} is not recorded in _migrations. If it was applied manually, keep an audit note.`);
+    const recordedMigrations = new Set(migrationRecords.rows.map((row) => row.filename));
+    for (const filename of RLS_MIGRATIONS) {
+      if (!recordedMigrations.has(filename)) {
+        warnings.push(`${filename} is not recorded in _migrations. If it was applied manually, keep an audit note.`);
+      }
     }
   } else {
     warnings.push("_migrations table does not exist; cannot verify migration history.");
@@ -117,7 +132,9 @@ try {
     process.exit(1);
   }
 
-  console.log(`RLS verified for ${rlsTables.length} tables with runtime role "${role?.current_user ?? "unknown"}".`);
+  console.log(
+    `RLS verified for ${rlsTables.length} tables from ${RLS_MIGRATIONS.join(", ")} with runtime role "${role?.current_user ?? "unknown"}".`,
+  );
 } finally {
   await pool.end();
 }

@@ -258,23 +258,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     };
   }, [location, tenant?.name]);
 
-  // Keyboard shortcut for search (Ctrl+K or Cmd+K)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        const searchInput = document.querySelector<HTMLInputElement>('[data-testid="input-global-search"]');
-        if (searchInput) {
-          searchInput.focus();
-          setSearchOpen(true);
-        }
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
   const SidebarContent = ({ collapsed = false }: { collapsed?: boolean }) => (
     <div className="flex flex-col h-full bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
       <div className={`p-6 flex items-center ${collapsed ? 'justify-center' : 'gap-2'}`}>
@@ -339,32 +322,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {section.items.map((item) => {
                 const isActive = location === item.href || location.startsWith(`${item.href}/`);
                 return (
-                  <Link key={item.href} href={item.href}>
-                    <div
-                      className={`relative flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`relative flex items-center ${collapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+                      isActive
+                        ? "bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 shadow-sm border-l-4 border-blue-600 dark:border-blue-500 pl-[10px]"
+                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent/80 hover:text-sidebar-foreground hover:pl-[10px] border-l-4 border-transparent"
+                    }`}
+                    aria-current={isActive ? "page" : undefined}
+                    title={collapsed ? item.label : undefined}
+                  >
+                    <item.icon
+                      {...iconA11yProps}
+                      className={`w-5 h-5 transition-all duration-200 ${
                         isActive
-                          ? "bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 shadow-sm border-l-4 border-blue-600 dark:border-blue-500 pl-[10px]"
-                          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/80 hover:text-sidebar-foreground hover:pl-[10px] border-l-4 border-transparent"
+                          ? "text-blue-600 dark:text-blue-400"
+                          : "text-sidebar-foreground/50 group-hover:text-sidebar-foreground group-hover:scale-110"
                       }`}
-                      tabIndex={0}
-                      role="link"
-                      aria-current={isActive ? "page" : undefined}
-                      title={collapsed ? item.label : undefined}
-                    >
-                      <item.icon
-                        {...iconA11yProps}
-                        className={`w-5 h-5 transition-all duration-200 ${
-                          isActive
-                            ? "text-blue-600 dark:text-blue-400"
-                            : "text-sidebar-foreground/50 group-hover:text-sidebar-foreground group-hover:scale-110"
-                        }`}
-                      />
-                      {!collapsed && (
-                        <span className={`${isActive ? "font-semibold" : "font-medium"}`}>
-                          {item.label}
-                        </span>
-                      )}
-                    </div>
+                    />
+                    {!collapsed && (
+                      <span className={`${isActive ? "font-semibold" : "font-medium"}`}>
+                        {item.label}
+                      </span>
+                    )}
                   </Link>
                 );
               })}

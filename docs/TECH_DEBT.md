@@ -2,6 +2,85 @@
 
 Atualizado em: 22/06/2026
 
+## Revisao Completa 2026-06-30
+
+Relatorio: `docs/reports/REVISAO_GO_LIVE_COMPLETA_2026-06-30.md`.
+
+### P0 - baseline antes de release candidate
+
+- Resolvido localmente em 2026-06-30: `tests/unit/data-export.test.ts` passou a validar download como `Buffer` pelo caminho duravel de storage mockado; `npm run test:unit` passou com 770/770.
+- Executar em staging/producao as evidencias pendentes: RLS, Redis TLS, backup/PITR, restore drill, pentest e `ops:go-live:verify:strict`.
+- Rodar `ops:oauth:encrypt-microsoft-tokens -- --apply` com `ENCRYPTION_KEY` para tokens Microsoft legados.
+
+### P1 - fechamento UX/QA
+
+- Parcialmente resolvido localmente em 2026-06-30: rotas reais corrigidas em `tests/accessibility`, `tests/mobile` e `tests/responsive`; banco SQLite local foi alinhado de forma aditiva e `npm run test:smoke:e2e` passou com 8/8. Ainda falta fixture autenticada completa para reabrir as suites E2E quarentenadas.
+- Parcialmente resolvido localmente em 2026-06-30: listener duplicado de `Ctrl/Cmd+K` removido de `DashboardLayout`; ainda falta consolidar completamente a UI de busca global para evitar dois padroes visuais.
+- Resolvido localmente nos pontos auditados: removidos `prompt()` e `div role=button/link` em `properties/list.tsx` e `dashboard-layout.tsx`.
+
+### P1 - arquitetura incremental
+
+- Resolvido localmente em 2026-06-30: `server/routes/lead-tags.ts` extraido de
+  `server/routes.ts`, seguindo o padrao de `newsletter` e `interactions`.
+- ADR registrado: `docs/ADR/0002-modularizacao-incremental-routes.md`.
+- Ainda pendente: continuar extraindo as demais secoes de `server/routes.ts`
+  por dominio, preservando ordem de matching e status codes antes de hardening.
+- Hardening posterior: validar explicitamente ownership do `tagId` em
+  `DELETE /api/leads/:leadId/tags/:tagId`; hoje a rota valida o lead e preserva
+  comportamento historico.
+
+### P1 - performance publica
+
+- Resolvido parcialmente em 2026-06-30: `GlobalSearch` e `TimeoutWarning`
+  deixaram de ser carregados estaticamente por `client/src/App.tsx`; agora sao
+  lazy chunks usados apenas em rotas protegidas. Build local reduziu a entry
+  principal publica de ~374 kB para ~348 kB.
+- Resolvido parcialmente em 2026-06-30: hero da vitrine publica de tenant
+  (`/e/:slug`) passou a declarar dimensoes, `sizes`, eager loading,
+  `fetchPriority="high"` e `decoding="async"`.
+- Ainda pendente: rodar Lighthouse/Web Vitals em preview/staging real para
+  comprovar LCP/CLS e substituir imagem remota da vitrine por asset local
+  responsivo AVIF/WebP.
+- Baseline Playwright mobile local em 2026-06-30 falhou 7/21:
+  `/dashboard` 4575 ms, peso total 8,09 MB, CSS 258 KB, 100 requests,
+  crescimento de heap 391%, mais duas falhas de harness. Corrigir primeiro o
+  harness (`hasTouch` e animacao) e depois atacar CSS global, requests e peso
+  inicial do dashboard.
+- Atualizacao 2026-06-30: harness corrigido para build/preview de producao com
+  `playwright.performance.config.ts`; suite passou a 19/21. `App.tsx` deixou
+  login, `DashboardLayout` e `Toaster` fora da entry principal; entry caiu de
+  ~348 kB para ~236 kB e JS medido caiu de ~866 KB para ~778 KB. Ainda falta
+  reduzir JS para <500 KB e CSS global de ~194 KB para <100 KB.
+
+## Revisao Go-Live Completa 2026-06-29
+
+Relatorio: `docs/reports/REVISAO_GO_LIVE_COMPLETA_2026-06-29.md`.
+
+### P0 - antes de staging/producao
+
+- Concluido localmente em 2026-06-29: expandir `script/verify-rls.ts` para validar tambem `migrations/RLS_enable_child_tables.sql`.
+- Concluido localmente em 2026-06-29: ajustar RLS/rota publica de assinatura digital para links por token continuarem funcionando sob RLS.
+- Remover e rotacionar secrets locais de `.env.production`; manter secrets somente em gerenciadores apropriados.
+- Concluido localmente em 2026-06-29: criptografar novos tokens OAuth Microsoft e criar script dry-run/apply para tokens legados.
+- Concluido localmente em 2026-06-29: tornar Redis TLS (`rediss://`) requisito hard em producao; evitar degradacao fail-open em rate limit/locks/2FA.
+- Revisar policies com `tenant_id IS NULL` em logs, newsletter e webhooks.
+
+### P1 - hardening pre-release
+
+- Padronizar rotas legadas para `404` em recurso inexistente ou cross-tenant.
+- Corrigir drift dos testes Playwright e reativar suites com fixtures autenticadas.
+- Unificar busca global e atalho `Ctrl/Cmd+K`.
+- Substituir `div role=button/link` por elementos nativos em imoveis e navegacao.
+- Trocar `prompt()` em fluxos administrativos por dialogs do design system.
+- Separar `add-performance-indexes.sql` de migrations transacionais comuns; usar estrategia segura para indices em producao.
+
+### P2 - maturidade
+
+- Resolver drift PG/SQLite ou reduzir dependencia de SQLite para validar comportamento de producao.
+- Reduzir chunks grandes (`vendor-charts`, `jspdf`, `html2canvas`, shell principal, `product-landing`).
+- Migrar relatorios com agregacao em memoria/N+1 para SQL/views/materialized views.
+- Ajustar observabilidade/analytics para LGPD por padrao.
+
 ## Plano de Excelência 2026-06-22 (execução em andamento)
 
 Backlog completo em `docs/reports/PLANO_EXCELENCIA_2026-06-22.md`. Owner-gated em

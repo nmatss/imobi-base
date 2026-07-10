@@ -198,8 +198,8 @@ function checkEnvironmentReadiness(): void {
     isPublicServiceUrl(value, ["postgres:", "postgresql:"]),
   );
   requireEnv("SESSION_SECRET", "32+ char random session secret", isStrongSecret);
-  requireEnv("REDIS_URL", "production Redis for distributed rate limit/cache/cron locks", (value) =>
-    isPublicServiceUrl(value, ["redis:", "rediss:"]),
+  requireEnv("REDIS_URL", "production Redis TLS URL for distributed rate limit/cache/cron locks", (value) =>
+    isPublicServiceUrl(value, ["rediss:"]),
   );
   requireEnv("CRON_SECRET", "32+ char bearer secret for /api/cron/*", isStrongSecret);
   requireEnv("PORTAL_JWT_SECRET", "32+ char secret for buyer/renter portal JWT (boot falha sem ele)", isStrongSecret);

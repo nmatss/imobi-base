@@ -226,6 +226,8 @@ Apresentar nota geral e estimativa do que falta para atingir nivel Enterprise.
 
 | Data       | Escopo                         | Entregavel                                                |
 | ---------- | ------------------------------ | --------------------------------------------------------- |
+| 2026-06-30 | Revisao go-live completa 360   | `docs/reports/REVISAO_GO_LIVE_COMPLETA_2026-06-30.md`     |
+| 2026-06-29 | Revisao go-live completa 360   | `docs/reports/REVISAO_GO_LIVE_COMPLETA_2026-06-29.md`     |
 | 2026-06-22 | Plano-mestre 10 dim -> 9+      | `docs/reports/PLANO_EXCELENCIA_2026-06-22.md` (multi-agente) |
 | 2026-06-21 | Go-live completo               | `docs/reports/REVISAO_GO_LIVE_COMPLETA_2026-06-21.md`     |
 | 2026-06-10 | Auditoria 1000% (15 P0)        | ver `docs/reports/`                                       |

@@ -52,6 +52,7 @@ describe('go-live readiness gate', () => {
     expect(source).toContain('GO_LIVE_PENTEST_VERIFIED');
     expect(source).toContain('GO_LIVE_RUN_PENTEST');
     expect(source).toContain('await checkRedisConnectivity();');
+    expect(source).toContain('isPublicServiceUrl(value, ["rediss:"])');
     expect(source).toContain('await checkDatabaseReadiness();');
     expect(source).toContain('RLS runtime verification');
     expect(source).toContain('webhook_events RLS');

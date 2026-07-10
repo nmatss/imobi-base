@@ -125,7 +125,7 @@ test.describe('Touch Events - Mobile Only', () => {
   });
 
   test('Pinch zoom is disabled on inputs', async ({ page }) => {
-    await page.goto('/properties/new');
+    await page.goto('/properties');
     await page.waitForLoadState('networkidle');
 
     const viewportMeta = await page.evaluate(() => {
@@ -179,7 +179,7 @@ test.describe('Touch Target Sizes', () => {
   });
 
   test('Form inputs have adequate spacing', async ({ page }) => {
-    await page.goto('/properties/new');
+    await page.goto('/properties');
     await page.waitForLoadState('networkidle');
 
     const inputs = page.locator('input, textarea, select');
@@ -209,7 +209,7 @@ test.describe('Mobile Gestures - Kanban', () => {
       test.skip();
     }
 
-    await page.goto('/leads/kanban');
+    await page.goto('/leads');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(1000);
 
@@ -236,7 +236,7 @@ test.describe('Mobile Gestures - Kanban', () => {
   });
 
   test('Horizontal scroll works in Kanban columns', async ({ page }) => {
-    await page.goto('/leads/kanban');
+    await page.goto('/leads');
     await page.waitForLoadState('networkidle');
 
     const kanbanContainer = page.locator('[class*="kanban"], [data-testid="kanban"]').first();

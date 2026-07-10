@@ -86,6 +86,29 @@ CREATE POLICY tenant_isolation ON "digital_signatures"
   USING (contract_id IN (SELECT id FROM contracts WHERE tenant_id = current_setting('app.tenant_id', true)))
   WITH CHECK (contract_id IN (SELECT id FROM contracts WHERE tenant_id = current_setting('app.tenant_id', true)));
 
+DROP POLICY IF EXISTS public_signature_token_select ON "digital_signatures";
+CREATE POLICY public_signature_token_select ON "digital_signatures"
+  FOR SELECT
+  USING (
+    token IS NOT NULL
+    AND token = current_setting('app.digital_signature_token', true)
+    AND (expires_at IS NULL OR expires_at > now())
+  );
+
+DROP POLICY IF EXISTS public_signature_token_update ON "digital_signatures";
+CREATE POLICY public_signature_token_update ON "digital_signatures"
+  FOR UPDATE
+  USING (
+    token IS NOT NULL
+    AND token = current_setting('app.digital_signature_token', true)
+    AND (expires_at IS NULL OR expires_at > now())
+  )
+  WITH CHECK (
+    token IS NOT NULL
+    AND token = current_setting('app.digital_signature_token', true)
+    AND (expires_at IS NULL OR expires_at > now())
+  );
+
 -- ---- contract_documents (via contracts) ------------------------------------
 ALTER TABLE "contract_documents" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "contract_documents" FORCE  ROW LEVEL SECURITY;

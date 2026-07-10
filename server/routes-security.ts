@@ -241,6 +241,13 @@ async function checkRateLimit(key: string): Promise<{
         "[2FA] Redis rate limiter failed; falling back to process-local memory",
         error,
       );
+      if (process.env.NODE_ENV === "production") {
+        return {
+          allowed: false,
+          remainingAttempts: 0,
+          resetIn: RATE_LIMIT_WINDOW,
+        };
+      }
     }
   }
 

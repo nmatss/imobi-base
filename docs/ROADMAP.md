@@ -2,6 +2,44 @@
 
 Atualizado em: 22/06/2026
 
+## Revisao Completa 2026-06-30
+
+Relatorio: `docs/reports/REVISAO_GO_LIVE_COMPLETA_2026-06-30.md`.
+
+Prioridade imediata: transformar as correcoes locais ja feitas em evidencias reais de staging/producao. A ordem recomendada e:
+
+1. Fechar P0 owner-gated: secrets, Redis TLS, `ENCRYPTION_KEY`, migrations e Google Console.
+2. Rodar gates reais: `db:rls:verify`, `ops:backup:verify`, `ops:restore:drill`, `security:pentest` e `ops:go-live:verify:strict`.
+3. Corrigir baseline QA restante: Playwright driftado, busca duplicada e semantica UI. O bloqueio unitario `data-export` foi resolvido localmente em 2026-06-30.
+4. Entrar na refatoracao controlada: `routes.ts`, `storage.ts`, mega-paginas e fetch cru.
+
+## Revisao Go-Live Completa 2026-06-29
+
+Relatorio: `docs/reports/REVISAO_GO_LIVE_COMPLETA_2026-06-29.md`.
+
+Veredito: **NO-GO enterprise** ate fechamento dos bloqueadores P0 abaixo.
+
+### Onda 0 - Seguranca/ambiente antes de staging
+
+- Pendente do dono: remover e rotacionar secrets locais de `.env.production`.
+- Concluido localmente em 2026-06-29: corrigir `db:rls:verify` para child tables.
+- Concluido localmente em 2026-06-29: corrigir assinatura publica por token sob RLS.
+- Concluido localmente em 2026-06-29: criptografar Microsoft OAuth e criar script para tokens legados.
+- Concluido localmente em 2026-06-29: exigir Redis TLS e bloquear degradacao fail-open em producao.
+
+### Onda 1 - Staging real com evidencias
+
+- Aplicar migrations revisadas em staging.
+- Rodar `npm run db:rls:verify`, `npm run ops:go-live:verify:strict`, `npm run ops:backup:verify`, `npm run ops:restore:drill` e `TEST_URL=<staging> npm run security:pentest`.
+- Provar isolamento cross-tenant dinamico.
+- Validar Google SSO/Calendar/Meet apos configuracao do Google Console e verificacao do app.
+
+### Onda 2 - UX/QA pre-release
+
+- Corrigir busca duplicada, semantica de links/botoes e prompts nativos.
+- Atualizar Playwright para rotas reais e smoke autenticado completo.
+- Reduzir chunks criticos e medir Lighthouse em staging.
+
 ## Plano de Excelência 2026-06-22 (10 dimensões → 9+)
 
 Backlog priorizado em ondas: `docs/reports/PLANO_EXCELENCIA_2026-06-22.md`.
@@ -83,6 +121,32 @@ Pré-requisitos de infra (dono): `docs/RUNBOOK_EXCELENCIA_DONO.md`.
   - Validar visualmente rotas autenticadas com sessao/fixtures dedicadas em 320px, 390px, 768px e desktop; a varredura manual sem sessao redirecionou essas rotas para `/login`.
   - Provar em staging/producao que duplicidade de `phoneNumberId` do WhatsApp falha fechado e que configuracoes reais nao possuem duplicatas.
   - Provar em staging/producao ownership de `entityType`/`entityId` em uploads genericos/documentos.
+
+## Execucao pos-auditoria 2026-06-30
+
+- Concluido localmente:
+  - Fase 0: baseline unitario limpo apos correcao de `data-export`
+    (`npm run test:unit` 770/770).
+  - Fase 1: ajustes UX/QA em propriedades, sidebar e rotas Playwright; smoke
+    E2E passou 8/8 depois de alinhamento aditivo do SQLite local ignorado.
+  - Fase 2: extracao de `lead-tags` para `server/routes/lead-tags.ts`;
+    `tenant-isolation` passou 27/27; ADR 0002 registrado.
+  - Fase 3: `GlobalSearch`/`TimeoutWarning` viraram lazy chunks somente em
+    rotas protegidas; entry publica caiu de ~374 kB para ~348 kB no build local;
+    hero da vitrine `/e/:slug` recebeu prioridade/dimensoes para LCP/CLS.
+- Proxima sequencia recomendada:
+  - Fase 4: parcialmente concluida; harness da suite de performance mobile foi
+    corrigido e agora roda contra build/preview de producao. Suite esta 19/21,
+    pendente reduzir JS de ~778 KB para <500 KB e CSS de ~194 KB para <100 KB.
+  - Fase 5: baseline Lighthouse/Web Vitals em preview/staging e logs/metrics de
+    rotas criticas.
+  - Fase 6: continuar modularizacao de `server/routes.ts` por dominios de baixo
+    risco e iniciar fixtures E2E autenticadas.
+  - Fase 7: consolidacao operacional em staging real: RLS, Redis TLS, backup,
+    restore drill, pentest e `ops:go-live:verify:strict`.
+- Bloqueio de go-live enterprise permanece:
+  - Sem evidencias reais de staging/producao para RLS, secrets rotacionados,
+    Redis TLS, backup/restore, pentest e gate strict.
 
 ## P1 - Produto competitivo
 

@@ -2,6 +2,115 @@
 
 Atualizado em: 27/06/2026
 
+## Sessao 2026-06-30 — Revisao completa holistica
+
+### Solicitacao
+
+Analise completa do sistema para identificar onde estamos, o que falta, onde precisamos chegar e montar plano de execucao para finalizar 100%.
+
+### Entregue
+
+- Auditoria 360 conforme `docs/prompts/PROMPT_MASTER_AUDITORIA.md`.
+- Relatorio principal: `docs/reports/REVISAO_GO_LIVE_COMPLETA_2026-06-30.md`.
+- Veredito mantido: **NO-GO enterprise** ate fechamento de P0 owner-gated e evidencias reais de staging/producao.
+
+### Validacoes
+
+- `npm run check`: passou.
+- `npm run lint -- --quiet`: passou.
+- `npm run ops:go-live:verify:static`: passou, 13 checks.
+- `npm run ops:cron:verify`: passou, 12 crons alinhados.
+- `npm run test:unit`: 769/770 passaram; falha conhecida em `tests/unit/data-export.test.ts` por arquivo ausente `uploads/exports/data-export-abc.zip`.
+
+### Atualizacao de execucao por fases
+
+- Fase 0/P0 local: corrigido `tests/unit/data-export.test.ts` para validar o contrato atual de `downloadExport` como `Buffer` via caminho duravel de storage mockado.
+- Validacoes pos-correcao: `npm run test:unit -- tests/unit/data-export.test.ts` passou (17/17), `npm run test:unit` passou (770/770), `npm run check` passou, `npm run lint -- --quiet` passou, `npm run ops:go-live:verify:static` passou e `npm run ops:cron:verify` passou.
+- Pendencias P0 remanescentes sao owner-gated/ambiente real: RLS, Redis TLS, backup/PITR, restore drill, pentest, secrets e migracao de tokens Microsoft legados.
+
+### Fase 1 - QA/UX pre-release
+
+- Corrigida semantica da navegacao lateral: removido `Link > div role="link"` em `client/src/components/layout/dashboard-layout.tsx`; o `Link` agora e o elemento interativo real com `aria-current`.
+- Removido listener duplicado de `Ctrl/Cmd+K` no `DashboardLayout`; a busca global permanece centralizada nos componentes de busca/atalhos existentes.
+- Corrigidos controles nao semanticos em `client/src/pages/properties/list.tsx`: thumbnail virou `button` com `aria-label`, titulo virou `Link` real.
+- Substituidos `prompt()` nativos de imagem/caracteristica por dialogs do design system.
+- Corrigidas rotas driftadas nas suites Playwright ativas: `/financial` -> `/financeiro`, `/properties/new` -> `/properties`, `/leads/kanban` -> `/leads`.
+- Validacoes: `npm run check`, `npm run lint -- --quiet`, `npm run test:unit` e `npm run build` passaram.
+- Ambiente SQLite local alinhado de forma aditiva e nao destrutiva: adicionada a coluna `tenants.onboarding_completed` e colunas faltantes de `visits` no banco ignorado `data/imobibase.db`. Depois disso, `/api/tenants/slug/sol` voltou a 200, `/api/visits` voltou a 200 e `npm run test:smoke:e2e` passou com 8/8.
+
+### Sintese
+
+Correcoes P0 locais de 2026-06-29 foram confirmadas por evidencias de codigo: `verify-rls` cobre child tables, Microsoft OAuth usa criptografia para novos tokens, existe script de migracao para tokens legados e o gate exige Redis TLS. Ainda faltam provas reais de RLS, Redis, backup/PITR, restore drill, pentest, migrations e Google OAuth/Calendar em staging/producao.
+
+## Sessao 2026-06-29 — Revisao Go-Live Completa
+
+### Solicitacao
+
+Analise completa do sistema para revisao de todos os pontos e tudo que falta para ir ao ar, usando harness enterprise e time completo.
+
+### Entregue
+
+- Auditoria 360 conforme `docs/prompts/PROMPT_MASTER_AUDITORIA.md`, com especialistas paralelos para Backend/Seguranca, Frontend/UX/UI, Banco/RLS, DevOps/Operacao e Produto/Documentacao.
+- Relatorio principal: `docs/reports/REVISAO_GO_LIVE_COMPLETA_2026-06-29.md`.
+- Espelho de seguranca em `docs/SECURITY_AUDIT.md`.
+- Atualizacao de pendencias em `docs/KNOWN_ISSUES.md`, `docs/TECH_DEBT.md` e `docs/ROADMAP.md`.
+
+### Validacoes
+
+- `npm run check`: passou.
+- `npm run lint -- --quiet`: passou.
+- `npm run ops:go-live:verify:static`: passou, 13 checks.
+- `npm run ops:cron:verify`: passou, 12 crons alinhados.
+- `npm run build`: passou; gerou HTML estatico para 11 rotas.
+- `npm run test:unit`: 765/766 passaram; falha pre-existente em `tests/unit/data-export.test.ts` por arquivo `uploads/exports/data-export-abc.zip` ausente.
+
+### Veredito
+
+**NO-GO enterprise** em 2026-06-29.
+
+Novos bloqueadores/riscos relevantes:
+
+- Secrets reais em `.env.production` local ignorado pelo git; remover e rotacionar.
+- `db:rls:verify` nao cobre `RLS_enable_child_tables.sql`.
+- Assinatura publica pode quebrar quando RLS das child tables for aplicado.
+- Microsoft OAuth persiste tokens em texto puro.
+- Redis/rate limit/locks/2FA precisam prova real/TLS e nao podem degradar fail-open em producao.
+- Playwright driftado e UX/UI ainda com busca duplicada e controles nao semanticos.
+
+Observacao: `client/public/sitemap.xml` ja estava modificado antes da auditoria; `npm run build` regenera esse arquivo.
+
+## Sessao 2026-06-29 — Inicio das correcoes por etapas
+
+### Solicitacao
+
+Criar lista completa por etapas do que corrigir/melhorar e iniciar imediatamente com time completo, revisando ao fim de cada etapa.
+
+### Entregue na Etapa 0
+
+- Criado `docs/PLANO_CORRECOES_GO_LIVE_2026-06-29.md`.
+- `script/verify-rls.ts` passou a validar `RLS_enable.sql` + `RLS_enable_child_tables.sql`.
+- `migrations/RLS_enable_child_tables.sql` passou a ter policies publicas estreitas para `digital_signatures` por `app.digital_signature_token`.
+- `server/routes-features.ts` passou a usar contexto RLS por token para lookup/update publico de assinatura e contexto tenant derivado para assinaturas irmas/contrato.
+- `server/auth/oauth-microsoft.ts` passou a criptografar tokens OAuth via `encryptSecret`.
+- Criado `script/encrypt-microsoft-oauth-tokens.ts` e script `ops:oauth:encrypt-microsoft-tokens` para dry-run/apply de tokens Microsoft legados.
+- `script/verify-go-live-readiness.ts` passou a exigir Redis TLS (`rediss://`).
+- `server/routes.ts` e `server/routes-security.ts` foram endurecidos para nao degradar fail-open em producao em rate limit/2FA.
+
+### Validacoes da Etapa 0
+
+- Testes focados RLS/OAuth/assinatura/go-live: 34 passaram.
+- Testes focados OAuth/token encryption: 10 passaram.
+- `npm run check:scripts`: passou.
+- `npm run check`: passou.
+- `npm run lint -- --quiet`: passou.
+- `npm run ops:go-live:verify:static`: passou.
+
+### Pendencias owner-gated
+
+- Remover e rotacionar secrets reais em `.env.production` local.
+- Configurar `ENCRYPTION_KEY` e rodar `ops:oauth:encrypt-microsoft-tokens -- --apply` em ambiente real.
+- Configurar `REDIS_URL` como `rediss://...` em staging/producao.
+
 ## Sessão 2026-06-27 — Google SSO + Google Calendar/Meet
 
 ### Solicitação
@@ -487,3 +596,87 @@ O usuario pediu analise profunda de arquitetura, banco, hospedagem, SEO, IA, res
   - `npm run test:coverage:enterprise`: falhou contra gate 80%; lines 12,90%, statements 12,44%, functions 10,11%, branches 9,50%.
 - Estado:
   - O codigo local ficou mais forte e validado, mas producao continua **NO-GO** ate ambiente real, cobertura/evidencias e gate strict passarem.
+
+## Execucao faseada pos-auditoria - 30/06/2026
+
+- Pedido: continuar executando fase a fase ate finalizar tudo, com revisao apos
+  cada etapa e documentacao/memoria atualizadas.
+- Fase 0 concluida:
+  - `tests/unit/data-export.test.ts` corrigido para validar o contrato atual de
+    `downloadExport` como `Buffer` vindo de storage duravel mockado.
+  - Validacoes: `npm run test:unit -- tests/unit/data-export.test.ts` passou
+    17/17; `npm run test:unit` passou 72 arquivos, 770/770.
+- Fase 1 concluida:
+  - `client/src/components/layout/dashboard-layout.tsx`: removido listener
+    duplicado de `Ctrl/Cmd+K`; sidebar usa `Link` nativo, sem `div role="link"`.
+  - `client/src/pages/properties/list.tsx`: `prompt()` substituido por dialogs
+    do design system; thumbnail virou `button` nomeado; titulo virou `Link`.
+  - Testes Playwright tiveram rotas driftadas alinhadas para `/financeiro`,
+    `/properties` e `/leads`.
+  - SQLite local ignorado (`data/imobibase.db`) foi alinhado aditivamente com
+    colunas faltantes de `tenants` e `visits`, sem reset destrutivo.
+  - Validacoes: `npm run check`, `npm run lint -- --quiet`,
+    `npm run test:unit`, `npm run build` e `npm run test:smoke:e2e` passaram.
+- Fase 2 concluida:
+  - `server/routes/lead-tags.ts` criado e o bloco de lead tags foi removido de
+    `server/routes.ts`, mantendo `registerLeadTagRoutes(app, { requireAuth })`
+    no mesmo ponto relativo.
+  - A ordem critica `/api/leads/tags/batch` antes de
+    `/api/leads/:leadId/tags` foi preservada no novo modulo.
+  - ADR criado: `docs/ADR/0002-modularizacao-incremental-routes.md`.
+  - Validacoes: `npx vitest run tests/integration/tenant-isolation.test.ts`
+    passou 27/27; `npm run check` passou; `npm run lint -- --quiet` passou;
+    `git diff --check` passou.
+- Pendencia registrada para hardening posterior:
+  - `DELETE /api/leads/:leadId/tags/:tagId` valida ownership do lead, mas ainda
+    nao valida explicitamente ownership do `tagId`; comportamento foi preservado
+    para manter a extracao mecanica.
+- Fase 3 concluida:
+  - `client/src/App.tsx`: `GlobalSearch` e `TimeoutWarning` passaram de imports
+    estaticos para lazy imports usados apenas em rotas protegidas.
+  - Evidencia do build: entry principal publica caiu de ~374 kB
+    (`index-Wygg9VWs.js`, build anterior) para ~348 kB
+    (`index-C37CKbbo.js`); `GlobalSearch` (~20 kB) e `TimeoutWarning` (~4 kB)
+    viraram chunks separados.
+  - `client/src/pages/public/landing.tsx`: imagem hero da vitrine `/e/:slug`
+    recebeu `width`, `height`, `sizes`, `loading="eager"`,
+    `fetchPriority="high"` e `decoding="async"` para reduzir risco de LCP/CLS.
+  - Validacoes: `npm run check`, `npm run lint -- --quiet`, `npm run build`,
+    `npm run test:smoke:e2e` e `git diff --check` passaram.
+  - Pendente: medir Lighthouse/Web Vitals em staging ou preview real para
+    confirmar impacto de LCP fora do ambiente local.
+- Fase 4 baseline local concluida:
+  - `npm run test:performance -- --reporter=list --project=chromium --workers=1`
+    executou a suite Playwright de performance mobile.
+  - Resultado: 14/21 passaram; 7 falharam.
+  - Falhas de performance/produto: `/dashboard` mobile carregou em 4575 ms
+    contra limite de 3000 ms; peso total ficou em 8,09 MB contra limite de
+    2 MB; CSS ficou em 258 KB contra limite de 100 KB; requests ficaram em
+    100 contra limite de 50; navegacao repetida indicou crescimento de heap de
+    391%.
+  - Falhas de harness/teste: teste de animacao aguardou `transitionend` que nao
+    disparou e expirou em 30s; teste de tap usa `page.tap()` sem contexto
+    `hasTouch`.
+  - Decisao: registrar como baseline e pendencia; nao relaxar limites nem
+    mascarar falhas. Proxima fase deve separar correcoes do harness de
+    performance real e entao reduzir CSS/requests/peso do dashboard.
+- Continuidade Fase 4:
+  - Harness corrigido em `tests/performance/mobile-performance.spec.ts`:
+    contexto mobile agora usa `hasTouch`/`isMobile`, teste de animacao nao
+    depende mais de `transitionend` inexistente e rota driftada
+    `/properties/new` foi alinhada para `/properties`.
+  - `playwright.performance.config.ts` criado para executar performance contra
+    `vite preview` em build de producao; `npm run test:performance` agora roda
+    `npm run build` antes da suite.
+  - Resultado apos harness correto contra preview: 19/21 passaram; falham
+    apenas os budgets reais de JS e CSS.
+  - Split adicional aplicado: `client/src/pages/auth/login.tsx` criado e login
+    removido do shell `App.tsx`; `DashboardLayout` e `Toaster` passaram a lazy
+    chunks.
+  - Evidencia de build: entry principal reduziu de ~348 kB para ~322,5 kB apos
+    extrair login e para ~236,2 kB apos lazy-load de `DashboardLayout`/`Toaster`.
+  - Evidencia da suite: JS total medido reduziu de ~866 KB para ~778 KB; CSS
+    segue ~194 KB. Suite permanece 19/21, bloqueada por JS <500 KB e CSS
+    <100 KB.
+  - Validacoes adicionais: `npm run check`, `npm run lint -- --quiet`,
+    `npm run test:smoke:e2e` e `git diff --check` passaram.
