@@ -38,6 +38,15 @@ Em dev/test os mesmos problemas viram apenas warning.
 - [ ] `REDIS_URL` configurada (rate limit, cache, locks de cron e 2FA).
 - [ ] `STRIPE_SECRET_KEY` + `STRIPE_PUBLISHABLE_KEY` + `VITE_STRIPE_PUBLISHABLE_KEY`
       + `STRIPE_WEBHOOK_SECRET` em modo **live** (sk_live_/pk_live_/whsec_).
+- [ ] **Stripe Price IDs por plano** (senão o checkout do plano fica indisponível):
+      criar os produtos/preços no Stripe Dashboard e informar os IDs `price_...` por
+      um dos caminhos:
+      (a) **env** `STRIPE_PRICE_<SLUG>_MONTHLY` / `STRIPE_PRICE_<SLUG>_YEARLY`
+      (ex.: `STRIPE_PRICE_STARTER_MONTHLY`, `STRIPE_PRICE_PRO_YEARLY`) — o
+      `seed-plans` popula no boot e mantém em sync; **ou**
+      (b) **admin UI** em `/admin/plans` → Editar Plano → campos "Stripe Price ID".
+      Valores da env têm precedência; se a env estiver ausente, o valor da admin UI
+      é preservado entre restarts.
 - [ ] `APP_URL` / `VITE_APP_URL` / `SITE_URL` = `https://imobibase.com.br`.
 - [ ] `CRON_SECRET` definido (os `/api/cron/*` exigem `Authorization: Bearer`).
 - [ ] `REDIS_URL` definido em producao; os `/api/cron/*` e o 2FA usam estado

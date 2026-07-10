@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { plans as PLAN_CATALOG } from "@/lib/plans-config";
 import {
   Building2,
   Palette,
@@ -151,6 +152,16 @@ export default function OnboardingPage() {
 
   const handleFinish = () => {
     setLocation("/dashboard");
+  };
+
+  // Ao final da etapa de plano: plano pago vai direto ao checkout do plano
+  // escolhido; plano gratuito segue o wizard para a etapa final.
+  const handlePlanContinue = () => {
+    if (selectedPlan && selectedPlan !== "free") {
+      setLocation(`/checkout/${selectedPlan}`);
+    } else {
+      goNext();
+    }
   };
 
   const handleExploreWithDemoData = async () => {
@@ -467,54 +478,22 @@ export default function OnboardingPage() {
   );
 
   const StepPlan = () => {
-    const plans = [
-      {
-        id: "free",
-        name: "Gratis",
-        price: "R$ 0",
+    // Deriva do catalogo canonico (client/src/lib/plans-config) para que os
+    // slugs (free/starter/pro) batam com /api/plans e /checkout/:planId — evita
+    // o descasamento antigo ("basico" nao existia como plano real).
+    const plans = PLAN_CATALOG.filter((p) => ["free", "starter", "pro"].includes(p.id)).map(
+      (p) => ({
+        id: p.id,
+        name: p.name,
+        price: p.monthlyPrice === 0 ? "R$ 0" : `R$ ${p.monthlyPrice}`,
         period: "/mes",
-        description: "Para comecar sua jornada digital.",
-        features: ["Ate 10 imoveis", "Ate 50 leads", "1 usuario", "Site publico basico"],
-        cta: "Comecar gratis",
-        variant: "outline" as const,
-      },
-      {
-        id: "basico",
-        name: "Basico",
-        price: "R$ 99",
-        period: "/mes",
-        description: "Para quem quer crescer com eficiencia.",
-        features: [
-          "Ate 100 imoveis",
-          "Leads ilimitados",
-          "5 usuarios",
-          "Integracao WhatsApp",
-          "Relatorios basicos",
-        ],
-        cta: "Assinar Basico",
-        variant: "outline" as const,
-        popular: false,
-      },
-      {
-        id: "pro",
-        name: "Profissional",
-        price: "R$ 199",
-        period: "/mes",
-        description: "Para quem quer escalar vendas.",
-        features: [
-          "Imoveis ilimitados",
-          "Leads ilimitados",
-          "Usuarios ilimitados",
-          "Todas as integracoes",
-          "IA (Marketing, AVM, ISA)",
-          "Portal do cliente",
-          "Vistorias digitais",
-        ],
-        cta: "Assinar Pro",
-        variant: "default" as const,
-        popular: true,
-      },
-    ];
+        description: p.description,
+        features: p.features.slice(0, 7),
+        cta: p.id === "free" ? "Comecar gratis" : `Assinar ${p.name}`,
+        variant: p.variant,
+        popular: p.popular,
+      }),
+    );
 
     return (
       <div className="py-6 px-4 max-w-3xl mx-auto w-full">
@@ -586,8 +565,8 @@ export default function OnboardingPage() {
           <Button variant="outline" onClick={goBack} className="h-11">
             <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
           </Button>
-          <Button onClick={goNext} className="flex-1 h-11">
-            {selectedPlan === "free" ? "Comecar gratis" : "Continuar"} <ArrowRight className="ml-2 w-4 h-4" />
+          <Button onClick={handlePlanContinue} className="flex-1 h-11">
+            {selectedPlan === "free" ? "Comecar gratis" : "Ir para o pagamento"} <ArrowRight className="ml-2 w-4 h-4" />
           </Button>
         </div>
 
