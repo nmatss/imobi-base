@@ -1,13 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Link } from "wouter";
-import {
-  motion,
-  AnimatePresence,
-  useInView,
-  useMotionValue,
-  useTransform,
-  animate,
-} from "framer-motion";
+import { motion, AnimatePresence, useInView } from "framer-motion";
 import {
 
   CheckCircle2,
@@ -21,7 +14,6 @@ import {
   Menu,
   X,
   Play,
-  Star,
   Smartphone,
   Brain,
   Plug,
@@ -81,44 +73,28 @@ function ScrollReveal({
   );
 }
 
-function AnimatedCounter({
-  target,
-  suffix = "",
-  prefix = "",
-}: {
-  target: number;
-  suffix?: string;
-  prefix?: string;
-}) {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true });
-  const motionValue = useMotionValue(0);
-  const rounded = useTransform(motionValue, (v) => Math.round(v));
-  const [display, setDisplay] = useState(0);
-
-  useEffect(() => {
-    if (isInView) {
-      const controls = animate(motionValue, target, {
-        duration: 1.5,
-        ease: [0, 0, 0.2, 1],
-      });
-      return controls.stop;
-    }
-  }, [isInView, target, motionValue]);
-
-  useEffect(() => {
-    const unsubscribe = rounded.on("change", (v) => setDisplay(v));
-    return unsubscribe;
-  }, [rounded]);
-
-  return (
-    <span ref={ref}>
-      {prefix}
-      {display}
-      {suffix}
-    </span>
-  );
-}
+const landingFaqs = [
+  {
+    q: "O ImobiBase substitui planilhas e ferramentas separadas?",
+    a: "Sim. A plataforma reúne CRM imobiliário, imóveis, leads, agenda de visitas, contratos, financeiro, locações, vistorias, site público, automações e relatórios em uma operação única.",
+  },
+  {
+    q: "O sistema ajuda no agendamento de visitas?",
+    a: "Sim. A agenda centraliza visitas, follow-ups e tarefas comerciais para reduzir conflitos, atrasos e oportunidades perdidas no atendimento.",
+  },
+  {
+    q: "Consigo migrar meus dados de outro sistema?",
+    a: "Sim. O ImobiBase permite importação de dados e a equipe pode apoiar a migração em planos com implantação assistida.",
+  },
+  {
+    q: "O site gerado é responsivo para celular?",
+    a: "Sim. As páginas públicas são responsivas, funcionam em celular, tablet e desktop e foram estruturadas para SEO técnico, captura de leads e contato por WhatsApp.",
+  },
+  {
+    q: "Tem fidelidade ou multa de cancelamento?",
+    a: "Não. Os planos podem ser cancelados sem multa, conforme as condições comerciais vigentes.",
+  },
+];
 
 // === Main Component ===
 
@@ -185,9 +161,10 @@ export default function ProductLanding() {
   return (
     <div className="min-h-screen bg-background font-sans text-foreground selection:bg-primary/20 overflow-x-hidden">
       <SeoHead
-        title="ImobiBase | Gestão Imobiliária Inteligente com CRM e Site"
-        description="Sistema completo para imobiliárias e corretores: CRM de leads, cadastro de imóveis, site automático, contratos, financeiro e inteligência artificial. Comece grátis."
+        title="ImobiBase | Sistema imobiliário completo com CRM, site e agenda"
+        description="Sistema completo para imobiliárias: CRM de leads, agenda de visitas, site imobiliário, imóveis, contratos, financeiro, locações, vistorias, WhatsApp e IA."
         path="/"
+        imageAlt="Dashboard do sistema imobiliário ImobiBase"
         structuredData={[
           OrganizationSchema,
           {
@@ -207,6 +184,23 @@ export default function ProductLanding() {
               ratingCount: "80",
             },
           },
+          {
+            "@type": "WebSite",
+            name: "ImobiBase",
+            url: "https://imobibase.com.br",
+            inLanguage: "pt-BR",
+          },
+          {
+            "@type": "FAQPage",
+            mainEntity: landingFaqs.map((faq) => ({
+              "@type": "Question",
+              name: faq.q,
+              acceptedAnswer: {
+                "@type": "Answer",
+                text: faq.a,
+              },
+            })),
+          },
         ]}
       />
       {/* ══════ Navbar ══════ */}
@@ -219,11 +213,11 @@ export default function ProductLanding() {
         <div className="container mx-auto px-4 flex items-center justify-between">
           <Logo wordmarkClassName="text-xl" iconClassName="h-9 w-9 drop-shadow-md" />
 
-          <nav className="hidden md:flex gap-8 text-sm font-medium text-muted-foreground">
+          <nav className="hidden lg:flex gap-6 xl:gap-8 text-sm font-medium text-muted-foreground">
             {[
               { label: "Recursos", id: "recursos" },
               { label: "Como Funciona", id: "como-funciona" },
-              { label: "Depoimentos", id: "depoimentos" },
+              { label: "Diferenciais", id: "depoimentos" },
             ].map((item) => (
               <button
                 key={item.id}
@@ -243,23 +237,24 @@ export default function ProductLanding() {
             </Link>
           </nav>
 
-          <div className="hidden md:flex items-center gap-4">
-            <Link href="/login">
-              <Button variant="ghost" className="hover:bg-primary/5">
+          <div className="hidden lg:flex items-center gap-4">
+            <Button asChild variant="ghost" className="hover:bg-primary/5">
+              <Link href="/login">
                 Entrar
-              </Button>
-            </Link>
-            <Link href="/login">
-              <Button className="rounded-full px-6 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-0.5">
+              </Link>
+            </Button>
+            <Button asChild className="rounded-full px-6 shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all hover:-translate-y-0.5">
+              <Link href="/login">
                 Começar Grátis
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
 
           <button
-            className="md:hidden"
+            className="lg:hidden min-h-11 min-w-11 inline-flex items-center justify-center rounded-md hover:bg-muted"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Menu"
+            aria-label={mobileMenuOpen ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={mobileMenuOpen}
           >
             {mobileMenuOpen ? <X /> : <Menu />}
           </button>
@@ -273,13 +268,13 @@ export default function ProductLanding() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="fixed top-16 left-0 w-full bg-background border-b z-40 md:hidden overflow-hidden"
+            className={`fixed ${scrolled ? "top-16" : "top-24"} left-0 w-full bg-background border-b z-40 lg:hidden overflow-hidden transition-all duration-300`}
           >
             <div className="p-4 flex flex-col gap-4">
               {[
                 { label: "Recursos", id: "recursos" },
                 { label: "Como Funciona", id: "como-funciona" },
-                { label: "Depoimentos", id: "depoimentos" },
+                { label: "Diferenciais", id: "depoimentos" },
               ].map((item) => (
                 <button
                   key={item.id}
@@ -300,14 +295,14 @@ export default function ProductLanding() {
                 Preços
               </Link>
               <div className="h-px bg-border my-2" />
-              <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-                <Button variant="outline" className="w-full justify-start">
+              <Button asChild variant="outline" className="w-full justify-start">
+                <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
                   Entrar
-                </Button>
-              </Link>
-              <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-                <Button className="w-full">Criar Conta</Button>
-              </Link>
+                </Link>
+              </Button>
+              <Button asChild className="w-full">
+                <Link href="/login" onClick={() => setMobileMenuOpen(false)}>Criar Conta</Link>
+              </Button>
             </div>
           </motion.div>
         )}
@@ -315,7 +310,7 @@ export default function ProductLanding() {
 
       <main>
         {/* ══════ Hero Section ══════ */}
-        <section className="pt-24 pb-12 md:pt-48 md:pb-32 relative overflow-hidden">
+        <section className="pt-24 pb-12 md:pt-36 md:pb-24 lg:pt-40 lg:pb-28 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-gradient-to-bl from-primary/10 to-transparent rounded-full blur-3xl -z-10 translate-x-1/3 -translate-y-1/4" />
           <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-gradient-to-tr from-blue-400/10 to-transparent rounded-full blur-3xl -z-10 -translate-x-1/3 translate-y-1/4" />
 
@@ -340,12 +335,12 @@ export default function ProductLanding() {
 
                 <motion.h1
                   variants={fadeInUp}
-                  className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-heading font-bold tracking-tight mb-5 md:mb-6 leading-[1.1]"
+                  className="text-4xl sm:text-5xl md:text-6xl xl:text-7xl font-heading font-bold tracking-tight mb-5 md:mb-6 leading-[1.1]"
                 >
-                  A inteligência <br />
-                  que sua imobiliária <br />
+                  O sistema completo <br />
+                  para sua imobiliária <br />
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-600">
-                    precisa.
+                    crescer.
                   </span>
                 </motion.h1>
 
@@ -353,23 +348,24 @@ export default function ProductLanding() {
                   variants={fadeInUp}
                   className="text-base sm:text-lg md:text-xl text-muted-foreground mb-6 md:mb-8 max-w-2xl mx-auto lg:mx-0 leading-relaxed"
                 >
-                  Centralize imóveis, leads e contratos em uma única plataforma.
-                  Crie sites automáticos e gerencie seu funil de vendas com a
-                  tecnologia que as grandes redes usam.
+                  Centralize CRM imobiliário, imóveis, agenda de visitas,
+                  WhatsApp, contratos, financeiro, locações, vistorias e site
+                  público em uma única plataforma.
                 </motion.p>
 
                 <motion.div
                   variants={fadeInUp}
                   className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start"
                 >
-                  <Link href="/login">
-                    <Button
-                      size="lg"
-                      className="h-12 md:h-14 px-6 md:px-8 text-base md:text-lg rounded-full shadow-xl shadow-primary/25 hover:scale-105 transition-all duration-300"
-                    >
+                  <Button
+                    asChild
+                    size="lg"
+                    className="h-12 md:h-14 px-6 md:px-8 text-base md:text-lg rounded-full shadow-xl shadow-primary/25 hover:scale-105 transition-all duration-300"
+                  >
+                    <Link href="/login">
                       Começar Agora <ArrowRight className="ml-2 w-5 h-5" />
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                   <Button
                     variant="outline"
                     size="lg"
@@ -411,16 +407,28 @@ export default function ProductLanding() {
                       dashboard.imobibase.com
                     </div>
                   </div>
-                  <img
-                    src="/dashboard-mockup.png"
-                    alt="Dashboard ImobiBase"
-                    className="w-full h-auto max-h-[240px] sm:max-h-none object-cover object-top shadow-inner"
-                    loading="eager"
-                    fetchPriority="high"
-                    decoding="async"
-                    width="1200"
-                    height="750"
-                  />
+                  <picture>
+                    <source
+                      type="image/avif"
+                      srcSet="/dashboard-mockup-960.avif 960w, /dashboard-mockup-1280.avif 1280w"
+                      sizes="(min-width: 1024px) 50vw, (min-width: 640px) 80vw, 100vw"
+                    />
+                    <source
+                      type="image/webp"
+                      srcSet="/dashboard-mockup-960.webp 960w, /dashboard-mockup-1280.webp 1280w"
+                      sizes="(min-width: 1024px) 50vw, (min-width: 640px) 80vw, 100vw"
+                    />
+                    <img
+                      src="/dashboard-mockup.png"
+                      alt="Dashboard ImobiBase com funil de leads, agenda e indicadores"
+                      className="w-full h-auto max-h-[240px] sm:max-h-none object-cover object-top shadow-inner"
+                      loading="eager"
+                      fetchPriority="high"
+                      decoding="async"
+                      width="1920"
+                      height="1080"
+                    />
+                  </picture>
 
                   <motion.div
                     className="absolute -left-6 top-20 bg-card p-4 rounded-xl shadow-xl border animate-float-slow hidden md:block"
@@ -467,27 +475,27 @@ export default function ProductLanding() {
           </div>
         </section>
 
-        {/* ══════ Social Proof Strip ══════ */}
+        {/* ══════ Faixa de valor (fatos, sem métricas fabricadas) ══════ */}
         <section className="py-12 bg-muted/30 border-y">
           <div className="container mx-auto px-4">
             <ScrollReveal>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-8 sm:gap-16 text-center">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-8 sm:gap-12 text-center">
                 {[
-                  { value: 1500, suffix: "+", label: "Imóveis cadastrados" },
-                  { value: 80, suffix: "+", label: "Imobiliárias ativas" },
-                  { value: 5000, suffix: "+", label: "Leads gerenciados" },
-                  { value: 99, suffix: "%", label: "Satisfação dos clientes" },
-                ].map((stat) => (
-                  <div key={stat.label} className="flex flex-col items-center">
-                    <div className="text-3xl md:text-4xl font-bold text-primary">
-                      <AnimatedCounter
-                        target={stat.value}
-                        suffix={stat.suffix}
-                      />
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {stat.label}
-                    </p>
+                  "Grátis para começar",
+                  "CRM + Site + Financeiro num só lugar",
+                  "Seus dados no Brasil (LGPD)",
+                  "Sem fidelidade — cancele quando quiser",
+                ].map((label) => (
+                  <div
+                    key={label}
+                    className="flex items-center gap-2 text-sm font-medium text-foreground"
+                  >
+                    <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                      <svg viewBox="0 0 20 20" className="w-3.5 h-3.5 fill-current" aria-hidden="true">
+                        <path d="M7.5 13.5 4 10l1.4-1.4 2.1 2.1 5.1-5.1L14 7z" />
+                      </svg>
+                    </span>
+                    {label}
                   </div>
                 ))}
               </div>
@@ -581,28 +589,28 @@ export default function ProductLanding() {
 
             <ScrollReveal>
               <Tabs defaultValue="crm" className="w-full max-w-5xl mx-auto">
-                <TabsList className="grid w-full grid-cols-3 mb-12 h-auto p-1 bg-muted/50 rounded-full">
+                <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3 mb-12 h-auto p-1 bg-muted/50 rounded-2xl sm:rounded-full gap-1">
                   <TabsTrigger
                     value="crm"
-                    className="rounded-full py-3 data-[state=active]:bg-white data-[state=active]:shadow-md transition-all"
+                    className="rounded-full py-3 px-2 text-xs sm:text-sm whitespace-normal data-[state=active]:bg-white data-[state=active]:shadow-md transition-all"
                   >
-                    <Users className="w-4 h-4 mr-2" /> CRM & Leads
+                    <Users className="w-4 h-4 mr-2 shrink-0" /> CRM & Leads
                   </TabsTrigger>
                   <TabsTrigger
                     value="site"
-                    className="rounded-full py-3 data-[state=active]:bg-white data-[state=active]:shadow-md transition-all"
+                    className="rounded-full py-3 px-2 text-xs sm:text-sm whitespace-normal data-[state=active]:bg-white data-[state=active]:shadow-md transition-all"
                   >
-                    <Globe className="w-4 h-4 mr-2" /> Site & Marketing
+                    <Globe className="w-4 h-4 mr-2 shrink-0" /> Site & Marketing
                   </TabsTrigger>
                   <TabsTrigger
                     value="management"
-                    className="rounded-full py-3 data-[state=active]:bg-white data-[state=active]:shadow-md transition-all"
+                    className="rounded-full py-3 px-2 text-xs sm:text-sm whitespace-normal data-[state=active]:bg-white data-[state=active]:shadow-md transition-all"
                   >
-                    <BarChart3 className="w-4 h-4 mr-2" /> Gestão & Analytics
+                    <BarChart3 className="w-4 h-4 mr-2 shrink-0" /> Gestão & Analytics
                   </TabsTrigger>
                 </TabsList>
 
-                <div className="relative min-h-[500px] bg-card border rounded-3xl overflow-hidden shadow-2xl">
+                <div className="relative min-h-[420px] md:min-h-[500px] bg-card border rounded-3xl overflow-hidden shadow-2xl">
                   <TabsContent value="crm" className="m-0 h-full">
                     <div className="grid md:grid-cols-2 h-full">
                       <div className="p-8 md:p-12 flex flex-col justify-center">
@@ -733,6 +741,92 @@ export default function ProductLanding() {
           </div>
         </section>
 
+        {/* ══════ Complete Platform Modules ══════ */}
+        <section className="py-24 bg-background border-y">
+          <div className="container mx-auto px-4">
+            <ScrollReveal>
+              <div className="max-w-3xl mx-auto text-center mb-14">
+                <Badge
+                  variant="outline"
+                  className="mb-4 bg-primary/5 text-primary border-primary/20"
+                >
+                  Sistema imobiliário completo
+                </Badge>
+                <h2 className="text-3xl md:text-5xl font-heading font-bold mb-6">
+                  Da captação ao pós-venda, sem perder controle
+                </h2>
+                <p className="text-lg text-muted-foreground">
+                  O ImobiBase conecta a jornada inteira: anúncio, lead,
+                  atendimento, agendamento, visita, proposta, contrato,
+                  financeiro e relacionamento com proprietários e clientes.
+                </p>
+              </div>
+            </ScrollReveal>
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 max-w-6xl mx-auto">
+              {[
+                {
+                  icon: Users,
+                  title: "CRM imobiliário e funil de leads",
+                  text: "Controle origem, responsável, etapa, follow-up e histórico de atendimento para cada oportunidade.",
+                },
+                {
+                  icon: Clock,
+                  title: "Agenda de visitas e tarefas",
+                  text: "Organize visitas, retornos, lembretes e compromissos comerciais para reduzir conflitos de horário.",
+                },
+                {
+                  icon: Globe,
+                  title: "Site para imobiliária com SEO",
+                  text: "Vitrine pública responsiva, páginas de imóveis, captura de interessados e contato direto por WhatsApp.",
+                },
+                {
+                  icon: Plug,
+                  title: "Portais, WhatsApp e integrações",
+                  text: "Centralize canais de aquisição e mantenha o time trabalhando com dados consistentes.",
+                },
+                {
+                  icon: BarChart3,
+                  title: "Financeiro, locações e comissões",
+                  text: "Acompanhe receitas, repasses, contratos de aluguel, propostas de venda e performance comercial.",
+                },
+                {
+                  icon: Brain,
+                  title: "IA aplicada à operação",
+                  text: "Use inteligência artificial para conteúdo, avaliação, atendimento e automações com registro no CRM.",
+                },
+                {
+                  icon: ShieldCheck,
+                  title: "Contratos, vistorias e segurança",
+                  text: "Padronize documentos, inspeções, evidências e processos com rastreabilidade e controle.",
+                },
+                {
+                  icon: Smartphone,
+                  title: "Mobile, PWA e acesso remoto",
+                  text: "Acesse em celular, tablet e desktop com experiência responsiva para equipes em campo.",
+                },
+                {
+                  icon: LayoutDashboard,
+                  title: "BI e gestão por indicadores",
+                  text: "Veja origem dos leads, conversão, visitas, imóveis parados, resultados por corretor e previsões.",
+                },
+              ].map((module) => (
+                <ScrollReveal key={module.title}>
+                  <article className="h-full rounded-2xl border bg-card p-6 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-5">
+                      <module.icon className="w-5 h-5" />
+                    </div>
+                    <h3 className="text-lg font-bold mb-2">{module.title}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      {module.text}
+                    </p>
+                  </article>
+                </ScrollReveal>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* ══════ Bento Grid Stats (Expanded) ══════ */}
         <section className="py-24 bg-background">
           <div className="container mx-auto px-4">
@@ -762,20 +856,22 @@ export default function ProductLanding() {
                     Otimizado para performance máxima. Carregamento instantâneo
                     de imóveis e fotos para não perder a atenção do cliente.
                   </p>
-                  <div className="flex gap-8">
-                    <div>
-                      <div className="text-4xl font-bold text-primary mb-1">
-                        <AnimatedCounter target={99} suffix="%" />
-                      </div>
-                      <div className="text-sm font-medium">
-                        Uptime Garantido
-                      </div>
+                  <div className="flex flex-wrap gap-x-8 gap-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <svg viewBox="0 0 20 20" className="w-3.5 h-3.5 fill-current" aria-hidden="true">
+                          <path d="M7.5 13.5 4 10l1.4-1.4 2.1 2.1 5.1-5.1L14 7z" />
+                        </svg>
+                      </span>
+                      Imagens otimizadas (WebP)
                     </div>
-                    <div>
-                      <div className="text-4xl font-bold text-primary mb-1">
-                        &lt;1s
-                      </div>
-                      <div className="text-sm font-medium">Carregamento</div>
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                        <svg viewBox="0 0 20 20" className="w-3.5 h-3.5 fill-current" aria-hidden="true">
+                          <path d="M7.5 13.5 4 10l1.4-1.4 2.1 2.1 5.1-5.1L14 7z" />
+                        </svg>
+                      </span>
+                      Carregamento sob demanda
                     </div>
                   </div>
                 </div>
@@ -862,13 +958,14 @@ export default function ProductLanding() {
                   variant="outline"
                   className="mb-4 bg-primary/5 text-primary border-primary/20"
                 >
-                  Depoimentos
+                  Diferenciais
                 </Badge>
                 <h2 className="text-3xl md:text-5xl font-heading font-bold mb-6">
-                  Quem usa, recomenda
+                  Por que imobiliárias escolhem o ImobiBase
                 </h2>
                 <p className="text-lg text-muted-foreground">
-                  Veja o que nossos clientes dizem sobre o ImobiBase.
+                  Uma plataforma pensada para a rotina de quem vende e aluga
+                  imóveis no Brasil.
                 </p>
               </div>
             </ScrollReveal>
@@ -876,59 +973,24 @@ export default function ProductLanding() {
             <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
               {[
                 {
-                  name: "Carla Mendes",
-                  role: "Diretora",
-                  company: "Mendes Imóveis",
-                  text: "O ImobiBase transformou nossa operação. Antes usávamos planilhas e perdíamos leads. Hoje temos controle total do funil e o site gerou 3x mais contatos.",
-                  initials: "CM",
-                  color: "bg-blue-100 text-blue-700",
+                  title: "Nenhum lead perdido",
+                  text: "Do primeiro contato ao fechamento: captação, qualificação, agenda de visitas e follow-up num funil só.",
                 },
                 {
-                  name: "Ricardo Alves",
-                  role: "Corretor Autônomo",
-                  company: "",
-                  text: "Como corretor autônomo, precisava de algo simples e profissional. O plano gratuito já me atende muito bem e o site ficou incrível.",
-                  initials: "RA",
-                  color: "bg-green-100 text-green-700",
+                  title: "Site que gera contato",
+                  text: "Vitrine profissional com SEO e portal do cliente, sem depender apenas de portais de terceiros.",
                 },
                 {
-                  name: "Patrícia Duarte",
-                  role: "Gerente Comercial",
-                  company: "Rede Habitar",
-                  text: "A inteligência artificial para descrições de imóveis economiza horas do nosso time. E o dashboard de comissões resolveu um problema que tínhamos há anos.",
-                  initials: "PD",
-                  color: "bg-purple-100 text-purple-700",
+                  title: "Operação no controle",
+                  text: "Contratos, financeiro, comissões e locações integrados — menos planilha, mais decisão.",
                 },
-              ].map((testimonial, i) => (
-                <ScrollReveal key={testimonial.name} delay={i * 0.1}>
+              ].map((d, i) => (
+                <ScrollReveal key={d.title} delay={i * 0.1}>
                   <div className="bg-card p-8 rounded-2xl border shadow-sm h-full flex flex-col">
-                    <div className="flex gap-1 mb-4">
-                      {[...Array(5)].map((_, j) => (
-                        <Star
-                          key={j}
-                          className="w-4 h-4 fill-yellow-400 text-yellow-400"
-                        />
-                      ))}
-                    </div>
-                    <p className="text-muted-foreground leading-relaxed mb-6 flex-1">
-                      "{testimonial.text}"
+                    <h3 className="text-lg font-semibold mb-3">{d.title}</h3>
+                    <p className="text-muted-foreground leading-relaxed flex-1">
+                      {d.text}
                     </p>
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-10 h-10 rounded-full ${testimonial.color} flex items-center justify-center text-sm font-bold`}
-                      >
-                        {testimonial.initials}
-                      </div>
-                      <div>
-                        <p className="font-semibold text-sm">
-                          {testimonial.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {testimonial.role}
-                          {testimonial.company && ` — ${testimonial.company}`}
-                        </p>
-                      </div>
-                    </div>
                   </div>
                 </ScrollReveal>
               ))}
@@ -955,6 +1017,7 @@ export default function ProductLanding() {
                     Mensal
                   </span>
                   <Switch
+                    aria-label="Alternar entre cobrança mensal e anual"
                     checked={billingCycle === "yearly"}
                     onCheckedChange={(c) =>
                       setBillingCycle(c ? "yearly" : "monthly")
@@ -1032,31 +1095,33 @@ export default function ProductLanding() {
                       </div>
 
                       {isExternal ? (
-                        <a
-                          href={plan.ctaLink}
-                          target={
-                            plan.ctaLink.startsWith("mailto:")
-                              ? undefined
-                              : "_blank"
-                          }
-                          rel="noopener noreferrer"
+                        <Button
+                          asChild
+                          variant={plan.variant}
+                          className={`w-full mb-8 ${plan.popular ? "shadow-lg shadow-primary/20" : ""}`}
                         >
-                          <Button
-                            variant={plan.variant}
-                            className={`w-full mb-8 ${plan.popular ? "shadow-lg shadow-primary/20" : ""}`}
+                          <a
+                            href={plan.ctaLink}
+                            target={
+                              plan.ctaLink.startsWith("mailto:")
+                                ? undefined
+                                : "_blank"
+                            }
+                            rel="noopener noreferrer"
                           >
                             {plan.cta}
-                          </Button>
-                        </a>
+                          </a>
+                        </Button>
                       ) : (
-                        <Link href={plan.ctaLink}>
-                          <Button
-                            variant={plan.variant}
-                            className={`w-full mb-8 ${plan.popular ? "shadow-lg shadow-primary/20" : ""}`}
-                          >
+                        <Button
+                          asChild
+                          variant={plan.variant}
+                          className={`w-full mb-8 ${plan.popular ? "shadow-lg shadow-primary/20" : ""}`}
+                        >
+                          <Link href={plan.ctaLink}>
                             {plan.cta}
-                          </Button>
-                        </Link>
+                          </Link>
+                        </Button>
                       )}
 
                       <div className="space-y-3 text-sm flex-1">
@@ -1135,24 +1200,7 @@ export default function ProductLanding() {
 
             <ScrollReveal>
               <Accordion type="single" collapsible className="w-full space-y-4">
-                {[
-                  {
-                    q: "Consigo migrar meus dados de outro sistema?",
-                    a: "Sim! Oferecemos ferramentas de importação via CSV e nossa equipe de suporte auxilia na migração no plano Profissional e Enterprise.",
-                  },
-                  {
-                    q: "O site gerado é responsivo para celular?",
-                    a: "Totalmente. Utilizamos tecnologia de ponta para garantir que seu site carregue rápido e funcione perfeitamente em qualquer dispositivo.",
-                  },
-                  {
-                    q: "Tem fidelidade ou multa de cancelamento?",
-                    a: "Não. Você pode cancelar a qualquer momento sem multas. Acreditamos na qualidade do nosso produto para manter você conosco.",
-                  },
-                  {
-                    q: "Como funciona o suporte?",
-                    a: "Oferecemos suporte via chat e e-mail para todos os planos. Clientes Enterprise possuem um gerente de conta dedicado e atendimento prioritário.",
-                  },
-                ].map((faq, i) => (
+                {landingFaqs.map((faq, i) => (
                   <AccordionItem
                     key={i}
                     value={`item-${i}`}
@@ -1173,7 +1221,6 @@ export default function ProductLanding() {
 
         {/* ══════ Final CTA ══════ */}
         <section className="py-32 bg-foreground text-background relative overflow-hidden">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5" />
           <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
 
           <div className="container mx-auto px-4 text-center relative z-10">
@@ -1186,14 +1233,15 @@ export default function ProductLanding() {
                 revolução digital do mercado imobiliário.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link href="/login">
-                  <Button
-                    size="lg"
-                    className="h-16 px-12 text-lg rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-2xl shadow-primary/30"
-                  >
+                <Button
+                  asChild
+                  size="lg"
+                  className="h-16 px-12 text-lg rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-2xl shadow-primary/30"
+                >
+                  <Link href="/login">
                     Criar Conta Grátis
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               </div>
             </ScrollReveal>
           </div>
@@ -1241,8 +1289,40 @@ export default function ProductLanding() {
               </div>
 
               <div>
-                <h4 className="font-bold text-foreground mb-6">Produto</h4>
+                <h2 className="font-bold text-foreground mb-6">Produto</h2>
                 <ul className="space-y-4 text-sm text-muted-foreground">
+                  <li>
+                    <Link
+                      href="/sistema-imobiliario-completo"
+                      className="hover:text-primary transition-colors"
+                    >
+                      Sistema completo
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/crm-imobiliario"
+                      className="hover:text-primary transition-colors"
+                    >
+                      CRM imobiliário
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/software-de-agendamento-imobiliario"
+                      className="hover:text-primary transition-colors"
+                    >
+                      Agenda de visitas
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/site-para-imobiliaria"
+                      className="hover:text-primary transition-colors"
+                    >
+                      Site para imobiliária
+                    </Link>
+                  </li>
                   <li>
                     <Link
                       href="/pricing"
@@ -1287,21 +1367,31 @@ export default function ProductLanding() {
               </div>
 
               <div>
-                <h4 className="font-bold text-foreground mb-6">
+                <h2 className="font-bold text-foreground mb-6">
                   Fique por dentro
-                </h4>
+                </h2>
                 <p className="text-sm text-muted-foreground mb-4">
                   Receba dicas de vendas e novidades da plataforma.
                 </p>
                 <form onSubmit={handleNewsletterSubmit} className="flex gap-2">
+                  <label htmlFor="product-newsletter-email" className="sr-only">
+                    E-mail para newsletter
+                  </label>
                   <Input
+                    id="product-newsletter-email"
                     name="email"
                     type="email"
+                    autoComplete="email"
                     placeholder="seu@email.com"
                     className="bg-muted border-transparent focus:bg-background"
                     required
                   />
-                  <Button type="submit" size="icon" className="shrink-0">
+                  <Button
+                    type="submit"
+                    size="icon"
+                    className="shrink-0"
+                    aria-label="Inscrever e-mail na newsletter"
+                  >
                     <ArrowRight className="w-4 h-4" />
                   </Button>
                 </form>

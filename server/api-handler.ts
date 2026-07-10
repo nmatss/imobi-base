@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { registerESignatureRoutes } from "./routes-esignature";
 import { registerWhatsAppRoutes } from "./routes-whatsapp";
@@ -12,21 +13,35 @@ import { registerAutoMarketingRoutes } from "./routes-auto-marketing";
 import { registerAVMRoutes as registerAvmRoutes } from "./routes-avm";
 import { registerIsaRoutes } from "./routes-isa";
 import { registerInspectionRoutes } from "./routes-inspections";
+import { registerOnboardingRoutes } from "./routes-onboarding";
 import { registerPortalRoutes } from "./routes-portal";
 import { registerExtensionRoutes } from "./routes-extensions";
 import { registerDocsRoutes } from "./routes-docs";
+import { registerBuyerPortalRoutes } from "./routes-buyer-portal";
+import { registerAiActionRoutes } from "./routes-ai-actions";
+import { registerAgendaCrmRoutes } from "./routes-agenda-crm";
+import { registerSignatureIntegrityRoutes } from "./routes-signature-integrity";
 import { createServer } from "http";
 import { initializeSentry, addSentryErrorHandler } from "./monitoring/sentry";
 import { initializeRedis } from "./cache/redis-client";
 import { sanitizeResponse, shouldSkipDetailedLogging } from "./utils/log-sanitizer";
 import { secretManager } from "./security/secret-manager";
 import { captureException } from "./monitoring/sentry";
+import { getCorsOrigins, isCorsOriginAllowed } from "./config/cors";
 
 const app = express();
 const httpServer = createServer(app);
 
-// Initialize and validate secrets FIRST (critical security)
-secretManager.initialize(process.env);
+// Initialize and validate secrets FIRST (critical security). Em serverless o
+// secret-manager lança se houver secret obrigatório ausente/fraco — capturamos
+// para o handler responder 503 (fail-closed) em vez de crashar o module load.
+let secretInitError: Error | null = null;
+try {
+  secretManager.initialize(process.env);
+} catch (err) {
+  secretInitError = err instanceof Error ? err : new Error(String(err));
+  console.error('Secret validation failed at startup:', secretInitError.message);
+}
 
 // Initialize Sentry (before any other middleware)
 initializeSentry(app);
@@ -58,6 +73,7 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
 
 // Security headers
 const securityHeaders = {
@@ -78,16 +94,15 @@ app.use((_req, res, next) => {
 // CORS for Vercel
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Credentials", "true");
-  const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(',');
-  const origin = req.headers.origin || '';
-  const corsOrigin = allowedOrigins.includes(origin) ? origin : '';
-  if (corsOrigin) {
-    res.setHeader("Access-Control-Allow-Origin", corsOrigin);
+  const origin = req.headers.origin;
+  const allowedOrigins = getCorsOrigins();
+  if (isCorsOriginAllowed(origin, allowedOrigins) && origin) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
   }
   res.setHeader("Access-Control-Allow-Methods", "GET,OPTIONS,PATCH,DELETE,POST,PUT");
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version"
+    "Authorization, X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version"
   );
   if (req.method === "OPTIONS") {
     res.status(200).end();
@@ -146,6 +161,9 @@ const appReadyPromise: Promise<void> = (async () => {
   // Register e-signature routes
   registerESignatureRoutes(app);
 
+  // Register signature integrity routes (verify/inspect document signatures)
+  registerSignatureIntegrityRoutes(app);
+
   // Register WhatsApp routes
   registerWhatsAppRoutes(app);
 
@@ -179,8 +197,20 @@ const appReadyPromise: Promise<void> = (async () => {
   // Register inspection routes (vistoria digital)
   registerInspectionRoutes(app);
 
+  // Register onboarding routes (dados de exemplo pós-onboarding)
+  registerOnboardingRoutes(app);
+
   // Register portal routes (owner/renter self-service)
   registerPortalRoutes(app);
+
+  // Register buyer selection portal routes (/api/portal/selection/*, /api/portal/buyer-selections*)
+  registerBuyerPortalRoutes(app);
+
+  // Register AI actions routes (plan/approve/execute IA actions)
+  registerAiActionRoutes(app);
+
+  // Register agenda + CRM routes (visits confirm/reschedule, lead intake)
+  registerAgendaCrmRoutes(app);
 
   // Register extension routes (settings, roles, permissions, integrations)
   registerExtensionRoutes(app);
@@ -227,6 +257,18 @@ appReadyPromise
   });
 
 const handler = async (req: Request, res: Response, next: NextFunction) => {
+  // Fail-closed: secrets obrigatórios ausentes/fracos no boot → 503.
+  if (secretInitError) {
+    captureException(secretInitError, { phase: 'startup-secrets' });
+    const isProduction = process.env.NODE_ENV === "production";
+    res.status(503).json(
+      isProduction
+        ? { message: "Service temporarily unavailable" }
+        : { error: 'Secret validation failed', message: secretInitError.message },
+    );
+    return;
+  }
+
   try {
     // Block until routes are registered (cold-start race fix).
     await appReadyPromise;

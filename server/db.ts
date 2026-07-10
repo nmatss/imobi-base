@@ -6,6 +6,7 @@ const { Pool } = pkg;
 
 import * as schemaPg from "@shared/schema";
 import * as schemaSqlite from "@shared/schema-sqlite";
+import { installTenantRlsOnPool } from "./db-rls";
 
 // Determine which database to use. Development can fall back to SQLite when
 // DATABASE_URL is absent; production/serverless must configure Postgres unless
@@ -69,6 +70,7 @@ if (useSqlite) {
   pgPool.on("error", (err) => {
     console.error("[pg-pool] unexpected error on idle client", err);
   });
+  installTenantRlsOnPool(pgPool);
   pgDb = drizzlePg(pgPool, { schema: schemaPg });
 }
 

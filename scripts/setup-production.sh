@@ -162,6 +162,7 @@ echo ""
 
 SESSION_SECRET=$(openssl rand -base64 64 | tr -d '\n')
 CRON_SECRET=$(openssl rand -base64 48 | tr -d '\n')
+PORTAL_JWT_SECRET=$(openssl rand -base64 48 | tr -d '\n')
 CSRF_SECRET=$(openssl rand -base64 32 | tr -d '\n')
 ENCRYPTION_KEY=$(openssl rand -base64 32 | tr -d '\n')
 CLICKSIGN_WEBHOOK_SECRET=$(openssl rand -hex 32)
@@ -177,6 +178,7 @@ cat > "$SECRETS_FILE" << EOF
 
 SESSION_SECRET=$SESSION_SECRET
 CRON_SECRET=$CRON_SECRET
+PORTAL_JWT_SECRET=$PORTAL_JWT_SECRET
 CSRF_SECRET=$CSRF_SECRET
 ENCRYPTION_KEY=$ENCRYPTION_KEY
 CLICKSIGN_WEBHOOK_SECRET=$CLICKSIGN_WEBHOOK_SECRET
@@ -268,44 +270,21 @@ pause_for_manual
 # ==================================
 log_phase "Setup do Banco de Dados"
 
-echo -e "Os comandos abaixo configuram o banco de dados de producao."
-echo -e "${RED}ATENCAO: Certifique-se que DATABASE_URL aponta para o banco CORRETO!${NC}"
+echo -e "O banco de producao deve ser preparado por migrations revisadas, uma a uma."
+echo -e "${RED}ATENCAO: nao execute db:push/db:migrate cegos contra producao.${NC}"
+echo -e "Use docs/DEPLOYMENT_RUNBOOK.md, docs/RLS_RUNBOOK.md e depois rode o gate strict."
 echo ""
 
-read -p "Deseja executar o setup do banco agora? (y/n) " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo ""
-    log_action "1/4 - Aplicando schema (52 tabelas)..."
-    npm run db:push || {
-        log_error "Falha ao aplicar schema. Verifique DATABASE_URL."
-        pause_for_manual
-    }
-
-    log_action "2/4 - Aplicando indexes de performance..."
-    npm run db:indexes:apply || {
-        log_warn "Falha ao aplicar indexes. Execute manualmente: npm run db:indexes:apply"
-    }
-
-    log_action "3/4 - Atualizando estatisticas do query planner..."
-    npm run db:analyze || {
-        log_warn "Falha no ANALYZE. Execute manualmente: npm run db:analyze"
-    }
-
-    log_action "4/4 - Criando tenant superadmin..."
-    npm run db:init:production || {
-        log_warn "Falha na inicializacao. Execute manualmente: npm run db:init:production"
-    }
-
-    log_info "Setup do banco concluido!"
-else
-    echo ""
-    echo -e "Execute manualmente quando estiver pronto:"
-    echo -e "  ${CYAN}npm run db:push${NC}              # Aplicar schema"
-    echo -e "  ${CYAN}npm run db:indexes:apply${NC}     # Indexes de performance"
-    echo -e "  ${CYAN}npm run db:analyze${NC}           # Estatisticas do planner"
-    echo -e "  ${CYAN}npm run db:init:production${NC}   # Criar tenant superadmin"
-fi
+echo -e "Checklist minimo:"
+echo -e "  ${CYAN}1.${NC} Aplicar migrations revisadas em staging/producao, uma por transacao"
+echo -e "  ${CYAN}2.${NC} Aplicar RLS explicitamente somente apos requisitos do RLS_RUNBOOK"
+echo -e "  ${CYAN}3.${NC} Rodar: npm run db:rls:verify"
+echo -e "  ${CYAN}4.${NC} Rodar: npm run ops:backup:verify"
+echo -e "  ${CYAN}5.${NC} Rodar restore drill e pentest com evidencias"
+echo -e "  ${CYAN}6.${NC} Rodar: npm run ops:go-live:verify:strict"
+echo ""
+echo -e "Superadmin inicial, se necessario:"
+echo -e "  ${CYAN}npm run db:init:production${NC}"
 
 pause_for_manual
 
@@ -328,8 +307,8 @@ echo -e "     - Pagamento (se configurado)"
 echo -e "     - Cron jobs (Vercel Dashboard > Monitoring)"
 echo ""
 echo -e "  ${CYAN}3. Deploy producao:${NC}"
-echo -e "     vercel --prod"
-echo -e "     # OU: npm run deploy:production"
+echo -e "     npm run ops:go-live:verify:strict"
+echo -e "     ./scripts/deploy.sh production"
 echo ""
 
 read -p "Deseja fazer deploy staging agora? (y/n) " -n 1 -r
@@ -437,10 +416,10 @@ if [ -f "$SECRETS_FILE" ]; then
 fi
 
 echo -e "Resumo:"
-echo -e "  - Codigo: 100% pronto"
+echo -e "  - Codigo: pre-go-live local validado; producao depende do gate strict verde"
 echo -e "  - Custo minimo: ~\$50-55/mes"
 echo -e "  - Monitoramento: Sentry + Vercel Dashboard"
-echo -e "  - Deploy: vercel --prod"
+echo -e "  - Deploy: ./scripts/deploy.sh production"
 echo ""
 echo -e "Comandos uteis:"
 echo -e "  ${CYAN}npm run deploy:production${NC}    # Deploy automatizado"

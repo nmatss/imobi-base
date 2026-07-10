@@ -6,8 +6,18 @@ import { db } from '../../db';
 // import { verificationCodes } from '../../../shared/schema';
 import { eq, and, gt } from 'drizzle-orm';
 
-// Placeholder types until schema is updated
+// A tabela verification_codes ainda não está provisionada no schema.
+// Mantemos o módulo fail-closed e explícito: em vez de derefenciar `null`
+// (NPE acidental), cada método checa `isStorageReady()` e degrada com aviso
+// claro. Isso evita 500 silencioso caso a rota SMS seja reativada antes do
+// provisionamento da tabela. Ver docs/KNOWN_ISSUES.md (2FA-SMS é stub).
 const verificationCodes: any = null;
+
+function isStorageReady(): boolean {
+  return verificationCodes != null;
+}
+
+const SMS_2FA_UNAVAILABLE = 'SMS 2FA indisponível: tabela verification_codes não provisionada';
 
 interface Generate2FACodeOptions {
   length?: number;
@@ -59,6 +69,10 @@ export class TwoFactorSMS {
       userId,
       purpose = 'verification',
     } = options;
+
+    if (!isStorageReady()) {
+      throw new Error(SMS_2FA_UNAVAILABLE);
+    }
 
     // Check rate limiting
     await this.checkRateLimit(phoneNumber);
@@ -155,6 +169,11 @@ export class TwoFactorSMS {
   async verify(options: Verify2FACodeOptions): Promise<boolean> {
     const { phoneNumber, code, purpose = 'verification', deleteOnSuccess = true } = options;
 
+    if (!isStorageReady()) {
+      console.warn(SMS_2FA_UNAVAILABLE);
+      return false;
+    }
+
     try {
       // Find the code
       const [record] = await db
@@ -219,6 +238,9 @@ export class TwoFactorSMS {
    * Check rate limiting for 2FA requests
    */
   private async checkRateLimit(phoneNumber: string): Promise<void> {
+    if (!isStorageReady()) {
+      return;
+    }
     const cutoff = new Date(Date.now() - this.RATE_LIMIT_WINDOW);
 
     const count = await db

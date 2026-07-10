@@ -92,7 +92,7 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
@@ -156,7 +156,7 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.activeTenants}</div>
             <p className="text-xs text-muted-foreground">
-              {((stats.activeTenants / stats.totalTenants) * 100).toFixed(1)}% do total
+              {(stats.totalTenants > 0 ? (stats.activeTenants / stats.totalTenants) * 100 : 0).toFixed(1)}% do total
             </p>
           </CardContent>
         </Card>

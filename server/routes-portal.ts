@@ -9,7 +9,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
-import { requireAuth } from "./middleware/auth";
+import { requireAdmin, requireAuth } from "./middleware/auth";
 import { getEmailService } from "./email/email-service";
 import { randomBytes, timingSafeEqual } from "crypto";
 import type { ClientPortalAccess } from "@shared/schema-sqlite";
@@ -1006,7 +1006,7 @@ export function registerPortalRoutes(app: Express): void {
   // ==================== ADMIN PORTAL MANAGEMENT ====================
 
   // GET /api/portal/admin/access
-  app.get("/api/portal/admin/access", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/portal/admin/access", requireAuth, requireAdmin, async (req: Request, res: Response) => {
     try {
       const tenantId = req.user!.tenantId;
       const accesses = await storage.getPortalAccessesByTenant(tenantId);
@@ -1037,7 +1037,7 @@ export function registerPortalRoutes(app: Express): void {
   });
 
   // POST /api/portal/admin/access
-  app.post("/api/portal/admin/access", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/portal/admin/access", requireAuth, requireAdmin, async (req: Request, res: Response) => {
     try {
       const tenantId = req.user!.tenantId;
       const { clientType, clientId, email, password } = req.body;
@@ -1089,7 +1089,7 @@ export function registerPortalRoutes(app: Express): void {
   });
 
   // PUT /api/portal/admin/access/:id
-  app.put("/api/portal/admin/access/:id", requireAuth, async (req: Request, res: Response) => {
+  app.put("/api/portal/admin/access/:id", requireAuth, requireAdmin, async (req: Request, res: Response) => {
     try {
       const access = await storage.getPortalAccess(req.params.id);
       if (!access || access.tenantId !== req.user!.tenantId) {
@@ -1111,7 +1111,7 @@ export function registerPortalRoutes(app: Express): void {
   });
 
   // DELETE /api/portal/admin/access/:id
-  app.delete("/api/portal/admin/access/:id", requireAuth, async (req: Request, res: Response) => {
+  app.delete("/api/portal/admin/access/:id", requireAuth, requireAdmin, async (req: Request, res: Response) => {
     try {
       const access = await storage.getPortalAccess(req.params.id);
       if (!access || access.tenantId !== req.user!.tenantId) {
@@ -1127,7 +1127,7 @@ export function registerPortalRoutes(app: Express): void {
   });
 
   // POST /api/portal/admin/access/:id/reset-password
-  app.post("/api/portal/admin/access/:id/reset-password", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/portal/admin/access/:id/reset-password", requireAuth, requireAdmin, async (req: Request, res: Response) => {
     try {
       const access = await storage.getPortalAccess(req.params.id);
       if (!access || access.tenantId !== req.user!.tenantId) {
@@ -1151,7 +1151,7 @@ export function registerPortalRoutes(app: Express): void {
   });
 
   // GET /api/portal/admin/maintenance
-  app.get("/api/portal/admin/maintenance", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/portal/admin/maintenance", requireAuth, requireAdmin, async (req: Request, res: Response) => {
     try {
       const tenantId = req.user!.tenantId;
       const tickets = await storage.getMaintenanceTicketsByTenant(tenantId);
@@ -1174,7 +1174,7 @@ export function registerPortalRoutes(app: Express): void {
   });
 
   // PUT /api/portal/admin/maintenance/:id
-  app.put("/api/portal/admin/maintenance/:id", requireAuth, async (req: Request, res: Response) => {
+  app.put("/api/portal/admin/maintenance/:id", requireAuth, requireAdmin, async (req: Request, res: Response) => {
     try {
       const ticket = await storage.getMaintenanceTicket(req.params.id);
       if (!ticket || ticket.tenantId !== req.user!.tenantId) {

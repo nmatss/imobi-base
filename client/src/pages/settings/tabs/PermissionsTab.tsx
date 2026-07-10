@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { SettingsCard } from "../components/SettingsCard";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -223,8 +223,8 @@ export function PermissionsTab() {
                   </TableHeader>
                   <TableBody>
                     {PERMISSIONS.map((category) => (
-                      <>
-                        <TableRow key={category.category} className="bg-muted/50">
+                      <React.Fragment key={category.category}>
+                        <TableRow className="bg-muted/50">
                           <TableCell
                             colSpan={roles.length + 1}
                             className="font-semibold sticky left-0 bg-muted/50 z-10"
@@ -252,7 +252,7 @@ export function PermissionsTab() {
                             ))}
                           </TableRow>
                         ))}
-                      </>
+                      </React.Fragment>
                     ))}
                   </TableBody>
                 </Table>

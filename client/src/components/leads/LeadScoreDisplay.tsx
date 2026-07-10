@@ -14,16 +14,18 @@ interface LeadScoreDisplayProps {
 }
 
 interface LeadScore {
-  id: string;
-  leadId: string;
+  calculated?: boolean;
+  id?: string;
+  leadId?: string;
   totalScore: number;
   budgetScore: number;
   engagementScore: number;
   profileScore: number;
   urgencyScore: number;
   behaviorScore: number;
-  trend: string;
+  trend: 'up' | 'down' | 'stable';
   calculatedAt: string;
+  lastCalculated?: string;
 }
 
 const getScoreColor = (score: number) => {
@@ -63,7 +65,7 @@ export function LeadScoreDisplay({ leadId, compact = false }: LeadScoreDisplayPr
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: score, isLoading } = useQuery<LeadScore>({
+  const { data: score, isLoading } = useQuery<LeadScore | null>({
     queryKey: ['lead-score', leadId],
     queryFn: async () => {
       const res = await fetch(`/api/leads/${leadId}/score`);
@@ -71,7 +73,8 @@ export function LeadScoreDisplay({ leadId, compact = false }: LeadScoreDisplayPr
         if (res.status === 404) return null;
         throw new Error('Erro ao carregar score');
       }
-      return res.json();
+      const payload = await res.json();
+      return payload.calculated === false ? null : payload;
     },
   });
 
@@ -132,6 +135,7 @@ export function LeadScoreDisplay({ leadId, compact = false }: LeadScoreDisplayPr
   }
 
   if (compact) {
+    const calculatedAt = score.calculatedAt || score.lastCalculated;
     return (
       <TooltipProvider>
         <Tooltip>
@@ -145,7 +149,7 @@ export function LeadScoreDisplay({ leadId, compact = false }: LeadScoreDisplayPr
             <div className="space-y-1">
               <p className="font-medium">{getScoreLabel(score.totalScore)}</p>
               <p className="text-xs text-muted-foreground">
-                Atualizado em {new Date(score.calculatedAt).toLocaleDateString('pt-BR')}
+                Atualizado em {calculatedAt ? new Date(calculatedAt).toLocaleDateString('pt-BR') : 'agora'}
               </p>
             </div>
           </TooltipContent>
@@ -153,6 +157,8 @@ export function LeadScoreDisplay({ leadId, compact = false }: LeadScoreDisplayPr
       </TooltipProvider>
     );
   }
+
+  const calculatedAt = score.calculatedAt || score.lastCalculated;
 
   return (
     <Card>
@@ -224,7 +230,7 @@ export function LeadScoreDisplay({ leadId, compact = false }: LeadScoreDisplayPr
 
         {/* Last Update */}
         <p className="text-xs text-muted-foreground text-center">
-          Atualizado em {new Date(score.calculatedAt).toLocaleString('pt-BR')}
+          Atualizado em {calculatedAt ? new Date(calculatedAt).toLocaleString('pt-BR') : 'agora'}
         </p>
       </CardContent>
     </Card>

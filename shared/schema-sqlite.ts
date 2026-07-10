@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -15,6 +15,7 @@ export const tenants = sqliteTable("tenants", {
   phone: text("phone"),
   email: text("email"),
   address: text("address"),
+  onboardingCompleted: integer("onboarding_completed", { mode: "boolean" }).notNull().default(true),
   createdAt: text("created_at").notNull().default(now()),
   deletedAt: text("deleted_at"), // soft delete (paridade com schema.ts/PG)
 });
@@ -130,12 +131,52 @@ export const visits = sqliteTable("visits", {
   status: text("status").notNull().default("scheduled"),
   notes: text("notes"),
   assignedTo: text("assigned_to").references(() => users.id),
+  // Confirmation / reschedule / feedback workflow (paridade com schema.ts/PG)
+  confirmationToken: text("confirmation_token"),
+  confirmationStatus: text("confirmation_status").default("pending"), // pending, confirmed, declined
+  confirmedAt: text("confirmed_at"),
+  rescheduledFromId: text("rescheduled_from_id"), // self-ref visits.id
+  reminderSentAt: text("reminder_sent_at"),
+  checklistJson: text("checklist_json"), // JSON array
+  feedbackRating: integer("feedback_rating"),
+  feedbackNotes: text("feedback_notes"),
+  feedbackAt: text("feedback_at"),
+  nextActionType: text("next_action_type"),
+  nextActionDueAt: text("next_action_due_at"),
+  // Google Calendar / Meet sync (paridade com schema.ts/PG)
+  googleCalendarEventId: text("google_calendar_event_id"),
+  googleMeetUrl: text("google_meet_url"),
+  googleSyncState: text("google_sync_state"),
+  googleSyncError: text("google_sync_error"),
+  lastSyncedAt: text("last_synced_at"),
   createdAt: text("created_at").notNull().default(now()),
 });
 
 export const insertVisitSchema = createInsertSchema(visits).omit({ id: true, createdAt: true });
 export type InsertVisit = z.infer<typeof insertVisitSchema>;
 export type Visit = typeof visits.$inferSelect;
+
+// Conexão Google Calendar por usuário/corretor (paridade com schema.ts/PG).
+export const userCalendarConnections = sqliteTable("user_calendar_connections", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id").notNull().references(() => users.id),
+  provider: text("provider").notNull().default("google"),
+  googleEmail: text("google_email"),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  tokenExpiresAt: text("token_expires_at"),
+  scope: text("scope"),
+  calendarId: text("calendar_id").notNull().default("primary"),
+  syncEnabled: integer("sync_enabled", { mode: "boolean" }).notNull().default(true),
+  lastError: text("last_error"),
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertUserCalendarConnectionSchema = createInsertSchema(userCalendarConnections).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserCalendarConnection = z.infer<typeof insertUserCalendarConnectionSchema>;
+export type UserCalendarConnection = typeof userCalendarConnections.$inferSelect;
 
 export const contracts = sqliteTable("contracts", {
   id: text("id").primaryKey(),
@@ -163,9 +204,19 @@ export const newsletterSubscriptions = sqliteTable("newsletter_subscriptions", {
   tenantId: text("tenant_id").references(() => tenants.id),
   subscribedAt: text("subscribed_at").notNull().default(now()),
   active: integer("active", { mode: "boolean" }).notNull().default(true),
+  unsubscribedAt: text("unsubscribed_at"),
+  unsubscribeReason: text("unsubscribe_reason"),
+  resubscribedAt: text("resubscribed_at"),
 });
 
-export const insertNewsletterSchema = createInsertSchema(newsletterSubscriptions).omit({ id: true, subscribedAt: true });
+export const insertNewsletterSchema = createInsertSchema(newsletterSubscriptions).omit({
+  id: true,
+  subscribedAt: true,
+  active: true,
+  unsubscribedAt: true,
+  unsubscribeReason: true,
+  resubscribedAt: true,
+});
 export type InsertNewsletter = z.infer<typeof insertNewsletterSchema>;
 export type Newsletter = typeof newsletterSubscriptions.$inferSelect;
 
@@ -657,6 +708,31 @@ export const auditLogs = sqliteTable("audit_logs", {
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
+
+/**
+ * WEBHOOK EVENTS
+ * Persistent idempotency ledger for provider callbacks.
+ */
+export const webhookEvents = sqliteTable("webhook_events", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").references(() => tenants.id),
+  provider: text("provider").notNull(),
+  eventId: text("event_id").notNull(),
+  eventType: text("event_type"),
+  status: text("status").notNull().default("processing"),
+  attempts: integer("attempts").notNull().default(1),
+  payloadDigest: text("payload_digest"),
+  signatureDigest: text("signature_digest"),
+  lastError: text("last_error"),
+  receivedAt: text("received_at").notNull().default(now()),
+  processedAt: text("processed_at"),
+  failedAt: text("failed_at"),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertWebhookEventSchema = createInsertSchema(webhookEvents).omit({ id: true, receivedAt: true, updatedAt: true });
+export type InsertWebhookEvent = z.infer<typeof insertWebhookEventSchema>;
+export type WebhookEvent = typeof webhookEvents.$inferSelect;
 
 /**
  * USER SESSIONS
@@ -1614,3 +1690,172 @@ export const autoMarketingContent = sqliteTable("auto_marketing_content", {
 export const insertAutoMarketingContentSchema = createInsertSchema(autoMarketingContent).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertAutoMarketingContent = z.infer<typeof insertAutoMarketingContentSchema>;
 export type AutoMarketingContent = typeof autoMarketingContent.$inferSelect;
+
+// ==================== BUYER SELECTIONS (curadoria de imóveis p/ comprador) ====================
+
+/**
+ * BUYER SELECTIONS
+ * Curated list of properties shared publicly with a buyer for feedback.
+ */
+export const buyerSelections = sqliteTable("buyer_selections", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  leadId: text("lead_id").references(() => leads.id),
+  createdBy: text("created_by").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  publicToken: text("public_token").notNull().unique(),
+  status: text("status").notNull().default("active"), // active, closed, expired
+  message: text("message"),
+  expiresAt: text("expires_at"),
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertBuyerSelectionSchema = createInsertSchema(buyerSelections).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertBuyerSelection = z.infer<typeof insertBuyerSelectionSchema>;
+export type BuyerSelection = typeof buyerSelections.$inferSelect;
+
+/**
+ * BUYER SELECTION ITEMS
+ * Individual properties within a buyer selection + buyer response.
+ */
+export const buyerSelectionItems = sqliteTable("buyer_selection_items", {
+  id: text("id").primaryKey(),
+  selectionId: text("selection_id").notNull().references(() => buyerSelections.id),
+  propertyId: text("property_id").notNull().references(() => properties.id),
+  sortOrder: integer("sort_order").default(0),
+  response: text("response"), // accepted, rejected, maybe
+  comment: text("comment"),
+  respondedAt: text("responded_at"),
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+export const insertBuyerSelectionItemSchema = createInsertSchema(buyerSelectionItems).omit({ id: true, createdAt: true });
+export type InsertBuyerSelectionItem = z.infer<typeof insertBuyerSelectionItemSchema>;
+export type BuyerSelectionItem = typeof buyerSelectionItems.$inferSelect;
+
+// ==================== AI ACTIONS (proposta/aprovação/execução de ações por IA) ====================
+
+/**
+ * AI ACTIONS
+ * Human-in-the-loop ledger of actions proposed by AI agents.
+ */
+export const aiActions = sqliteTable("ai_actions", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  actionType: text("action_type").notNull(),
+  status: text("status").notNull().default("proposed"), // proposed, approved, rejected, executed, failed, expired
+  targetType: text("target_type").notNull(),
+  targetId: text("target_id"),
+  payload: text("payload", { mode: "json" }).notNull(),
+  rationale: text("rationale"),
+  confidence: real("confidence"),
+  requiresApproval: integer("requires_approval", { mode: "boolean" }).notNull().default(true),
+  riskLevel: text("risk_level").default("low"),
+  proposedBy: text("proposed_by").notNull().default("ai"),
+  aiModel: text("ai_model"),
+  conversationId: text("conversation_id"),
+  approvedBy: text("approved_by").references(() => users.id),
+  approvedAt: text("approved_at"),
+  executedAt: text("executed_at"),
+  result: text("result", { mode: "json" }),
+  error: text("error"),
+  expiresAt: text("expires_at"),
+  createdAt: text("created_at").notNull().default(now()),
+  updatedAt: text("updated_at").notNull().default(now()),
+}, (table) => ({
+  tenantStatusIdx: index("idx_ai_actions_tenant_status").on(table.tenantId, table.status),
+  tenantTargetIdx: index("idx_ai_actions_tenant_target").on(table.tenantId, table.targetType, table.targetId),
+}));
+
+export const insertAiActionSchema = createInsertSchema(aiActions).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAiAction = z.infer<typeof insertAiActionSchema>;
+export type AiAction = typeof aiActions.$inferSelect;
+
+/**
+ * AI ACTION AUDIT
+ * Append-only audit trail for ai_actions lifecycle events.
+ */
+export const aiActionAudit = sqliteTable("ai_action_audit", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  actionId: text("action_id").notNull().references(() => aiActions.id),
+  event: text("event").notNull(),
+  actorId: text("actor_id").references(() => users.id),
+  actorType: text("actor_type").notNull(),
+  beforeState: text("before_state", { mode: "json" }),
+  afterState: text("after_state", { mode: "json" }),
+  details: text("details", { mode: "json" }),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: text("created_at").notNull().default(now()),
+}, (table) => ({
+  tenantActionCreatedIdx: index("idx_ai_action_audit_tenant_action_created").on(table.tenantId, table.actionId, table.createdAt),
+}));
+
+export const insertAiActionAuditSchema = createInsertSchema(aiActionAudit).omit({ id: true, createdAt: true });
+export type InsertAiActionAudit = z.infer<typeof insertAiActionAuditSchema>;
+export type AiActionAudit = typeof aiActionAudit.$inferSelect;
+
+// ==================== LEAD SCORING / ASSIGNMENT CONFIG ====================
+
+/**
+ * LEAD SCORE WEIGHTS
+ * Per-tenant tunable weights/thresholds for the lead scoring engine.
+ */
+export const leadScoreWeights = sqliteTable("lead_score_weights", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id).unique(),
+  budgetWeight: integer("budget_weight").default(25),
+  engagementWeight: integer("engagement_weight").default(25),
+  profileWeight: integer("profile_weight").default(20),
+  urgencyWeight: integer("urgency_weight").default(15),
+  behaviorWeight: integer("behavior_weight").default(15),
+  hotThreshold: integer("hot_threshold").default(70),
+  warmThreshold: integer("warm_threshold").default(40),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertLeadScoreWeightsSchema = createInsertSchema(leadScoreWeights).omit({ id: true, updatedAt: true });
+export type InsertLeadScoreWeights = z.infer<typeof insertLeadScoreWeightsSchema>;
+export type LeadScoreWeights = typeof leadScoreWeights.$inferSelect;
+
+/**
+ * LEAD ASSIGNMENT STATE
+ * Per-tenant round-robin / assignment cursor.
+ */
+export const leadAssignmentState = sqliteTable("lead_assignment_state", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id).unique(),
+  strategy: text("strategy").default("round_robin"),
+  lastAssignedUserId: text("last_assigned_user_id").references(() => users.id),
+  updatedAt: text("updated_at").notNull().default(now()),
+});
+
+export const insertLeadAssignmentStateSchema = createInsertSchema(leadAssignmentState).omit({ id: true, updatedAt: true });
+export type InsertLeadAssignmentState = z.infer<typeof insertLeadAssignmentStateSchema>;
+export type LeadAssignmentState = typeof leadAssignmentState.$inferSelect;
+
+// ==================== SIGNATURE CERTIFICATES (ICP-Brasil / e-sign) ====================
+
+/**
+ * SIGNATURE CERTIFICATES
+ * Stored digital signing certificates (PEM) per tenant/user.
+ */
+export const signatureCertificates = sqliteTable("signature_certificates", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id),
+  userId: text("user_id").references(() => users.id),
+  serialNumber: text("serial_number"),
+  subject: text("subject"),
+  issuer: text("issuer"),
+  validFrom: text("valid_from"),
+  validTo: text("valid_to"),
+  certificatePem: text("certificate_pem").notNull(),
+  fingerprint: text("fingerprint"),
+  createdAt: text("created_at").notNull().default(now()),
+});
+
+export const insertSignatureCertificateSchema = createInsertSchema(signatureCertificates).omit({ id: true, createdAt: true });
+export type InsertSignatureCertificate = z.infer<typeof insertSignatureCertificateSchema>;
+export type SignatureCertificate = typeof signatureCertificates.$inferSelect;

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { getStoredTheme, setStoredTheme, type Theme } from "@/lib/theme";
 
 interface PreferencesData {
   theme: "light" | "dark" | "system";
@@ -31,7 +32,7 @@ interface PreferencesData {
 export function PreferencesSettings() {
   const { toast } = useToast();
   const [preferences, setPreferences] = useState<PreferencesData>({
-    theme: "system",
+    theme: getStoredTheme(),
     language: "pt-BR",
     compactMode: false,
     showAvatars: true,
@@ -65,6 +66,10 @@ export function PreferencesSettings() {
       ...prev,
       [key]: value,
     }));
+    // Tema é aplicado e persistido imediatamente (efeito visual instantâneo).
+    if (key === "theme") {
+      setStoredTheme(value as Theme);
+    }
   };
 
   return (

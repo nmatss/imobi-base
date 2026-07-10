@@ -33,7 +33,7 @@ type Props = {
 };
 
 type FormState = {
-  flow: "in" | "out";
+  flow: "income" | "expense";
   description: string;
   amount: string;
   entryDate: string; // yyyy-MM-dd
@@ -43,7 +43,7 @@ type FormState = {
 };
 
 const EMPTY_FORM: FormState = {
-  flow: "in",
+  flow: "income",
   description: "",
   amount: "",
   entryDate: new Date().toISOString().split("T")[0],
@@ -105,7 +105,7 @@ export default function TransactionFormDialog({
     return () => abortController.abort();
   }, [open]);
 
-  const categoryTypeForFlow = form.flow === "in" ? "income" : "expense";
+  const categoryTypeForFlow = form.flow;
   const flowCategories = categories.filter(
     (c) => c.type === categoryTypeForFlow || c.id === form.categoryId,
   );
@@ -201,8 +201,8 @@ export default function TransactionFormDialog({
                   <SelectValue placeholder="Tipo" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="in">Receita</SelectItem>
-                  <SelectItem value="out">Despesa</SelectItem>
+                  <SelectItem value="income">Receita</SelectItem>
+                  <SelectItem value="expense">Despesa</SelectItem>
                 </SelectContent>
               </Select>
             </div>

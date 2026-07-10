@@ -13,7 +13,19 @@ import archiver from "archiver";
 import { createWriteStream, mkdirSync, existsSync } from "fs";
 import { join } from "path";
 import os from "os";
+import { readFile } from "fs/promises";
 import { logComplianceAudit } from "./audit-logger";
+import {
+  STORAGE_BUCKETS,
+  isStorageConfigured,
+  uploadObject,
+  downloadObject,
+} from "../storage/supabase-client";
+
+/** Chave determinística do objeto de export no bucket privado EXPORTS. */
+function exportObjectKey(tenantId: string, fileName: string): string {
+  return `${tenantId}/${fileName}`;
+}
 
 const EXPORT_EXPIRY_DAYS = 7; // Export links expire after 7 days
 
@@ -164,7 +176,23 @@ async function processDataExport(
     const stats = fs.statSync(filePath);
     const fileSize = stats.size.toString();
 
-    // For production, upload to S3 or cloud storage
+    // Persistir em storage durável (Supabase) quando configurado. O /tmp do
+    // serverless é efêmero por instância — sem isso o link de 7 dias morre no
+    // próximo cold start. Em dev/test (sem Supabase) mantemos o arquivo local.
+    if (isStorageConfigured()) {
+      const buffer = await readFile(filePath);
+      const ok = await uploadObject(
+        STORAGE_BUCKETS.EXPORTS,
+        exportObjectKey(tenantId, fileName),
+        buffer,
+        "application/zip",
+      );
+      if (!ok) {
+        throw new Error("Falha ao enviar o export para o storage durável (Supabase)");
+      }
+      await fs.promises.unlink(filePath).catch(() => undefined);
+    }
+
     const fileUrl = `/api/compliance/export-data/download/${requestId}`;
 
     // Update request with file info
@@ -352,9 +380,11 @@ export async function getExportStatus(requestId: string, userId: string) {
 }
 
 /**
- * Download export file
+ * Download export file. Returns the file CONTENT as a Buffer so the route não
+ * dependa de um path local: em produção o conteúdo vem do Supabase Storage
+ * (durável entre instâncias); em dev lê do filesystem local.
  */
-export async function downloadExport(requestId: string, userId: string) {
+export async function downloadExport(requestId: string, userId: string): Promise<Buffer> {
   const [request] = await db.select().from(schema.dataExportRequests).where(eq(schema.dataExportRequests.id, requestId));
 
   if (!request) {
@@ -394,8 +424,19 @@ export async function downloadExport(requestId: string, userId: string) {
     severity: "info",
   });
 
-  // Return file path
-  return join(EXPORTS_DIR, request.fileName!);
+  // Conteúdo durável (Supabase) ou fallback local (dev).
+  if (isStorageConfigured()) {
+    const buffer = await downloadObject(
+      STORAGE_BUCKETS.EXPORTS,
+      exportObjectKey(request.tenantId, request.fileName!),
+    );
+    if (!buffer) {
+      throw new Error("Export file not found");
+    }
+    return buffer;
+  }
+
+  return readFile(join(EXPORTS_DIR, request.fileName!));
 }
 
 /**

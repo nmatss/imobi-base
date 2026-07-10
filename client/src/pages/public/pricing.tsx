@@ -24,9 +24,7 @@ import {
   Shield,
   FileCheck,
   Lock,
-  Star,
   Award,
-  Quote,
 } from "lucide-react";
 import { plans, CONTACT_EMAIL } from "@/lib/plans-config";
 import { SeoHead, breadcrumbSchema } from "@/components/seo/SeoHead";
@@ -122,22 +120,23 @@ export default function PricingPage() {
           </nav>
 
           <div className="hidden md:flex items-center gap-4">
-            <Link href="/login">
-              <Button variant="ghost" className="hover:bg-primary/5">
+            <Button asChild variant="ghost" className="hover:bg-primary/5">
+              <Link href="/login">
                 Entrar
-              </Button>
-            </Link>
-            <Link href="/login">
-              <Button className="rounded-full px-6 shadow-lg shadow-primary/20">
+              </Link>
+            </Button>
+            <Button asChild className="rounded-full px-6 shadow-lg shadow-primary/20">
+              <Link href="/login">
                 Começar Grátis
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
 
           <button
             className="md:hidden"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Menu"
+            aria-label={mobileMenuOpen ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={mobileMenuOpen}
           >
             {mobileMenuOpen ? <X /> : <Menu />}
           </button>
@@ -146,7 +145,7 @@ export default function PricingPage() {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="fixed top-14 left-0 w-full bg-background border-b z-40 md:hidden">
+        <div className="fixed top-16 left-0 w-full bg-background border-b z-40 md:hidden">
           <div className="p-4 flex flex-col gap-4">
             <Link
               href="/"
@@ -163,14 +162,16 @@ export default function PricingPage() {
               Preços
             </Link>
             <div className="h-px bg-border my-2" />
-            <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-              <Button variant="outline" className="w-full justify-start">
+            <Button asChild variant="outline" className="w-full justify-start">
+              <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
                 Entrar
-              </Button>
-            </Link>
-            <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
-              <Button className="w-full">Criar Conta</Button>
-            </Link>
+              </Link>
+            </Button>
+            <Button asChild className="w-full">
+              <Link href="/login" onClick={() => setMobileMenuOpen(false)}>
+                Criar Conta
+              </Link>
+            </Button>
           </div>
         </div>
       )}
@@ -206,6 +207,7 @@ export default function PricingPage() {
                 Mensal
               </span>
               <Switch
+                aria-label="Alternar cobrança anual"
                 checked={billingCycle === "yearly"}
                 onCheckedChange={(c) =>
                   setBillingCycle(c ? "yearly" : "monthly")
@@ -273,7 +275,7 @@ export default function PricingPage() {
                             {price === 0 ? "Grátis" : `R$ ${price}`}
                           </span>
                           {price > 0 && (
-                            <span className="text-muted-foreground">/mes</span>
+                            <span className="text-muted-foreground">/mês</span>
                           )}
                         </div>
                       )}
@@ -291,26 +293,27 @@ export default function PricingPage() {
                     </div>
 
                     {isExternal ? (
-                      <a
-                        href={plan.ctaLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <Button variant={plan.variant} className="w-full mb-6">
-                          {plan.cta}
-                        </Button>
-                      </a>
-                    ) : (
-                      <Link href={plan.ctaLink}>
-                        <Button
-                          variant={plan.variant}
-                          className={`w-full mb-6 ${
-                            plan.popular ? "shadow-lg shadow-primary/20" : ""
-                          }`}
+                      <Button asChild variant={plan.variant} className="w-full mb-6">
+                        <a
+                          href={plan.ctaLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
                         >
                           {plan.cta}
-                        </Button>
-                      </Link>
+                        </a>
+                      </Button>
+                    ) : (
+                      <Button
+                        asChild
+                        variant={plan.variant}
+                        className={`w-full mb-6 ${
+                          plan.popular ? "shadow-lg shadow-primary/20" : ""
+                        }`}
+                      >
+                        <Link href={plan.ctaLink}>
+                          {plan.cta}
+                        </Link>
+                      </Button>
                     )}
 
                     <div className="space-y-3 text-sm flex-1">
@@ -382,17 +385,17 @@ export default function PricingPage() {
                 },
                 {
                   icon: BarChart3,
-                  title: "Relatorios",
-                  desc: "Dashboards em tempo real e analytics avancados.",
+                  title: "Relatórios",
+                  desc: "Dashboards em tempo real e analytics avançados.",
                 },
                 {
                   icon: Brain,
-                  title: "Inteligencia Artificial",
-                  desc: "Descricoes, avaliacao de mercado e atendimento IA.",
+                  title: "Inteligência Artificial",
+                  desc: "Descrições, avaliação de mercado e atendimento IA.",
                 },
                 {
                   icon: Shield,
-                  title: "Seguranca",
+                  title: "Segurança",
                   desc: "Dados criptografados e backups automáticos diários.",
                 },
               ].map((item) => (
@@ -409,91 +412,48 @@ export default function PricingPage() {
           </div>
         </section>
 
-        {/* Social Proof — stats + testemunhos + selos */}
+        {/* Diferenciais — apenas alegacoes verdadeiras (sem stats/depoimentos fabricados) */}
         <section className="py-20 bg-background">
           <div className="container mx-auto px-4">
-            {/* Stats strip */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-8 sm:gap-16 text-center mb-16">
-              {[
-                { value: "1.500+", label: "Imóveis cadastrados" },
-                { value: "80+", label: "Imobiliárias ativas" },
-                { value: "5.000+", label: "Leads gerenciados" },
-                { value: "99%", label: "Satisfação dos clientes" },
-              ].map((stat) => (
-                <div key={stat.label} className="flex flex-col items-center">
-                  <div className="text-3xl md:text-4xl font-bold text-primary">
-                    {stat.value}
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {stat.label}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            {/* Testemunhos */}
             <div className="text-center mb-12">
               <h2 className="text-3xl font-heading font-bold mb-4">
-                Quem já usa, recomenda
+                Feito para o mercado imobiliário brasileiro
               </h2>
-              <p className="text-muted-foreground text-lg">
-                Corretores e imobiliárias que cresceram com o ImobiBase.
+              <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+                Tudo o que uma imobiliária ou corretor precisa para operar — do
+                primeiro lead à assinatura do contrato.
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto mb-16">
               {[
                 {
-                  text: "Reduzi em 60% o tempo para cadastrar imóveis e fechar contratos. O CRM integrado virou o cérebro da operação.",
-                  name: "Mariana Souza",
-                  role: "Diretora — Souza Imóveis",
-                  initials: "MS",
-                  color: "bg-primary/15 text-primary",
+                  title: "Comece sem custo",
+                  text: "Plano gratuito de verdade, sem cartão de crédito e sem prazo para expirar.",
                 },
                 {
-                  text: "Como corretor autônomo, o plano Gratuito já me atendeu muito bem. Subi para o Pro quando o volume de leads começou a crescer e não me arrependo.",
-                  name: "Rafael Lima",
-                  role: "Corretor autônomo — Campinas/SP",
-                  initials: "RL",
-                  color: "bg-emerald-500/15 text-emerald-600",
+                  title: "Sem fidelidade",
+                  text: "Assine mensal e cancele quando quiser, direto pelo painel.",
                 },
                 {
-                  text: "A automação de marketing e os relatórios avançados fizeram diferença real no fechamento de vendas. Suporte nota 10.",
-                  name: "Patrícia Alves",
-                  role: "Gerente Comercial — Alves Negócios",
-                  initials: "PA",
-                  color: "bg-orange-500/15 text-orange-600",
+                  title: "Seus dados no Brasil",
+                  text: "Hospedagem nacional e conformidade com a LGPD desde o primeiro dia.",
                 },
-              ].map((t) => (
-                <div
-                  key={t.name}
-                  className="bg-card p-6 rounded-2xl border hover:shadow-md transition-shadow flex flex-col"
-                >
-                  <Quote className="w-6 h-6 text-primary/40 mb-3" />
-                  <p className="text-sm text-foreground leading-relaxed mb-5">
-                    "{t.text}"
+              ].map((d) => (
+                <div key={d.title} className="bg-card p-6 rounded-2xl border">
+                  <h3 className="font-semibold text-lg mb-2">{d.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {d.text}
                   </p>
-                  <div className="flex items-center gap-3 mt-auto">
-                    <div
-                      className={`w-10 h-10 rounded-full ${t.color} flex items-center justify-center text-sm font-bold`}
-                    >
-                      {t.initials}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">{t.name}</p>
-                      <p className="text-xs text-muted-foreground">{t.role}</p>
-                    </div>
-                  </div>
                 </div>
               ))}
             </div>
 
-            {/* Selos de confiança */}
+            {/* Selos de confiança (apenas verdadeiros) */}
             <div className="flex flex-wrap items-center justify-center gap-6 md:gap-10 text-muted-foreground">
               {[
                 { icon: Lock, label: "SSL / TLS 1.3" },
                 { icon: Shield, label: "LGPD-compliant" },
                 { icon: Award, label: "Hospedado no Brasil" },
-                { icon: Star, label: "Uptime 99% SLA" },
               ].map((badge) => (
                 <div
                   key={badge.label}
@@ -534,7 +494,6 @@ export default function PricingPage() {
 
         {/* CTA */}
         <section className="py-24 bg-foreground text-background relative overflow-hidden">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5" />
           <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2 pointer-events-none" />
 
           <div className="container mx-auto px-4 text-center relative z-10">
@@ -546,26 +505,28 @@ export default function PricingPage() {
               plano e tirar todas as suas dúvidas.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a
-                href={`mailto:${CONTACT_EMAIL}?subject=Dúvidas sobre os planos do ImobiBase`}
+              <Button
+                asChild
+                size="lg"
+                className="h-14 px-10 text-lg rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-2xl shadow-primary/30"
               >
-                <Button
-                  size="lg"
-                  className="h-14 px-10 text-lg rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-2xl shadow-primary/30"
+                <a
+                  href={`mailto:${CONTACT_EMAIL}?subject=Dúvidas sobre os planos do ImobiBase`}
                 >
                   <MessageSquare className="mr-2 w-5 h-5" /> Falar com um
                   consultor
-                </Button>
-              </a>
-              <Link href="/login">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="h-14 px-10 text-lg rounded-full border-background/30 text-background hover:bg-background/10"
-                >
+                </a>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
+                className="h-14 px-10 text-lg rounded-full border-background/30 text-background hover:bg-background/10"
+              >
+                <Link href="/login">
                   Começar grátis <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
-              </Link>
+                </Link>
+              </Button>
             </div>
           </div>
         </section>

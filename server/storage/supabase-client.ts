@@ -112,6 +112,53 @@ export async function initializeStorageBuckets() {
 }
 
 /**
+ * Whether durable Supabase Storage is actually configured (real env, not the
+ * dummy fallback). Callers use this to decide between durable object storage
+ * (produção serverless) e o filesystem local efêmero (dev/test).
+ */
+export function isStorageConfigured(): boolean {
+  return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY);
+}
+
+/**
+ * Upload a buffer to a private bucket at a deterministic path (upsert).
+ * Returns true on success. Used por export LGPD e certificados de exclusão,
+ * que NÃO podem depender do /tmp efêmero do serverless.
+ */
+export async function uploadObject(
+  bucket: StorageBucket,
+  path: string,
+  body: Buffer,
+  contentType: string,
+): Promise<boolean> {
+  const { error } = await supabaseStorage.storage
+    .from(bucket)
+    .upload(path, body, { contentType, upsert: true });
+
+  if (error) {
+    console.error(`Failed to upload object to ${bucket}/${path}:`, error);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Download an object from a private bucket as a Buffer (null se ausente/erro).
+ */
+export async function downloadObject(
+  bucket: StorageBucket,
+  path: string,
+): Promise<Buffer | null> {
+  const { data, error } = await supabaseStorage.storage.from(bucket).download(path);
+  if (error || !data) {
+    console.error(`Failed to download object from ${bucket}/${path}:`, error);
+    return null;
+  }
+  const arrayBuffer = await data.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+/**
  * Get public URL for a file
  */
 export function getPublicUrl(bucket: StorageBucket, path: string): string {

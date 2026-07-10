@@ -143,6 +143,22 @@ if (isDirectRun) {
     });
 }
 
+/**
+ * Resolve os Stripe Price IDs de um plano a partir de variaveis de ambiente
+ * (ex.: STRIPE_PRICE_STARTER_MONTHLY, STRIPE_PRICE_STARTER_YEARLY). Permite
+ * provisionar os IDs por Infra-as-Code (Vercel env) sem edicao manual no banco.
+ * Quando ausentes, o valor configurado pelo admin e preservado (ver set abaixo).
+ */
+function resolveStripePriceIds(slug: string): {
+  monthly: string | null;
+  yearly: string | null;
+} {
+  const key = slug.toUpperCase();
+  const monthly = process.env[`STRIPE_PRICE_${key}_MONTHLY`]?.trim();
+  const yearly = process.env[`STRIPE_PRICE_${key}_YEARLY`]?.trim();
+  return { monthly: monthly || null, yearly: yearly || null };
+}
+
 export async function seedPlans(): Promise<void> {
   if (isSqlite) {
     console.log("Plans seed skipped: plans table is PostgreSQL-only in SQLite development mode");
@@ -151,6 +167,7 @@ export async function seedPlans(): Promise<void> {
 
   try {
     for (const plan of PLAN_DEFINITIONS) {
+      const stripeIds = resolveStripePriceIds(plan.slug);
       await db
         .insert(plans)
         .values({
@@ -165,6 +182,10 @@ export async function seedPlans(): Promise<void> {
           trialDays: plan.trialDays,
           features: plan.features,
           isActive: true,
+          // So define no insert quando fornecido via env; caso contrario fica
+          // null ate ser configurado (env em um proximo boot ou admin UI).
+          ...(stripeIds.monthly ? { stripePriceId: stripeIds.monthly } : {}),
+          ...(stripeIds.yearly ? { stripeYearlyPriceId: stripeIds.yearly } : {}),
         })
         .onConflictDoUpdate({
           target: plans.slug,
@@ -179,6 +200,11 @@ export async function seedPlans(): Promise<void> {
             trialDays: plan.trialDays,
             features: plan.features,
             updatedAt: new Date(),
+            // IMPORTANTE: so sobrescreve os Stripe Price IDs quando explicitamente
+            // fornecidos via env. Se ausentes, preserva o que foi setado pela
+            // admin UI — um restart do servidor nunca apaga um ID configurado.
+            ...(stripeIds.monthly ? { stripePriceId: stripeIds.monthly } : {}),
+            ...(stripeIds.yearly ? { stripeYearlyPriceId: stripeIds.yearly } : {}),
           },
         });
     }

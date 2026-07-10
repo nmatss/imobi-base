@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import { useLocation } from "wouter";
-import { setCSRFToken, clearCSRFToken } from "@/lib/queryClient";
+import { setCSRFToken, clearCSRFToken, queryClient } from "@/lib/queryClient";
 import { unwrapList, unwrapData, getPaginationTotal } from "@/lib/api-envelope";
 
 // --- Types ---
@@ -107,7 +107,7 @@ type ImobiContextType = {
   leads: Lead[];
   visits: Visit[];
   contracts: Contract[];
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, options?: LoginOptions) => Promise<void>;
   logout: () => Promise<void>;
   switchTenant: (tenantId: string) => Promise<void>;
   loading: boolean;
@@ -119,21 +119,45 @@ type ImobiContextType = {
 
 const ImobiContext = createContext<ImobiContextType | undefined>(undefined);
 
+export type LoginOptions = {
+  twoFactorToken?: string;
+  backupCode?: string;
+};
+
+export class TwoFactorRequiredError extends Error {
+  constructor(message = "Código de autenticação necessário") {
+    super(message);
+    this.name = "TwoFactorRequiredError";
+  }
+}
+
+const AUTH_OPTIONAL_PUBLIC_PATHS = new Set([
+  "/",
+  "/login",
+  "/pricing",
+  "/signup",
+  "/contato",
+  "/novidades",
+  "/termos",
+  "/privacidade",
+  "/crm-imobiliario",
+  "/software-de-agendamento-imobiliario",
+  "/sistema-imobiliario-completo",
+  "/site-para-imobiliaria",
+  "/crm-imobiliario-com-ia",
+]);
+
+const AUTH_OPTIONAL_PUBLIC_PREFIXES = [
+  "/e/",
+  "/portal/login",
+  "/portal/reset-password",
+  "/auth/forgot-password",
+  "/auth/reset-password",
+  "/auth/verify-email",
+];
+
 function isPublicAuthOptionalPath(path: string): boolean {
-  return (
-    path === "/" ||
-    path === "/login" ||
-    path === "/pricing" ||
-    path === "/signup" ||
-    path === "/termos" ||
-    path === "/privacidade" ||
-    path.startsWith("/e/") ||
-    path.startsWith("/portal/login") ||
-    path.startsWith("/portal/reset-password") ||
-    path.startsWith("/auth/forgot-password") ||
-    path.startsWith("/auth/reset-password") ||
-    path.startsWith("/auth/verify-email")
-  );
+  return AUTH_OPTIONAL_PUBLIC_PATHS.has(path) || AUTH_OPTIONAL_PUBLIC_PREFIXES.some((prefix) => path.startsWith(prefix));
 }
 
 // As rotas autenticadas /api/properties e /api/leads são paginadas no servidor
@@ -349,20 +373,28 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
     }
   }, [user, tenant, fetchAllData]);
 
-  async function login(email: string, password: string) {
+  async function login(email: string, password: string, options?: LoginOptions) {
     const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({
+        email,
+        password,
+        ...(options?.twoFactorToken ? { twoFactorToken: options.twoFactorToken } : {}),
+        ...(options?.backupCode ? { backupCode: options.backupCode } : {}),
+      }),
       credentials: "include",
     });
 
-    if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.error || "Login failed");
+    const data = await res.json();
+
+    if (data.twoFactorRequired && res.ok) {
+      throw new TwoFactorRequiredError(data.message);
     }
 
-    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Login failed");
+    }
     setUser(data.user);
     setTenant(data.tenant);
     // Login responde o estado da sessão — não precisa do /api/auth/me adiado.
@@ -395,6 +427,10 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
     // Clear CSRF token on logout
     clearCSRFToken();
 
+    // FE-1/FE-2: limpar o cache do React Query no logout impede que dados do
+    // tenant/usuario anterior vazem para a proxima conta antes do refetch.
+    queryClient.clear();
+
     setUser(null);
     setTenant(null);
     setTenants([]);
@@ -406,12 +442,25 @@ export function ImobiProvider({ children }: { children: ReactNode }) {
   }
 
   async function switchTenant(tenantId: string) {
+    // Só permite trocar para um tenant que o usuario realmente possui acesso
+    // (a lista `tenants` ja vem escopada pelo servidor: proprio tenant, ou todos
+    // para superadmin). Trocar para qualquer outro id e ignorado.
     const newTenant = tenants.find((t) => t.id === tenantId);
-    if (newTenant) {
-      setTenant(newTenant);
-      // In a real app, we'd need to switch the user's tenant on the server
-      // For now, we just switch locally
+    if (!newTenant || newTenant.id === tenant?.id) {
+      return;
     }
+
+    // FE-1: ao mudar o contexto de tenant, descartar TODO o cache do React Query
+    // e o estado local derivado, para nao exibir dados do tenant anterior sob a
+    // identidade do novo. O servidor continua escopando por sessao (RLS), entao
+    // os dados sao re-buscados ja no contexto correto.
+    queryClient.clear();
+    setProperties([]);
+    setLeads([]);
+    setVisits([]);
+    setContracts([]);
+    setTenant(newTenant);
+    // O useEffect [user, tenant] dispara fetchAllData() no novo contexto.
   }
 
   const value = {

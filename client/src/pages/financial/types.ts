@@ -26,7 +26,7 @@ export type FinanceTransaction = {
   sourceId: string | null;
   description: string;
   amount: string;
-  flow: 'in' | 'out';
+  flow: 'income' | 'expense';
   entryDate: string;
   notes: string | null;
   originType: string | null;
@@ -72,18 +72,19 @@ export type TransactionFilters = {
   search?: string;
 };
 
+// Fluxo canônico 'income'/'expense' (alinhado ao seeder do server e ao TransactionFormDialog).
 export const FINANCE_CATEGORIES = [
-  { name: 'Comissões de Venda', type: 'in', color: '#22c55e' },
-  { name: 'Comissões de Locação', type: 'in', color: '#3b82f6' },
-  { name: 'Taxa de Administração', type: 'in', color: '#8b5cf6' },
-  { name: 'Taxas de Cartório', type: 'out', color: '#ef4444' },
-  { name: 'Manutenção de Imóveis', type: 'out', color: '#f59e0b' },
-  { name: 'Publicidade', type: 'out', color: '#ec4899' },
-  { name: 'Honorários', type: 'out', color: '#6366f1' },
-  { name: 'Impostos', type: 'out', color: '#dc2626' },
-  { name: 'Repasses a Proprietários', type: 'out', color: '#f97316' },
-  { name: 'Despesas Administrativas', type: 'out', color: '#64748b' },
-  { name: 'Despesas com Pessoal', type: 'out', color: '#475569' },
+  { name: 'Comissões de Venda', type: 'income', color: '#22c55e' },
+  { name: 'Comissões de Locação', type: 'income', color: '#3b82f6' },
+  { name: 'Taxa de Administração', type: 'income', color: '#8b5cf6' },
+  { name: 'Taxas de Cartório', type: 'expense', color: '#ef4444' },
+  { name: 'Manutenção de Imóveis', type: 'expense', color: '#f59e0b' },
+  { name: 'Publicidade', type: 'expense', color: '#ec4899' },
+  { name: 'Honorários', type: 'expense', color: '#6366f1' },
+  { name: 'Impostos', type: 'expense', color: '#dc2626' },
+  { name: 'Repasses a Proprietários', type: 'expense', color: '#f97316' },
+  { name: 'Despesas Administrativas', type: 'expense', color: '#64748b' },
+  { name: 'Despesas com Pessoal', type: 'expense', color: '#475569' },
 ];
 
 export const TRANSACTION_STATUS_CONFIG = {

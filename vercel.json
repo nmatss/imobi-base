@@ -15,6 +15,10 @@
   },
   "rewrites": [
     {
+      "source": "/sitemap-dynamic.xml",
+      "destination": "/api/index.mjs"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/index.mjs"
     },
@@ -46,6 +50,14 @@
         {
           "key": "Permissions-Policy",
           "value": "camera=(), microphone=(), geolocation=(self)"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains; preload"
+        },
+        {
+          "key": "Content-Security-Policy-Report-Only",
+          "value": "default-src 'self'; script-src 'self' https://js.stripe.com https://*.posthog.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://*.supabase.co https://*.googleusercontent.com; font-src 'self' https://fonts.gstatic.com https://r2cdn.perplexity.ai data:; connect-src 'self' https://*.supabase.co https://api.stripe.com https://api.mercadopago.com https://graph.facebook.com https://maps.googleapis.com https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com https://api.clicksign.com https://*.sentry.io https://*.posthog.com https://*.i.posthog.com wss://*.supabase.co; frame-src 'self' https://js.stripe.com https://hooks.stripe.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
         }
       ]
     },
@@ -55,6 +67,15 @@
         {
           "key": "Cache-Control",
           "value": "no-store, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/api/properties/public/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=60, s-maxage=300, stale-while-revalidate=600"
         }
       ]
     },
@@ -73,12 +94,14 @@
     { "path": "/api/cron/daily-reports", "schedule": "0 3 * * *" },
     { "path": "/api/cron/weekly-reports", "schedule": "0 11 * * 1" },
     { "path": "/api/cron/monthly-reports", "schedule": "0 11 1 * *" },
-    { "path": "/api/cron/cleanup-sessions", "schedule": "0 2 * * *" },
-    { "path": "/api/cron/cleanup-logs", "schedule": "0 4 * * *" },
-    { "path": "/api/cron/integration-sync", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/cleanup-sessions", "schedule": "0 * * * *" },
+    { "path": "/api/cron/cleanup-logs", "schedule": "0 */6 * * *" },
+    { "path": "/api/cron/integration-sync", "schedule": "0 */6 * * *" },
+    { "path": "/api/cron/database-backup", "schedule": "0 5 * * *" },
     { "path": "/api/cron/cleanup-temp-files", "schedule": "0 6 * * 0" },
-    { "path": "/api/cron/cleanup-soft-deletes", "schedule": "0 7 * * 0" },
-    { "path": "/api/cron/enforce-plan-limits", "schedule": "30 6 * * *" }
+    { "path": "/api/cron/cleanup-soft-deletes", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/enforce-plan-limits", "schedule": "30 6 * * *" },
+    { "path": "/api/cron/visit-reminders", "schedule": "0 * * * *" }
   ],
   "env": {
     "NODE_ENV": "production"

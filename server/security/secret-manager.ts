@@ -78,6 +78,21 @@ const SECRET_CONFIGS: Record<string, SecretConfig> = {
     minLength: 32,
     description: 'Secret for authenticating Vercel Cron job requests',
   },
+  ENCRYPTION_KEY: {
+    required: false,
+    minLength: 32,
+    description: 'AES-256-GCM key for encrypting OAuth/integration tokens at rest',
+  },
+  GOOGLE_CLIENT_ID: {
+    required: false,
+    pattern: /\.apps\.googleusercontent\.com$/,
+    description: 'Google OAuth 2.0 client ID (SSO + Calendar/Meet)',
+  },
+  GOOGLE_CLIENT_SECRET: {
+    required: false,
+    pattern: /^GOCSPX-/,
+    description: 'Google OAuth 2.0 client secret',
+  },
 };
 
 class SecretManager {
@@ -153,7 +168,16 @@ class SecretManager {
         console.error('Application cannot start in production with invalid secrets');
         process.exit(1);
       } else if (isServerless) {
-        console.error('⚠️  Secret validation errors in serverless - continuing with warnings');
+        // Serverless (Vercel): process.exit não é apropriado, mas NÃO podemos
+        // seguir com secrets obrigatórios ausentes/fracos (ex.: SESSION_SECRET).
+        // Lançamos para falhar fechado — o handler serverless captura como
+        // startupError e responde 503, em vez de subir com secret inseguro.
+        // (Apenas secrets REQUIRED/malformados geram `errors`; opcionais
+        // ausentes viram `warnings` e não chegam aqui.)
+        console.error('🚨 Secret validation errors in serverless — failing closed.');
+        throw new Error(
+          `Secret validation failed in serverless: ${errors.length} issue(s). See logs above.`,
+        );
       }
     }
 

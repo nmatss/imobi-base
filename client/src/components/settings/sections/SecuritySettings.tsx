@@ -1,50 +1,41 @@
 import React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SettingsCard } from "@/pages/settings/components/SettingsCard";
 import { SettingsFormField } from "../SettingsFormField";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useImobi } from "@/lib/imobi-context";
+import { apiRequest } from "@/lib/queryClient";
+import { TwoFactorSetup } from "@/components/security/TwoFactorSetup";
 import {
   Shield,
-  Key,
-  Smartphone,
-  Monitor,
   AlertTriangle,
-  CheckCircle2,
   Eye,
   EyeOff,
-  Loader2,
   LogOut,
 } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Alert,
   AlertDescription,
   AlertTitle,
 } from "@/components/ui/alert";
 
-interface Session {
+interface AccessLog {
   id: string;
-  device: string;
-  location: string;
-  lastActive: string;
-  current: boolean;
+  success: boolean;
+  failureReason?: string | null;
+  ipAddress?: string | null;
+  location?: string | null;
+  createdAt: string;
 }
 
 export function SecuritySettings() {
   const { toast } = useToast();
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const { user } = useImobi();
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isEndingSessions, setIsEndingSessions] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -54,29 +45,23 @@ export function SecuritySettings() {
     confirm: "",
   });
   const [passwordStrength, setPasswordStrength] = useState(0);
-  const [sessions] = useState<Session[]>([
-    {
-      id: "1",
-      device: "Chrome on Windows",
-      location: "São Paulo, SP",
-      lastActive: "Agora",
-      current: true,
-    },
-    {
-      id: "2",
-      device: "Safari on iPhone",
-      location: "São Paulo, SP",
-      lastActive: "Há 2 horas",
-      current: false,
-    },
-    {
-      id: "3",
-      device: "Chrome on Android",
-      location: "Rio de Janeiro, RJ",
-      lastActive: "Há 1 dia",
-      current: false,
-    },
-  ]);
+  const [accessLogs, setAccessLogs] = useState<AccessLog[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await apiRequest("GET", "/api/auth/security/login-history?limit=10");
+        const data = await res.json();
+        if (active) setAccessLogs(Array.isArray(data?.history) ? data.history : []);
+      } catch {
+        if (active) setAccessLogs([]);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const calculatePasswordStrength = (password: string): number => {
     let strength = 0;
@@ -151,8 +136,10 @@ export function SecuritySettings() {
     setIsChangingPassword(true);
 
     try {
-      // Simular API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await apiRequest("POST", "/api/auth/change-password", {
+        currentPassword: passwordData.current,
+        newPassword: passwordData.new,
+      });
 
       toast({
         title: "Senha alterada",
@@ -162,63 +149,27 @@ export function SecuritySettings() {
       setPasswordData({ current: "", new: "", confirm: "" });
       setPasswordStrength(0);
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível alterar a senha.",
-        variant: "destructive",
-      });
+      // apiRequest lança Error("<status>: <body>"); tenta extrair { error }.
+      let description = "Não foi possível alterar a senha.";
+      if (error instanceof Error) {
+        const body = error.message.replace(/^\d+:\s*/, "");
+        try {
+          const parsed = JSON.parse(body);
+          if (parsed?.error) description = parsed.error;
+        } catch {
+          if (body) description = body;
+        }
+      }
+      toast({ title: "Erro ao alterar senha", description, variant: "destructive" });
     } finally {
       setIsChangingPassword(false);
     }
   };
 
-  const handleToggle2FA = async () => {
-    const newState = !twoFactorEnabled;
-
-    try {
-      // Simular API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      setTwoFactorEnabled(newState);
-
-      toast({
-        title: newState ? "2FA Ativado" : "2FA Desativado",
-        description: newState
-          ? "Autenticação de dois fatores foi ativada com sucesso."
-          : "Autenticação de dois fatores foi desativada.",
-      });
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível alterar a configuração de 2FA.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleEndSession = async (sessionId: string) => {
-    try {
-      // Simular API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      toast({
-        title: "Sessão encerrada",
-        description: "A sessão foi encerrada com sucesso.",
-      });
-    } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível encerrar a sessão.",
-        variant: "destructive",
-      });
-    }
-  };
-
   const handleEndAllSessions = async () => {
+    setIsEndingSessions(true);
     try {
-      // Simular API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
+      await apiRequest("POST", "/api/auth/logout-all");
       toast({
         title: "Sessões encerradas",
         description: "Todas as outras sessões foram encerradas.",
@@ -229,6 +180,8 @@ export function SecuritySettings() {
         description: "Não foi possível encerrar as sessões.",
         variant: "destructive",
       });
+    } finally {
+      setIsEndingSessions(false);
     }
   };
 
@@ -332,120 +285,32 @@ export function SecuritySettings() {
         </div>
       </SettingsCard>
 
-      {/* Two-Factor Authentication */}
-      <SettingsCard
-        title="Autenticação de Dois Fatores (2FA)"
-        description="Adicione uma camada extra de segurança à sua conta"
-        showSaveButton={false}
-      >
-        <div className="flex items-start justify-between">
-          <div className="space-y-1 flex-1">
-            <div className="flex items-center gap-2">
-              <Smartphone className="h-5 w-5 text-primary" />
-              <Label htmlFor="2fa-toggle" className="text-base font-medium">
-                Ativar 2FA
-              </Label>
-              {twoFactorEnabled && (
-                <Badge variant="default" className="gap-1">
-                  <CheckCircle2 className="h-3 w-3" />
-                  Ativo
-                </Badge>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Quando ativado, você precisará fornecer um código de 6 dígitos além da senha
-              para fazer login.
-            </p>
-          </div>
-          <Switch
-            id="2fa-toggle"
-            checked={twoFactorEnabled}
-            onCheckedChange={handleToggle2FA}
-          />
-        </div>
-
-        {twoFactorEnabled && (
-          <Alert className="mt-4">
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-            <AlertTitle>2FA Configurado</AlertTitle>
-            <AlertDescription>
-              Sua conta está protegida com autenticação de dois fatores. Use o app Google
-              Authenticator ou similar para gerar códigos.
-            </AlertDescription>
-          </Alert>
-        )}
-      </SettingsCard>
+      {/* Two-Factor Authentication (componente real com QR/backup codes) */}
+      {user && <TwoFactorSetup userId={user.id} />}
 
       {/* Active Sessions */}
       <SettingsCard
         title="Sessões Ativas"
-        description="Gerencie os dispositivos conectados à sua conta"
+        description="Encerre o acesso em outros dispositivos"
         showSaveButton={false}
       >
-        <div className="space-y-4">
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Dispositivo</TableHead>
-                  <TableHead>Localização</TableHead>
-                  <TableHead>Última Atividade</TableHead>
-                  <TableHead className="w-[100px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sessions.map((session) => (
-                  <TableRow key={session.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Monitor className="h-4 w-4 text-muted-foreground" />
-                        <span>{session.device}</span>
-                        {session.current && (
-                          <Badge variant="secondary" className="text-xs">
-                            Atual
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {session.location}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {session.lastActive}
-                    </TableCell>
-                    <TableCell>
-                      {!session.current && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEndSession(session.id)}
-                          className="gap-1"
-                        >
-                          <LogOut className="h-3 w-3" />
-                          Encerrar
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span>
+              Se você acha que sua conta foi acessada em outro dispositivo,
+              encerre todas as outras sessões. Você continua conectado aqui.
+            </span>
           </div>
-
-          <div className="flex items-center justify-between pt-2 border-t">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <AlertTriangle className="h-4 w-4" />
-              <span>Não reconhece algum dispositivo?</span>
-            </div>
-            <Button
-              variant="outline"
-              onClick={handleEndAllSessions}
-              className="gap-2"
-            >
-              <LogOut className="h-4 w-4" />
-              Encerrar Todas as Outras Sessões
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            onClick={handleEndAllSessions}
+            isLoading={isEndingSessions}
+            className="gap-2 shrink-0"
+          >
+            <LogOut className="h-4 w-4" />
+            Encerrar Outras Sessões
+          </Button>
         </div>
       </SettingsCard>
 
@@ -456,49 +321,36 @@ export function SecuritySettings() {
         showSaveButton={false}
       >
         <div className="space-y-3">
-          {[
-            {
-              action: "Login bem-sucedido",
-              time: "Há 5 minutos",
-              location: "São Paulo, SP",
-              status: "success",
-            },
-            {
-              action: "Senha alterada",
-              time: "Há 2 dias",
-              location: "São Paulo, SP",
-              status: "success",
-            },
-            {
-              action: "Tentativa de login falhou",
-              time: "Há 5 dias",
-              location: "Curitiba, PR",
-              status: "warning",
-            },
-          ].map((log, index) => (
-            <div
-              key={index}
-              className="flex items-start gap-3 p-3 rounded-lg border bg-card"
-            >
+          {accessLogs.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              Nenhum acesso registrado ainda.
+            </p>
+          ) : (
+            accessLogs.map((log) => (
               <div
-                className={`mt-0.5 h-2 w-2 rounded-full ${
-                  log.status === "success" ? "bg-green-500" : "bg-yellow-500"
-                }`}
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">{log.action}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {log.location} • {log.time}
-                </p>
+                key={log.id}
+                className="flex items-start gap-3 p-3 rounded-lg border bg-card"
+              >
+                <div
+                  className={`mt-0.5 h-2 w-2 rounded-full ${
+                    log.success ? "bg-green-500" : "bg-yellow-500"
+                  }`}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">
+                    {log.success
+                      ? "Login bem-sucedido"
+                      : `Tentativa de login falhou${log.failureReason ? ` — ${log.failureReason}` : ""}`}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {(log.location || log.ipAddress || "Origem desconhecida")}
+                    {" • "}
+                    {new Date(log.createdAt).toLocaleString("pt-BR")}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="pt-4 text-center">
-          <Button variant="link" size="sm">
-            Ver histórico completo
-          </Button>
+            ))
+          )}
         </div>
       </SettingsCard>
     </div>

@@ -31,12 +31,12 @@ function ArticleView({ article }: { article: HelpArticle }) {
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/ajuda">
-          <Button variant="ghost" size="sm" className="gap-2 -ml-2 text-muted-foreground hover:text-foreground">
+        <Button asChild variant="ghost" size="sm" className="gap-2 -ml-2 text-muted-foreground hover:text-foreground">
+          <Link href="/ajuda">
             <ArrowLeft {...iconA11yProps} className="h-4 w-4" />
             Voltar para a Central de Ajuda
-          </Button>
-        </Link>
+          </Link>
+        </Button>
       </div>
 
       <Card>
@@ -57,12 +57,12 @@ function ArticleView({ article }: { article: HelpArticle }) {
 function ArticleNotFound() {
   return (
     <div className="space-y-6">
-      <Link href="/ajuda">
-        <Button variant="ghost" size="sm" className="gap-2 -ml-2 text-muted-foreground hover:text-foreground">
+      <Button asChild variant="ghost" size="sm" className="gap-2 -ml-2 text-muted-foreground hover:text-foreground">
+        <Link href="/ajuda">
           <ArrowLeft {...iconA11yProps} className="h-4 w-4" />
           Voltar para a Central de Ajuda
-        </Button>
-      </Link>
+        </Link>
+      </Button>
       <Card>
         <CardContent className="py-12 text-center space-y-2">
           <HelpCircle {...iconA11yProps} className="h-10 w-10 mx-auto text-muted-foreground/50" />

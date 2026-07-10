@@ -18,11 +18,15 @@ import { registerOnboardingRoutes } from "./routes-onboarding";
 import { registerPortalRoutes } from "./routes-portal";
 import { registerExtensionRoutes } from "./routes-extensions";
 import { registerDocsRoutes } from "./routes-docs";
+import { registerBuyerPortalRoutes } from "./routes-buyer-portal";
+import { registerAiActionRoutes } from "./routes-ai-actions";
+import { registerAgendaCrmRoutes } from "./routes-agenda-crm";
+import { registerSignatureIntegrityRoutes } from "./routes-signature-integrity";
 // import smsRoutes from "./routes-sms"; // Disabled - SMS schema not defined
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { initializeSentry, addSentryErrorHandler } from "./monitoring/sentry";
-import { initializeRedis, closeRedis } from "./cache/redis-client";
+import { closeRedis } from "./cache/redis-client";
 import { initializeJobs, shutdownJobs } from "./jobs";
 import { sanitizeResponse, shouldSkipDetailedLogging } from "./utils/log-sanitizer";
 import { secretManager } from "./security/secret-manager";
@@ -98,6 +102,9 @@ app.use((req, res, next) => {
   // Register e-signature routes
   registerESignatureRoutes(app);
 
+  // Register signature integrity routes (verify/inspect document signatures)
+  registerSignatureIntegrityRoutes(app);
+
   // Register WhatsApp routes
   registerWhatsAppRoutes(app);
 
@@ -134,6 +141,15 @@ app.use((req, res, next) => {
   // Register portal routes (owner/renter self-service)
   registerPortalRoutes(app);
 
+  // Register buyer selection portal routes (/api/portal/selection/*, /api/portal/buyer-selections*)
+  registerBuyerPortalRoutes(app);
+
+  // Register AI actions routes (plan/approve/execute IA actions)
+  registerAiActionRoutes(app);
+
+  // Register agenda + CRM routes (visits confirm/reschedule, lead intake)
+  registerAgendaCrmRoutes(app);
+
   // Register extension routes (settings, roles, permissions, integrations)
   registerExtensionRoutes(app);
 
@@ -142,6 +158,21 @@ app.use((req, res, next) => {
 
   // Register SMS routes
   // app.use('/api/sms', smsRoutes); // Disabled - SMS schema not defined
+
+  if (process.env.ENABLE_BACKGROUND_JOBS === "true" && !process.env.VERCEL) {
+    await initializeJobs();
+    const shutdownBackgroundJobs = async (signal: string): Promise<void> => {
+      log(`received ${signal}, shutting down background jobs`);
+      await shutdownJobs().catch((error) => {
+        console.error("Failed to shutdown jobs:", error);
+      });
+      await closeRedis().catch((error) => {
+        console.error("Failed to close Redis:", error);
+      });
+    };
+    process.once("SIGTERM", () => void shutdownBackgroundJobs("SIGTERM"));
+    process.once("SIGINT", () => void shutdownBackgroundJobs("SIGINT"));
+  }
 
   // Add Sentry error handler (must be before custom error handlers)
   addSentryErrorHandler(app);

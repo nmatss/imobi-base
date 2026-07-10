@@ -1,5 +1,6 @@
 import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState, useCallback, useMemo, useEffect } from "react";
+import { Link } from "wouter";
 import { useImobi, Contract, Lead, Property } from "@/lib/imobi-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -89,6 +90,7 @@ import {
 import { ptBR } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { ContractSignaturePanel } from "./ContractSignaturePanel";
 
 // Format price to BRL
 function formatPrice(price: string | number) {
@@ -99,28 +101,28 @@ function formatPrice(price: string | number) {
 
 // Proposal status config
 const PROPOSAL_STATUS = {
-  draft: { label: "Rascunho", color: "bg-gray-100 text-gray-700 border-gray-300", icon: FileText },
-  sent: { label: "Enviada", color: "bg-blue-100 text-blue-700 border-blue-300", icon: Send },
-  analyzing: { label: "Em Análise", color: "bg-amber-100 text-amber-700 border-amber-300", icon: Clock },
-  approved: { label: "Aprovada", color: "bg-green-100 text-green-700 border-green-300", icon: CheckCircle },
-  rejected: { label: "Recusada", color: "bg-red-100 text-red-700 border-red-300", icon: XCircle },
-  expired: { label: "Vencida", color: "bg-purple-100 text-purple-700 border-purple-300", icon: AlertTriangle },
+  draft: { label: "Rascunho", color: "bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700", icon: FileText },
+  sent: { label: "Enviada", color: "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800", icon: Send },
+  analyzing: { label: "Em Análise", color: "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800", icon: Clock },
+  approved: { label: "Aprovada", color: "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800", icon: CheckCircle },
+  rejected: { label: "Recusada", color: "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800", icon: XCircle },
+  expired: { label: "Vencida", color: "bg-purple-100 text-purple-700 border-purple-300 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800", icon: AlertTriangle },
 };
 
 // Contract status config
 const CONTRACT_STATUS = {
-  active: { label: "Ativo", color: "bg-green-100 text-green-700 border-green-300", icon: CheckCircle },
-  terminated: { label: "Rescindido", color: "bg-red-100 text-red-700 border-red-300", icon: Ban },
-  expired: { label: "Vencido", color: "bg-amber-100 text-amber-700 border-amber-300", icon: AlertTriangle },
-  renewing: { label: "Em Renovação", color: "bg-blue-100 text-blue-700 border-blue-300", icon: RefreshCw },
+  active: { label: "Ativo", color: "bg-green-100 text-green-700 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800", icon: CheckCircle },
+  terminated: { label: "Rescindido", color: "bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800", icon: Ban },
+  expired: { label: "Vencido", color: "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800", icon: AlertTriangle },
+  renewing: { label: "Em Renovação", color: "bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800", icon: RefreshCw },
 };
 
 // Signature status config
 const SIGNATURE_STATUS = {
-  pending: { label: "Aguardando", color: "bg-gray-100 text-gray-700" },
-  sent: { label: "Enviado", color: "bg-blue-100 text-blue-700" },
-  signed: { label: "Assinado", color: "bg-green-100 text-green-700" },
-  rejected: { label: "Recusado", color: "bg-red-100 text-red-700" },
+  pending: { label: "Aguardando", color: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
+  sent: { label: "Enviado", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
+  signed: { label: "Assinado", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300" },
+  rejected: { label: "Recusado", color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300" },
 };
 
 // AI prompts for contracts/proposals
@@ -263,8 +265,18 @@ export default function ContractsPage() {
       ? approved.reduce((sum, c) => sum + parseFloat(c.value), 0) / approved.length
       : 0;
 
-    // Average time to close (mock - would need actual tracking)
-    const avgDays = 12; // Placeholder
+    // Tempo médio real até a assinatura: média de (signedAt - createdAt) dos
+    // contratos efetivamente assinados no período. Sem assinados = 0 (sem dado),
+    // em vez do valor fixo "12" que era exibido como se fosse real (B4).
+    const signedWithDates = periodContracts.filter((c) => c.signedAt && c.createdAt);
+    const avgDays = signedWithDates.length > 0
+      ? Math.round(
+          signedWithDates.reduce(
+            (sum, c) => sum + differenceInDays(new Date(c.signedAt!), new Date(c.createdAt!)),
+            0,
+          ) / signedWithDates.length,
+        )
+      : 0;
 
     return {
       proposalsCount: proposals.length,
@@ -643,12 +655,15 @@ export default function ContractsPage() {
 
                   <div className="space-y-2">
                     <Label>Tipo de Negócio</Label>
-                    <Select value={filters.type} onValueChange={(v) => setFilters(f => ({ ...f, type: v }))}>
+                    <Select
+                      value={filters.type || "__all__"}
+                      onValueChange={(v) => setFilters(f => ({ ...f, type: v === "__all__" ? "" : v }))}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Todos os tipos" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos os tipos</SelectItem>
+                        <SelectItem value="__all__">Todos os tipos</SelectItem>
                         <SelectItem value="sale">Venda</SelectItem>
                         <SelectItem value="rent">Locação</SelectItem>
                       </SelectContent>
@@ -657,12 +672,15 @@ export default function ContractsPage() {
 
                   <div className="space-y-2">
                     <Label>Status (Propostas)</Label>
-                    <Select value={filters.status} onValueChange={(v) => setFilters(f => ({ ...f, status: v }))}>
+                    <Select
+                      value={filters.status || "__all__"}
+                      onValueChange={(v) => setFilters(f => ({ ...f, status: v === "__all__" ? "" : v }))}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Todos os status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Todos os status</SelectItem>
+                        <SelectItem value="__all__">Todos os status</SelectItem>
                         {Object.entries(PROPOSAL_STATUS).map(([key, val]) => (
                           <SelectItem key={key} value={key}>{val.label}</SelectItem>
                         ))}
@@ -985,9 +1003,9 @@ export default function ContractsPage() {
                                 {contract.createdAt ? format(new Date(contract.createdAt), "dd/MM/yyyy") : "—"}
                               </TableCell>
                               <TableCell>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Abrir ações do contrato">
                                       <MoreVertical className="h-4 w-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
@@ -996,9 +1014,9 @@ export default function ContractsPage() {
                                       <Eye className="h-4 w-4 mr-2" />
                                       Ver Detalhes
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem>
+                                    <DropdownMenuItem disabled>
                                       <Download className="h-4 w-4 mr-2" />
-                                      Baixar PDF
+                                      Baixar PDF (em breve)
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicate(contract); }}>
                                       <Copy className="h-4 w-4 mr-2" />
@@ -1024,14 +1042,14 @@ export default function ContractsPage() {
                                     {["sent", "analyzing"].includes(contract.status) && (
                                       <>
                                         <DropdownMenuItem
-                                          className="text-green-600"
+                                          className="text-green-600 dark:text-green-400"
                                           onClick={(e) => { e.stopPropagation(); handleUpdateStatus(contract.id, "approved"); }}
                                         >
                                           <CheckCircle className="h-4 w-4 mr-2" />
                                           Aprovar
                                         </DropdownMenuItem>
                                         <DropdownMenuItem
-                                          className="text-red-600"
+                                          className="text-red-600 dark:text-red-400"
                                           onClick={(e) => { e.stopPropagation(); handleUpdateStatus(contract.id, "rejected"); }}
                                         >
                                           <XCircle className="h-4 w-4 mr-2" />
@@ -1194,7 +1212,7 @@ export default function ContractsPage() {
                               <TableCell>
                                 {contract.signedAt ? (
                                   <div className="flex items-center gap-1.5 text-xs">
-                                    <CheckCircle className="h-3.5 w-3.5 text-green-600" />
+                                    <CheckCircle className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
                                     <span>{format(new Date(contract.signedAt), "dd/MM/yyyy")}</span>
                                   </div>
                                 ) : (
@@ -1204,7 +1222,12 @@ export default function ContractsPage() {
                               <TableCell>
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      aria-label="Abrir ações do contrato"
+                                    >
                                       <MoreVertical className="h-4 w-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
@@ -1213,11 +1236,11 @@ export default function ContractsPage() {
                                       <Eye className="h-4 w-4 mr-2" />
                                       Ver Detalhes
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem>
+                                    <DropdownMenuItem disabled>
                                       <Download className="h-4 w-4 mr-2" />
-                                      Baixar PDF
+                                      Baixar PDF (em breve)
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem>
+                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDetailPanel(contract); }}>
                                       <History className="h-4 w-4 mr-2" />
                                       Ver Histórico
                                     </DropdownMenuItem>
@@ -1674,10 +1697,10 @@ export default function ContractsPage() {
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-sm">{selectedItem.lead?.name || "Não informado"}</span>
                           <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
-                            <a href="/leads">
+                            <Link href="/leads">
                               <ExternalLink className="h-3 w-3 mr-1" />
                               Ver no CRM
-                            </a>
+                            </Link>
                           </Button>
                         </div>
                         {selectedItem.lead?.phone && (
@@ -1706,7 +1729,7 @@ export default function ContractsPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="flex-1 h-9 text-xs text-green-600"
+                            className="flex-1 h-9 text-xs text-green-600 dark:text-green-400"
                             onClick={() => {
                               if (selectedItem.lead?.phone) {
                                 const phone = selectedItem.lead.phone.replace(/\D/g, "");
@@ -1733,10 +1756,10 @@ export default function ContractsPage() {
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-sm">{selectedItem.property?.title || "Não informado"}</span>
                           <Button variant="ghost" size="sm" className="h-7 text-xs" asChild>
-                            <a href={`/properties/${selectedItem.propertyId}`}>
+                            <Link href={`/properties/${selectedItem.propertyId}`}>
                               <ExternalLink className="h-3 w-3 mr-1" />
                               Ver detalhes
-                            </a>
+                            </Link>
                           </Button>
                         </div>
                         {selectedItem.property?.address && (
@@ -1834,7 +1857,7 @@ export default function ContractsPage() {
                             <>
                               <Button
                                 variant="outline"
-                                className="h-10 text-xs text-green-600"
+                                className="h-10 text-xs text-green-600 dark:text-green-400"
                                 onClick={() => handleUpdateStatus(selectedItem.id, "approved")}
                               >
                                 <CheckCircle className="h-4 w-4 mr-1.5" />
@@ -1842,7 +1865,7 @@ export default function ContractsPage() {
                               </Button>
                               <Button
                                 variant="outline"
-                                className="h-10 text-xs text-red-600"
+                                className="h-10 text-xs text-red-600 dark:text-red-400"
                                 onClick={() => handleUpdateStatus(selectedItem.id, "rejected")}
                               >
                                 <XCircle className="h-4 w-4 mr-1.5" />
@@ -1877,57 +1900,7 @@ export default function ContractsPage() {
                   </TabsContent>
 
                   <TabsContent value="document" className="p-4 space-y-4 mt-0">
-                    <Card className="bg-muted/30 border-dashed">
-                      <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                        <FileWarning className="h-12 w-12 text-muted-foreground/30 mb-4" />
-                        <h3 className="font-semibold mb-1 text-sm">Visualização do Documento</h3>
-                        <p className="text-xs text-muted-foreground mb-4 max-w-xs">
-                          A visualização do PDF será implementada com integração de assinatura digital.
-                        </p>
-                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                          <Button variant="outline" size="sm" className="h-9">
-                            <Download className="h-4 w-4 mr-2" />
-                            Baixar PDF
-                          </Button>
-                          <Button variant="outline" size="sm" className="h-9">
-                            <FileSignature className="h-4 w-4 mr-2" />
-                            Enviar para Assinatura
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {/* Signature status (mock) */}
-                    <Card>
-                      <CardHeader className="p-3 pb-2">
-                        <CardTitle className="text-sm flex items-center gap-2">
-                          <PenLine className="h-4 w-4 text-primary" />
-                          Status da Assinatura
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-3 pt-0">
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Cliente</span>
-                            <Badge variant="outline" className={cn("text-xs", SIGNATURE_STATUS.pending.color)}>
-                              {SIGNATURE_STATUS.pending.label}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Proprietário</span>
-                            <Badge variant="outline" className={cn("text-xs", SIGNATURE_STATUS.pending.color)}>
-                              {SIGNATURE_STATUS.pending.label}
-                            </Badge>
-                          </div>
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Imobiliária</span>
-                            <Badge variant="outline" className={cn("text-xs", SIGNATURE_STATUS.pending.color)}>
-                              {SIGNATURE_STATUS.pending.label}
-                            </Badge>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <ContractSignaturePanel contractId={selectedItem.id} />
                   </TabsContent>
 
                   <TabsContent value="ai" className="p-4 space-y-4 mt-0">

@@ -16,13 +16,16 @@ import {
 } from "./services/ai-service";
 import { isSqlite } from "./db";
 import {
+  runWithAuthEmailRlsContext,
+  runWithTenantRlsContext,
+  runWithUserRlsContext,
+} from "./db-rls";
+import {
   insertUserSchema,
   insertPropertySchema,
   insertLeadSchema,
   insertVisitSchema,
   insertContractSchema,
-  insertNewsletterSchema,
-  insertInteractionSchema,
   insertOwnerSchema,
   insertRenterSchema,
   insertRentalContractSchema,
@@ -31,8 +34,6 @@ import {
   insertPropertySaleSchema,
   insertFinanceCategorySchema,
   insertFinanceEntrySchema,
-  insertLeadTagSchema,
-  insertLeadTagLinkSchema,
   insertFollowUpSchema,
   insertRentalTransferSchema,
   insertCommissionSchema,
@@ -43,8 +44,14 @@ import connectPg from "connect-pg-simple";
 import pkg from "pg";
 import rateLimit from "express-rate-limit";
 import RedisStore from "rate-limit-redis";
+import * as Sentry from "@sentry/node";
 import helmet from "helmet";
 import cors from "cors";
+import {
+  getCorsOrigins,
+  getCorsProductionWarnings,
+  isCorsOriginAllowed,
+} from "./config/cors";
 import { apiResponse, apiError, apiPaginated } from "./utils/api-response";
 import {
   checkFeatureAccess,
@@ -52,7 +59,11 @@ import {
   checkLeadLimit,
   isLeadLimitReachedForTenant,
 } from "./middleware/plan-limits";
-import { registerSecurityRoutes } from "./routes-security";
+import {
+  isTwoFactorEnabledForUser,
+  registerSecurityRoutes,
+  verifyTwoFactorChallenge,
+} from "./routes-security";
 import { sendEmail as sendContactEmail } from "./auth/email-service";
 import {
   checkAccountLock,
@@ -63,6 +74,8 @@ import { registerFeatureRoutes } from "./routes-features";
 import { registerPaymentRoutes } from "./routes-payments";
 import { registerAdminBootstrapRoutes } from "./routes-admin-bootstrap";
 import { registerCronRoutes } from "./routes-cron";
+import { registerGoogleCalendarRoutes } from "./routes-google-calendar";
+import { syncVisitToGoogle, removeVisitFromGoogle } from "./integrations/google-calendar/service";
 import mapsRouter from "./routes-maps";
 import analyticsRouter from "./routes-analytics";
 import { secretManager } from "./security/secret-manager";
@@ -70,44 +83,35 @@ const { Pool } = pkg;
 import { generateRateLimitKey } from "./middleware/rate-limit-key-generator";
 import { subscriptionGuard } from "./middleware/subscription-guard";
 import { validateResourceTenant } from "./middleware/tenant-resource";
+import {
+  toHttpError,
+  createHttpError,
+  isValidEmail,
+  isValidPhone,
+  isValidDate,
+  sanitizePagination,
+  validateTenantUserReference,
+  validateLeadReference,
+  validatePropertyReference,
+  validateOwnerReference,
+  validateRenterReference,
+  validateRentalContractReference,
+  validateFinanceCategoryReference,
+  validateLeadAssignment,
+  validateContractReferences,
+  validateRentalContractReferences,
+  validatePropertySaleReferences,
+  validateFollowUpReferences,
+} from "./routes/_shared";
+import { registerNewsletterRoutes } from "./routes/newsletter";
+import { registerInteractionRoutes } from "./routes/interactions";
+import { registerLeadTagRoutes } from "./routes/lead-tags";
+import { assertVisitSchedulePolicy } from "./services/visit-scheduling";
+import { summarizeLeadSla } from "./services/lead-sla";
+import { applyLeadDedupAndAssign, createLeadDeduped } from "./services/lead-intake";
 
-// ===== ERROR HELPER =====
-function toHttpError(error: unknown): { status: number; message: string } {
-  const err = error as { status?: number; message?: string } | undefined;
-  return {
-    status: err?.status || 500,
-    message: err?.message || "Erro interno do servidor",
-  };
-}
-
-// ===== VALIDATION HELPERS =====
-const isValidEmail = (email: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
-const isValidPhone = (phone: string): boolean => {
-  const cleaned = phone.replace(/\D/g, "");
-  return cleaned.length >= 10 && cleaned.length <= 15;
-};
-
-const isValidDate = (dateString: string): boolean => {
-  const date = new Date(dateString);
-  return !isNaN(date.getTime());
-};
-
-const sanitizePagination = (
-  page: string | number | undefined,
-  limit: string | number | undefined,
-  maxLimit: number = 100,
-): { page: number; limit: number } => {
-  const parsedPage = Math.max(1, parseInt(String(page)) || 1);
-  const parsedLimit = Math.min(
-    maxLimit,
-    Math.max(1, parseInt(String(limit)) || 50),
-  );
-  return { page: parsedPage, limit: parsedLimit };
-};
+// Helpers de erro, validacao e tenant-isolation movidos para ./routes/_shared.ts
+// (arch-1). Importados no topo deste arquivo.
 
 const scryptAsync = promisify(scrypt);
 
@@ -181,11 +185,7 @@ async function safeHandleSuccessfulLogin(
   }
 }
 
-// ===== TENANT ISOLATION HELPERS (IDOR Prevention) =====
-// validateResourceTenant agora centralizado em middleware/tenant-resource.ts.
-// Mantido import acima para preservar os ~11 call-sites existentes sem quebrar.
-// Novas rotas devem preferir `withTenantResource` (mesmo modulo) que combina
-// carregamento, validacao e anexacao a req.resource em uma unica middleware.
+// Família validate*Reference (IDOR prevention) movida para ./routes/_shared.ts (arch-1).
 
 // ===== CSRF PROTECTION (Double Submit Cookie Pattern) =====
 /**
@@ -217,6 +217,15 @@ const csrfExcludedPaths = [
   "/api/portal/forgot-password",
   "/api/portal/reset-password",
   "/api/portal/logout",
+  // Confirmação/reagendamento público de visita por token (sem sessão). Os
+  // endpoints autenticados /api/visits/:id/checklist e /:id/feedback NÃO casam
+  // com estes prefixos, então continuam exigindo CSRF.
+  "/api/visits/confirm/",
+  "/api/visits/reschedule/",
+  // Seleção de imóveis do comprador via token público (sem sessão). Os endpoints
+  // autenticados da imobiliária são /api/portal/buyer-selections* (prefixo
+  // diferente), então continuam exigindo CSRF.
+  "/api/portal/selection/",
   "/api/cron/",
   "/api/admin/bootstrap",
   // Fluxos pré-autenticação do app principal: o usuário ainda não tem sessão
@@ -317,14 +326,7 @@ export async function registerRoutes(
 
   // ===== CORS CONFIGURATION WITH WHITELIST =====
   // IMPORTANT: CORS must be configured BEFORE helmet to ensure proper header handling
-  const allowedOrigins = process.env.CORS_ORIGINS?.split(",") || [
-    "http://localhost:5000",
-    "http://127.0.0.1:5000", // Localhost IP
-    "http://localhost:5173", // Vite dev server
-    "http://127.0.0.1:5173", // Vite dev server IP
-    "https://imobibase.com",
-    "https://www.imobibase.com",
-  ];
+  const allowedOrigins = getCorsOrigins();
 
   app.use(
     cors({
@@ -335,19 +337,7 @@ export async function registerRoutes(
           return callback(null, true);
         }
 
-        // Check if origin is in allowed list or matches wildcard
-        const isAllowed = allowedOrigins.some((allowed) => {
-          if (allowed.includes("*")) {
-            // Convert wildcard to regex: https://*.example.com -> /^https:\/\/.*\.example\.com$/
-            const regex = new RegExp(
-              `^${allowed.replace(/\./g, "\\.").replace(/\*/g, ".*")}$`,
-            );
-            return regex.test(origin);
-          }
-          return allowed === origin;
-        });
-
-        if (isAllowed) {
+        if (isCorsOriginAllowed(origin, allowedOrigins)) {
           callback(null, true);
         } else {
           console.warn("[CORS] Blocked request from origin:", origin);
@@ -520,8 +510,18 @@ export async function registerRoutes(
           prefix,
         });
       console.log("[RateLimit] Using Redis store");
-    } catch {
+    } catch (error) {
+      // ESC-6: REDIS_URL configurada mas o store Redis falhou — degradacao para
+      // memoria (limite por instancia => multiplicado em multi-instancia). Isso e
+      // um incidente operacional, nao um estado de config esperado: alerta no Sentry.
       console.log("[RateLimit] Redis not available, using in-memory store");
+      Sentry.captureMessage(
+        "RateLimit degradado para store em memoria: REDIS_URL setada mas Redis indisponivel. Limite efetivo se multiplica entre instancias serverless.",
+        "warning",
+      );
+      Sentry.captureException(error, {
+        tags: { component: "rate-limit", action: "redis-store-init" },
+      });
     }
   } else {
     console.log("[RateLimit] REDIS_URL not set, using in-memory store");
@@ -535,10 +535,9 @@ export async function registerRoutes(
     standardHeaders: true,
     legacyHeaders: false,
     store: createRateLimitStore?.("rl:api:"),
-    // Fail-open: se o store Redis falhar (timeout, conexão caída), a request
-    // passa sem contar — melhor que o default (passOnStoreError:false), que
-    // transforma erro de store em 500 para TODO o /api/*.
-    passOnStoreError: true,
+    // Em producao, Redis e requisito operacional para limites distribuidos:
+    // falha do store deve bloquear em vez de multiplicar limite entre instancias.
+    passOnStoreError: process.env.NODE_ENV !== "production",
   });
 
   // Stricter rate limiting for auth routes
@@ -551,7 +550,7 @@ export async function registerRoutes(
     standardHeaders: true,
     legacyHeaders: false,
     store: createRateLimitStore?.("rl:auth:"),
-    passOnStoreError: true, // fail-open em erro do store Redis (ver apiLimiter)
+    passOnStoreError: process.env.NODE_ENV !== "production",
   });
 
   // Stricter rate limiting for public routes (lead creation, newsletter)
@@ -562,7 +561,7 @@ export async function registerRoutes(
     standardHeaders: true,
     legacyHeaders: false,
     store: createRateLimitStore?.("rl:public:"),
-    passOnStoreError: true, // fail-open em erro do store Redis (ver apiLimiter)
+    passOnStoreError: process.env.NODE_ENV !== "production",
   });
 
   // Rate limiter para endpoints administrativos
@@ -574,7 +573,7 @@ export async function registerRoutes(
     standardHeaders: true,
     legacyHeaders: false,
     store: createRateLimitStore?.("rl:admin:"),
-    passOnStoreError: true, // fail-open em erro do store Redis (ver apiLimiter)
+    passOnStoreError: process.env.NODE_ENV !== "production",
   });
 
   // Apply general rate limiting to all API routes
@@ -744,7 +743,9 @@ export async function registerRoutes(
       { usernameField: "email", passReqToCallback: true },
       async (req, email, password, done) => {
         try {
-          const user = await storage.getUserByEmail(email);
+          const user = await runWithAuthEmailRlsContext(email, () =>
+            storage.getUserByEmail(email),
+          );
           if (!user) {
             // Não revela existência da conta; registra tentativa best-effort.
             await safeHandleFailedLogin(
@@ -757,7 +758,9 @@ export async function registerRoutes(
           }
 
           // 1) Antes de validar a senha, checar bloqueio de conta (fail-safe).
-          const lockStatus = await safeCheckAccountLock(user.id);
+          const lockStatus = await runWithTenantRlsContext(user.tenantId, () =>
+            safeCheckAccountLock(user.id),
+          );
           if (lockStatus.locked) {
             return done(null, false, {
               message: "Conta bloqueada temporariamente. Tente novamente mais tarde.",
@@ -766,17 +769,21 @@ export async function registerRoutes(
 
           // 2) Validar senha.
           if (!(await comparePassword(password, user.password))) {
-            await safeHandleFailedLogin(
-              user.id,
-              email,
-              "invalid_password",
-              req,
+            await runWithTenantRlsContext(user.tenantId, () =>
+              safeHandleFailedLogin(
+                user.id,
+                email,
+                "invalid_password",
+                req,
+              ),
             );
             return done(null, false, { message: "Email ou senha incorretos" });
           }
 
           // 3) Sucesso: resetar contadores / registrar login (best-effort).
-          await safeHandleSuccessfulLogin(user.id, email, req);
+          await runWithTenantRlsContext(user.tenantId, () =>
+            safeHandleSuccessfulLogin(user.id, email, req),
+          );
           return done(null, user);
         } catch (err) {
           return done(err);
@@ -791,7 +798,7 @@ export async function registerRoutes(
 
   passport.deserializeUser(async (id: string, done) => {
     try {
-      const user = await storage.getUser(id);
+      const user = await runWithUserRlsContext(id, () => storage.getUser(id));
       if (!user) {
         console.log(`User not found during deserialization: ${id}`);
         return done(null, false);
@@ -831,7 +838,14 @@ export async function registerRoutes(
       req.session.touch();
     }
 
-    next();
+    if (!req.user.tenantId) {
+      return res.status(403).json({
+        error: "Sessão inválida",
+        code: "INVALID_SESSION",
+      });
+    }
+
+    runWithTenantRlsContext(req.user.tenantId, () => next());
   };
 
   // SuperAdmin middleware
@@ -842,6 +856,21 @@ export async function registerRoutes(
     if (!isSuperAdminRole(req.user!.role)) {
       return res.status(403).json({
         error: "Acesso negado. Apenas superadmins podem acessar esta rota.",
+      });
+    }
+    next();
+  };
+
+  // B5: guard financeiro/comissoes. Apenas admin/gestor (admin, super_admin,
+  // owner) podem criar/editar lancamentos e aprovar/pagar comissoes. Corretor
+  // comum (member/viewer) recebe 403 — evita aprovar/pagar a propria comissao
+  // ou editar lancamentos financeiros de terceiros.
+  const requireFinanceManager = (req: Request, res: Response, next: Function) => {
+    const role = req.user?.role;
+    if (!isAdminRole(role) && role !== ROLES.OWNER) {
+      return res.status(403).json({
+        error:
+          "Acesso negado. Apenas administradores/gestores podem gerenciar dados financeiros.",
       });
     }
     next();
@@ -1216,7 +1245,9 @@ export async function registerRoutes(
         }
 
         // Check email uniqueness
-        const existingUser = await storage.getUserByEmail(email);
+        const existingUser = await runWithAuthEmailRlsContext(email, () =>
+          storage.getUserByEmail(email),
+        );
         if (existingUser) {
           res.status(409).json({ error: "Este email já está em uso" });
           return;
@@ -1239,32 +1270,34 @@ export async function registerRoutes(
           email,
         });
 
-        // Setup default roles, categories, settings
-        const { setupNewTenant } = await import("./seed-defaults");
-        await setupNewTenant(storage, tenant);
+        const user = await runWithTenantRlsContext(tenant.id, async () => {
+          // Setup default roles, categories, settings
+          const { setupNewTenant } = await import("./seed-defaults");
+          await setupNewTenant(storage, tenant);
 
-        // Create free plan subscription for new tenant
-        try {
-          const freePlan = await storage.getPlanBySlug("free");
-          if (freePlan) {
-            await storage.createTenantSubscription({
-              tenantId: tenant.id,
-              planId: freePlan.id,
-              status: "active",
-            });
+          // Create free plan subscription for new tenant
+          try {
+            const freePlan = await storage.getPlanBySlug("free");
+            if (freePlan) {
+              await storage.createTenantSubscription({
+                tenantId: tenant.id,
+                planId: freePlan.id,
+                status: "active",
+              });
+            }
+          } catch (subError) {
+            console.error("Failed to create free subscription:", subError);
           }
-        } catch (subError) {
-          console.error("Failed to create free subscription:", subError);
-        }
 
-        // Create admin user
-        const hashedPwd = await hashPassword(password);
-        const user = await storage.createUser({
-          tenantId: tenant.id,
-          name,
-          email,
-          password: hashedPwd,
-          role: "admin",
+          // Create admin user
+          const hashedPwd = await hashPassword(password);
+          return storage.createUser({
+            tenantId: tenant.id,
+            name,
+            email,
+            password: hashedPwd,
+            role: "admin",
+          });
         });
 
         // Send verification email (non-blocking - don't fail registration if email fails)
@@ -1293,7 +1326,7 @@ export async function registerRoutes(
   app.post("/api/auth/login", authLimiter, (req, res, next) => {
     passport.authenticate(
       "local",
-      (
+      async (
         err: unknown,
         user: User | false,
         info: { message?: string } | undefined,
@@ -1313,6 +1346,41 @@ export async function registerRoutes(
           });
         }
 
+        try {
+          if (
+            await runWithTenantRlsContext(user.tenantId, () =>
+              isTwoFactorEnabledForUser(user.id),
+            )
+          ) {
+            const twoFactorToken = req.body?.twoFactorToken ?? req.body?.token;
+            const backupCode = req.body?.backupCode;
+            if (!twoFactorToken && !backupCode) {
+              return res.status(200).json({
+                twoFactorRequired: true,
+                message: "Código de autenticação necessário",
+              });
+            }
+
+            const challenge = await runWithTenantRlsContext(user.tenantId, () =>
+              verifyTwoFactorChallenge(
+                user.id,
+                { token: twoFactorToken, backupCode },
+                "2fa_login",
+              ),
+            );
+            if (!challenge.ok) {
+              return res.status(challenge.status).json({
+                error: challenge.error,
+                twoFactorRequired: true,
+                remainingAttempts: challenge.remainingAttempts,
+                retryAfter: challenge.retryAfter,
+              });
+            }
+          }
+        } catch (error) {
+          return next(error);
+        }
+
         req.login(user, async (err) => {
           if (err) return next(err);
 
@@ -1327,7 +1395,9 @@ export async function registerRoutes(
             req.login(user, async (loginErr) => {
               if (loginErr) return next(loginErr);
 
-              const tenant = await storage.getTenant(user.tenantId);
+              const tenant = await runWithTenantRlsContext(user.tenantId, () =>
+                storage.getTenant(user.tenantId),
+              );
 
               // Generate CSRF token and set cookie for Double Submit Cookie pattern
               const csrfToken = generateCSRFToken();
@@ -1525,6 +1595,56 @@ export async function registerRoutes(
     }
   });
 
+  // Completa o onboarding de uma imobiliária criada via SSO (Google/Microsoft).
+  // O usuário já está autenticado (sessão criada no callback OAuth); aqui ele
+  // refina nome/slug da empresa e marca onboarding_completed = true.
+  app.post("/api/auth/complete-onboarding", requireAuth, async (req, res) => {
+    try {
+      const user = req.user!;
+      if (user.role !== "admin") {
+        return apiError(res, 403, "Apenas o administrador pode concluir o cadastro da imobiliária", "FORBIDDEN");
+      }
+
+      const { companyName, slug, phone } = req.body ?? {};
+      if (!companyName || typeof companyName !== "string" || companyName.trim().length < 2) {
+        return apiError(res, 400, "Informe o nome da imobiliária", "INVALID_NAME");
+      }
+
+      const normalizedSlug = String(slug || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "");
+      if (normalizedSlug.length < 3) {
+        return apiError(res, 400, "O identificador (slug) deve ter pelo menos 3 caracteres", "INVALID_SLUG");
+      }
+
+      // Slug único (permitindo o slug atual do próprio tenant).
+      const slugOwner = await storage.getTenantBySlug(normalizedSlug);
+      if (slugOwner && slugOwner.id !== user.tenantId) {
+        return apiError(res, 409, "Este identificador já está em uso. Escolha outro.", "SLUG_TAKEN");
+      }
+
+      const updated = await runWithTenantRlsContext(user.tenantId, () =>
+        storage.updateTenant(user.tenantId, {
+          name: companyName.trim(),
+          slug: normalizedSlug,
+          phone: typeof phone === "string" && phone.trim() ? phone.trim() : undefined,
+          onboardingCompleted: true,
+        }),
+      );
+
+      if (!updated) {
+        return apiError(res, 404, "Tenant não encontrado", "TENANT_NOT_FOUND");
+      }
+
+      apiResponse(res, { tenant: updated });
+    } catch (error: unknown) {
+      console.error("Error in /api/auth/complete-onboarding:", error);
+      apiError(res, 500, "Erro ao concluir cadastro da imobiliária", "INTERNAL_ERROR");
+    }
+  });
+
   // Session refresh endpoint
   app.post("/api/auth/refresh", requireAuth, async (req, res) => {
     try {
@@ -1567,7 +1687,9 @@ export async function registerRoutes(
   // ===== TENANT ROUTES =====
   app.get("/api/tenants", requireAuth, async (req, res) => {
     try {
-      const tenants = await storage.getAllTenants();
+      const tenants = isSuperAdminRole(req.user!.role)
+        ? await storage.getAllTenants()
+        : [await storage.getTenant(req.user!.tenantId)].filter(Boolean);
       res.json(tenants);
     } catch (error: unknown) {
       res.status(500).json({ error: "Erro ao buscar empresas" });
@@ -1654,6 +1776,7 @@ export async function registerRoutes(
 
   app.get("/api/properties/public/:tenantId", async (req, res) => {
     try {
+      const tenantId = req.params.tenantId;
       const { page, limit } = req.query;
       const { page: p, limit: l } = sanitizePagination(
         page as string,
@@ -1661,13 +1784,18 @@ export async function registerRoutes(
       );
       const offset = (p - 1) * l;
       const filters = { status: "available" };
-      const [rows, total] = await Promise.all([
-        storage.getPropertiesByTenant(req.params.tenantId, filters, {
-          limit: l,
-          offset,
-        }),
-        storage.countPropertiesByTenant(req.params.tenantId, filters),
-      ]);
+      const [rows, total] = await runWithTenantRlsContext(tenantId, () =>
+        Promise.all([
+          storage.getPropertiesByTenant(tenantId, filters, {
+            limit: l,
+            offset,
+          }),
+          storage.countPropertiesByTenant(tenantId, filters),
+        ]),
+      );
+      // PERF-2/3: catalogo publico e cacheavel no CDN. ETag (weak) e emitido pelo
+      // Express; s-maxage permite cache de borda da Vercel (carve-out no vercel.json).
+      res.set("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=600");
       res.json({ data: rows, pagination: { page: p, limit: l, total } });
     } catch (error: unknown) {
       res.status(500).json({ error: "Erro ao buscar imóveis" });
@@ -1676,13 +1804,18 @@ export async function registerRoutes(
 
   app.get("/api/properties/public/:tenantId/:propertyId", async (req, res) => {
     try {
-      const property = await storage.getProperty(req.params.propertyId);
+      const { tenantId, propertyId } = req.params;
+      const property = await runWithTenantRlsContext(tenantId, () =>
+        storage.getProperty(propertyId),
+      );
       if (!property)
         return res.status(404).json({ error: "Imóvel não encontrado" });
-      if (property.tenantId !== req.params.tenantId)
+      if (property.tenantId !== tenantId)
         return res.status(404).json({ error: "Imóvel não encontrado" });
       if (property.status !== "available")
         return res.status(404).json({ error: "Imóvel não disponível" });
+      // PERF-2/3: detalhe publico cacheavel no CDN (ETag weak via Express).
+      res.set("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=600");
       res.json(property);
     } catch (error: unknown) {
       res.status(500).json({ error: "Erro ao buscar imóvel" });
@@ -1777,7 +1910,25 @@ export async function registerRoutes(
       const data = insertLeadSchema.parse(req.body);
       // Lead publico conta contra o limite mensal do tenant dono do site.
       // Sem req.user aqui, entao a checagem usa o tenantId do proprio lead.
-      if (await isLeadLimitReachedForTenant(data.tenantId)) {
+      const outcome = await runWithTenantRlsContext(data.tenantId, async () => {
+        if (await isLeadLimitReachedForTenant(data.tenantId)) {
+          return { status: "limit" as const };
+        }
+
+        const intake = await applyLeadDedupAndAssign(data.tenantId, data);
+        if (intake.duplicate) {
+          return { status: "duplicate" as const, existingLead: intake.existingLead };
+        }
+
+        // ACT-2: resolve a corrida de de-dup (indice unico) como duplicata.
+        const result = await createLeadDeduped(data.tenantId, intake.leadData);
+        if (result.duplicate) {
+          return { status: "duplicate" as const, existingLead: result.existingLead };
+        }
+        return { status: "created" as const, lead: result.lead };
+      });
+
+      if (outcome.status === "limit") {
         return res.status(403).json({
           error: "Lead limit reached",
           upgradeRequired: true,
@@ -1785,11 +1936,27 @@ export async function registerRoutes(
             "O limite de leads/mês do plano desta imobiliária foi atingido. Faça upgrade para continuar recebendo leads.",
         });
       }
-      const lead = await storage.createLead(data);
-      res.status(201).json({ success: true, lead });
+
+      if (outcome.status === "duplicate") {
+        return res.status(409).json({
+          error: "Lead duplicado para este telefone/email",
+          existingLeadId: outcome.existingLead?.id,
+        });
+      }
+
+      res.status(201).json({ success: true, lead: outcome.lead });
     } catch (error: unknown) {
+      // Endpoint PÚBLICO: nunca vazar a mensagem crua do erro em produção
+      // (pode conter detalhes de schema/DB). Log completo fica no servidor.
+      console.error("[/api/leads/public] error:", error);
+      const isProduction = process.env.NODE_ENV === "production";
       res.status(400).json({
-        error: error instanceof Error ? error.message : "Erro ao criar lead",
+        error:
+          isProduction
+            ? "Erro ao criar lead"
+            : error instanceof Error
+              ? error.message
+              : "Erro ao criar lead",
       });
     }
   });
@@ -1809,6 +1976,32 @@ export async function registerRoutes(
       apiPaginated(res, rows, total, p, l);
     } catch (error: unknown) {
       apiError(res, 500, "Erro ao buscar leads");
+    }
+  });
+
+  app.get("/api/leads/sla/summary", requireAuth, async (req, res) => {
+    try {
+      const requestedLimit = parseInt(String(req.query.limit ?? "500"), 10);
+      const limit = Math.min(Math.max(Number.isNaN(requestedLimit) ? 500 : requestedLimit, 1), 2000);
+      const leads = await storage.getLeadsByTenant(req.user!.tenantId, { limit, offset: 0 });
+      const interactionEntries = await Promise.all(
+        leads.map(async (lead) => [
+          lead.id,
+          await storage.getInteractionsByLead(lead.id),
+        ] as const),
+      );
+      const interactionsByLeadId = new Map(interactionEntries);
+
+      res.json({
+        ...summarizeLeadSla(leads, interactionsByLeadId),
+        limit,
+      });
+    } catch (error: unknown) {
+      const httpErr = toHttpError(error);
+      const status = httpErr.status === 500 ? 400 : httpErr.status;
+      res.status(status).json({
+        error: httpErr.message || "Erro ao calcular SLA dos leads",
+      });
     }
   });
 
@@ -1832,8 +2025,22 @@ export async function registerRoutes(
         ...req.body,
         tenantId: req.user!.tenantId,
       });
-      const lead = await storage.createLead(data);
-      apiResponse(res, lead, undefined, 201);
+      await validateLeadAssignment(req.user!.tenantId, data.assignedTo);
+      const intake = await applyLeadDedupAndAssign(req.user!.tenantId, data);
+      if (intake.duplicate) {
+        return apiError(res, 409, "Lead duplicado para este telefone/email", "LEAD_DUPLICATE", {
+          existingLeadId: intake.existingLead?.id,
+        });
+      }
+      // ACT-2: resolve a corrida de de-dup (indice unico) como duplicata 409,
+      // em vez de deixar a violacao virar 400/500 generico sob concorrencia.
+      const result = await createLeadDeduped(req.user!.tenantId, intake.leadData);
+      if (result.duplicate) {
+        return apiError(res, 409, "Lead duplicado para este telefone/email", "LEAD_DUPLICATE", {
+          existingLeadId: result.existingLead?.id,
+        });
+      }
+      apiResponse(res, result.lead, undefined, 201);
     } catch (error: unknown) {
       apiError(
         res,
@@ -1856,6 +2063,9 @@ export async function registerRoutes(
         createdAt: _c,
         ...safe
       } = req.body;
+      if ("assignedTo" in safe) {
+        await validateLeadAssignment(req.user!.tenantId, safe.assignedTo);
+      }
       const lead = await storage.updateLead(req.params.id, safe);
       if (!lead) return res.status(404).json({ error: "Lead não encontrado" });
       res.json(lead);
@@ -1900,43 +2110,8 @@ export async function registerRoutes(
     },
   );
 
-  // ===== INTERACTION ROUTES =====
-  app.get("/api/leads/:leadId/interactions", requireAuth, async (req, res) => {
-    try {
-      // IDOR Protection: validate the parent lead belongs to the tenant
-      const lead = await storage.getLead(req.params.leadId);
-      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
-      const interactions = await storage.getInteractionsByLead(
-        req.params.leadId,
-      );
-      res.json(interactions);
-    } catch (error: unknown) {
-      const httpErr = toHttpError(error);
-      const message = httpErr.message || "Erro ao buscar interações";
-      res.status(httpErr.status).json({ error: message });
-    }
-  });
-
-  app.post("/api/interactions", requireAuth, async (req, res) => {
-    try {
-      const data = insertInteractionSchema.parse({
-        ...req.body,
-        userId: req.user!.id,
-      });
-      // IDOR Protection: validate the target lead belongs to the tenant
-      // before attaching an interaction to it.
-      const lead = await storage.getLead(data.leadId);
-      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
-      const interaction = await storage.createInteraction(data);
-      res.status(201).json(interaction);
-    } catch (error: unknown) {
-      const httpErr = toHttpError(error);
-      // Erros de validacao do Zod / corpo invalido continuam como 400.
-      const status = httpErr.status === 500 ? 400 : httpErr.status;
-      const message = httpErr.message || "Erro ao criar interação";
-      res.status(status).json({ error: message });
-    }
-  });
+  // ===== INTERACTION ROUTES ===== (extraidas para ./routes/interactions.ts — arch-1)
+  registerInteractionRoutes(app, { requireAuth });
 
   // ===== VISIT ROUTES =====
   app.get("/api/visits", requireAuth, async (req, res) => {
@@ -1954,11 +2129,22 @@ export async function registerRoutes(
         ...req.body,
         tenantId: req.user!.tenantId,
       });
+      await assertVisitSchedulePolicy(req.user!.tenantId, {
+        propertyId: data.propertyId,
+        leadId: data.leadId,
+        assignedTo: data.assignedTo,
+        scheduledFor: data.scheduledFor,
+        status: data.status,
+      }, storage);
       const visit = await storage.createVisit(data);
+      // Sincroniza com o Google Agenda do corretor (best-effort; nunca lança).
+      await syncVisitToGoogle(visit.id);
       res.status(201).json(visit);
     } catch (error: unknown) {
-      res.status(400).json({
-        error: error instanceof Error ? error.message : "Erro ao criar visita",
+      const httpErr = toHttpError(error);
+      const status = httpErr.status === 500 ? 400 : httpErr.status;
+      res.status(status).json({
+        error: httpErr.message || "Erro ao criar visita",
       });
     }
   });
@@ -1968,6 +2154,9 @@ export async function registerRoutes(
       // IDOR Protection: Validate tenant ownership before updating
       const existing = await storage.getVisit(req.params.id);
       await validateResourceTenant(existing, req.user!.tenantId, "Visita");
+      if (!existing) {
+        throw createHttpError(404, "Visita não encontrada");
+      }
 
       // Mass-assignment guard: strip immutable fields before update.
       const {
@@ -1976,9 +2165,32 @@ export async function registerRoutes(
         createdAt: _c,
         ...safe
       } = req.body;
-      const visit = await storage.updateVisit(req.params.id, safe);
+      const updateData = insertVisitSchema.partial().parse(safe);
+      const candidate = {
+        propertyId: updateData.propertyId ?? existing.propertyId,
+        leadId: updateData.leadId === undefined ? existing.leadId : updateData.leadId,
+        assignedTo: updateData.assignedTo === undefined ? existing.assignedTo : updateData.assignedTo,
+        scheduledFor: updateData.scheduledFor ?? existing.scheduledFor,
+        status: updateData.status ?? existing.status,
+      };
+      await assertVisitSchedulePolicy(
+        req.user!.tenantId,
+        {
+          propertyId: candidate.propertyId,
+          leadId: candidate.leadId,
+          assignedTo: candidate.assignedTo,
+          scheduledFor: candidate.scheduledFor,
+          status: candidate.status,
+        },
+        storage,
+        existing.id,
+      );
+
+      const visit = await storage.updateVisit(req.params.id, updateData);
       if (!visit)
         return res.status(404).json({ error: "Visita não encontrada" });
+      // Reflete a mudança no Google Agenda do corretor (best-effort).
+      await syncVisitToGoogle(visit.id);
       res.json(visit);
     } catch (error: unknown) {
       const httpErr = toHttpError(error);
@@ -1996,6 +2208,8 @@ export async function registerRoutes(
       const success = await storage.deleteVisit(req.params.id);
       if (!success)
         return res.status(404).json({ error: "Visita não encontrada" });
+      // Remove o evento espelhado no Google Agenda (best-effort).
+      if (visit) await removeVisitFromGoogle(visit);
       res.json({ success: true });
     } catch (error: unknown) {
       const httpErr = toHttpError(error);
@@ -2033,12 +2247,13 @@ export async function registerRoutes(
         ...req.body,
         tenantId: req.user!.tenantId,
       });
+      await validateContractReferences(req.user!.tenantId, data);
       const contract = await storage.createContract(data);
       res.status(201).json(contract);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error ? error.message : "Erro ao criar contrato",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao criar contrato",
       });
     }
   });
@@ -2056,6 +2271,7 @@ export async function registerRoutes(
         createdAt: _c,
         ...safe
       } = req.body;
+      await validateContractReferences(req.user!.tenantId, safe);
       const contract = await storage.updateContract(req.params.id, safe);
       if (!contract)
         return res.status(404).json({ error: "Contrato não encontrado" });
@@ -2067,25 +2283,8 @@ export async function registerRoutes(
     }
   });
 
-  // ===== NEWSLETTER ROUTES =====
-  app.post("/api/newsletter/subscribe", publicLimiter, async (req, res) => {
-    try {
-      // Validate email format
-      if (!req.body.email || !isValidEmail(req.body.email)) {
-        return res.status(400).json({ error: "Email inválido" });
-      }
-      const data = insertNewsletterSchema.parse(req.body);
-      const subscription = await storage.subscribeNewsletter(data);
-      res.status(201).json(subscription);
-    } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro ao inscrever newsletter",
-      });
-    }
-  });
+  // ===== NEWSLETTER ROUTES ===== (extraidas para ./routes/newsletter.ts — arch-1)
+  registerNewsletterRoutes(app, { publicLimiter });
 
   // ===== CONTATO PÚBLICO (form da landing) =====
   app.post("/api/public/contact", publicLimiter, async (req, res) => {
@@ -2332,14 +2531,13 @@ export async function registerRoutes(
         ...req.body,
         tenantId: req.user!.tenantId,
       });
+      await validateRentalContractReferences(req.user!.tenantId, data);
       const contract = await storage.createRentalContract(data);
       res.status(201).json(contract);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro ao criar contrato de aluguel",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao criar contrato de aluguel",
       });
     }
   });
@@ -2360,6 +2558,7 @@ export async function registerRoutes(
         createdAt: _c,
         ...allowedFields
       } = req.body;
+      await validateRentalContractReferences(req.user!.tenantId, allowedFields);
       const contract = await storage.updateRentalContract(
         req.params.id,
         allowedFields,
@@ -2436,12 +2635,13 @@ export async function registerRoutes(
         ...req.body,
         tenantId: req.user!.tenantId,
       });
+      await validateRentalContractReference(req.user!.tenantId, data.rentalContractId);
       const payment = await storage.createRentalPayment(data);
       res.status(201).json(payment);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error ? error.message : "Erro ao criar pagamento",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao criar pagamento",
       });
     }
   });
@@ -2460,17 +2660,16 @@ export async function registerRoutes(
         createdAt: _c,
         ...allowedFields
       } = req.body;
+      await validateRentalContractReference(req.user!.tenantId, allowedFields.rentalContractId);
       const payment = await storage.updateRentalPayment(
         req.params.id,
         allowedFields,
       );
       res.json(payment);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error
-            ? error.message
-            : "Erro ao atualizar pagamento",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao atualizar pagamento",
       });
     }
   });
@@ -2622,11 +2821,13 @@ export async function registerRoutes(
           .json({ error: "Valor líquido não pode ser negativo" });
       }
 
+      await validateOwnerReference(req.user!.tenantId, data.ownerId);
       const transfer = await storage.createRentalTransfer(data);
       res.status(201).json(transfer);
     } catch (error: unknown) {
-      res.status(400).json({
-        error: error instanceof Error ? error.message : "Erro ao criar repasse",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao criar repasse",
       });
     }
   });
@@ -2645,15 +2846,16 @@ export async function registerRoutes(
         createdAt: _c,
         ...allowedFields
       } = req.body;
+      await validateOwnerReference(req.user!.tenantId, allowedFields.ownerId);
       const transfer = await storage.updateRentalTransfer(
         req.params.id,
         allowedFields,
       );
       res.json(transfer);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error ? error.message : "Erro ao atualizar repasse",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao atualizar repasse",
       });
     }
   });
@@ -2793,12 +2995,13 @@ export async function registerRoutes(
         ...req.body,
         tenantId: req.user!.tenantId,
       });
+      await validateContractReferences(req.user!.tenantId, data);
       const proposal = await storage.createSaleProposal(data);
       res.status(201).json(proposal);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error ? error.message : "Erro ao criar proposta",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao criar proposta",
       });
     }
   });
@@ -2815,6 +3018,7 @@ export async function registerRoutes(
         createdAt: _c,
         ...allowedFields
       } = req.body;
+      await validateContractReferences(req.user!.tenantId, allowedFields);
       const proposal = await storage.updateSaleProposal(
         req.params.id,
         allowedFields,
@@ -2870,12 +3074,50 @@ export async function registerRoutes(
         ...req.body,
         tenantId: req.user!.tenantId,
       });
+      await validatePropertySaleReferences(req.user!.tenantId, data);
+
+      // B6: o valor de comissao e a FONTE DE VERDADE FINANCEIRA — recalcula no
+      // servidor a partir de saleValue x commissionRate, ignorando qualquer
+      // commissionValue vindo do payload do client (tamperavel).
+      const saleValueNum = Number((data as { saleValue: unknown }).saleValue);
+      const rateNum = Number((data as { commissionRate?: unknown }).commissionRate ?? "6");
+      const commissionValue = (saleValueNum * rateNum / 100).toFixed(2);
+      (data as { commissionValue?: string }).commissionValue = commissionValue;
+
       const sale = await storage.createPropertySale(data);
+
+      // B6: imovel vendido sai da vitrine publica e do sitemap (status !== 'available').
+      if (sale.propertyId) {
+        await storage.updateProperty(sale.propertyId, { status: "sold" });
+      }
+
+      // B5: cria a comissao automaticamente ao fechar a venda (quando ha corretor),
+      // eliminando lancamentos esquecidos e divergencia com o valor real da venda.
+      // Falha na comissao NAO aborta a venda (pode ser criada manualmente depois).
+      if (sale.brokerId) {
+        try {
+          await storage.createCommission({
+            tenantId: req.user!.tenantId,
+            saleId: sale.id,
+            brokerId: sale.brokerId,
+            transactionType: "sale",
+            transactionValue: sale.saleValue,
+            commissionRate: rateNum.toFixed(2),
+            grossCommission: commissionValue,
+            agencySplit: "50",
+            brokerCommission: (Number(commissionValue) * 0.5).toFixed(2),
+            status: "pending",
+          });
+        } catch (commErr) {
+          console.error("Falha ao criar comissao automatica da venda:", commErr);
+        }
+      }
+
       res.status(201).json(sale);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error ? error.message : "Erro ao registrar venda",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao registrar venda",
       });
     }
   });
@@ -2894,15 +3136,16 @@ export async function registerRoutes(
         createdAt: _c,
         ...allowedFields
       } = req.body;
+      await validatePropertySaleReferences(req.user!.tenantId, allowedFields);
       const sale = await storage.updatePropertySale(
         req.params.id,
         allowedFields,
       );
       res.json(sale);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error ? error.message : "Erro ao atualizar venda",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao atualizar venda",
       });
     }
   });
@@ -2919,7 +3162,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/finance-categories", requireAuth, async (req, res) => {
+  app.post("/api/finance-categories", requireAuth, requireFinanceManager, async (req, res) => {
     try {
       const data = insertFinanceCategorySchema.parse({
         ...req.body,
@@ -2935,7 +3178,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/finance-categories/:id", requireAuth, async (req, res) => {
+  app.patch("/api/finance-categories/:id", requireAuth, requireFinanceManager, async (req, res) => {
     try {
       const existing = await storage.getFinanceCategory(req.params.id);
       if (!existing)
@@ -2964,7 +3207,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/finance-categories/:id", requireAuth, async (req, res) => {
+  app.delete("/api/finance-categories/:id", requireAuth, requireFinanceManager, async (req, res) => {
     try {
       const existing = await storage.getFinanceCategory(req.params.id);
       if (!existing)
@@ -3011,7 +3254,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/finance-entries", requireAuth, async (req, res) => {
+  app.post("/api/finance-entries", requireAuth, requireFinanceManager, async (req, res) => {
     try {
       const data = insertFinanceEntrySchema.parse({
         ...req.body,
@@ -3021,17 +3264,18 @@ export async function registerRoutes(
           : {}),
         tenantId: req.user!.tenantId,
       });
+      await validateFinanceCategoryReference(req.user!.tenantId, data.categoryId);
       const entry = await storage.createFinanceEntry(data);
       res.status(201).json(entry);
     } catch (error: unknown) {
-      res.status(400).json({
-        error:
-          error instanceof Error ? error.message : "Erro ao criar lançamento",
+      const httpErr = toHttpError(error);
+      res.status(httpErr.status === 500 ? 400 : httpErr.status).json({
+        error: httpErr.message || "Erro ao criar lançamento",
       });
     }
   });
 
-  app.patch("/api/finance-entries/:id", requireAuth, async (req, res) => {
+  app.patch("/api/finance-entries/:id", requireAuth, requireFinanceManager, async (req, res) => {
     try {
       // IDOR Protection: 404 em mismatch de tenant (não vaza existência do ID).
       const existing = await storage.getFinanceEntry(req.params.id);
@@ -3047,6 +3291,7 @@ export async function registerRoutes(
       if (allowedFields.entryDate) {
         allowedFields.entryDate = new Date(allowedFields.entryDate);
       }
+      await validateFinanceCategoryReference(req.user!.tenantId, allowedFields.categoryId);
       const entry = await storage.updateFinanceEntry(
         req.params.id,
         allowedFields,
@@ -3059,7 +3304,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/finance-entries/:id", requireAuth, async (req, res) => {
+  app.delete("/api/finance-entries/:id", requireAuth, requireFinanceManager, async (req, res) => {
     try {
       // IDOR Protection: 404 em mismatch de tenant (não vaza existência do ID).
       const existing = await storage.getFinanceEntry(req.params.id);
@@ -3073,132 +3318,8 @@ export async function registerRoutes(
     }
   });
 
-  // ===== LEAD TAGS ROUTES =====
-  app.get("/api/lead-tags", requireAuth, async (req, res) => {
-    try {
-      const tags = await storage.getLeadTagsByTenant(req.user!.tenantId);
-      res.json(tags);
-    } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar tags" });
-    }
-  });
-
-  app.post("/api/lead-tags", requireAuth, async (req, res) => {
-    try {
-      const data = insertLeadTagSchema.parse({
-        ...req.body,
-        tenantId: req.user!.tenantId,
-      });
-      const tag = await storage.createLeadTag(data);
-      res.status(201).json(tag);
-    } catch (error: unknown) {
-      res.status(400).json({
-        error: error instanceof Error ? error.message : "Erro ao criar tag",
-      });
-    }
-  });
-
-  app.patch("/api/lead-tags/:id", requireAuth, async (req, res) => {
-    try {
-      const existing = await storage.getLeadTag(req.params.id);
-      if (!existing)
-        return res.status(404).json({ error: "Tag não encontrada" });
-      if (existing.tenantId !== req.user!.tenantId)
-        return res.status(403).json({ error: "Acesso negado" });
-      // Mass-assignment guard: strip immutable fields before update.
-      const {
-        tenantId: _t,
-        id: _id,
-        createdAt: _c,
-        ...allowedFields
-      } = req.body;
-      const tag = await storage.updateLeadTag(req.params.id, allowedFields);
-      res.json(tag);
-    } catch (error: unknown) {
-      res.status(400).json({
-        error: error instanceof Error ? error.message : "Erro ao atualizar tag",
-      });
-    }
-  });
-
-  app.delete("/api/lead-tags/:id", requireAuth, async (req, res) => {
-    try {
-      const existing = await storage.getLeadTag(req.params.id);
-      if (!existing)
-        return res.status(404).json({ error: "Tag não encontrada" });
-      if (existing.tenantId !== req.user!.tenantId)
-        return res.status(403).json({ error: "Acesso negado" });
-      await storage.deleteLeadTag(req.params.id);
-      res.json({ success: true });
-    } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao deletar tag" });
-    }
-  });
-
-  // ===== LEAD TAG LINKS ROUTES =====
-  app.get("/api/leads/tags/batch", requireAuth, async (req, res) => {
-    try {
-      const tagsMap = await storage.getTagsForAllLeads(req.user!.tenantId);
-      res.json(tagsMap);
-    } catch (error: unknown) {
-      res.status(500).json({ error: "Erro ao buscar tags dos leads" });
-    }
-  });
-
-  app.get("/api/leads/:leadId/tags", requireAuth, async (req, res) => {
-    try {
-      // IDOR Protection: validate the parent lead belongs to the tenant
-      const lead = await storage.getLead(req.params.leadId);
-      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
-      const tags = await storage.getTagsByLead(req.params.leadId);
-      res.json(tags);
-    } catch (error: unknown) {
-      const httpErr = toHttpError(error);
-      const message = httpErr.message || "Erro ao buscar tags do lead";
-      res.status(httpErr.status).json({ error: message });
-    }
-  });
-
-  app.post("/api/leads/:leadId/tags", requireAuth, async (req, res) => {
-    try {
-      const data = insertLeadTagLinkSchema.parse({
-        leadId: req.params.leadId,
-        tagId: req.body.tagId,
-      });
-      // IDOR Protection: validate both the lead and the tag belong to the
-      // tenant before linking them.
-      const lead = await storage.getLead(req.params.leadId);
-      await validateResourceTenant(lead, req.user!.tenantId, "Lead");
-      const tag = await storage.getLeadTag(data.tagId);
-      await validateResourceTenant(tag, req.user!.tenantId, "Tag");
-      const link = await storage.addTagToLead(data);
-      res.status(201).json(link);
-    } catch (error: unknown) {
-      const httpErr = toHttpError(error);
-      const status = httpErr.status === 500 ? 400 : httpErr.status;
-      const message = httpErr.message || "Erro ao adicionar tag";
-      res.status(status).json({ error: message });
-    }
-  });
-
-  app.delete(
-    "/api/leads/:leadId/tags/:tagId",
-    requireAuth,
-    async (req, res) => {
-      try {
-        // IDOR Protection: validate the parent lead belongs to the tenant
-        // before removing any tag link.
-        const lead = await storage.getLead(req.params.leadId);
-        await validateResourceTenant(lead, req.user!.tenantId, "Lead");
-        await storage.removeTagFromLead(req.params.leadId, req.params.tagId);
-        res.json({ success: true });
-      } catch (error: unknown) {
-        const httpErr = toHttpError(error);
-        const message = httpErr.message || "Erro ao remover tag";
-        res.status(httpErr.status).json({ error: message });
-      }
-    },
-  );
+  // ===== LEAD TAGS ROUTES ===== (extraidas para ./routes/lead-tags.ts — arch-2)
+  registerLeadTagRoutes(app, { requireAuth });
 
   // ===== FINANCIAL MODULE ROUTES =====
   app.get("/api/financial/metrics", requireAuth, async (req, res) => {
@@ -3318,6 +3439,7 @@ export async function registerRoutes(
         ...req.body,
         tenantId: req.user!.tenantId,
       });
+      await validateFollowUpReferences(req.user!.tenantId, data);
       const followUp = await storage.createFollowUp(data);
       res.status(201).json(followUp);
     } catch (error: unknown) {
@@ -3340,6 +3462,12 @@ export async function registerRoutes(
         createdAt: _c,
         ...allowedFields
       } = req.body;
+      if ("leadId" in allowedFields || "assignedTo" in allowedFields) {
+        await validateFollowUpReferences(req.user!.tenantId, {
+          leadId: allowedFields.leadId,
+          assignedTo: allowedFields.assignedTo,
+        });
+      }
       const followUp = await storage.updateFollowUp(
         req.params.id,
         allowedFields,
@@ -4051,7 +4179,7 @@ export async function registerRoutes(
   });
 
   // PATCH /api/commissions/:id/status - Update commission status
-  app.patch("/api/commissions/:id/status", requireAuth, checkFeatureAccess('commission_management'), async (req, res) => {
+  app.patch("/api/commissions/:id/status", requireAuth, checkFeatureAccess('commission_management'), requireFinanceManager, async (req, res) => {
     try {
       const { status } = req.body;
 
@@ -4086,7 +4214,7 @@ export async function registerRoutes(
   });
 
   // POST /api/commissions - Create new commission
-  app.post("/api/commissions", requireAuth, checkFeatureAccess('commission_management'), async (req, res) => {
+  app.post("/api/commissions", requireAuth, checkFeatureAccess('commission_management'), requireFinanceManager, async (req, res) => {
     try {
       // Validate using schema
       const data = insertCommissionSchema.parse({
@@ -4125,7 +4253,7 @@ export async function registerRoutes(
   });
 
   // DELETE /api/commissions/:id - Delete commission
-  app.delete("/api/commissions/:id", requireAuth, checkFeatureAccess('commission_management'), async (req, res) => {
+  app.delete("/api/commissions/:id", requireAuth, checkFeatureAccess('commission_management'), requireFinanceManager, async (req, res) => {
     try {
       const existing = await storage.getCommission(req.params.id);
       if (!existing) {
@@ -4161,6 +4289,9 @@ export async function registerRoutes(
   // Register analytics routes
   app.use("/api/analytics", analyticsRouter);
 
+  // Register Google Calendar (per-corretor) connection + sync routes
+  registerGoogleCalendarRoutes(app, { requireAuth });
+
   // Register Vercel Cron endpoints (protected by CRON_SECRET)
   registerCronRoutes(app);
 
@@ -4188,18 +4319,16 @@ export async function registerRoutes(
   // ===== PRODUCTION CORS VALIDATION =====
   // Validate CORS configuration in production
   if (process.env.NODE_ENV === "production") {
-    const origins = process.env.CORS_ORIGINS;
-    if (!origins || origins.includes("localhost")) {
-      console.error(
-        "⚠️  WARNING: CORS_ORIGINS not properly configured for production!",
-      );
-      console.error("   Current value:", origins);
-      console.error(
-        "   Localhost origins should not be allowed in production.",
-      );
+    const warnings = getCorsProductionWarnings();
+    if (warnings.length > 0) {
+      console.error("⚠️  WARNING: CORS not properly configured for production!");
+      for (const warning of warnings) {
+        console.error(`   ${warning}`);
+      }
+      console.error("   Allowed origins:", allowedOrigins.join(","));
     } else {
       console.log("✓ CORS properly configured for production");
-      console.log("  Allowed origins:", origins);
+      console.log("  Allowed origins:", allowedOrigins.join(","));
     }
   }
 

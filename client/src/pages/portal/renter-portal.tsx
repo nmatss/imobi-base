@@ -43,6 +43,28 @@ function portalFetch(url: string, options?: RequestInit) {
   });
 }
 
+function PortalLoading() {
+  return (
+    <div className="flex items-center justify-center py-16" role="status" aria-live="polite">
+      <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+      <span className="sr-only">Carregando...</span>
+    </div>
+  );
+}
+
+function PortalError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Card>
+      <CardContent className="flex flex-col items-center py-12 text-muted-foreground">
+        <AlertTriangle className="h-12 w-12 mb-4 text-amber-500" />
+        <p className="text-lg font-medium text-foreground">Não foi possível carregar</p>
+        <p className="text-sm mb-4">Ocorreu um erro ao obter os dados. Tente novamente.</p>
+        <Button variant="outline" size="sm" onClick={onRetry}>Tentar novamente</Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function RenterPortal() {
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -109,30 +131,30 @@ export default function RenterPortal() {
     }
   }, [brand]);
 
-  const { data: dashboard } = useQuery({
+  const { data: dashboard, isLoading: dashboardLoading, isError: dashboardError, refetch: refetchDashboard } = useQuery({
     queryKey: ["/api/portal/renter/dashboard"],
     queryFn: () => portalFetch("/api/portal/renter/dashboard"),
   });
 
-  const { data: payments } = useQuery({
+  const { data: payments, isLoading: paymentsLoading, isError: paymentsError, refetch: refetchPayments } = useQuery({
     queryKey: ["/api/portal/renter/payments"],
     queryFn: () => portalFetch("/api/portal/renter/payments"),
     enabled: activeTab === "payments",
   });
 
-  const { data: contract } = useQuery({
+  const { data: contract, isLoading: contractLoading, isError: contractError, refetch: refetchContract } = useQuery({
     queryKey: ["/api/portal/renter/contract"],
     queryFn: () => portalFetch("/api/portal/renter/contract"),
     enabled: activeTab === "contract" || activeTab === "dashboard",
   });
 
-  const { data: documents } = useQuery({
+  const { data: documents, isLoading: documentsLoading, isError: documentsError, refetch: refetchDocuments } = useQuery({
     queryKey: ["/api/portal/renter/documents"],
     queryFn: () => portalFetch("/api/portal/renter/documents"),
     enabled: activeTab === "documents",
   });
 
-  const { data: maintenance } = useQuery({
+  const { data: maintenance, isLoading: maintenanceLoading, isError: maintenanceError, refetch: refetchMaintenance } = useQuery({
     queryKey: ["/api/portal/renter/maintenance"],
     queryFn: () => portalFetch("/api/portal/renter/maintenance"),
     enabled: activeTab === "maintenance",
@@ -267,6 +289,7 @@ export default function RenterPortal() {
 
           {/* Dashboard */}
           <TabsContent value="dashboard">
+            {dashboardLoading ? <PortalLoading /> : dashboardError ? <PortalError onRetry={() => refetchDashboard()} /> : (
             <div className="space-y-6">
               {/* Next Payment Card */}
               {dashboard?.nextPayment && (
@@ -388,22 +411,22 @@ export default function RenterPortal() {
                 </Card>
               )}
 
-              {/* Contact Card */}
-              {tenant && (
+              {/* Contact Card — só renderiza se houver ao menos um meio de contato */}
+              {(brand?.phone || brand?.email) && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Contato da Imobiliária</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="flex flex-wrap gap-4">
-                      {tenant.phone && (
-                        <a href={`tel:${tenant.phone}`} className="flex items-center gap-2 text-sm text-primary hover:underline">
-                          <Phone className="h-4 w-4" /> {tenant.phone}
+                      {brand.phone && (
+                        <a href={`tel:${brand.phone}`} className="flex items-center gap-2 text-sm text-primary hover:underline">
+                          <Phone className="h-4 w-4" /> {brand.phone}
                         </a>
                       )}
-                      {tenant.email && (
-                        <a href={`mailto:${tenant.email}`} className="flex items-center gap-2 text-sm text-primary hover:underline">
-                          <Mail className="h-4 w-4" /> {tenant.email}
+                      {brand.email && (
+                        <a href={`mailto:${brand.email}`} className="flex items-center gap-2 text-sm text-primary hover:underline">
+                          <Mail className="h-4 w-4" /> {brand.email}
                         </a>
                       )}
                     </div>
@@ -411,11 +434,12 @@ export default function RenterPortal() {
                 </Card>
               )}
             </div>
+            )}
           </TabsContent>
 
           {/* Payments */}
           <TabsContent value="payments">
-            {!payments || payments.length === 0 ? (
+            {paymentsLoading ? <PortalLoading /> : paymentsError ? <PortalError onRetry={() => refetchPayments()} /> : !payments || payments.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center py-12 text-muted-foreground">
                   <DollarSign className="h-12 w-12 mb-4 opacity-50" />
@@ -493,7 +517,7 @@ export default function RenterPortal() {
 
           {/* Contract */}
           <TabsContent value="contract">
-            {!contract ? (
+            {contractLoading ? <PortalLoading /> : contractError ? <PortalError onRetry={() => refetchContract()} /> : !contract ? (
               <Card>
                 <CardContent className="flex flex-col items-center py-12 text-muted-foreground">
                   <FileText className="h-12 w-12 mb-4 opacity-50" />
@@ -622,7 +646,7 @@ export default function RenterPortal() {
               </Button>
             </div>
 
-            {!maintenance || maintenance.length === 0 ? (
+            {maintenanceLoading ? <PortalLoading /> : maintenanceError ? <PortalError onRetry={() => refetchMaintenance()} /> : !maintenance || maintenance.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center py-12 text-muted-foreground">
                   <Wrench className="h-12 w-12 mb-4 opacity-50" />
@@ -693,7 +717,7 @@ export default function RenterPortal() {
 
           {/* Documents */}
           <TabsContent value="documents">
-            {!documents || documents.length === 0 ? (
+            {documentsLoading ? <PortalLoading /> : documentsError ? <PortalError onRetry={() => refetchDocuments()} /> : !documents || documents.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center py-12 text-muted-foreground">
                   <FileText className="h-12 w-12 mb-4 opacity-50" />

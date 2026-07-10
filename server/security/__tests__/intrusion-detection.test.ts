@@ -89,15 +89,20 @@ describe('Intrusion Detection System', () => {
     });
 
     it('should auto-unblock after duration expires', async () => {
-      const testIp = '10.0.0.3';
-      const shortDuration = 100; // 100ms
+      vi.useFakeTimers();
+      try {
+        const testIp = '10.0.0.3';
+        const shortDuration = 100; // 100ms
 
-      blockIp(testIp, shortDuration);
-      expect(isIpBlocked(testIp)).toBe(true);
+        blockIp(testIp, shortDuration);
+        expect(isIpBlocked(testIp)).toBe(true);
 
-      await new Promise(resolve => setTimeout(resolve, 150));
+        await vi.advanceTimersByTimeAsync(shortDuration + 1);
 
-      expect(isIpBlocked(testIp)).toBe(false);
+        expect(isIpBlocked(testIp)).toBe(false);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('should handle custom block durations', () => {
@@ -433,21 +438,25 @@ describe('Intrusion Detection System', () => {
     });
 
     it('should reset after window expires', async () => {
-      const rateLimit = compositeRateLimit(100, 2); // 100ms window
-      mockReq.ip = '10.0.4.3';
-      mockReq.headers = { 'user-agent': 'test-agent' };
+      vi.useFakeTimers();
+      try {
+        const rateLimit = compositeRateLimit(100, 2); // 100ms window
+        mockReq.ip = '10.0.4.3';
+        mockReq.headers = { 'user-agent': 'test-agent' };
 
-      // Use up limit
-      rateLimit(mockReq as Request, mockRes as Response, mockNext);
-      rateLimit(mockReq as Request, mockRes as Response, mockNext);
+        // Use up limit
+        rateLimit(mockReq as Request, mockRes as Response, mockNext);
+        rateLimit(mockReq as Request, mockRes as Response, mockNext);
 
-      // Wait for window to expire
-      await new Promise(resolve => setTimeout(resolve, 150));
+        await vi.advanceTimersByTimeAsync(101);
 
-      // Should allow again
-      rateLimit(mockReq as Request, mockRes as Response, mockNext);
+        // Should allow again
+        rateLimit(mockReq as Request, mockRes as Response, mockNext);
 
-      expect(mockNext).toHaveBeenCalledTimes(3);
+        expect(mockNext).toHaveBeenCalledTimes(3);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 

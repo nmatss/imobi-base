@@ -7,9 +7,14 @@ import type { Express, Request, Response } from "express";
 import { nanoid } from "nanoid";
 import axios from "axios";
 import { db } from "../db";
-import { users, loginHistory } from "@shared/schema-sqlite";
+import { tenants, users, loginHistory } from "@shared/schema-sqlite";
+import { ROLES } from "@shared/constants/roles";
 import { eq, or, and } from "drizzle-orm";
 import { createAuditLog } from "../routes-security";
+import { runWithAuthEmailRlsContext, runWithTenantRlsContext } from "../db-rls";
+import { issueOAuthState, consumeOAuthState } from "./oauth-state";
+import { encryptSecret } from "../security/token-encryption";
+import { provisionOAuthTenantAndOwner } from "./oauth-provisioning";
 
 // Google OAuth configuration
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
@@ -20,6 +25,7 @@ const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'http://localhost
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo';
+const OAUTH_AUTO_PROVISION_TENANT_ID = process.env.OAUTH_AUTO_PROVISION_TENANT_ID || '';
 
 interface GoogleTokenResponse {
   access_token: string;
@@ -41,37 +47,22 @@ interface GoogleUserInfo {
   locale: string;
 }
 
-// State storage for OAuth flow (in production, use Redis)
-const oauthStateStore = new Map<string, { createdAt: number; redirectUrl?: string }>();
+type OAuthUser = typeof users.$inferSelect;
 
-function generateState(): string {
-  const state = nanoid(32);
-  oauthStateStore.set(state, { createdAt: Date.now() });
-
-  // Clean up old states (older than 10 minutes)
-  setTimeout(() => {
-    const now = Date.now();
-    oauthStateStore.forEach((value, key) => {
-      if (now - value.createdAt > 10 * 60 * 1000) {
-        oauthStateStore.delete(key);
-      }
-    });
-  }, 1000);
-
-  return state;
+function sanitizeRedirectUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  if (!value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return undefined;
+  return value;
 }
 
-function verifyState(state: string): boolean {
-  const record = oauthStateStore.get(state);
-  if (!record) return false;
-
-  // Check if state is not expired (10 minutes)
-  if (Date.now() - record.createdAt > 10 * 60 * 1000) {
-    oauthStateStore.delete(state);
-    return false;
-  }
-
-  return true;
+async function getAutoProvisionTenantId(): Promise<string | null> {
+  if (!OAUTH_AUTO_PROVISION_TENANT_ID) return null;
+  const [tenant] = await db
+    .select({ id: tenants.id })
+    .from(tenants)
+    .where(eq(tenants.id, OAUTH_AUTO_PROVISION_TENANT_ID))
+    .limit(1);
+  return tenant?.id ?? null;
 }
 
 export function registerGoogleOAuthRoutes(app: Express) {
@@ -83,16 +74,9 @@ export function registerGoogleOAuthRoutes(app: Express) {
         return res.status(500).json({ error: "Google OAuth não configurado" });
       }
 
-      const state = generateState();
-
-      // Store redirect URL if provided
-      const redirectUrl = req.query.redirect as string;
-      if (redirectUrl) {
-        const stateData = oauthStateStore.get(state);
-        if (stateData) {
-          stateData.redirectUrl = redirectUrl;
-        }
-      }
+      // State stateless via cookie assinado (serverless-safe).
+      const redirectUrl = sanitizeRedirectUrl(req.query.redirect);
+      const state = issueOAuthState(res, "google", redirectUrl);
 
       const params = new URLSearchParams({
         client_id: GOOGLE_CLIENT_ID,
@@ -121,19 +105,21 @@ export function registerGoogleOAuthRoutes(app: Express) {
       // Handle OAuth errors
       if (error) {
         console.error('Google OAuth error:', error);
-        return res.redirect(`/auth/login?error=oauth_failed&provider=google`);
+        return res.redirect(`/login?error=oauth_failed&provider=google`);
       }
 
       if (!code || typeof code !== 'string') {
-        return res.redirect(`/auth/login?error=missing_code`);
+        return res.redirect(`/login?error=missing_code`);
       }
 
-      if (!state || typeof state !== 'string' || !verifyState(state)) {
-        return res.redirect(`/auth/login?error=invalid_state`);
+      const stateResult = consumeOAuthState(req, res, "google", state);
+      if (!stateResult.valid) {
+        return res.redirect(`/login?error=invalid_state`);
       }
+      const oauthRedirectUrl = stateResult.redirectUrl;
 
       if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-        return res.redirect(`/auth/login?error=oauth_not_configured`);
+        return res.redirect(`/login?error=oauth_not_configured`);
       }
 
       // Exchange code for tokens
@@ -157,106 +143,150 @@ export function registerGoogleOAuthRoutes(app: Express) {
       const googleUser = userInfoResponse.data;
 
       // Check if user already exists (by email or OAuth ID)
-      const existingUserList = await db.select()
-        .from(users)
-        .where(
-          or(
-            eq(users.email, googleUser.email),
-            and(
-              eq(users.oauthProvider, 'google'),
-              eq(users.oauthId, googleUser.id)
+      const existingUserList = await runWithAuthEmailRlsContext(googleUser.email, () =>
+        db.select()
+          .from(users)
+          .where(
+            or(
+              eq(users.email, googleUser.email),
+              and(
+                eq(users.oauthProvider, 'google'),
+                eq(users.oauthId, googleUser.id)
+              )
             )
           )
-        )
-        .limit(1);
+          .limit(1),
+      );
 
-      let user;
+      // Tokens de terceiros são criptografados em repouso (AES-256-GCM).
+      const encAccessToken = encryptSecret(access_token);
+      const encRefreshToken = encryptSecret(refresh_token || null);
+
+      let user: OAuthUser;
       let isNewUser = false;
+      let needsOnboarding = false;
 
       if (existingUserList.length > 0) {
         user = existingUserList[0];
 
         // Update OAuth tokens if this is an OAuth account
         if (user.oauthProvider === 'google' && user.oauthId === googleUser.id) {
-          await db.update(users)
-            .set({
-              oauthAccessToken: access_token,
-              oauthRefreshToken: refresh_token || user.oauthRefreshToken,
-              lastLogin: new Date().toISOString(),
-              lastLoginIp: req.ip || req.headers['x-forwarded-for']?.toString() || null,
-              avatar: googleUser.picture || user.avatar,
-              emailVerified: googleUser.verified_email,
-            })
-            .where(eq(users.id, user.id));
+          await runWithTenantRlsContext(user.tenantId, () =>
+            db.update(users)
+              .set({
+                oauthAccessToken: encAccessToken,
+                oauthRefreshToken: encRefreshToken || user.oauthRefreshToken,
+                lastLogin: new Date().toISOString(),
+                lastLoginIp: req.ip || req.headers['x-forwarded-for']?.toString() || null,
+                avatar: googleUser.picture || user.avatar,
+                emailVerified: googleUser.verified_email,
+              })
+              .where(eq(users.id, user.id)),
+          );
         } else {
-          // User exists with same email but different provider
-          // This is a linking scenario - handled separately
-          return res.redirect(`/auth/link-account?email=${encodeURIComponent(googleUser.email)}&provider=google&pending=true`);
+          // Conta já existe com este email mas com outro provedor/senha.
+          // Não há fluxo de account-linking na UI ainda, então em vez de
+          // redirecionar para uma rota inexistente (404), mostramos um erro
+          // amigável na tela de login. Ver docs/reports/PLANO_GO_LIVE_360 (B7).
+          return res.redirect(`/login?error=email_in_use_other_provider`);
         }
 
       } else {
-        // Create new user
         isNewUser = true;
+        const overrideTenantId = await getAutoProvisionTenantId();
 
-        // Get default tenant (you may need to adjust this logic)
-        const defaultTenantId = 'default-tenant'; // Replace with actual tenant selection logic
+        if (overrideTenantId) {
+          // Modo white-label: usuário entra como MEMBER em um tenant fixo.
+          const userId = nanoid();
+          user = await runWithTenantRlsContext(overrideTenantId, async () => {
+            await db.insert(users).values({
+              id: userId,
+              tenantId: overrideTenantId,
+              name: googleUser.name,
+              email: googleUser.email,
+              password: '', // No password for OAuth users
+              role: ROLES.MEMBER,
+              avatar: googleUser.picture,
+              emailVerified: googleUser.verified_email,
+              oauthProvider: 'google',
+              oauthId: googleUser.id,
+              oauthAccessToken: encAccessToken,
+              oauthRefreshToken: encRefreshToken || null,
+              lastLogin: new Date().toISOString(),
+              lastLoginIp: req.ip || req.headers['x-forwarded-for']?.toString() || null,
+            });
 
-        const userId = nanoid();
+            const createdUser = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0];
 
-        await db.insert(users).values({
-          id: userId,
-          tenantId: defaultTenantId,
-          name: googleUser.name,
-          email: googleUser.email,
-          password: '', // No password for OAuth users
-          role: 'user',
-          avatar: googleUser.picture,
-          emailVerified: googleUser.verified_email,
-          oauthProvider: 'google',
-          oauthId: googleUser.id,
-          oauthAccessToken: access_token,
-          oauthRefreshToken: refresh_token || null,
-          lastLogin: new Date().toISOString(),
-          lastLoginIp: req.ip || req.headers['x-forwarded-for']?.toString() || null,
+            await createAuditLog(
+              createdUser.tenantId,
+              createdUser.id,
+              'account_created',
+              'user',
+              createdUser.id,
+              null,
+              { provider: 'google', email: createdUser.email },
+              req
+            );
+
+            return createdUser;
+          });
+        } else {
+          // SaaS multi-tenant: provisiona nova imobiliária + admin e leva ao
+          // onboarding para refinar nome/slug da empresa.
+          const { userId } = await provisionOAuthTenantAndOwner({
+            name: googleUser.name,
+            email: googleUser.email,
+            avatar: googleUser.picture,
+            oauthProvider: 'google',
+            oauthId: googleUser.id,
+            oauthAccessToken: encAccessToken,
+            oauthRefreshToken: encRefreshToken,
+            emailVerified: googleUser.verified_email,
+          });
+
+          user = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0];
+          needsOnboarding = true;
+
+          await runWithTenantRlsContext(user.tenantId, () =>
+            createAuditLog(
+              user.tenantId,
+              user.id,
+              'account_created',
+              'user',
+              user.id,
+              null,
+              { provider: 'google', email: user.email, onboarding: true },
+              req
+            ),
+          );
+        }
+      }
+
+      await runWithTenantRlsContext(user.tenantId, async () => {
+        // Log successful login
+        await db.insert(loginHistory).values({
+          id: nanoid(),
+          userId: user.id,
+          email: user.email,
+          success: true,
+          failureReason: null,
+          ipAddress: req.ip || req.headers['x-forwarded-for']?.toString() || null,
+          userAgent: req.headers['user-agent'] || null,
         });
 
-        user = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0];
-
-        // Audit log for new account
+        // Audit log for login
         await createAuditLog(
           user.tenantId,
           user.id,
-          'account_created',
+          'login',
           'user',
           user.id,
           null,
-          { provider: 'google', email: user.email },
+          { provider: 'google', isNewUser },
           req
         );
-      }
-
-      // Log successful login
-      await db.insert(loginHistory).values({
-        id: nanoid(),
-        userId: user.id,
-        email: user.email,
-        success: true,
-        failureReason: null,
-        ipAddress: req.ip || req.headers['x-forwarded-for']?.toString() || null,
-        userAgent: req.headers['user-agent'] || null,
       });
-
-      // Audit log for login
-      await createAuditLog(
-        user.tenantId,
-        user.id,
-        'login',
-        'user',
-        user.id,
-        null,
-        { provider: 'google', isNewUser },
-        req
-      );
 
       // Set up session with regeneration to prevent session fixation
       if (req.login) {
@@ -264,31 +294,28 @@ export function registerGoogleOAuthRoutes(app: Express) {
         req.session.regenerate(async (regenerateErr) => {
           if (regenerateErr) {
             console.error('OAuth session regeneration error:', regenerateErr);
-            return res.redirect('/auth/login?error=session_error');
+            return res.redirect('/login?error=session_error');
           }
 
           req.login(user, (err) => {
             if (err) {
               console.error('OAuth login error:', err);
-              return res.redirect('/auth/login?error=login_failed');
+              return res.redirect('/login?error=login_failed');
             }
 
-            // Get redirect URL from state
-            const stateData = oauthStateStore.get(state as string);
-            const redirectUrl = stateData?.redirectUrl || '/dashboard';
-            oauthStateStore.delete(state as string);
-
-            res.redirect(redirectUrl);
+            // Novo tenant via SSO: leva ao onboarding antes do dashboard.
+            // Caso contrário, usa o redirect do state assinado (cookie).
+            res.redirect(needsOnboarding ? '/onboarding/agency' : (oauthRedirectUrl || '/dashboard'));
           });
         });
       } else {
         // If no session management, redirect with error
-        res.redirect('/auth/login?error=session_unavailable');
+        res.redirect('/login?error=session_unavailable');
       }
 
     } catch (error: any) {
       console.error('Google OAuth callback error:', error);
-      res.redirect(`/auth/login?error=oauth_callback_failed`);
+      res.redirect(`/login?error=oauth_callback_failed`);
     }
   });
 

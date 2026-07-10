@@ -7,9 +7,13 @@ import type { Express, Request, Response } from "express";
 import { nanoid } from "nanoid";
 import axios from "axios";
 import { db } from "../db";
-import { users, loginHistory } from "@shared/schema-sqlite";
+import { tenants, users, loginHistory } from "@shared/schema-sqlite";
+import { ROLES } from "@shared/constants/roles";
 import { eq, or, and } from "drizzle-orm";
 import { createAuditLog } from "../routes-security";
+import { runWithAuthEmailRlsContext, runWithTenantRlsContext } from "../db-rls";
+import { issueOAuthState, consumeOAuthState } from "./oauth-state";
+import { encryptSecret } from "../security/token-encryption";
 
 // Microsoft OAuth configuration
 const MICROSOFT_CLIENT_ID = process.env.MICROSOFT_CLIENT_ID || '';
@@ -21,6 +25,7 @@ const MICROSOFT_TENANT = process.env.MICROSOFT_TENANT || 'common'; // 'common', 
 const MICROSOFT_AUTH_URL = `https://login.microsoftonline.com/${MICROSOFT_TENANT}/oauth2/v2.0/authorize`;
 const MICROSOFT_TOKEN_URL = `https://login.microsoftonline.com/${MICROSOFT_TENANT}/oauth2/v2.0/token`;
 const MICROSOFT_USERINFO_URL = 'https://graph.microsoft.com/v1.0/me';
+const OAUTH_AUTO_PROVISION_TENANT_ID = process.env.OAUTH_AUTO_PROVISION_TENANT_ID || '';
 
 interface MicrosoftTokenResponse {
   access_token: string;
@@ -43,37 +48,22 @@ interface MicrosoftUserInfo {
   officeLocation?: string;
 }
 
-// State storage for OAuth flow (in production, use Redis)
-const oauthStateStore = new Map<string, { createdAt: number; redirectUrl?: string }>();
+type OAuthUser = typeof users.$inferSelect;
 
-function generateState(): string {
-  const state = nanoid(32);
-  oauthStateStore.set(state, { createdAt: Date.now() });
-
-  // Clean up old states (older than 10 minutes)
-  setTimeout(() => {
-    const now = Date.now();
-    oauthStateStore.forEach((value, key) => {
-      if (now - value.createdAt > 10 * 60 * 1000) {
-        oauthStateStore.delete(key);
-      }
-    });
-  }, 1000);
-
-  return state;
+function sanitizeRedirectUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  if (!value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return undefined;
+  return value;
 }
 
-function verifyState(state: string): boolean {
-  const record = oauthStateStore.get(state);
-  if (!record) return false;
-
-  // Check if state is not expired (10 minutes)
-  if (Date.now() - record.createdAt > 10 * 60 * 1000) {
-    oauthStateStore.delete(state);
-    return false;
-  }
-
-  return true;
+async function getAutoProvisionTenantId(): Promise<string | null> {
+  if (!OAUTH_AUTO_PROVISION_TENANT_ID) return null;
+  const [tenant] = await db
+    .select({ id: tenants.id })
+    .from(tenants)
+    .where(eq(tenants.id, OAUTH_AUTO_PROVISION_TENANT_ID))
+    .limit(1);
+  return tenant?.id ?? null;
 }
 
 export function registerMicrosoftOAuthRoutes(app: Express) {
@@ -85,16 +75,9 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
         return res.status(500).json({ error: "Microsoft OAuth não configurado" });
       }
 
-      const state = generateState();
-
-      // Store redirect URL if provided
-      const redirectUrl = req.query.redirect as string;
-      if (redirectUrl) {
-        const stateData = oauthStateStore.get(state);
-        if (stateData) {
-          stateData.redirectUrl = redirectUrl;
-        }
-      }
+      // State stateless via cookie assinado (serverless-safe).
+      const redirectUrl = sanitizeRedirectUrl(req.query.redirect);
+      const state = issueOAuthState(res, "microsoft", redirectUrl);
 
       const params = new URLSearchParams({
         client_id: MICROSOFT_CLIENT_ID,
@@ -122,19 +105,21 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
       // Handle OAuth errors
       if (error) {
         console.error('Microsoft OAuth error:', error, error_description);
-        return res.redirect(`/auth/login?error=oauth_failed&provider=microsoft&details=${encodeURIComponent(error_description as string || '')}`);
+        return res.redirect(`/login?error=oauth_failed&provider=microsoft&details=${encodeURIComponent(error_description as string || '')}`);
       }
 
       if (!code || typeof code !== 'string') {
-        return res.redirect(`/auth/login?error=missing_code`);
+        return res.redirect(`/login?error=missing_code`);
       }
 
-      if (!state || typeof state !== 'string' || !verifyState(state)) {
-        return res.redirect(`/auth/login?error=invalid_state`);
+      const stateResult = consumeOAuthState(req, res, "microsoft", state);
+      if (!stateResult.valid) {
+        return res.redirect(`/login?error=invalid_state`);
       }
+      const oauthRedirectUrl = stateResult.redirectUrl;
 
       if (!MICROSOFT_CLIENT_ID || !MICROSOFT_CLIENT_SECRET) {
-        return res.redirect(`/auth/login?error=oauth_not_configured`);
+        return res.redirect(`/login?error=oauth_not_configured`);
       }
 
       // Exchange code for tokens
@@ -170,24 +155,30 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
       const email = microsoftUser.mail || microsoftUser.userPrincipalName;
 
       if (!email) {
-        return res.redirect(`/auth/login?error=no_email_from_provider`);
+        return res.redirect(`/login?error=no_email_from_provider`);
       }
 
+      // Tokens de terceiros sao criptografados em repouso (AES-256-GCM).
+      const encAccessToken = encryptSecret(access_token);
+      const encRefreshToken = encryptSecret(refresh_token || null);
+
       // Check if user already exists (by email or OAuth ID)
-      const existingUserList = await db.select()
-        .from(users)
-        .where(
-          or(
-            eq(users.email, email),
-            and(
-              eq(users.oauthProvider, 'microsoft'),
-              eq(users.oauthId, microsoftUser.id)
+      const existingUserList = await runWithAuthEmailRlsContext(email, () =>
+        db.select()
+          .from(users)
+          .where(
+            or(
+              eq(users.email, email),
+              and(
+                eq(users.oauthProvider, 'microsoft'),
+                eq(users.oauthId, microsoftUser.id)
+              )
             )
           )
-        )
-        .limit(1);
+          .limit(1),
+      );
 
-      let user;
+      let user: OAuthUser;
       let isNewUser = false;
 
       if (existingUserList.length > 0) {
@@ -195,83 +186,94 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
 
         // Update OAuth tokens if this is an OAuth account
         if (user.oauthProvider === 'microsoft' && user.oauthId === microsoftUser.id) {
-          await db.update(users)
-            .set({
-              oauthAccessToken: access_token,
-              oauthRefreshToken: refresh_token || user.oauthRefreshToken,
-              lastLogin: new Date().toISOString(),
-              lastLoginIp: req.ip || req.headers['x-forwarded-for']?.toString() || null,
-              emailVerified: true, // Microsoft accounts are pre-verified
-            })
-            .where(eq(users.id, user.id));
+          await runWithTenantRlsContext(user.tenantId, () =>
+            db.update(users)
+              .set({
+                oauthAccessToken: encAccessToken,
+                oauthRefreshToken: encRefreshToken || user.oauthRefreshToken,
+                lastLogin: new Date().toISOString(),
+                lastLoginIp: req.ip || req.headers['x-forwarded-for']?.toString() || null,
+                emailVerified: true, // Microsoft accounts are pre-verified
+              })
+              .where(eq(users.id, user.id)),
+          );
         } else {
-          // User exists with same email but different provider
-          return res.redirect(`/auth/link-account?email=${encodeURIComponent(email)}&provider=microsoft&pending=true`);
+          // Conta já existe com este email mas com outro provedor/senha.
+          // Sem fluxo de account-linking na UI ainda: erro amigável no login
+          // em vez de rota inexistente (404). Ver PLANO_GO_LIVE_360 (B7).
+          return res.redirect(`/login?error=email_in_use_other_provider`);
         }
 
       } else {
-        // Create new user
+        // Create new user only when an explicit tenant was configured and verified.
         isNewUser = true;
-
-        // Get default tenant
-        const defaultTenantId = 'default-tenant'; // Replace with actual tenant selection logic
+        const tenantId = await getAutoProvisionTenantId();
+        if (!tenantId) {
+          return res.redirect(`/login?error=oauth_account_not_found&provider=microsoft`);
+        }
 
         const userId = nanoid();
 
-        await db.insert(users).values({
-          id: userId,
-          tenantId: defaultTenantId,
-          name: microsoftUser.displayName,
-          email,
-          password: '', // No password for OAuth users
-          role: 'user',
-          avatar: null,
-          emailVerified: true,
-          oauthProvider: 'microsoft',
-          oauthId: microsoftUser.id,
-          oauthAccessToken: access_token,
-          oauthRefreshToken: refresh_token || null,
-          lastLogin: new Date().toISOString(),
-          lastLoginIp: req.ip || req.headers['x-forwarded-for']?.toString() || null,
+        user = await runWithTenantRlsContext(tenantId, async () => {
+          await db.insert(users).values({
+            id: userId,
+            tenantId,
+            name: microsoftUser.displayName,
+            email,
+            password: '', // No password for OAuth users
+            role: ROLES.MEMBER,
+            avatar: null,
+            emailVerified: true,
+            oauthProvider: 'microsoft',
+            oauthId: microsoftUser.id,
+            oauthAccessToken: encAccessToken,
+            oauthRefreshToken: encRefreshToken || null,
+            lastLogin: new Date().toISOString(),
+            lastLoginIp: req.ip || req.headers['x-forwarded-for']?.toString() || null,
+          });
+
+          const createdUser = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0];
+
+          // Audit log for new account
+          await createAuditLog(
+            createdUser.tenantId,
+            createdUser.id,
+            'account_created',
+            'user',
+            createdUser.id,
+            null,
+            { provider: 'microsoft', email: createdUser.email },
+            req
+          );
+
+          return createdUser;
+        });
+      }
+
+      await runWithTenantRlsContext(user.tenantId, async () => {
+        // Log successful login
+        await db.insert(loginHistory).values({
+          id: nanoid(),
+          userId: user.id,
+          email: user.email,
+          success: true,
+          failureReason: null,
+          ipAddress: req.ip || req.headers['x-forwarded-for']?.toString() || null,
+          userAgent: req.headers['user-agent'] || null,
         });
 
-        user = (await db.select().from(users).where(eq(users.id, userId)).limit(1))[0];
-
-        // Audit log for new account
+        // Audit log for login
         await createAuditLog(
           user.tenantId,
           user.id,
-          'account_created',
+          'login',
           'user',
           user.id,
           null,
-          { provider: 'microsoft', email: user.email },
+          { provider: 'microsoft', isNewUser },
           req
         );
-      }
-
-      // Log successful login
-      await db.insert(loginHistory).values({
-        id: nanoid(),
-        userId: user.id,
-        email: user.email,
-        success: true,
-        failureReason: null,
-        ipAddress: req.ip || req.headers['x-forwarded-for']?.toString() || null,
-        userAgent: req.headers['user-agent'] || null,
       });
-
-      // Audit log for login
-      await createAuditLog(
-        user.tenantId,
-        user.id,
-        'login',
-        'user',
-        user.id,
-        null,
-        { provider: 'microsoft', isNewUser },
-        req
-      );
 
       // Set up session with regeneration to prevent session fixation
       if (req.login) {
@@ -279,31 +281,27 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
         req.session.regenerate(async (regenerateErr) => {
           if (regenerateErr) {
             console.error('OAuth session regeneration error:', regenerateErr);
-            return res.redirect('/auth/login?error=session_error');
+            return res.redirect('/login?error=session_error');
           }
 
           req.login(user, (err) => {
             if (err) {
               console.error('OAuth login error:', err);
-              return res.redirect('/auth/login?error=login_failed');
+              return res.redirect('/login?error=login_failed');
             }
 
-            // Get redirect URL from state
-            const stateData = oauthStateStore.get(state as string);
-            const redirectUrl = stateData?.redirectUrl || '/dashboard';
-            oauthStateStore.delete(state as string);
-
-            res.redirect(redirectUrl);
+            // Redirect URL veio do state assinado (cookie), já consumido.
+            res.redirect(oauthRedirectUrl || '/dashboard');
           });
         });
       } else {
         // If no session management, redirect with error
-        res.redirect('/auth/login?error=session_unavailable');
+        res.redirect('/login?error=session_unavailable');
       }
 
     } catch (error: any) {
       console.error('Microsoft OAuth callback error:', error);
-      res.redirect(`/auth/login?error=oauth_callback_failed`);
+      res.redirect(`/login?error=oauth_callback_failed`);
     }
   });
 

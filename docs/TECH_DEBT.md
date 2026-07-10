@@ -1,0 +1,202 @@
+# Technical Debt
+
+Atualizado em: 10/07/2026
+
+## 2026-07-10 — Guardas de manutenibilidade (Fase 4, "parar a sangria")
+
+Foram adicionadas 3 guardas de CI (ratchet) que **impedem novo débito** sem exigir
+a refatoração completa de imediato. Rodam via `npm run guard` (e no CI, job
+`lint-and-typecheck`). Ao reduzir um arquivo/contagem, **baixe o teto correspondente**.
+
+- **`guard:schema`** (`script/check-schema-drift.ts`) — falha em drift de TABELA
+  novo entre `shared/schema.ts` (PG) e `shared/schema-sqlite.ts`. Baseline aceito
+  hoje: 5 tabelas só-PG (`whatsapp_conversations`, `whatsapp_messages`,
+  `whatsapp_message_queue`, `whatsapp_auto_responses`, `whatsapp_templates`) e 1
+  só-SQLite (`legal_documents`). **Débito:** o domínio WhatsApp é estruturalmente
+  não-testável em dev/CT (SQLite) — migrar essas tabelas para o schema SQLite ou
+  documentar skip. Drift de COLUNA (não-bloqueante) existe em 14 tabelas
+  (account_deletion_requests, ai_settings, compliance_audit_log, cookie_preferences,
+  data_breach_incidents, data_export_requests, data_processing_activities,
+  finance_categories, notification_preferences, owners, renters, tenant_settings,
+  user_consents, user_roles) — inclui inconsistências de nome (ex.: `tenant_id` vs
+  `tenantId`) a reconciliar.
+- **`guard:size`** (`script/check-file-size-budget.ts`) — teto de linhas para os
+  monolitos e mega-páginas (routes.ts 4337, storage.ts 4550, schema 2000/1862,
+  vendas 2653, kanban 2416, calendar 2256, contracts 1971, reports 1866, rentals
+  1599). Só podem encolher. **Backlog de decomposição** abaixo.
+- **`guard:fetch`** (`script/check-fetch-budget.ts`) — teto de `fetch` cru em
+  pages/components = **174** (64 arquivos). Código novo deve usar
+  `apiRequest`/`getQueryFn` (CSRF + cache). Migrar os existentes oportunisticamente.
+
+### Backlog de decomposição (baixar os tetos ao concluir)
+- `server/routes.ts` e `server/storage.ts`: continuar arch-1 por domínio
+  (`register<Domain>Routes` + repositório), aproveitando para adicionar testes de
+  caracterização antes de extrair.
+- Mega-páginas (`vendas`, `leads/kanban`, `calendar`, `contracts`, `reports`,
+  `rentals`): quebrar em container + hooks + apresentacional (padrão já iniciado em
+  `vendas/`). Meta ~500–600 LOC/arquivo.
+
+## Revisao Completa 2026-06-30
+
+## Revisao Completa 2026-06-30
+
+Relatorio: `docs/reports/REVISAO_GO_LIVE_COMPLETA_2026-06-30.md`.
+
+### P0 - baseline antes de release candidate
+
+- Resolvido localmente em 2026-06-30: `tests/unit/data-export.test.ts` passou a validar download como `Buffer` pelo caminho duravel de storage mockado; `npm run test:unit` passou com 770/770.
+- Executar em staging/producao as evidencias pendentes: RLS, Redis TLS, backup/PITR, restore drill, pentest e `ops:go-live:verify:strict`.
+- Rodar `ops:oauth:encrypt-microsoft-tokens -- --apply` com `ENCRYPTION_KEY` para tokens Microsoft legados.
+
+### P1 - fechamento UX/QA
+
+- Parcialmente resolvido localmente em 2026-06-30: rotas reais corrigidas em `tests/accessibility`, `tests/mobile` e `tests/responsive`; banco SQLite local foi alinhado de forma aditiva e `npm run test:smoke:e2e` passou com 8/8. Ainda falta fixture autenticada completa para reabrir as suites E2E quarentenadas.
+- Parcialmente resolvido localmente em 2026-06-30: listener duplicado de `Ctrl/Cmd+K` removido de `DashboardLayout`; ainda falta consolidar completamente a UI de busca global para evitar dois padroes visuais.
+- Resolvido localmente nos pontos auditados: removidos `prompt()` e `div role=button/link` em `properties/list.tsx` e `dashboard-layout.tsx`.
+
+### P1 - arquitetura incremental
+
+- Resolvido localmente em 2026-06-30: `server/routes/lead-tags.ts` extraido de
+  `server/routes.ts`, seguindo o padrao de `newsletter` e `interactions`.
+- ADR registrado: `docs/ADR/0002-modularizacao-incremental-routes.md`.
+- Ainda pendente: continuar extraindo as demais secoes de `server/routes.ts`
+  por dominio, preservando ordem de matching e status codes antes de hardening.
+- Hardening posterior: validar explicitamente ownership do `tagId` em
+  `DELETE /api/leads/:leadId/tags/:tagId`; hoje a rota valida o lead e preserva
+  comportamento historico.
+
+### P1 - performance publica
+
+- Resolvido parcialmente em 2026-06-30: `GlobalSearch` e `TimeoutWarning`
+  deixaram de ser carregados estaticamente por `client/src/App.tsx`; agora sao
+  lazy chunks usados apenas em rotas protegidas. Build local reduziu a entry
+  principal publica de ~374 kB para ~348 kB.
+- Resolvido parcialmente em 2026-06-30: hero da vitrine publica de tenant
+  (`/e/:slug`) passou a declarar dimensoes, `sizes`, eager loading,
+  `fetchPriority="high"` e `decoding="async"`.
+- Ainda pendente: rodar Lighthouse/Web Vitals em preview/staging real para
+  comprovar LCP/CLS e substituir imagem remota da vitrine por asset local
+  responsivo AVIF/WebP.
+- Baseline Playwright mobile local em 2026-06-30 falhou 7/21:
+  `/dashboard` 4575 ms, peso total 8,09 MB, CSS 258 KB, 100 requests,
+  crescimento de heap 391%, mais duas falhas de harness. Corrigir primeiro o
+  harness (`hasTouch` e animacao) e depois atacar CSS global, requests e peso
+  inicial do dashboard.
+- Atualizacao 2026-06-30: harness corrigido para build/preview de producao com
+  `playwright.performance.config.ts`; suite passou a 19/21. `App.tsx` deixou
+  login, `DashboardLayout` e `Toaster` fora da entry principal; entry caiu de
+  ~348 kB para ~236 kB e JS medido caiu de ~866 KB para ~778 KB. Ainda falta
+  reduzir JS para <500 KB e CSS global de ~194 KB para <100 KB.
+
+## Revisao Go-Live Completa 2026-06-29
+
+Relatorio: `docs/reports/REVISAO_GO_LIVE_COMPLETA_2026-06-29.md`.
+
+### P0 - antes de staging/producao
+
+- Concluido localmente em 2026-06-29: expandir `script/verify-rls.ts` para validar tambem `migrations/RLS_enable_child_tables.sql`.
+- Concluido localmente em 2026-06-29: ajustar RLS/rota publica de assinatura digital para links por token continuarem funcionando sob RLS.
+- Remover e rotacionar secrets locais de `.env.production`; manter secrets somente em gerenciadores apropriados.
+- Concluido localmente em 2026-06-29: criptografar novos tokens OAuth Microsoft e criar script dry-run/apply para tokens legados.
+- Concluido localmente em 2026-06-29: tornar Redis TLS (`rediss://`) requisito hard em producao; evitar degradacao fail-open em rate limit/locks/2FA.
+- Revisar policies com `tenant_id IS NULL` em logs, newsletter e webhooks.
+
+### P1 - hardening pre-release
+
+- Padronizar rotas legadas para `404` em recurso inexistente ou cross-tenant.
+- Corrigir drift dos testes Playwright e reativar suites com fixtures autenticadas.
+- Unificar busca global e atalho `Ctrl/Cmd+K`.
+- Substituir `div role=button/link` por elementos nativos em imoveis e navegacao.
+- Trocar `prompt()` em fluxos administrativos por dialogs do design system.
+- Separar `add-performance-indexes.sql` de migrations transacionais comuns; usar estrategia segura para indices em producao.
+
+### P2 - maturidade
+
+- Resolver drift PG/SQLite ou reduzir dependencia de SQLite para validar comportamento de producao.
+- Reduzir chunks grandes (`vendor-charts`, `jspdf`, `html2canvas`, shell principal, `product-landing`).
+- Migrar relatorios com agregacao em memoria/N+1 para SQL/views/materialized views.
+- Ajustar observabilidade/analytics para LGPD por padrao.
+
+## Plano de Excelência 2026-06-22 (execução em andamento)
+
+Backlog completo em `docs/reports/PLANO_EXCELENCIA_2026-06-22.md`. Owner-gated em
+`docs/RUNBOOK_EXCELENCIA_DONO.md`.
+
+### Resolvido nesta leva
+
+- Idempotência de pagamento agora durável em Redis (era `Map` in-process). (ACT-3/ESC-2)
+- Cache `query-cache.ts` ativado no `getDashboardStats` (estava morto); `storage-cached.ts` (demo) removido. (ESC-1/PERF-4/arch-4)
+- `getDashboardStats` agrega com `COUNT(*)` (era full-table scans). (PERF-1)
+- Race de de-dup de lead resolvido via índice único → 409. (ACT-2)
+- Leak de timers no prefetch on-hover corrigido. (PERF-8)
+- `db:rls:apply` cobre child tables. (DB-2)
+- Decomposição de `routes.ts` iniciada (`server/routes/_shared.ts` + domínios newsletter/interactions). (arch-1)
+
+### Remanescente (priorizado)
+
+- **arch-1**: extrair as ~35 seções restantes de `routes.ts` (4349 LOC) para `server/routes/<dominio>.ts`. Padrão já provado.
+- **Frontend**: decompor os 6 mega-componentes (dashboard/vendas/kanban/calendar/contracts/reports); migrar fetch para React Query (FE-3); reduzir `any` (~305 → <50, FE-6).
+- **ACT-2b**: cursor round-robin de lead ainda tem janela read-then-advance (fairness) — precisa `SELECT FOR UPDATE` no `lead_assignment_state` via `withTenantTransaction`.
+- **ACT-4 (full)**: envolver update-de-negócio + `markWebhookEventProcessed` na MESMA transação (a reserva/dedup já é atômica).
+- **UI-2**: migrar ~7 páginas de chart restantes para `getChartColor` (atenção: cores de estágio do kanban são semânticas, não mapear cego a `--chart-*`).
+- **UI-6**: guard-rail ESLint contra hex em `fill`/`stroke` (só após concluir UI-2).
+
+## Features P1 2026-06-20 (premissas a revisar)
+
+- `getActiveBrokers` define corretor "ativo" por role (broker/agent/corretor/admin/manager/owner) porque nao existe coluna `isActive` em `users`. Se houver outra definicao de corretor ativo, ajustar.
+- `lead-intake.applyLeadDedupAndAssign` persiste phone/email NORMALIZADOS no lead para cair no mesmo bucket do indice unico parcial; qualquer fluxo de escrita de lead que burle esse helper pode criar divergencia entre app e indice. Manter a normalizacao identica ao `regexp_replace(phone, '\\D', '', 'g')` da migration.
+- O `calculateLeadScore` legado em `routes-features.ts` NAO foi trocado pelo `lead-score-weighted.ts` (conservador; ha commit recente alinhando contrato). O caminho ponderado por tenant existe via as novas rotas `/api/settings/lead-score-weights`. Decidir migracao do call-site quando seguro.
+- IA acionavel: definir feature flag por plano (`ai_actions`) e limite/custo do planner por tenant (rate-limit atual e in-memory, nao persiste entre instancias serverless).
+- `ai_action_audit` e append-only por convencao (sem trigger no Postgres); nao expor metodos de update/delete no storage.
+
+## Frontend
+
+- Reduzir JavaScript inicial da home.
+- Avaliar lazy-load ou reducao de Framer Motion acima da dobra.
+- Revisar fontes externas e considerar self-host.
+- Expandir pipeline automatico de imagens AVIF/WebP para todas as imagens publicas.
+- Manter checks mobile em 320px, 390px, 768px e desktop.
+- Estender prerender/HTML estatico para vitrines dinamicas de tenant/imovel/cidade/bairro; rotas publicas conhecidas ja sao geradas no build.
+- Trocar hero remoto das paginas de solucao por asset local responsivo com dimensoes declaradas.
+- Manter sentinelas explicitas (`__all__`, `__none__`) em Radix Select; nao reintroduzir `SelectItem value=""`.
+- Expandir revisao visual autenticada com fixtures para `/vendas`, `/calendar`, `/contracts`, `/leads`, `/rentals`, `/financeiro`, admin e configuracoes.
+- Reduzir chunks grandes apontados no build de 18/06/2026: `vendor-charts`, `jspdf`, `html2canvas`, `vendor-react`, shell principal e `product-landing`. O alerta de chunk circular Radix foi resolvido com `vendor-ui-overlays`.
+
+## Backend
+
+- Consolidar estrategia oficial de jobs longos: crons HTTP da Vercel estao manifestados e possuem lock/status via Redis; BullMQ/worker persistente pode ser habilitado por `ENABLE_BACKGROUND_JOBS=true`.
+- Concluir rollout operacional de CORS: `server/config/cors.ts` ja centraliza runtime e defaults de producao sao seguros; falta remover `ALLOWED_ORIGINS` dos ambientes depois de migrar para `CORS_ORIGINS`.
+- Revisar rotas antigas para garantir tenant ownership e ausencia de IDOR. Vistorias e fluxos centrais de contratos, locacoes, pagamentos, repasses, propostas, vendas, lancamentos financeiros e AVM foram reforcados em 17/06/2026; ainda falta prova dinamica multi-tenant em staging/producao e auditoria de rotas legadas/integracoes.
+- Validar rate limit/lockout de 2FA com Redis real no deploy serverless; o codigo ja usa Redis quando `REDIS_URL` existe e fallback local em dev/test.
+- Manter o wrapper anti-SSRF (`fetchExternalUrl`) como caminho obrigatorio para qualquer novo fetch de URL externa; DNS, redirects manuais e webhooks/WhatsApp ja foram cobertos localmente.
+- Manter `fetchExternalUrl` tambem em ClickSign document downloads, backup duravel e restore drill remoto.
+- Manter fail-closed do `phoneNumberId` do WhatsApp em duplicidades e auditar configuracoes reais em staging/producao.
+- Manter normalizacao de `phoneNumberId` do WhatsApp alinhada entre UI/storage/webhook/migration; qualquer novo fluxo deve usar o helper compartilhado.
+- Manter validacao de ownership de `entityType`/`entityId` em uploads genericos/documentos e ampliar coverage por tipo de entidade conforme novos fluxos usarem anexos.
+- Reduzir risco residual de DoS autenticado em upload de imagens substituindo `memoryStorage` por streaming/upload assinado; limites locais ja foram reduzidos para 10 arquivos de 10MB e lote maximo de 50MB.
+- Validar ledger persistente do webhook oficial do WhatsApp em staging/producao e remover fluxos legados quando nao forem mais necessarios.
+- Manifesto de crons ja unifica `vercel.json`, status HTTP e fallback `node-cron`; manter `npm run ops:cron:verify` no CI.
+- Manter `npm run ops:go-live:verify:strict` como gate de producao pre-deploy; qualquer alteracao em RLS, Redis, webhooks, cron, backup ou restore deve passar por esse gate.
+- Manter `scripts/deploy.sh` alinhado ao workflow seguro: producao precisa de `check:scripts`, lint sem erros, build prebuilt, `ops:go-live:verify:strict`, sem migrations automaticas e push de tag opt-in.
+- Manter `scripts/setup-production.sh` e README alinhados ao runbook atual; eles nao podem sugerir `db:push`/migrations cegas em producao, `vercel --prod` direto ou declarar producao "100% pronta" sem gate strict verde.
+- Validar `20260617_002_newsletter_opt_out.sql` em staging/producao para fechar opt-out persistente fora do ambiente local.
+
+## Banco
+
+- Habilitar e validar RLS para tabelas multi-tenant.
+- Revisar indices de consultas por `tenantId`, status, datas e relatorios.
+- Executar `npm run ops:restore:drill` contra banco isolado real e registrar RPO/RTO. Quando Supabase PITR for a estrategia oficial, manter `BACKUP_OPTIONAL=true` e `SUPABASE_PITR_ENABLED=true` validados em staging/producao.
+- Avaliar regiao do banco em relacao ao deploy.
+
+## Qualidade
+
+- Aumentar cobertura de testes de 12,44% statements / 12,90% lines para >= 80%.
+- Reduzir 5180 warnings de lint por area, sem refatoracao ampla e sem mudancas comportamentais desnecessarias.
+- Expandir testes de seguranca para IDOR, CSRF, SSRF, XSS e cadeias de tokens ainda faltantes.
+
+## Produto
+
+- Agenda de visitas ja possui bloqueio backend inicial para conflito de imovel/corretor; ainda precisa evoluir para confirmacao, lembrete, ficha de visita e proxima acao automatica.
+- SLA de leads ja possui resumo backend e alertas no Kanban; ainda falta deduplicacao persistente, roleta de distribuicao e UI completa de atribuicao.
+- IA agora possui balao global no layout autenticado; ainda deve evoluir para acoes auditaveis/aprovaveis, nao apenas geracao de texto.
+- Portal de atendimento com selecao de imoveis e aceite/recusa do cliente ainda e oportunidade competitiva.

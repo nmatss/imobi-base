@@ -30,8 +30,21 @@ import {
   generateRiskAssessment,
   getComplianceDashboard,
 } from "./dpo-tools";
-import { createReadStream } from "fs";
 import { generateRateLimitKey } from "../middleware/rate-limit-key-generator";
+import { runWithTenantRlsContext } from "../db-rls";
+
+/**
+ * Versão dos documentos legais (Termos de Uso / Política de Privacidade) vigente
+ * no momento do registro de consentimento. Mantém rastreabilidade LGPD: ao
+ * atualizar os termos, basta apontar LEGAL_CONSENT_VERSION para a nova versão e
+ * os consentimentos passam a ser registrados com a versão correta.
+ */
+const LEGAL_CONSENT_VERSION = process.env.LEGAL_CONSENT_VERSION || "1.0.0";
+
+function isComplianceAdmin(req: Request): req is Request & { user: Express.User } {
+  const role = req.user?.role;
+  return role === "admin" || role === "super_admin";
+}
 
 /**
  * Register compliance routes
@@ -76,7 +89,7 @@ export function registerComplianceRoutes(app: Express) {
       const result = await setCookieConsent(
         sessionId || "anonymous",
         preferences,
-        consentVersion || "1.0.0",
+        consentVersion || LEGAL_CONSENT_VERSION,
         userId,
         ipAddress,
         userAgent
@@ -119,7 +132,7 @@ export function registerComplianceRoutes(app: Express) {
     try {
       const { certificateNumber } = req.params;
 
-      const filePath = await getDeletionCertificate(certificateNumber);
+      const fileBuffer = await getDeletionCertificate(certificateNumber);
 
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader(
@@ -127,8 +140,7 @@ export function registerComplianceRoutes(app: Express) {
         `attachment; filename="certificado-exclusao-${certificateNumber}.pdf"`
       );
 
-      const stream = createReadStream(filePath);
-      stream.pipe(res);
+      res.end(fileBuffer);
     } catch (error: any) {
       res.status(404).json({ error: error.message });
     }
@@ -154,7 +166,7 @@ export function registerComplianceRoutes(app: Express) {
         userId,
         tenantId,
         consentType: type as any,
-        consentVersion: "1.0.0", // TODO: Get from legal documents
+        consentVersion: LEGAL_CONSENT_VERSION,
         purpose,
         ipAddress,
         userAgent,
@@ -268,13 +280,12 @@ export function registerComplianceRoutes(app: Express) {
       const { requestId } = req.params;
       const userId = req.user.id;
 
-      const filePath = await downloadExport(requestId, userId);
+      const fileBuffer = await downloadExport(requestId, userId);
 
       res.setHeader("Content-Type", "application/zip");
       res.setHeader("Content-Disposition", `attachment; filename="my-data-export.zip"`);
 
-      const stream = createReadStream(filePath);
-      stream.pipe(res);
+      res.end(fileBuffer);
     } catch (error: any) {
       res.status(404).json({ error: error.message });
     }
@@ -343,12 +354,14 @@ export function registerComplianceRoutes(app: Express) {
   // Data inventory (ROPA)
   app.get("/api/admin/compliance/data-inventory", async (req: Request, res: Response) => {
     try {
-      if (!req.user || req.user.role !== "admin") {
+      if (!isComplianceAdmin(req)) {
         return res.status(403).json({ error: "Acesso negado. Apenas administradores." });
       }
 
       const tenantId = req.user.tenantId;
-      const inventory = await generateDataInventory(tenantId);
+      const inventory = await runWithTenantRlsContext(tenantId, () =>
+        generateDataInventory(tenantId),
+      );
 
       res.json(inventory);
     } catch (error: any) {
@@ -359,17 +372,19 @@ export function registerComplianceRoutes(app: Express) {
   // Consent report
   app.get("/api/admin/compliance/consent-report", async (req: Request, res: Response) => {
     try {
-      if (!req.user || req.user.role !== "admin") {
+      if (!isComplianceAdmin(req)) {
         return res.status(403).json({ error: "Acesso negado" });
       }
 
       const tenantId = req.user.tenantId;
       const { startDate, endDate } = req.query;
 
-      const report = await generateConsentReport(
-        tenantId,
-        startDate as string,
-        endDate as string
+      const report = await runWithTenantRlsContext(tenantId, () =>
+        generateConsentReport(
+          tenantId,
+          startDate as string,
+          endDate as string
+        )
       );
 
       res.json(report);
@@ -381,14 +396,16 @@ export function registerComplianceRoutes(app: Express) {
   // Deletion requests log
   app.get("/api/admin/compliance/deletion-requests", async (req: Request, res: Response) => {
     try {
-      if (!req.user || req.user.role !== "admin") {
+      if (!isComplianceAdmin(req)) {
         return res.status(403).json({ error: "Acesso negado" });
       }
 
       const tenantId = req.user.tenantId;
       const { status } = req.query;
 
-      const log = await getDeletionRequestsLog(tenantId, status as string);
+      const log = await runWithTenantRlsContext(tenantId, () =>
+        getDeletionRequestsLog(tenantId, status as string),
+      );
 
       res.json(log);
     } catch (error: any) {
@@ -399,18 +416,20 @@ export function registerComplianceRoutes(app: Express) {
   // Data breach reporting
   app.post("/api/admin/compliance/data-breach", async (req: Request, res: Response) => {
     try {
-      if (!req.user || req.user.role !== "admin") {
+      if (!isComplianceAdmin(req)) {
         return res.status(403).json({ error: "Acesso negado" });
       }
 
       const tenantId = req.user.tenantId;
       const reportedBy = req.user.id;
 
-      const result = await reportDataBreach({
-        tenantId,
-        reportedBy,
-        ...req.body,
-      });
+      const result = await runWithTenantRlsContext(tenantId, () =>
+        reportDataBreach({
+          tenantId,
+          reportedBy,
+          ...req.body,
+        }),
+      );
 
       res.json(result);
     } catch (error: any) {
@@ -420,13 +439,16 @@ export function registerComplianceRoutes(app: Express) {
 
   app.put("/api/admin/compliance/data-breach/:incidentId", async (req: Request, res: Response) => {
     try {
-      if (!req.user || req.user.role !== "admin") {
+      if (!isComplianceAdmin(req)) {
         return res.status(403).json({ error: "Acesso negado" });
       }
 
       const { incidentId } = req.params;
+      const tenantId = req.user.tenantId;
 
-      const result = await updateDataBreach(incidentId, req.body);
+      const result = await runWithTenantRlsContext(tenantId, () =>
+        updateDataBreach(incidentId, tenantId, req.body),
+      );
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -436,12 +458,14 @@ export function registerComplianceRoutes(app: Express) {
   // Risk assessment
   app.get("/api/admin/compliance/risk-assessment", async (req: Request, res: Response) => {
     try {
-      if (!req.user || req.user.role !== "admin") {
+      if (!isComplianceAdmin(req)) {
         return res.status(403).json({ error: "Acesso negado" });
       }
 
       const tenantId = req.user.tenantId;
-      const assessment = await generateRiskAssessment(tenantId);
+      const assessment = await runWithTenantRlsContext(tenantId, () =>
+        generateRiskAssessment(tenantId),
+      );
 
       res.json(assessment);
     } catch (error: any) {
@@ -452,12 +476,14 @@ export function registerComplianceRoutes(app: Express) {
   // Compliance dashboard
   app.get("/api/admin/compliance/dashboard", async (req: Request, res: Response) => {
     try {
-      if (!req.user || req.user.role !== "admin") {
+      if (!isComplianceAdmin(req)) {
         return res.status(403).json({ error: "Acesso negado" });
       }
 
       const tenantId = req.user.tenantId;
-      const dashboard = await getComplianceDashboard(tenantId);
+      const dashboard = await runWithTenantRlsContext(tenantId, () =>
+        getComplianceDashboard(tenantId),
+      );
 
       res.json(dashboard);
     } catch (error: any) {

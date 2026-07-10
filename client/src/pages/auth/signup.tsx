@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useImobi } from "@/lib/imobi-context";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, CheckCircle2 } from "lucide-react";
 import { Logo, LogoIcon } from "@/components/brand/logo";
 import { SeoHead } from "@/components/seo/SeoHead";
+import { OAuthButtons } from "@/components/auth/OAuthButtons";
 
 function slugify(text: string): string {
   return text
@@ -113,7 +114,7 @@ export default function SignupPage() {
           <div className="mx-auto w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
             <CheckCircle2 className="h-8 w-8 text-green-600" />
           </div>
-          <h2 className="text-2xl font-heading font-bold">Conta criada com sucesso!</h2>
+          <h1 className="text-2xl font-heading font-bold">Conta criada com sucesso!</h1>
           <p className="text-muted-foreground">
             Enviamos um email de verificação para o endereço informado. Verifique sua caixa de
             entrada (e spam) para ativar sua conta.
@@ -136,7 +137,6 @@ export default function SignupPage() {
       />
       {/* Left Side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary via-blue-600 to-indigo-700 p-12 flex-col justify-between relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10" />
         <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
         <div className="absolute -top-32 -right-32 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
 
@@ -150,26 +150,29 @@ export default function SignupPage() {
         </div>
 
         <div className="relative z-10 text-white space-y-6">
-          <h1 className="text-4xl font-heading font-bold leading-tight">
+          <h2 className="text-4xl font-heading font-bold leading-tight">
             Comece a gerenciar sua imobiliária hoje
-          </h1>
+          </h2>
           <p className="text-lg text-white/80 max-w-md">
             Crie sua conta gratuita e tenha acesso completo a todas as ferramentas para
             alavancar seu negócio imobiliário.
           </p>
-          <div className="flex items-center gap-4 pt-4">
-            <div className="flex -space-x-2">
-              {[1, 2, 3, 4].map((i) => (
-                <img
-                  key={i}
-                  src={`https://i.pravatar.cc/40?img=${i + 20}`}
-                  alt={`Usuário ${i}`}
-                  className="w-10 h-10 rounded-full border-2 border-white/20"
-                />
-              ))}
-            </div>
-            <p className="text-sm text-white/70">Junte-se a centenas de corretores</p>
-          </div>
+          <ul className="space-y-3 pt-4">
+            {[
+              "Grátis para começar, sem cartão de crédito",
+              "Imóveis, leads, contratos e financeiro em um só lugar",
+              "Seu site profissional no ar em minutos",
+            ].map((item) => (
+              <li key={item} className="flex items-center gap-3 text-sm text-white/80">
+                <span className="w-5 h-5 rounded-full bg-white/15 flex items-center justify-center shrink-0">
+                  <svg viewBox="0 0 20 20" className="w-3 h-3 fill-white" aria-hidden="true">
+                    <path d="M7.5 13.5 4 10l1.4-1.4 2.1 2.1 5.1-5.1L14 7z" />
+                  </svg>
+                </span>
+                {item}
+              </li>
+            ))}
+          </ul>
         </div>
 
         <div className="relative z-10 text-white/60 text-sm">
@@ -185,7 +188,7 @@ export default function SignupPage() {
           </div>
 
           <div className="text-center lg:text-left">
-            <h2 className="text-3xl font-heading font-bold tracking-tight">Criar conta grátis</h2>
+            <h1 className="text-3xl font-heading font-bold tracking-tight">Criar conta grátis</h1>
             <p className="text-muted-foreground mt-2">
               Preencha os dados abaixo para começar
             </p>
@@ -256,6 +259,7 @@ export default function SignupPage() {
                 id="email"
                 name="email"
                 type="email"
+                autoComplete="email"
                 placeholder="seu@email.com"
                 required
                 className="h-12"
@@ -269,7 +273,9 @@ export default function SignupPage() {
               <div className="relative">
                 <Input
                   id="password"
+                  name="password"
                   type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
                   placeholder="Mín. 8 caracteres, maiúscula, número, especial"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -280,7 +286,7 @@ export default function SignupPage() {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  tabIndex={-1}
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -337,11 +343,13 @@ export default function SignupPage() {
             </div>
           </div>
 
+          <OAuthButtons action="signup" />
+
           <p className="text-center text-sm text-muted-foreground">
             Já tem uma conta?{" "}
-            <a href="/login" className="text-primary font-medium hover:underline">
+            <Link href="/login" className="text-primary font-medium hover:underline">
               Entrar
-            </a>
+            </Link>
           </p>
         </div>
       </div>

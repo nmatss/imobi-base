@@ -9,7 +9,7 @@
  */
 
 import { db, schema } from "../db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { sendBreachAlertToDpo, addBusinessDays } from "./compliance-email";
 
@@ -279,6 +279,7 @@ export async function reportDataBreach(options: {
  */
 export async function updateDataBreach(
   incidentId: string,
+  tenantId: string,
   updates: {
     status?: string;
     rootCause?: string;
@@ -292,7 +293,16 @@ export async function updateDataBreach(
     notes?: string;
   }
 ) {
-  const [incident] = await db.select().from(schema.dataBreachIncidents).where(eq(schema.dataBreachIncidents.id, incidentId));
+  const [incident] = await db
+    .select()
+    .from(schema.dataBreachIncidents)
+    .where(
+      and(
+        eq(schema.dataBreachIncidents.id, incidentId),
+        eq(schema.dataBreachIncidents.tenantId, tenantId),
+      ),
+    )
+    .limit(1);
   if (!incident) {
     throw new Error("Incident not found");
   }
@@ -302,7 +312,12 @@ export async function updateDataBreach(
     mitigationActions: updates.mitigationActions ? JSON.stringify(updates.mitigationActions) : undefined,
     preventiveActions: updates.preventiveActions ? JSON.stringify(updates.preventiveActions) : undefined,
     updatedAt: new Date().toISOString(),
-  }).where(eq(schema.dataBreachIncidents.id, incidentId));
+  }).where(
+    and(
+      eq(schema.dataBreachIncidents.id, incidentId),
+      eq(schema.dataBreachIncidents.tenantId, tenantId),
+    ),
+  );
 
   // Disparo AUTOMÁTICO ao DPO em atualização de incidente high/critical, salvo
   // quando já se está apenas marcando como notificado/resolvido à autoridade.

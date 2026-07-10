@@ -51,6 +51,9 @@ export default defineConfig({
         "**/*.stories.tsx",
         "**/examples/**",
         "**/__tests__/**",
+        // V8 coverage/Rollup remapping cannot parse this large uncovered TSX
+        // marketing page reliably; it is covered by Playwright smoke instead.
+        "client/src/pages/public/product-landing.tsx",
       ],
       // Ratchet — subir conforme cobertura cresce. Medido em 2026-06-10:
       // statements 9.66% | branches 6.93% | functions 7.45% | lines 10.04%.

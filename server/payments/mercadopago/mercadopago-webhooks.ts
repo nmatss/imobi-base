@@ -3,51 +3,43 @@
  * Processes Mercado Pago webhook notifications
  */
 
+import crypto from 'node:crypto';
 import type { Request, Response } from 'express';
 import { MercadoPagoService } from './mercadopago-service';
 import { storage } from '../../storage';
 import * as Sentry from '@sentry/node';
+import { runWithTenantRlsContext } from '../../db-rls';
+import {
+  createWebhookPayloadDigest,
+  markWebhookEventFailed,
+  markWebhookEventProcessed,
+  reserveWebhookEvent,
+} from '../../integrations/webhook-ledger';
 
 /**
- * Idempotencia via Redis SETNX (espelha o padrao do Stripe webhook).
+ * Idempotencia persistente (espelha o padrao do Stripe webhook).
  * Retorna true se for a primeira vez que vemos este data.id (deve processar).
- * Retorna false se ja foi processado dentro do TTL (nao processar de novo).
- * Se o Redis estiver indisponivel, retorna true (fail-open) e deixa o
- * MercadoPago fazer retry — melhor processar duas vezes que perder evento.
+ * Retorna false se ja foi processado/esta em processamento.
  */
-async function markEventAsProcessing(eventKey: string): Promise<boolean> {
-  if (!process.env.REDIS_URL) return true;
-  try {
-    const { getRedisClient } = await import('../../cache/redis-client');
-    const client = getRedisClient();
-    const key = `mercadopago:webhook:${eventKey}`;
-    // NX = only set if not exists. EX = expiration in seconds (24h).
-    const result = await client.set(key, '1', 'EX', 24 * 60 * 60, 'NX');
-    return result === 'OK';
-  } catch (err) {
-    // Fail-open: se Redis falhar, prossegue e aceita risco de dupla execucao
-    console.warn('[mercadopago-webhook] Idempotency check failed (fail-open):', err);
-    Sentry.captureMessage('MercadoPago webhook idempotency fail-open', {
-      level: 'warning',
-      extra: { eventKey, error: err instanceof Error ? err.message : String(err) },
-    });
-    return true;
-  }
+async function markEventAsProcessing(
+  eventKey: string,
+  eventType: string | undefined,
+  rawBody: unknown,
+): Promise<boolean> {
+  const reservation = await reserveWebhookEvent({
+    provider: 'mercadopago',
+    eventId: eventKey,
+    eventType,
+    payloadDigest: createWebhookPayloadDigest(rawBody),
+  });
+  return reservation.reserved;
 }
 
 /**
- * Marca o evento como falhou para permitir retry: deleta a chave de
- * idempotencia para que o proximo webhook possa reprocessar.
+ * Marca o evento como falhou para permitir retry persistente.
  */
-async function markEventAsFailed(eventKey: string): Promise<void> {
-  if (!process.env.REDIS_URL) return;
-  try {
-    const { getRedisClient } = await import('../../cache/redis-client');
-    const client = getRedisClient();
-    await client.del(`mercadopago:webhook:${eventKey}`);
-  } catch (err) {
-    console.warn('[mercadopago-webhook] Failed to clear idempotency key:', err);
-  }
+async function markEventAsFailed(eventKey: string, error: unknown): Promise<void> {
+  await markWebhookEventFailed({ provider: 'mercadopago', eventId: eventKey, error });
 }
 
 /**
@@ -85,11 +77,13 @@ async function handlePaymentNotification(paymentId: string): Promise<void> {
       const periodEnd = new Date(now);
       periodEnd.setDate(periodEnd.getDate() + 30);
 
-      await storage.updateTenantSubscription(tenantId, {
-        status: 'active',
-        currentPeriodStart: now,
-        currentPeriodEnd: periodEnd,
-      });
+      await runWithTenantRlsContext(tenantId, () =>
+        storage.updateTenantSubscription(tenantId, {
+          status: 'active',
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+        }),
+      );
 
       console.log(
         `Payment approved for tenant ${tenantId}: ${paymentId}, amount: R$ ${paymentStatus.transactionAmount}`
@@ -110,9 +104,11 @@ async function handlePaymentNotification(paymentId: string): Promise<void> {
         },
       });
     } else if (paymentStatus.status === 'refunded') {
-      await storage.updateTenantSubscription(tenantId, {
-        status: 'suspended',
-      });
+      await runWithTenantRlsContext(tenantId, () =>
+        storage.updateTenantSubscription(tenantId, {
+          status: 'suspended',
+        }),
+      );
 
       console.log(`Payment refunded for tenant ${tenantId}: ${paymentId}`);
 
@@ -186,8 +182,8 @@ async function handleSubscriptionAuthorizedPayment(dataId: string): Promise<void
  * 1. FAIL-CLOSED na assinatura: se faltar x-signature / x-request-id / data.id
  *    => 401. Se a assinatura nao bater (ou o secret nao estiver configurado)
  *    => 401. Nunca pula a verificacao.
- * 2. Idempotencia via Redis SETNX (24h TTL) por data.id. Se ja processado,
- *    responde 200 (duplicate) sem reprocessar.
+ * 2. Idempotencia persistente em webhook_events por type:data.id.
+ *    Se ja processado/ativo, responde 200 (duplicate) sem reprocessar.
  * 3. Dispatch do handler especifico.
  * 4. Em erro transitorio do processamento, limpa a chave de idempotencia e
  *    responde 500 para o MercadoPago fazer retry. 200 so em sucesso/duplicado.
@@ -215,7 +211,7 @@ export async function handleMercadoPagoWebhook(req: Request, res: Response): Pro
 
   // 2. Idempotencia — processa cada (type:data.id) no maximo uma vez por 24h.
   const eventKey = `${type ?? 'unknown'}:${dataId}`;
-  const isNew = await markEventAsProcessing(eventKey);
+  const isNew = await markEventAsProcessing(eventKey, type, req.rawBody);
   if (!isNew) {
     console.log(`[mercadopago-webhook] Duplicate event ignored: ${eventKey}`);
     res.status(200).json({ success: true, duplicate: true });
@@ -243,6 +239,7 @@ export async function handleMercadoPagoWebhook(req: Request, res: Response): Pro
         console.log(`[mercadopago-webhook] Unhandled notification type: ${type}`);
     }
 
+    await markWebhookEventProcessed({ provider: 'mercadopago', eventId: eventKey });
     res.status(200).json({ success: true });
   } catch (error) {
     console.error('[mercadopago-webhook] Error processing webhook:', error);
@@ -253,7 +250,7 @@ export async function handleMercadoPagoWebhook(req: Request, res: Response): Pro
 
     // Permite retry: limpa a chave de idempotencia e responde 500 para que o
     // MercadoPago dispare o proximo retry automatico.
-    await markEventAsFailed(eventKey);
+    await markEventAsFailed(eventKey, error);
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Webhook processing failed',
     });
@@ -265,6 +262,18 @@ export async function handleMercadoPagoWebhook(req: Request, res: Response): Pro
  */
 export async function handleMercadoPagoIPN(req: Request, res: Response): Promise<void> {
   try {
+    if (process.env.MERCADOPAGO_ENABLE_LEGACY_IPN !== 'true') {
+      res.status(410).json({
+        error: 'Legacy Mercado Pago IPN is disabled. Use the signed webhook endpoint.',
+      });
+      return;
+    }
+
+    if (!isLegacyIpnAuthorized(req)) {
+      res.status(401).json({ error: 'Invalid legacy IPN secret' });
+      return;
+    }
+
     const { id, topic } = req.query;
 
     if (!id || !topic) {
@@ -276,7 +285,7 @@ export async function handleMercadoPagoIPN(req: Request, res: Response): Promise
 
     // Idempotencia por (topic:id), espelhando o webhook principal.
     const eventKey = `ipn:${topic}:${id}`;
-    const isNew = await markEventAsProcessing(eventKey);
+    const isNew = await markEventAsProcessing(eventKey, String(topic), req.rawBody);
     if (!isNew) {
       console.log(`[mercadopago-ipn] Duplicate event ignored: ${eventKey}`);
       res.status(200).json({ success: true, duplicate: true });
@@ -287,6 +296,7 @@ export async function handleMercadoPagoIPN(req: Request, res: Response): Promise
       if (topic === 'payment') {
         await handlePaymentNotification(id as string);
       }
+      await markWebhookEventProcessed({ provider: 'mercadopago', eventId: eventKey });
       res.status(200).json({ success: true });
     } catch (error) {
       console.error('[mercadopago-ipn] Error processing IPN:', error);
@@ -295,7 +305,7 @@ export async function handleMercadoPagoIPN(req: Request, res: Response): Promise
         extra: { eventKey },
       });
       // Permite retry: limpa a chave e responde 500.
-      await markEventAsFailed(eventKey);
+      await markEventAsFailed(eventKey, error);
       res.status(500).json({
         error: error instanceof Error ? error.message : 'IPN processing failed',
       });
@@ -307,4 +317,22 @@ export async function handleMercadoPagoIPN(req: Request, res: Response): Promise
     });
     res.status(500).json({ error: 'IPN processing failed' });
   }
+}
+
+function isLegacyIpnAuthorized(req: Request): boolean {
+  const secret = process.env.MERCADOPAGO_IPN_SECRET;
+  if (!secret) {
+    console.error('[mercadopago-ipn] MERCADOPAGO_IPN_SECRET is required when legacy IPN is enabled');
+    return false;
+  }
+
+  const provided =
+    (req.headers['x-mercadopago-ipn-secret'] as string | undefined) ||
+    (req.query.secret as string | undefined);
+
+  if (!provided) return false;
+
+  const expected = Buffer.from(secret);
+  const received = Buffer.from(provided);
+  return expected.length === received.length && crypto.timingSafeEqual(expected, received);
 }

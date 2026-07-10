@@ -1,6 +1,7 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
 import { rm, readFile, writeFile } from "fs/promises";
+import { generateStaticPublicHtml } from "./generate-static-public-html";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -37,6 +38,8 @@ async function buildAll() {
 
   console.log("building client...");
   await viteBuild();
+  const staticHtmlFiles = await generateStaticPublicHtml();
+  console.warn(`  static public HTML generated for ${staticHtmlFiles.length} routes`);
 
   // Skip standalone server build on Vercel (not needed for serverless)
   if (!process.env.VERCEL) {
@@ -109,13 +112,18 @@ export default async function handler(req, res) {
     appHandler(req, res);
   } catch (e) {
     console.error('HANDLER ERROR:', e.message, e.stack);
+    const isProduction = process.env.NODE_ENV === 'production';
     res.statusCode = 500;
     res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({
-      error: 'Handler failed',
-      message: e.message,
-      stack: e.stack?.split('\\n').slice(0, 10),
-    }));
+    res.end(JSON.stringify(
+      isProduction
+        ? { message: 'Service temporarily unavailable' }
+        : {
+            error: 'Handler failed',
+            message: e.message,
+            stack: e.stack?.split('\\n').slice(0, 10),
+          },
+    ));
   }
 }
 `.trim());

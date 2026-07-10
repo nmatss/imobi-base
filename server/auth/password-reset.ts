@@ -13,6 +13,11 @@ import { eq, and, gt } from "drizzle-orm";
 import { sendPasswordResetEmail, sendPasswordChangedEmail } from "./email-service";
 import { createAuditLog } from "../routes-security";
 import { getRedisClient } from "../cache/redis-client";
+import {
+  runWithAuthEmailRlsContext,
+  runWithPasswordResetTokenRlsContext,
+  runWithTenantRlsContext,
+} from "../db-rls";
 
 // Rate limiting for password reset requests
 const resetRequestLimiter = new Map<string, { count: number; resetAt: number }>();
@@ -170,7 +175,9 @@ export function registerPasswordResetRoutes(app: Express) {
       }
 
       // Find user by email
-      const userList = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
+      const userList = await runWithAuthEmailRlsContext(normalizedEmail, () =>
+        db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1),
+      );
 
       // Always return success to prevent email enumeration
       if (!userList.length) {
@@ -195,28 +202,30 @@ export function registerPasswordResetRoutes(app: Express) {
       const hashedToken = hashToken(resetToken);
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-      // Save token to database
-      await db.update(users)
-        .set({
-          passwordResetToken: hashedToken,
-          passwordResetExpires: expiresAt.toISOString(),
-        })
-        .where(eq(users.id, user.id));
+      await runWithTenantRlsContext(user.tenantId, async () => {
+        // Save token to database
+        await db.update(users)
+          .set({
+            passwordResetToken: hashedToken,
+            passwordResetExpires: expiresAt.toISOString(),
+          })
+          .where(eq(users.id, user.id));
 
-      // Send reset email
-      await sendPasswordResetEmail(user.email, user.name, resetToken);
+        // Send reset email
+        await sendPasswordResetEmail(user.email, user.name, resetToken);
 
-      // Audit log
-      await createAuditLog(
-        user.tenantId,
-        user.id,
-        'password_reset_requested',
-        'user',
-        user.id,
-        null,
-        { email: user.email },
-        req
-      );
+        // Audit log
+        await createAuditLog(
+          user.tenantId,
+          user.id,
+          'password_reset_requested',
+          'user',
+          user.id,
+          null,
+          { email: user.email },
+          req
+        );
+      });
 
       res.json({
         success: true,
@@ -241,15 +250,17 @@ export function registerPasswordResetRoutes(app: Express) {
       const hashedToken = hashToken(token);
       const now = new Date().toISOString();
 
-      const userList = await db.select()
-        .from(users)
-        .where(
-          and(
-            eq(users.passwordResetToken, hashedToken),
-            gt(users.passwordResetExpires, now)
+      const userList = await runWithPasswordResetTokenRlsContext(hashedToken, () =>
+        db.select()
+          .from(users)
+          .where(
+            and(
+              eq(users.passwordResetToken, hashedToken),
+              gt(users.passwordResetExpires, now)
+            )
           )
-        )
-        .limit(1);
+          .limit(1),
+      );
 
       if (!userList.length) {
         return res.status(400).json({
@@ -292,15 +303,17 @@ export function registerPasswordResetRoutes(app: Express) {
       const now = new Date().toISOString();
 
       // Find user with valid token
-      const userList = await db.select()
-        .from(users)
-        .where(
-          and(
-            eq(users.passwordResetToken, hashedToken),
-            gt(users.passwordResetExpires, now)
+      const userList = await runWithPasswordResetTokenRlsContext(hashedToken, () =>
+        db.select()
+          .from(users)
+          .where(
+            and(
+              eq(users.passwordResetToken, hashedToken),
+              gt(users.passwordResetExpires, now)
+            )
           )
-        )
-        .limit(1);
+          .limit(1),
+      );
 
       if (!userList.length) {
         return res.status(400).json({
@@ -312,7 +325,9 @@ export function registerPasswordResetRoutes(app: Express) {
       const user = userList[0];
 
       // Check password history
-      const isPasswordReused = !(await checkPasswordHistory(user.id, password));
+      const isPasswordReused = !(await runWithTenantRlsContext(user.tenantId, () =>
+        checkPasswordHistory(user.id, password),
+      ));
       if (isPasswordReused) {
         return res.status(400).json({
           error: "Esta senha foi usada recentemente. Escolha uma senha diferente."
@@ -322,44 +337,46 @@ export function registerPasswordResetRoutes(app: Express) {
       // Hash new password
       const hashedPassword = await bcrypt.hash(password, 12); // P2 Security Fix: Increased from 10 to 12 rounds
 
-      // Update password and clear reset token
-      await db.update(users)
-        .set({
-          password: hashedPassword,
-          passwordResetToken: null,
-          passwordResetExpires: null,
-          failedLoginAttempts: 0,
-          lockedUntil: null,
-        })
-        .where(eq(users.id, user.id));
+      await runWithTenantRlsContext(user.tenantId, async () => {
+        // Update password and clear reset token
+        await db.update(users)
+          .set({
+            password: hashedPassword,
+            passwordResetToken: null,
+            passwordResetExpires: null,
+            failedLoginAttempts: 0,
+            lockedUntil: null,
+          })
+          .where(eq(users.id, user.id));
 
-      // Update password history
-      await updatePasswordHistory(user.id, hashedPassword);
+        // Update password history
+        await updatePasswordHistory(user.id, hashedPassword);
 
-      // Send confirmation email
-      await sendPasswordChangedEmail(user.email, user.name);
+        // Send confirmation email
+        await sendPasswordChangedEmail(user.email, user.name);
 
-      // Audit log
-      await createAuditLog(
-        user.tenantId,
-        user.id,
-        'password_changed',
-        'user',
-        user.id,
-        null,
-        { method: 'reset_token' },
-        req
-      );
+        // Audit log
+        await createAuditLog(
+          user.tenantId,
+          user.id,
+          'password_changed',
+          'user',
+          user.id,
+          null,
+          { method: 'reset_token' },
+          req
+        );
 
-      // Log successful password reset
-      await db.insert(loginHistory).values({
-        id: nanoid(),
-        userId: user.id,
-        email: user.email,
-        success: true,
-        failureReason: null,
-        ipAddress: req.ip || req.headers['x-forwarded-for']?.toString() || null,
-        userAgent: req.headers['user-agent'] || null,
+        // Log successful password reset
+        await db.insert(loginHistory).values({
+          id: nanoid(),
+          userId: user.id,
+          email: user.email,
+          success: true,
+          failureReason: null,
+          ipAddress: req.ip || req.headers['x-forwarded-for']?.toString() || null,
+          userAgent: req.headers['user-agent'] || null,
+        });
       });
 
       res.json({

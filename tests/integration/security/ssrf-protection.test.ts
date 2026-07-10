@@ -6,11 +6,10 @@
  * existem no produto. Isso dava "falso verde": validava um wrapper de teste, não
  * o código real.
  *
- * AGORA: exercitamos diretamente o GUARD REAL `validateExternalUrl` /
- * `validateUrlWithWhitelist` de `server/security/url-validator.ts` — exatamente a
- * função que ClickSign (document-service) e WhatsApp (business-api / routes-whatsapp
- * `POST /api/whatsapp/send-media`) chamam para barrar SSRF antes de fazer fetch de
- * URL externa. As asserções refletem o COMPORTAMENTO REAL do guard.
+ * AGORA: exercitamos diretamente o GUARD REAL `validateExternalUrl`,
+ * `validateExternalUrlResolved`, `fetchExternalUrl` e `validateUrlWithWhitelist`
+ * de `server/security/url-validator.ts` — exatamente a defesa usada por
+ * ClickSign/WhatsApp/security webhooks para barrar SSRF antes de fetch externo.
  *
  * Por que não subir uma rota HTTP via buildRealApp? A única rota que aceita URL
  * externa e roda o guard (`/api/whatsapp/send-media`) é registrada em
@@ -18,23 +17,20 @@
  * harness monta), e fica atrás de `checkFeatureAccess('whatsapp')` + auth + plan
  * limits + filas (Redis). O guard em si é a unidade de defesa SSRF e é 100%
  * exercitado chamando a função real exportada — sem mock.
- *
- * LIMITAÇÕES REAIS DO GUARD (bugs em código compartilhado fora do meu track de
- * edição — server/security/url-validator.ts pertence ao meu track, MAS há um
- * teste unitário existente em server/security/__tests__/url-validator.test.ts que
- * documenta e CONGELA o comportamento atual como `valid: true` para IPv6 loopback
- * com um TODO explícito; corrigir o guard quebraria aquela suíte fora do meu
- * arquivo). Por isso os casos genuinamente NÃO protegidos hoje ficam marcados com
- * it.skip + ticket, mantendo a suíte verde sem esconder a lacuna. Ver bloco
- * "Lacunas conhecidas do guard" e o relatório.
  */
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import {
+  fetchExternalUrl,
   validateExternalUrl,
+  validateExternalUrlResolved,
   validateUrlWithWhitelist,
 } from '../../../server/security/url-validator';
 
 describe('SSRF Protection — GUARD REAL (validateExternalUrl)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   describe('Localhost / Loopback', () => {
     it('bloqueia http://localhost', () => {
       const r = validateExternalUrl('http://localhost:3000/admin');
@@ -218,6 +214,36 @@ describe('SSRF Protection — GUARD REAL (validateExternalUrl)', () => {
     }
   });
 
+  describe('Resolucao DNS e redirects manuais', () => {
+    it('bloqueia dominio externo que resolve para IP privado', async () => {
+      const r = await validateExternalUrlResolved(
+        'https://cdn.example.test/file.pdf',
+        async () => [{ address: '10.0.0.10', family: 4 }]
+      );
+
+      expect(r.valid).toBe(false);
+      expect(r.error).toContain('DNS resolves to private IP');
+    });
+
+    it('bloqueia redirect para destino privado antes do segundo fetch', async () => {
+      const mockFetch = vi.fn().mockResolvedValue(
+        new Response(null, {
+          status: 302,
+          headers: { Location: 'http://169.254.169.254/latest/meta-data/' },
+        })
+      );
+      vi.stubGlobal('fetch', mockFetch);
+
+      await expect(
+        fetchExternalUrl('https://cdn.example.test/start', {
+          dnsLookup: async () => [{ address: '93.184.216.34', family: 4 }],
+        })
+      ).rejects.toThrow(/Unsafe external URL|internal resources|private/);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('validateUrlWithWhitelist (caminho REAL do ClickSign)', () => {
     const allowed = ['example.com', 'api.trusted.com'];
 
@@ -247,20 +273,6 @@ describe('SSRF Protection — GUARD REAL (validateExternalUrl)', () => {
     });
   });
 
-  /**
-   * Lacunas conhecidas do guard REAL (NÃO mascaradas — registradas como skip).
-   *
-   * Estes vetores de SSRF NÃO são barrados pela implementação atual de
-   * `server/security/url-validator.ts`. O guard pertence ao meu track, mas há um
-   * teste unitário em `server/security/__tests__/url-validator.test.ts` (fora do
-   * meu arquivo de edição) que congela essas exatas respostas como `valid: true`
-   * com TODO explícito ("Enhance validator to block IPv6 private addresses").
-   * Corrigir o guard quebraria aquela suíte. Deixo aqui como it.skip com o
-   * comportamento ESPERADO (deveria bloquear) + ticket, para a lacuna ficar
-   * visível e rastreável sem deixar a suíte vermelha.
-   *
-   * Ticket sugerido: SEC-SSRF-IPV6 / SEC-SSRF-MALFORMED-HOST.
-   */
   describe('Lacunas de SSRF (corrigidas no guard)', () => {
     it('bloqueia IPv6 loopback [::1] (SEC-SSRF-IPV6)', () => {
       const r = validateExternalUrl('http://[::1]:3000/admin');

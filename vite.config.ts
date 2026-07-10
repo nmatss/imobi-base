@@ -157,12 +157,19 @@ export default defineConfig(({ mode }) => ({
           if (pkg("@radix-ui/react-dialog") || pkg("@radix-ui/react-alert-dialog")) {
             return "vendor-ui-dialog";
           }
+          // Radix overlay primitives depend on each other through shared focus,
+          // collection and popper internals. Keep them together to avoid circular
+          // manual chunks in production builds.
           if (
             pkg("@radix-ui/react-dropdown-menu") ||
             pkg("@radix-ui/react-select") ||
-            pkg("@radix-ui/react-menubar")
+            pkg("@radix-ui/react-menubar") ||
+            pkg("@radix-ui/react-tooltip") ||
+            pkg("@radix-ui/react-popover") ||
+            pkg("@radix-ui/react-tabs") ||
+            pkg("@radix-ui/react-accordion")
           ) {
-            return "vendor-ui-dropdown";
+            return "vendor-ui-overlays";
           }
           if (
             pkg("@radix-ui/react-checkbox") ||
@@ -171,14 +178,6 @@ export default defineConfig(({ mode }) => ({
             pkg("@radix-ui/react-slider")
           ) {
             return "vendor-ui-forms";
-          }
-          if (
-            pkg("@radix-ui/react-tooltip") ||
-            pkg("@radix-ui/react-popover") ||
-            pkg("@radix-ui/react-tabs") ||
-            pkg("@radix-ui/react-accordion")
-          ) {
-            return "vendor-ui-misc";
           }
 
           // Forms and validation

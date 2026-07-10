@@ -178,11 +178,22 @@ let clickSignClient: ClickSignClient | null = null;
 
 export function getClickSignClient(): ClickSignClient {
   if (!clickSignClient) {
-    const apiKey = process.env.CLICKSIGN_API_KEY || 'dummy-key-for-development';
-    if (!process.env.CLICKSIGN_API_KEY) {
+    const apiKey = process.env.CLICKSIGN_API_KEY;
+    if (!apiKey) {
+      // Fail-closed em produção (B2): sem chave real não instanciamos um client
+      // com "dummy-key" — ele bateria na API real da ClickSign e retornaria
+      // 401/500 confuso. Falhar explícito deixa claro que a assinatura via
+      // ClickSign está indisponível até configurar CLICKSIGN_API_KEY.
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(
+          'Assinatura via ClickSign indisponível: CLICKSIGN_API_KEY não configurada.',
+        );
+      }
       console.warn('⚠️  CLICKSIGN_API_KEY not configured. E-signature features will be limited.');
+      clickSignClient = new ClickSignClient({ apiKey: 'dummy-key-for-development' });
+    } else {
+      clickSignClient = new ClickSignClient({ apiKey });
     }
-    clickSignClient = new ClickSignClient({ apiKey });
   }
   return clickSignClient;
 }

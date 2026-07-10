@@ -233,9 +233,9 @@ export default function PropertyDetailsPage() {
         <p className="text-muted-foreground text-sm mb-4">
           {error || "O imóvel que você procura não existe ou foi removido."}
         </p>
-        <Link href="/properties">
-          <Button variant="outline">Voltar para a lista</Button>
-        </Link>
+        <Button asChild variant="outline">
+          <Link href="/properties">Voltar para a lista</Link>
+        </Button>
       </div>
     );
   }
@@ -252,20 +252,20 @@ export default function PropertyDetailsPage() {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
-          <Link href="/properties">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="shrink-0 h-9 w-9 sm:h-10 sm:w-10" aria-label="Voltar para lista de imóveis">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button asChild variant="ghost" size="icon" className="shrink-0 h-9 w-9 sm:h-10 sm:w-10">
+                  <Link href="/properties" aria-label="Voltar para lista de imóveis">
                     <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Voltar para lista</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </Link>
+                  </Link>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Voltar para lista</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg sm:text-xl lg:text-2xl font-heading font-bold text-foreground truncate">
@@ -307,12 +307,12 @@ export default function PropertyDetailsPage() {
               {isSharing ? "Copiando..." : copied ? "Copiado" : "Compartilhar"}
             </span>
           </Button>
-          <Link href={`/properties?edit=${propertyId}`}>
-            <Button size="sm" className="gap-1.5 h-9">
+          <Button asChild size="sm" className="gap-1.5 h-9">
+            <Link href={`/properties?edit=${propertyId}`}>
               <Edit className="w-4 h-4" />
               <span className="hidden sm:inline">Editar</span>
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         </div>
       </div>
 

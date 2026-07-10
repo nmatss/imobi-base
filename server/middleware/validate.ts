@@ -7,6 +7,21 @@ import { Request, Response, NextFunction } from 'express';
 import { ZodSchema, ZodError } from 'zod';
 import { ValidationError } from './error-handler';
 
+type ValidatedRequestKey = 'body' | 'query' | 'params' | 'headers';
+
+function setValidatedRequestValue(
+  req: Request,
+  key: ValidatedRequestKey,
+  value: unknown,
+): void {
+  Object.defineProperty(req, key, {
+    value,
+    writable: true,
+    enumerable: true,
+    configurable: true,
+  });
+}
+
 /**
  * Validates request body against a Zod schema
  * @param schema Zod schema to validate against
@@ -14,7 +29,7 @@ import { ValidationError } from './error-handler';
 export function validateBody<T>(schema: ZodSchema<T>) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      req.body = await schema.parseAsync(req.body);
+      setValidatedRequestValue(req, 'body', await schema.parseAsync(req.body));
       next();
     } catch (error) {
       if (error instanceof ZodError) {
@@ -33,7 +48,7 @@ export function validateBody<T>(schema: ZodSchema<T>) {
 export function validateQuery<T>(schema: ZodSchema<T>) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      req.query = await schema.parseAsync(req.query) as any;
+      setValidatedRequestValue(req, 'query', await schema.parseAsync(req.query));
       next();
     } catch (error) {
       if (error instanceof ZodError) {
@@ -52,7 +67,7 @@ export function validateQuery<T>(schema: ZodSchema<T>) {
 export function validateParams<T>(schema: ZodSchema<T>) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      req.params = await schema.parseAsync(req.params) as any;
+      setValidatedRequestValue(req, 'params', await schema.parseAsync(req.params));
       next();
     } catch (error) {
       if (error instanceof ZodError) {
@@ -71,7 +86,7 @@ export function validateParams<T>(schema: ZodSchema<T>) {
 export function validateHeaders<T>(schema: ZodSchema<T>) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      req.headers = await schema.parseAsync(req.headers) as any;
+      setValidatedRequestValue(req, 'headers', await schema.parseAsync(req.headers));
       next();
     } catch (error) {
       if (error instanceof ZodError) {

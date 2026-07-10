@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, timestamp, boolean, decimal, json, real } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, timestamp, boolean, decimal, json, real, index } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -13,6 +13,7 @@ export const tenants = pgTable("tenants", {
   phone: text("phone"),
   email: text("email"),
   address: text("address"),
+  onboardingCompleted: boolean("onboarding_completed").notNull().default(true),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   deletedAt: timestamp("deleted_at"),
 });
@@ -129,12 +130,53 @@ export const visits = pgTable("visits", {
   status: text("status").notNull().default("scheduled"),
   notes: text("notes"),
   assignedTo: varchar("assigned_to").references(() => users.id),
+  // Confirmation / reschedule / feedback workflow (paridade com schema-sqlite)
+  confirmationToken: text("confirmation_token"),
+  confirmationStatus: text("confirmation_status").default("pending"), // pending, confirmed, declined
+  confirmedAt: timestamp("confirmed_at"),
+  rescheduledFromId: varchar("rescheduled_from_id"), // self-ref visits.id
+  reminderSentAt: timestamp("reminder_sent_at"),
+  checklistJson: text("checklist_json"), // JSON array
+  feedbackRating: integer("feedback_rating"),
+  feedbackNotes: text("feedback_notes"),
+  feedbackAt: timestamp("feedback_at"),
+  nextActionType: text("next_action_type"),
+  nextActionDueAt: timestamp("next_action_due_at"),
+  // Google Calendar / Meet sync (preenchido pelo corretor conectado em Configurações)
+  googleCalendarEventId: text("google_calendar_event_id"),
+  googleMeetUrl: text("google_meet_url"),
+  googleSyncState: text("google_sync_state"), // synced | failed | skipped | null
+  googleSyncError: text("google_sync_error"),
+  lastSyncedAt: timestamp("last_synced_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const insertVisitSchema = createInsertSchema(visits).omit({ id: true, createdAt: true });
 export type InsertVisit = z.infer<typeof insertVisitSchema>;
 export type Visit = typeof visits.$inferSelect;
+
+// Conexão Google Calendar por usuário/corretor (token com scope calendar.events,
+// separado do login SSO). Tokens armazenados criptografados (token-encryption).
+export const userCalendarConnections = pgTable("user_calendar_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  provider: text("provider").notNull().default("google"),
+  googleEmail: text("google_email"),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  scope: text("scope"),
+  calendarId: text("calendar_id").notNull().default("primary"),
+  syncEnabled: boolean("sync_enabled").notNull().default(true),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertUserCalendarConnectionSchema = createInsertSchema(userCalendarConnections).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserCalendarConnection = z.infer<typeof insertUserCalendarConnectionSchema>;
+export type UserCalendarConnection = typeof userCalendarConnections.$inferSelect;
 
 export const contracts = pgTable("contracts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -162,9 +204,19 @@ export const newsletterSubscriptions = pgTable("newsletter_subscriptions", {
   tenantId: varchar("tenant_id").references(() => tenants.id),
   subscribedAt: timestamp("subscribed_at").notNull().defaultNow(),
   active: boolean("active").notNull().default(true),
+  unsubscribedAt: timestamp("unsubscribed_at"),
+  unsubscribeReason: text("unsubscribe_reason"),
+  resubscribedAt: timestamp("resubscribed_at"),
 });
 
-export const insertNewsletterSchema = createInsertSchema(newsletterSubscriptions).omit({ id: true, subscribedAt: true });
+export const insertNewsletterSchema = createInsertSchema(newsletterSubscriptions).omit({
+  id: true,
+  subscribedAt: true,
+  active: true,
+  unsubscribedAt: true,
+  unsubscribeReason: true,
+  resubscribedAt: true,
+});
 export type InsertNewsletter = z.infer<typeof insertNewsletterSchema>;
 export type Newsletter = typeof newsletterSubscriptions.$inferSelect;
 
@@ -944,6 +996,31 @@ export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 
 /**
+ * WEBHOOK EVENTS
+ * Persistent idempotency ledger for provider callbacks.
+ */
+export const webhookEvents = pgTable("webhook_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").references(() => tenants.id),
+  provider: text("provider").notNull(),
+  eventId: text("event_id").notNull(),
+  eventType: text("event_type"),
+  status: text("status").notNull().default("processing"), // processing, processed, failed
+  attempts: integer("attempts").notNull().default(1),
+  payloadDigest: text("payload_digest"),
+  signatureDigest: text("signature_digest"),
+  lastError: text("last_error"),
+  receivedAt: timestamp("received_at").notNull().defaultNow(),
+  processedAt: timestamp("processed_at"),
+  failedAt: timestamp("failed_at"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertWebhookEventSchema = createInsertSchema(webhookEvents).omit({ id: true, receivedAt: true, updatedAt: true });
+export type InsertWebhookEvent = z.infer<typeof insertWebhookEventSchema>;
+export type WebhookEvent = typeof webhookEvents.$inferSelect;
+
+/**
  * TWO FACTOR AUTHENTICATION
  * 2FA via TOTP (paridade com schema-sqlite; consumidor: server/routes-security.ts)
  */
@@ -1218,15 +1295,15 @@ export const files = pgTable("files", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
   userId: varchar("user_id").references(() => users.id),
-  filename: text("filename").notNull(),
-  originalName: text("original_name").notNull(),
+  bucket: text("bucket").notNull(), // Storage bucket name
+  filePath: text("file_path").notNull(), // Full path in storage
+  fileName: text("file_name").notNull(), // Original filename
+  fileSize: integer("file_size").notNull(), // Size in bytes
   mimeType: text("mime_type").notNull(),
-  size: integer("size").notNull(),
-  path: text("path").notNull(),
-  url: text("url"),
-  category: text("category"), // document, image, video, etc.
-  relatedTo: text("related_to"), // property, lead, contract, etc.
-  relatedId: varchar("related_id"),
+  category: text("category").notNull(), // property-image, document, avatar, logo, invoice, export
+  entityType: text("entity_type"), // property, lead, contract, user, tenant
+  entityId: varchar("entity_id"),
+  isPublic: boolean("is_public").default(false),
   metadata: json("metadata"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -1751,3 +1828,172 @@ export const autoMarketingContent = pgTable("auto_marketing_content", {
 export const insertAutoMarketingContentSchema = createInsertSchema(autoMarketingContent).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertAutoMarketingContent = z.infer<typeof insertAutoMarketingContentSchema>;
 export type AutoMarketingContent = typeof autoMarketingContent.$inferSelect;
+
+// ==================== BUYER SELECTIONS (curadoria de imóveis p/ comprador) ====================
+
+/**
+ * BUYER SELECTIONS
+ * Curated list of properties shared publicly with a buyer for feedback.
+ */
+export const buyerSelections = pgTable("buyer_selections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  leadId: varchar("lead_id").references(() => leads.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  publicToken: text("public_token").notNull().unique(),
+  status: text("status").notNull().default("active"), // active, closed, expired
+  message: text("message"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertBuyerSelectionSchema = createInsertSchema(buyerSelections).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertBuyerSelection = z.infer<typeof insertBuyerSelectionSchema>;
+export type BuyerSelection = typeof buyerSelections.$inferSelect;
+
+/**
+ * BUYER SELECTION ITEMS
+ * Individual properties within a buyer selection + buyer response.
+ */
+export const buyerSelectionItems = pgTable("buyer_selection_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  selectionId: varchar("selection_id").notNull().references(() => buyerSelections.id),
+  propertyId: varchar("property_id").notNull().references(() => properties.id),
+  sortOrder: integer("sort_order").default(0),
+  response: text("response"), // accepted, rejected, maybe
+  comment: text("comment"),
+  respondedAt: timestamp("responded_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertBuyerSelectionItemSchema = createInsertSchema(buyerSelectionItems).omit({ id: true, createdAt: true });
+export type InsertBuyerSelectionItem = z.infer<typeof insertBuyerSelectionItemSchema>;
+export type BuyerSelectionItem = typeof buyerSelectionItems.$inferSelect;
+
+// ==================== AI ACTIONS (proposta/aprovação/execução de ações por IA) ====================
+
+/**
+ * AI ACTIONS
+ * Human-in-the-loop ledger of actions proposed by AI agents.
+ */
+export const aiActions = pgTable("ai_actions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  actionType: text("action_type").notNull(),
+  status: text("status").notNull().default("proposed"), // proposed, approved, rejected, executed, failed, expired
+  targetType: text("target_type").notNull(),
+  targetId: varchar("target_id"),
+  payload: json("payload").notNull(),
+  rationale: text("rationale"),
+  confidence: real("confidence"),
+  requiresApproval: boolean("requires_approval").notNull().default(true),
+  riskLevel: text("risk_level").default("low"),
+  proposedBy: text("proposed_by").notNull().default("ai"),
+  aiModel: text("ai_model"),
+  conversationId: varchar("conversation_id"),
+  approvedBy: varchar("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  executedAt: timestamp("executed_at"),
+  result: json("result"),
+  error: text("error"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  tenantStatusIdx: index("idx_ai_actions_tenant_status").on(table.tenantId, table.status),
+  tenantTargetIdx: index("idx_ai_actions_tenant_target").on(table.tenantId, table.targetType, table.targetId),
+}));
+
+export const insertAiActionSchema = createInsertSchema(aiActions).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAiAction = z.infer<typeof insertAiActionSchema>;
+export type AiAction = typeof aiActions.$inferSelect;
+
+/**
+ * AI ACTION AUDIT
+ * Append-only audit trail for ai_actions lifecycle events.
+ */
+export const aiActionAudit = pgTable("ai_action_audit", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  actionId: varchar("action_id").notNull().references(() => aiActions.id),
+  event: text("event").notNull(),
+  actorId: varchar("actor_id").references(() => users.id),
+  actorType: text("actor_type").notNull(),
+  beforeState: json("before_state"),
+  afterState: json("after_state"),
+  details: json("details"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  tenantActionCreatedIdx: index("idx_ai_action_audit_tenant_action_created").on(table.tenantId, table.actionId, table.createdAt),
+}));
+
+export const insertAiActionAuditSchema = createInsertSchema(aiActionAudit).omit({ id: true, createdAt: true });
+export type InsertAiActionAudit = z.infer<typeof insertAiActionAuditSchema>;
+export type AiActionAudit = typeof aiActionAudit.$inferSelect;
+
+// ==================== LEAD SCORING / ASSIGNMENT CONFIG ====================
+
+/**
+ * LEAD SCORE WEIGHTS
+ * Per-tenant tunable weights/thresholds for the lead scoring engine.
+ */
+export const leadScoreWeights = pgTable("lead_score_weights", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id).unique(),
+  budgetWeight: integer("budget_weight").default(25),
+  engagementWeight: integer("engagement_weight").default(25),
+  profileWeight: integer("profile_weight").default(20),
+  urgencyWeight: integer("urgency_weight").default(15),
+  behaviorWeight: integer("behavior_weight").default(15),
+  hotThreshold: integer("hot_threshold").default(70),
+  warmThreshold: integer("warm_threshold").default(40),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertLeadScoreWeightsSchema = createInsertSchema(leadScoreWeights).omit({ id: true, updatedAt: true });
+export type InsertLeadScoreWeights = z.infer<typeof insertLeadScoreWeightsSchema>;
+export type LeadScoreWeights = typeof leadScoreWeights.$inferSelect;
+
+/**
+ * LEAD ASSIGNMENT STATE
+ * Per-tenant round-robin / assignment cursor.
+ */
+export const leadAssignmentState = pgTable("lead_assignment_state", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id).unique(),
+  strategy: text("strategy").default("round_robin"),
+  lastAssignedUserId: varchar("last_assigned_user_id").references(() => users.id),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertLeadAssignmentStateSchema = createInsertSchema(leadAssignmentState).omit({ id: true, updatedAt: true });
+export type InsertLeadAssignmentState = z.infer<typeof insertLeadAssignmentStateSchema>;
+export type LeadAssignmentState = typeof leadAssignmentState.$inferSelect;
+
+// ==================== SIGNATURE CERTIFICATES (ICP-Brasil / e-sign) ====================
+
+/**
+ * SIGNATURE CERTIFICATES
+ * Stored digital signing certificates (PEM) per tenant/user.
+ */
+export const signatureCertificates = pgTable("signature_certificates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id),
+  userId: varchar("user_id").references(() => users.id),
+  serialNumber: text("serial_number"),
+  subject: text("subject"),
+  issuer: text("issuer"),
+  validFrom: timestamp("valid_from"),
+  validTo: timestamp("valid_to"),
+  certificatePem: text("certificate_pem").notNull(),
+  fingerprint: text("fingerprint"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertSignatureCertificateSchema = createInsertSchema(signatureCertificates).omit({ id: true, createdAt: true });
+export type InsertSignatureCertificate = z.infer<typeof insertSignatureCertificateSchema>;
+export type SignatureCertificate = typeof signatureCertificates.$inferSelect;

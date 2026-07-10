@@ -68,6 +68,7 @@ export function ImageLightbox({ images, initialIndex = 0, isOpen, onClose }: Ima
         size="icon"
         className="absolute top-4 right-4 text-white hover:bg-white/20 z-50"
         onClick={(e) => { e.stopPropagation(); onClose(); }}
+        aria-label="Fechar visualização de imagem"
         data-testid="button-close-lightbox"
       >
         <X className="h-6 w-6" />
@@ -79,6 +80,7 @@ export function ImageLightbox({ images, initialIndex = 0, isOpen, onClose }: Ima
           size="icon"
           className="text-white hover:bg-white/20"
           onClick={(e) => { e.stopPropagation(); handleZoomOut(); }}
+          aria-label="Reduzir zoom da imagem"
           data-testid="button-zoom-out"
         >
           <ZoomOut className="h-5 w-5" />
@@ -89,6 +91,7 @@ export function ImageLightbox({ images, initialIndex = 0, isOpen, onClose }: Ima
           size="icon"
           className="text-white hover:bg-white/20"
           onClick={(e) => { e.stopPropagation(); handleZoomIn(); }}
+          aria-label="Ampliar zoom da imagem"
           data-testid="button-zoom-in"
         >
           <ZoomIn className="h-5 w-5" />
@@ -102,6 +105,7 @@ export function ImageLightbox({ images, initialIndex = 0, isOpen, onClose }: Ima
             size="icon"
             className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20 h-12 w-12"
             onClick={(e) => { e.stopPropagation(); goToPrevious(); }}
+            aria-label="Ver imagem anterior"
             data-testid="button-prev-image"
           >
             <ChevronLeft className="h-8 w-8" />
@@ -111,6 +115,7 @@ export function ImageLightbox({ images, initialIndex = 0, isOpen, onClose }: Ima
             size="icon"
             className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:bg-white/20 h-12 w-12"
             onClick={(e) => { e.stopPropagation(); goToNext(); }}
+            aria-label="Ver próxima imagem"
             data-testid="button-next-image"
           >
             <ChevronRight className="h-8 w-8" />
@@ -141,6 +146,7 @@ export function ImageLightbox({ images, initialIndex = 0, isOpen, onClose }: Ima
               <button
                 key={idx}
                 onClick={(e) => { e.stopPropagation(); setCurrentIndex(idx); setZoom(1); }}
+                aria-label={`Ver imagem ${idx + 1}`}
                 className={`w-2 h-2 rounded-full transition-colors ${
                   idx === currentIndex ? "bg-white" : "bg-white/40 hover:bg-white/60"
                 }`}
@@ -156,6 +162,7 @@ export function ImageLightbox({ images, initialIndex = 0, isOpen, onClose }: Ima
           <button
             key={idx}
             onClick={(e) => { e.stopPropagation(); setCurrentIndex(idx); setZoom(1); }}
+            aria-label={`Ver miniatura ${idx + 1}`}
             className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-colors ${
               idx === currentIndex ? "border-white" : "border-transparent opacity-60 hover:opacity-100"
             }`}

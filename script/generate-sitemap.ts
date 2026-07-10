@@ -11,6 +11,7 @@
  */
 import { writeFile, mkdir } from "fs/promises";
 import { resolve, dirname } from "path";
+import { PUBLIC_SEO_ROUTES, SITE_URL } from "./public-seo-manifest";
 
 type SitemapRoute = {
   loc: string;
@@ -25,21 +26,11 @@ type SitemapRoute = {
   priority?: number;
 };
 
-const SITE_URL = (
-  process.env.SITE_URL ||
-  process.env.VITE_SITE_URL ||
-  "https://imobibase.com.br"
-).replace(/\/$/, "");
-
-// Apenas rotas publicas indexaveis. login/signup ficam fora (paginas privadas).
-const ROUTES: SitemapRoute[] = [
-  { loc: "/", changefreq: "weekly", priority: 1.0 },
-  { loc: "/pricing", changefreq: "weekly", priority: 0.9 },
-  { loc: "/termos", changefreq: "monthly", priority: 0.3 },
-  { loc: "/privacidade", changefreq: "monthly", priority: 0.3 },
-  { loc: "/contato", changefreq: "monthly", priority: 0.6 },
-  { loc: "/novidades", changefreq: "weekly", priority: 0.5 },
-];
+const ROUTES: SitemapRoute[] = PUBLIC_SEO_ROUTES.map((route) => ({
+  loc: route.path,
+  changefreq: route.changefreq,
+  priority: route.priority,
+}));
 
 function buildXml(routes: SitemapRoute[], lastmod: string): string {
   const urls = routes

@@ -20,8 +20,20 @@ import {
 import { sendDeletionConfirmationEmail } from "./compliance-email";
 import PDFDocument from "pdfkit";
 import { createWriteStream, mkdirSync, existsSync, readdirSync } from "fs";
+import { readFile } from "fs/promises";
 import { join } from "path";
 import os from "os";
+import {
+  STORAGE_BUCKETS,
+  isStorageConfigured,
+  uploadObject,
+  downloadObject,
+} from "../storage/supabase-client";
+
+/** Chave determinística do certificado de exclusão no bucket privado DOCUMENTS. */
+function certificateObjectKey(certificateNumber: string): string {
+  return `deletion-certificates/${certificateNumber}.pdf`;
+}
 
 /**
  * Deriva a base legal real (LGPD Art. 7/Art. 18) conforme a ação de compliance,
@@ -388,16 +400,49 @@ async function generateDeletionCertificate(
   deletionType: string,
   requestId: string
 ): Promise<string> {
-  ensureCertificatesDir(); // mkdir recursivo no momento do uso (serverless-safe)
   const fileName = `deletion-certificate-${randomUUID()}-${certificateNumber}.pdf`;
+  const useDurable = isStorageConfigured();
+  if (!useDurable) {
+    ensureCertificatesDir(); // mkdir recursivo no momento do uso (serverless-safe)
+  }
   const filePath = join(CERTIFICATES_DIR, fileName);
 
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ margin: 50 });
-      const stream = createWriteStream(filePath);
+      // Coletamos o PDF em memória para poder enviá-lo a storage durável
+      // (Supabase) em produção, sem depender do /tmp efêmero do serverless.
+      const chunks: Buffer[] = [];
+      doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+      doc.on("error", (err) => reject(err));
+      doc.on("end", () => {
+        const pdfBuffer = Buffer.concat(chunks);
+        if (useDurable) {
+          uploadObject(
+            STORAGE_BUCKETS.DOCUMENTS,
+            certificateObjectKey(certificateNumber),
+            pdfBuffer,
+            "application/pdf",
+          )
+            .then((ok) => {
+              if (!ok) {
+                reject(new Error("Falha ao enviar o certificado de exclusão ao storage durável"));
+                return;
+              }
+              resolve(`/api/compliance/deletion-certificate/${certificateNumber}`);
+            })
+            .catch(reject);
+        }
+      });
 
-      doc.pipe(stream);
+      if (!useDurable) {
+        const stream = createWriteStream(filePath);
+        doc.pipe(stream);
+        stream.on("finish", () => {
+          resolve(`/api/compliance/deletion-certificate/${certificateNumber}`);
+        });
+        stream.on("error", (err) => reject(err));
+      }
 
       // Header
       doc
@@ -504,15 +549,9 @@ async function generateDeletionCertificate(
       doc.text("ImobiBase - Sistema de Gestão Imobiliária", { align: "center" });
       doc.text("Encarregado de Dados (DPO): dpo@imobibase.com", { align: "center" });
 
+      // Dispara 'end' (e o upload durável, quando aplicável) ou o flush do
+      // stream local em dev.
       doc.end();
-
-      stream.on("finish", () => {
-        resolve(`/api/compliance/deletion-certificate/${certificateNumber}`);
-      });
-
-      stream.on("error", (err) => {
-        reject(err);
-      });
     } catch (error) {
       reject(error);
     }
@@ -529,6 +568,19 @@ export async function getDeletionCertificate(certificateNumber: string) {
     throw new Error("Certificate not found");
   }
 
+  // Conteúdo durável (Supabase) ou fallback local (dev). Retorna Buffer para a
+  // rota não depender de um path local entre instâncias serverless.
+  if (isStorageConfigured()) {
+    const buffer = await downloadObject(
+      STORAGE_BUCKETS.DOCUMENTS,
+      certificateObjectKey(certificateNumber),
+    );
+    if (!buffer) {
+      throw new Error("Certificate file not found");
+    }
+    return buffer;
+  }
+
   // Find the certificate file by matching the certificate number suffix (filename includes a UUID prefix)
   const files = existsSync(CERTIFICATES_DIR) ? readdirSync(CERTIFICATES_DIR) : [];
   const matchingFile = files.find(f => f.endsWith(`-${certificateNumber}.pdf`));
@@ -537,7 +589,7 @@ export async function getDeletionCertificate(certificateNumber: string) {
   }
   const filePath = join(CERTIFICATES_DIR, matchingFile);
 
-  return filePath;
+  return readFile(filePath);
 }
 
 /**

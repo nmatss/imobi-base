@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 
 /**
  * Validates email address format
@@ -30,9 +30,11 @@ export function validateEmails(emails: string[]): { valid: string[]; invalid: st
  * Generates an unsubscribe token for a user
  */
 export function generateUnsubscribeToken(userId: string, email: string): string {
-  const data = `${userId}:${email}:${Date.now()}`;
-  const token = Buffer.from(data).toString('base64url');
-  return token;
+  const payload = Buffer.from(
+    JSON.stringify({ userId, email, timestamp: Date.now() }),
+  ).toString('base64url');
+  const signature = signUnsubscribePayload(payload);
+  return `${payload}.${signature}`;
 }
 
 /**
@@ -40,25 +42,80 @@ export function generateUnsubscribeToken(userId: string, email: string): string 
  */
 export function validateUnsubscribeToken(token: string): { userId: string; email: string } | null {
   try {
-    const decoded = Buffer.from(token, 'base64url').toString('utf-8');
-    const [userId, email, timestamp] = decoded.split(':');
+    const parsed = parseUnsubscribeToken(token);
+    if (!parsed) return null;
+    const { userId, email, timestamp } = parsed;
 
-    if (!userId || !email || !timestamp) {
-      return null;
-    }
+    if (!userId || !email || !timestamp || !isValidEmail(email)) return null;
 
-    // Token expires after 30 days
-    const tokenAge = Date.now() - parseInt(timestamp);
-    const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
+    const issuedAt = Number(timestamp);
+    if (!Number.isFinite(issuedAt)) return null;
 
-    if (tokenAge > maxAge) {
-      return null;
-    }
+    const tokenAge = Date.now() - issuedAt;
+    const maxAge = 30 * 24 * 60 * 60 * 1000;
+    if (tokenAge < 0 || tokenAge > maxAge) return null;
 
     return { userId, email };
   } catch {
     return null;
   }
+}
+
+function getUnsubscribeTokenSecret(): string {
+  return (
+    process.env.UNSUBSCRIBE_TOKEN_SECRET ||
+    process.env.SESSION_SECRET ||
+    'dev-unsubscribe-token-secret'
+  );
+}
+
+function signUnsubscribePayload(payload: string): string {
+  return createHmac('sha256', getUnsubscribeTokenSecret())
+    .update(payload)
+    .digest('base64url');
+}
+
+function verifyUnsubscribeSignature(payload: string, signature: string): boolean {
+  const expected = signUnsubscribePayload(payload);
+  const expectedBuffer = Buffer.from(expected);
+  const signatureBuffer = Buffer.from(signature);
+  return (
+    expectedBuffer.length === signatureBuffer.length &&
+    timingSafeEqual(expectedBuffer, signatureBuffer)
+  );
+}
+
+function parseUnsubscribeToken(
+  token: string,
+): { userId: string; email: string; timestamp: number | string } | null {
+  const [payload, signature] = token.split('.');
+
+  if (!payload || !signature) {
+    return null;
+  }
+
+  if (!verifyUnsubscribeSignature(payload, signature)) return null;
+
+  const decoded = Buffer.from(payload, 'base64url').toString('utf-8');
+  const parsed = JSON.parse(decoded);
+
+  if (!parsed || typeof parsed !== 'object') return null;
+
+  const { userId, email, timestamp } = parsed as {
+    userId?: unknown;
+    email?: unknown;
+    timestamp?: unknown;
+  };
+
+  if (
+    typeof userId !== 'string' ||
+    typeof email !== 'string' ||
+    (typeof timestamp !== 'number' && typeof timestamp !== 'string')
+  ) {
+    return null;
+  }
+
+  return { userId, email, timestamp };
 }
 
 /**

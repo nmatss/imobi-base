@@ -11,6 +11,7 @@ import { users, loginHistory } from "@shared/schema-sqlite";
 import { eq, and, desc, gte } from "drizzle-orm";
 import { createAuditLog } from "../routes-security";
 import { sendSecurityAlertEmail, sendNewLoginEmail } from "./email-service";
+import { runWithTenantRlsContext } from "../db-rls";
 
 // Account lockout configuration
 const MAX_FAILED_ATTEMPTS = 5;
@@ -330,7 +331,10 @@ export function registerSecurityRoutes(app: Express) {
     if (!req.isAuthenticated?.() || !req.user) {
       return res.status(401).json({ error: "Não autenticado" });
     }
-    next();
+    if (!req.user.tenantId) {
+      return res.status(403).json({ error: "Sessão inválida" });
+    }
+    runWithTenantRlsContext(req.user.tenantId, () => next());
   };
 
   // Get password strength requirements
@@ -384,6 +388,63 @@ export function registerSecurityRoutes(app: Express) {
     } catch (error: any) {
       console.error('Get login history error:', error);
       res.status(500).json({ error: "Erro ao buscar histórico de login" });
+    }
+  });
+
+  // Change password (autenticado) — preenche a lacuna do painel de Segurança (B3):
+  // valida senha atual, força, diferença e histórico antes de aplicar bcrypt(12).
+  app.post("/api/auth/change-password", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const { currentPassword, newPassword } = req.body ?? {};
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: "Informe a senha atual e a nova senha." });
+      }
+
+      const userList = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!userList.length) {
+        return res.status(404).json({ error: "Usuário não encontrado" });
+      }
+      const user = userList[0];
+
+      if (!user.password) {
+        return res.status(400).json({
+          error: "Sua conta usa login social. Defina uma senha pelo fluxo de recuperação de senha.",
+        });
+      }
+
+      const currentOk = await bcrypt.compare(currentPassword, user.password);
+      if (!currentOk) {
+        return res.status(401).json({ error: "Senha atual incorreta." });
+      }
+
+      if (currentPassword === newPassword) {
+        return res.status(400).json({ error: "A nova senha deve ser diferente da atual." });
+      }
+
+      const strength = validatePasswordStrength(newPassword);
+      if (!strength.valid) {
+        return res.status(400).json({
+          error: strength.message || "A nova senha não atende aos requisitos de segurança.",
+        });
+      }
+
+      const notReused = await checkPasswordHistory(userId, newPassword);
+      if (!notReused) {
+        return res.status(400).json({
+          error: "Você já usou esta senha recentemente. Escolha uma senha diferente.",
+        });
+      }
+
+      const hash = await bcrypt.hash(newPassword, 12);
+      await db.update(users).set({ password: hash }).where(eq(users.id, userId));
+      await updatePasswordHistory(userId, hash);
+
+      res.json({ success: true, message: "Senha alterada com sucesso." });
+    } catch (error: any) {
+      console.error("Change password error:", error);
+      res.status(500).json({ error: "Erro ao alterar a senha" });
     }
   });
 

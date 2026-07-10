@@ -9,6 +9,7 @@ import { StripeService } from './payments/stripe/stripe-service';
 import { handleStripeWebhook } from './payments/stripe/stripe-webhooks';
 import { MercadoPagoService } from './payments/mercadopago/mercadopago-service';
 import { handleMercadoPagoWebhook, handleMercadoPagoIPN } from './payments/mercadopago/mercadopago-webhooks';
+import { isMercadoPagoPaymentOwnedByTenant } from './payments/mercadopago/tenant-ownership';
 import { storage } from './storage';
 import * as Sentry from '@sentry/node';
 import { asyncHandler, AuthError } from './middleware/error-handler';
@@ -37,6 +38,16 @@ const paymentMutationLimiter = rateLimit({
     });
   },
 });
+
+/**
+ * Em produção NÃO vazamos a mensagem crua do erro (Stripe/DB podem conter IDs
+ * internos, "No such customer: cus_...", detalhes de chave etc.). Fora de
+ * produção retornamos o detalhe para facilitar o debug.
+ */
+function safeErrorMessage(error: unknown, fallback: string): string {
+  if (process.env.NODE_ENV === 'production') return fallback;
+  return error instanceof Error ? error.message : fallback;
+}
 
 /**
  * Register payment routes
@@ -87,7 +98,7 @@ export function registerPaymentRoutes(app: Express): void {
         tags: { route: 'payments', operation: 'cancelStripeSubscription' },
       });
       res.status(500).json({
-        error: error instanceof Error ? error.message : 'Failed to cancel subscription',
+        error: safeErrorMessage(error, 'Failed to cancel subscription'),
       });
     }
   });
@@ -299,7 +310,7 @@ export function registerPaymentRoutes(app: Express): void {
         tags: { route: 'payments', operation: 'updatePaymentMethod' },
       });
       res.status(500).json({
-        error: error instanceof Error ? error.message : 'Failed to update payment method',
+        error: safeErrorMessage(error, 'Failed to update payment method'),
       });
     }
   });
@@ -344,7 +355,7 @@ export function registerPaymentRoutes(app: Express): void {
         tags: { route: 'payments', operation: 'getSubscriptionStatus' },
       });
       res.status(500).json({
-        error: error instanceof Error ? error.message : 'Failed to get subscription status',
+        error: safeErrorMessage(error, 'Failed to get subscription status'),
       });
     }
   });
@@ -387,7 +398,7 @@ export function registerPaymentRoutes(app: Express): void {
         tags: { route: 'payments', operation: 'getInvoices' },
       });
       res.status(500).json({
-        error: error instanceof Error ? error.message : 'Failed to get invoices',
+        error: safeErrorMessage(error, 'Failed to get invoices'),
       });
     }
   });
@@ -422,7 +433,7 @@ export function registerPaymentRoutes(app: Express): void {
         tags: { route: 'payments', operation: 'createPixPayment' },
       });
       res.status(500).json({
-        error: error instanceof Error ? error.message : 'Failed to create PIX payment',
+        error: safeErrorMessage(error, 'Failed to create PIX payment'),
       });
     }
   });
@@ -457,7 +468,7 @@ export function registerPaymentRoutes(app: Express): void {
         tags: { route: 'payments', operation: 'createBoletoPayment' },
       });
       res.status(500).json({
-        error: error instanceof Error ? error.message : 'Failed to create Boleto payment',
+        error: safeErrorMessage(error, 'Failed to create Boleto payment'),
       });
     }
   });
@@ -473,7 +484,13 @@ export function registerPaymentRoutes(app: Express): void {
       }
 
       const { paymentId } = req.params;
+      const tenantId = req.user.tenantId;
       const status = await MercadoPagoService.getPaymentStatus(paymentId);
+
+      if (!isMercadoPagoPaymentOwnedByTenant(status, tenantId)) {
+        res.status(404).json({ error: 'Payment not found' });
+        return;
+      }
 
       res.json(status);
     } catch (error) {
@@ -482,7 +499,7 @@ export function registerPaymentRoutes(app: Express): void {
         tags: { route: 'payments', operation: 'getPaymentStatus' },
       });
       res.status(500).json({
-        error: error instanceof Error ? error.message : 'Failed to get payment status',
+        error: safeErrorMessage(error, 'Failed to get payment status'),
       });
     }
   });

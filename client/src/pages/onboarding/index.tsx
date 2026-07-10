@@ -1,14 +1,16 @@
 import { usePageTitle } from "@/hooks/use-page-title";
 import React, { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useImobi } from "@/lib/imobi-context";
 import { apiRequest } from "@/lib/queryClient";
+import { toast } from "@/lib/toast-helpers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { plans as PLAN_CATALOG } from "@/lib/plans-config";
 import {
   Building2,
   Palette,
@@ -114,12 +116,13 @@ export default function OnboardingPage() {
         phone: brandData.phone,
         address: brandData.address,
       });
+      // U1: so avanca quando o salvamento realmente teve sucesso.
+      goNext();
     } catch {
-      // silently continue
+      toast.errors.operation("salvar as informações da empresa");
     } finally {
       setIsSaving(false);
     }
-    goNext();
   };
 
   const handleCreateProperty = async () => {
@@ -138,16 +141,27 @@ export default function OnboardingPage() {
         area: propertyData.area ? parseInt(propertyData.area) : null,
         status: "active",
       });
+      // U1: so avanca quando o imovel foi realmente criado.
+      goNext();
     } catch {
-      // silently continue
+      toast.errors.operation("cadastrar o imóvel");
     } finally {
       setIsSaving(false);
     }
-    goNext();
   };
 
   const handleFinish = () => {
     setLocation("/dashboard");
+  };
+
+  // Ao final da etapa de plano: plano pago vai direto ao checkout do plano
+  // escolhido; plano gratuito segue o wizard para a etapa final.
+  const handlePlanContinue = () => {
+    if (selectedPlan && selectedPlan !== "free") {
+      setLocation(`/checkout/${selectedPlan}`);
+    } else {
+      goNext();
+    }
   };
 
   const handleExploreWithDemoData = async () => {
@@ -157,8 +171,16 @@ export default function OnboardingPage() {
       // catch abaixo absorve o erro e seguimos para o dashboard de qualquer
       // forma — o painel estará populado nos dois cenários.
       await apiRequest("POST", "/api/onboarding/demo-data");
-    } catch {
-      // silently continue — fluxo de onboarding não deve travar
+    } catch (err) {
+      // 409 = dados de exemplo ja existem (esperado, segue normal). Outros erros
+      // viram aviso nao-bloqueante: o painel funciona mesmo sem os dados de demo.
+      const isConflict = err instanceof Error && err.message.startsWith("409");
+      if (!isConflict) {
+        toast.warning(
+          "Não foi possível gerar todos os dados de exemplo",
+          "Você ainda pode explorar o painel normalmente.",
+        );
+      }
     } finally {
       setIsSeedingDemo(false);
     }
@@ -202,7 +224,7 @@ export default function OnboardingPage() {
   const StepBrand = () => (
     <div className="py-6 px-4 max-w-xl mx-auto w-full">
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 flex items-center justify-center">
           <Palette className="w-5 h-5" />
         </div>
         <div>
@@ -309,7 +331,7 @@ export default function OnboardingPage() {
   const StepProperty = () => (
     <div className="py-6 px-4 max-w-xl mx-auto w-full">
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-green-100 text-green-600 flex items-center justify-center">
+        <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center">
           <Home className="w-5 h-5" />
         </div>
         <div>
@@ -456,59 +478,27 @@ export default function OnboardingPage() {
   );
 
   const StepPlan = () => {
-    const plans = [
-      {
-        id: "free",
-        name: "Gratis",
-        price: "R$ 0",
+    // Deriva do catalogo canonico (client/src/lib/plans-config) para que os
+    // slugs (free/starter/pro) batam com /api/plans e /checkout/:planId — evita
+    // o descasamento antigo ("basico" nao existia como plano real).
+    const plans = PLAN_CATALOG.filter((p) => ["free", "starter", "pro"].includes(p.id)).map(
+      (p) => ({
+        id: p.id,
+        name: p.name,
+        price: p.monthlyPrice === 0 ? "R$ 0" : `R$ ${p.monthlyPrice}`,
         period: "/mes",
-        description: "Para comecar sua jornada digital.",
-        features: ["Ate 10 imoveis", "Ate 50 leads", "1 usuario", "Site publico basico"],
-        cta: "Comecar gratis",
-        variant: "outline" as const,
-      },
-      {
-        id: "basico",
-        name: "Basico",
-        price: "R$ 99",
-        period: "/mes",
-        description: "Para quem quer crescer com eficiencia.",
-        features: [
-          "Ate 100 imoveis",
-          "Leads ilimitados",
-          "5 usuarios",
-          "Integracao WhatsApp",
-          "Relatorios basicos",
-        ],
-        cta: "Assinar Basico",
-        variant: "outline" as const,
-        popular: false,
-      },
-      {
-        id: "pro",
-        name: "Profissional",
-        price: "R$ 199",
-        period: "/mes",
-        description: "Para quem quer escalar vendas.",
-        features: [
-          "Imoveis ilimitados",
-          "Leads ilimitados",
-          "Usuarios ilimitados",
-          "Todas as integracoes",
-          "IA (Marketing, AVM, ISA)",
-          "Portal do cliente",
-          "Vistorias digitais",
-        ],
-        cta: "Assinar Pro",
-        variant: "default" as const,
-        popular: true,
-      },
-    ];
+        description: p.description,
+        features: p.features.slice(0, 7),
+        cta: p.id === "free" ? "Comecar gratis" : `Assinar ${p.name}`,
+        variant: p.variant,
+        popular: p.popular,
+      }),
+    );
 
     return (
       <div className="py-6 px-4 max-w-3xl mx-auto w-full">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 flex items-center justify-center">
             <CreditCard className="w-5 h-5" />
           </div>
           <div>
@@ -575,15 +565,15 @@ export default function OnboardingPage() {
           <Button variant="outline" onClick={goBack} className="h-11">
             <ArrowLeft className="w-4 h-4 mr-2" /> Voltar
           </Button>
-          <Button onClick={goNext} className="flex-1 h-11">
-            {selectedPlan === "free" ? "Comecar gratis" : "Continuar"} <ArrowRight className="ml-2 w-4 h-4" />
+          <Button onClick={handlePlanContinue} className="flex-1 h-11">
+            {selectedPlan === "free" ? "Comecar gratis" : "Ir para o pagamento"} <ArrowRight className="ml-2 w-4 h-4" />
           </Button>
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-4">
-          <a href="/pricing" className="text-primary hover:underline">
+          <Link href="/pricing" className="text-primary hover:underline">
             Ver detalhes completos dos planos
-          </a>
+          </Link>
         </p>
       </div>
     );
@@ -591,9 +581,9 @@ export default function OnboardingPage() {
 
   const StepDone = () => (
     <div className="flex flex-col items-center text-center py-8 px-4">
-      <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-8 relative">
-        <Check className="w-10 h-10 text-green-600" />
-        <div className="absolute inset-0 rounded-full border-4 border-green-200 animate-ping opacity-20" />
+      <div className="w-20 h-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-8 relative">
+        <Check className="w-10 h-10 text-green-600 dark:text-green-400" />
+        <div className="absolute inset-0 rounded-full border-4 border-green-200 dark:border-green-800 animate-ping opacity-20" />
       </div>
       <h1 className="text-3xl md:text-4xl font-heading font-bold mb-4">Tudo pronto!</h1>
       <p className="text-lg text-muted-foreground max-w-lg mb-8">
@@ -663,19 +653,22 @@ export default function OnboardingPage() {
   ];
 
   const renderStep = () => {
+    // Chamadas de função (não <Componente/>): evita criar novos tipos de componente
+    // a cada render do pai, o que remontaria a subárvore e faria os <Input> perderem
+    // o foco a cada tecla digitada.
     switch (currentStep) {
       case 1:
-        return <StepWelcome />;
+        return StepWelcome();
       case 2:
-        return <StepBrand />;
+        return StepBrand();
       case 3:
-        return <StepProperty />;
+        return StepProperty();
       case 4:
-        return <StepPlan />;
+        return StepPlan();
       case 5:
-        return <StepDone />;
+        return StepDone();
       default:
-        return <StepWelcome />;
+        return StepWelcome();
     }
   };
 

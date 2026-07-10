@@ -34,6 +34,9 @@ jobs:
       - name: TypeScript type check
         run: npm run check
 
+      - name: Operational script type check
+        run: npm run check:scripts
+
       - name: Lint
         run: npm run lint
 
@@ -60,9 +63,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: pre-deploy
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     environment:
       name: production
-      url: https://imobibase.com
+      url: https://imobibase.com.br
 
     steps:
       - name: Checkout code
@@ -73,6 +79,9 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
@@ -85,6 +94,12 @@ jobs:
         env:
           NODE_ENV: production
 
+      - name: Verify cron manifest
+        run: npm run ops:cron:verify
+
+      - name: Verify Go Live readiness gate
+        run: npm run ops:go-live:verify:strict
+
       - name: Deploy to Vercel Production
         id: deploy
         run: |
@@ -92,40 +107,10 @@ jobs:
           echo "DEPLOY_URL=$DEPLOY_URL" >> $GITHUB_OUTPUT
           echo "🚀 Deployed to: $DEPLOY_URL"
 
-      - name: Install Dependencies
-        run: npm ci
-
-      - name: Run Database Migrations
-        id: migrate
+      - name: Database migration policy
         run: |
-          echo "Running database migrations..."
-          npm run db:migrate
-          echo "✅ Migrations complete"
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        continue-on-error: false
-
-      - name: Rollback Deployment on Migration Failure
-        if: failure() && steps.migrate.outcome == 'failure'
-        run: |
-          echo "❌ Migration failed! Deployment should be rolled back."
-          echo "::error::Database migration failed. Please check migration logs and fix issues before redeploying."
-          exit 1
-
-      - name: Notify Sentry of Deployment
-        if: always()
-        run: |
-          curl -X POST "https://sentry.io/api/0/organizations/${{ secrets.SENTRY_ORG }}/releases/" \
-            -H "Authorization: Bearer ${{ secrets.SENTRY_AUTH_TOKEN }}" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "version": "${{ github.sha }}",
-              "projects": ["imobibase"],
-              "refs": [{
-                "repository": "${{ github.repository }}",
-                "commit": "${{ github.sha }}"
-              }]
-            }' || echo "⚠️  Sentry notification failed (non-blocking)"
+          echo "Automatic production migrations are disabled by policy."
+          echo "Apply reviewed migrations before deploy, one file at a time, following docs/DEPLOYMENT_RUNBOOK.md."
 
       - name: Health Check
         run: |
@@ -144,6 +129,21 @@ jobs:
             echo "::error::Production deployment is not healthy!"
             exit 1
           fi
+
+      - name: Notify Sentry of Deployment
+        if: success() && steps.deploy.outputs.DEPLOY_URL != ''
+        run: |
+          curl -X POST "https://sentry.io/api/0/organizations/${{ secrets.SENTRY_ORG }}/releases/" \
+            -H "Authorization: Bearer ${{ secrets.SENTRY_AUTH_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "version": "${{ github.sha }}",
+              "projects": ["imobibase"],
+              "refs": [{
+                "repository": "${{ github.repository }}",
+                "commit": "${{ github.sha }}"
+              }]
+            }' || echo "⚠️  Sentry notification failed (non-blocking)"
 
       - name: Create GitHub Deployment
         uses: actions/github-script@v7

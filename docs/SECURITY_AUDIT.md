@@ -1,5 +1,36 @@
 # Security Audit Report - ImobiBase
 
+## Atualizacao 2026-06-30 — Revisao completa holistica
+
+Fonte: `docs/reports/REVISAO_GO_LIVE_COMPLETA_2026-06-30.md`.
+
+Veredito de seguranca: **NO-GO enterprise** ate evidencias reais de staging/producao.
+
+Achados atuais:
+
+- `CRITICO`: RLS ainda precisa ser aplicado e verificado em staging/producao com role runtime nao-owner sem `BYPASSRLS`.
+- `CRITICO`: secrets reais em `.env.production` local foram reportados em 2026-06-29; remover do workspace, mover para secrets manager e rotacionar.
+- `CRITICO`: backup/PITR, restore drill e pentest real ainda nao possuem evidencia suficiente para go-live enterprise.
+- `ALTO`: Microsoft OAuth ja criptografa novos tokens localmente, mas tokens legados exigem rodar `npm run ops:oauth:encrypt-microsoft-tokens -- --apply` com `ENCRYPTION_KEY` em ambiente real.
+- `ALTO`: Redis TLS (`rediss://`) precisa ser provado em staging/producao para rate limit, locks, crons e 2FA.
+- `ALTO`: rotas legadas ainda devem padronizar `404` para recursos inexistentes/cross-tenant para reduzir vazamento de existencia.
+- `MEDIO`: `DELETE /api/leads/:leadId/tags/:tagId` valida ownership do lead,
+  mas ainda precisa validar explicitamente ownership do `tagId` em fase de
+  hardening; comportamento preservado na extracao mecanica de 2026-06-30.
+- `MEDIO`: analytics/session replay precisam revisao LGPD/consentimento antes de operacao enterprise.
+
+Validacoes locais da rodada:
+
+- `npm run check`: passou.
+- `npm run lint -- --quiet`: passou.
+- `npm run ops:go-live:verify:static`: passou, 13 checks.
+- `npm run ops:cron:verify`: passou, 12 crons alinhados.
+- `npm run test:unit`: passou, 770/770 apos correcao de `data-export`.
+- `npx vitest run tests/integration/tenant-isolation.test.ts`: passou, 27/27
+  apos extracao de `server/routes/lead-tags.ts`.
+- `npm run test:smoke:e2e`: passou, 8/8 apos alinhamento aditivo do SQLite
+  local ignorado.
+
 **Date:** December 24, 2025
 **Auditor:** Agent 11 - Security & Vulnerability Engineer
 **Application:** ImobiBase - Real Estate Management Platform
@@ -690,3 +721,40 @@ By implementing the recommendations in this report, particularly the Priority 1 
 **Report Prepared By:** Agent 11 - Security & Vulnerability Engineer
 **Date:** December 24, 2025
 **Classification:** Internal - Security Sensitive
+
+---
+
+## Atualizacao 2026-06-29 - Revisao Go-Live Completa
+
+Fonte: `docs/reports/REVISAO_GO_LIVE_COMPLETA_2026-06-29.md`.
+
+Veredito de seguranca: **NO-GO enterprise** ate fechamento dos itens abaixo.
+
+### CRITICO
+
+- Secrets reais existem em arquivo local ignorado pelo git (`.env.production`). Nao reproduzir valores em docs/logs. Acao: mover para Vercel/GitHub Secrets, remover do workspace local e rotacionar credenciais.
+- RLS multi-tenant ainda nao possui prova em staging/producao com role runtime nao-owner sem `BYPASSRLS`.
+
+### ALTO
+
+- `npm run db:rls:verify` cobre `migrations/RLS_enable.sql`, mas nao verifica `migrations/RLS_enable_child_tables.sql`.
+- Links publicos de assinatura digital podem quebrar apos aplicar RLS de tabelas filhas: rota publica por token consulta `digital_signatures`, mas a policy exige `app.tenant_id`.
+- Microsoft OAuth ainda persiste access/refresh tokens em texto puro; Google OAuth ja usa criptografia.
+- Rate limit, locks e 2FA degradam para memoria/fail-open sem Redis real, inadequado para serverless em producao.
+- Algumas rotas legadas retornam `403` em recurso cross-tenant, vazando existencia. Padronizar `404`.
+- Redis de producao deve usar TLS (`rediss://`) e ser validado no gate strict.
+
+### MEDIO
+
+- ClickSign anti-replay por timestamp e opcional; exigir em producao ou documentar compensacao.
+- Reset token do portal e armazenado em texto puro; aplicar hash como no fluxo principal de reset.
+- Sentry Replay/PostHog precisam revisao de LGPD/consentimento antes de uso amplo com dados reais.
+- Preview PR publica credenciais demo; remover ou gerar credenciais efemeras.
+
+### Proximas acoes
+
+1. Rotacionar/remover secrets locais.
+2. Corrigir verifier RLS e fluxo publico de assinatura antes de aplicar RLS em staging.
+3. Criptografar tokens Microsoft e migrar legados.
+4. Tornar Redis TLS requisito hard em producao.
+5. Rodar `ops:go-live:verify:strict`, `db:rls:verify`, restore drill e pentest em staging real.

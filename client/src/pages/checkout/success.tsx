@@ -102,11 +102,11 @@ export default function CheckoutSuccessPage() {
               <ArrowRight className="w-4 h-4 mr-2" />
               Ir para o dashboard
             </Button>
-            <Link href="/settings/billing" className="flex-1">
-              <Button variant="outline" className="w-full">
+            <Button asChild variant="outline" className="flex-1 w-full">
+              <Link href="/settings/billing">
                 Ver assinatura
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
 
           {subscriptionStatus === "pending" && (

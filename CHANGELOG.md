@@ -4,6 +4,122 @@ All notable changes to ImobiBase are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2.6.0] - 2026-07-10 — Go-Live Fase 2 (P0 B1–B8) + guardas de manutenibilidade
+
+> Plano canônico: `docs/reports/PLANO_GO_LIVE_360_2026-07-10.md` (auditoria multi-agente
+> de 25 agentes). PR [#5](https://github.com/nmatss/imobi-base/pull/5)
+> (`feat/google-sso-calendar`). Validado: `tsc`, 770/770 unit, `build`, gate estático
+> 13/13, smoke E2E 8/8, `npm run guard`. Merge → Go-Live ainda depende de credenciais e
+> provas operacionais owner-gated (ver `docs/GO_LIVE_CHECKLIST.md`).
+
+### Added
+
+- **Página pública de assinatura `/sign/:token`** (`client/src/pages/sign/`) +
+  `ContractSignaturePanel` — envio/assinatura via fluxo interno por token (sem ClickSign).
+- **`POST /api/auth/change-password`** — troca de senha autenticada (valida senha atual,
+  força, diferença, reuso e histórico); liga a aba Segurança real.
+- **Guardas de manutenibilidade** (`npm run guard`, no CI): `guard:schema` (drift PG↔SQLite),
+  `guard:size` (teto de linhas dos monolitos/mega-páginas), `guard:fetch` (teto de `fetch` cru).
+- **Provisionamento de `stripePriceId` por env** — `STRIPE_PRICE_<SLUG>_MONTHLY/YEARLY` no
+  `seed-plans`, sem sobrescrever valores da admin UI; novos campos Stripe/anual/leads/trial
+  em `admin/plans`. Placeholder local de foto de imóvel (`client/src/lib/placeholder.ts`).
+
+### Fixed
+
+- **Funil de billing (B1)** — onboarding leva plano pago a `/checkout/:slug` e login propaga
+  `?plan=`; antes nenhum cliente novo conseguia assinar plano pago.
+- **Redirects de erro OAuth (B7)** — apontavam para `/auth/login` (rota inexistente → 404);
+  corrigidos para `/login`; colisão de e-mail mostra mensagem amigável.
+- **Integridade financeira (B5/B6)** — controle de papel (`requireFinanceManager`) nas escritas
+  de financeiro/comissões; venda marca o imóvel como `sold` e recalcula a comissão no servidor.
+- **Dados falsos (B4)** — remove "Resumo do Mês" fixo, trends de KPI hardcoded e mock de
+  relatórios salvos; `avgDays` de contratos calculado de verdade.
+- **Aba Segurança (B3)** — deixa de ser mock (2FA/senha/sessões reais).
+- **Credibilidade (B8)** — remove avatares/depoimentos/estatísticas fabricados e assets
+  hotlinked de terceiros (login, signup, pricing, product-landing).
+
+### Changed
+
+- **ClickSign** passa a **fail-closed** em produção sem `CLICKSIGN_API_KEY` (evita 500 silencioso).
+
+## [2.5.0] - 2026-06-27 — Google SSO + Google Calendar/Meet
+
+> Relatório completo em `docs/reports/GOOGLE_SSO_CALENDAR_2026-06-27.md`.
+> PR [#5](https://github.com/nmatss/imobi-base/pull/5) (`feat/google-sso-calendar`).
+> Código **dormente** até o dono configurar credenciais Google + verificação do app
+> (scope `calendar.events` é sensível). `tsc` verde; 765/766 testes (a 1 falha
+> `data-export` é pré-existente).
+
+### Added
+
+- **Google SSO ligado (Onda 1)** — `OAuthButtons` montado em login/signup; **onboarding
+  pós-Google** (`server/auth/oauth-provisioning.ts`): usuário Google novo cria nova
+  imobiliária + admin (`onboarding_completed=false`) e segue para `/onboarding/agency`
+  (`client/src/pages/onboarding/agency.tsx`); endpoint `POST /api/auth/complete-onboarding`.
+- **Criptografia de tokens at-rest** — `server/security/token-encryption.ts` (AES-256-GCM
+  via `ENCRYPTION_KEY`, fail-closed em produção, retrocompatível com texto puro). Aplicada
+  aos tokens OAuth do Google. Novo `tests/unit/token-encryption.test.ts` (6 casos).
+- **Google Agenda + Meet por corretor (Onda 2)** — conexão por usuário (scope
+  `calendar.events`), tabela `user_calendar_connections` (dual schema + RLS), cliente REST
+  `axios` (`server/integrations/google-calendar/client.ts`, sem dep `googleapis`) com
+  `conferenceData`=Meet, serviço de sync best-effort, rotas
+  `server/routes-google-calendar.ts`, e UI `GoogleCalendarCard.tsx` em Configurações.
+- **Schema** — `tenants.onboarding_completed`; colunas de sync em `visits`
+  (`googleCalendarEventId/googleMeetUrl/googleSyncState/googleSyncError/lastSyncedAt`);
+  migrations `20260627_001_tenant_onboarding.sql` e `20260627_002_google_calendar.sql`
+  (+ política RLS em `RLS_enable.sql`).
+- **`oauth-state.ts`** estendido com `meta` assinado (HMAC) — carrega `userId/tenantId` no
+  callback do connect de Calendar sem depender do cookie de sessão.
+
+### Changed
+
+- **CSP** (`vercel.json`) libera `accounts.google.com`, `oauth2.googleapis.com`,
+  `www.googleapis.com` e `*.googleusercontent.com`.
+- **`secret-manager.ts`** valida `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ENCRYPTION_KEY`.
+- **Visitas** — `POST/PATCH/DELETE /api/visits` sincronizam com o Google Agenda do corretor;
+  link do Meet entra nas notificações WhatsApp/e-mail de visita.
+
+## [2.4.0] - 2026-06-22 — Execução do Plano de Excelência (Ondas 0-3 parciais)
+
+> Execução do backlog priorizado em `docs/reports/PLANO_EXCELENCIA_2026-06-22.md`
+> (auditoria multi-agente das 10 dimensões). Ações de infra que exigem credenciais
+> de produção ficam em `docs/RUNBOOK_EXCELENCIA_DONO.md`.
+
+### Added
+
+- **`server/db-tx.ts`** — `withTenantTransaction(tenantId, fn)`: uma transação com contexto RLS (`SET LOCAL app.tenant_id`), base para mutações atômicas (`FOR UPDATE`/`ON CONFLICT`). (ACT-1)
+- **`server/utils/db-errors.ts`** — `isUniqueViolation` agnóstico de driver (PG 23505 / SQLite), compartilhado com `webhook-ledger`. (ACT-2)
+- **Decomposição de `routes.ts` iniciada (arch-1)** — `server/routes/_shared.ts` (helpers de erro/validação + família `validate*Reference` de IDOR + tipo `RouteDeps`) e domínios `server/routes/newsletter.ts` e `server/routes/interactions.ts`. `routes.ts`: 4523 → 4349 LOC.
+- **`getChartColor`/`getChartPalette`** em `client/src/lib/design-helpers.ts`, ancorados nas CSS vars `--chart-*` (light/dark). (UI-1)
+- **Governança/planejamento** — `CLAUDE.md`, `docs/prompts/PROMPT_MASTER_AUDITORIA.md`, `docs/reports/PLANO_EXCELENCIA_2026-06-22.md`, `docs/RUNBOOK_EXCELENCIA_DONO.md`.
+
+### Performance
+
+- **`getDashboardStats`** agrega com `COUNT(*)` no banco (era 4 full-table scans + `.length`) e passa a servir do cache Redis (TTL 60s, invalidado nos creates de lead/property/contract/visit). (PERF-1, ESC-1/PERF-4)
+- **`query-cache` ativado** (estava morto, nunca invocado) e tornado **no-op seguro sem `REDIS_URL`** (antes cairia para `localhost:6379`, gerando latência em serverless). (arch-4)
+- **Idempotência de pagamento durável** em Redis (`SET NX` + TTL 7d, 409 em concorrência in-flight, fallback observável via Sentry) — antes era `Map` in-process (risco de dupla cobrança em multi-instância). (ACT-3/ESC-2)
+- **CDN nos endpoints públicos** de catálogo: carve-out do `no-store` no `vercel.json` + `Cache-Control`/`ETag` em `/api/properties/public/*`. (PERF-2/3)
+- **Clamp de paginação** na camada de storage (defesa além do Zod). (ACT-6)
+
+### Fixed / Security
+
+- **Upload**: script/web-shell/SVG-XSS embutido em imagem agora **bloqueia** (era apenas warning); varredura até 256KB. (A4)
+- **Race de de-dup de lead** resolvido deterministicamente: violação do índice único parcial → 409 limpo (era 400/500 genérico). (ACT-2)
+- **Isolamento de tenant no client**: `logout` e `switchTenant` limpam o cache do React Query; `switchTenant` só aceita tenant autorizado. (FE-1/FE-2)
+- **Onboarding** não falha mais silenciosamente — erro vira toast e o fluxo não avança fingindo sucesso. (U1)
+- **Leak de timers** no prefetch on-hover (`useRef` + cleanup no unmount). (PERF-8)
+- **`db:rls:apply`** passa a cobrir parent + child tables na ordem correta (antes o child vazava para o `db:migrate` normal). (DB-2)
+- **Observabilidade**: alerta Sentry quando o rate-limit degrada para store em memória. (ESC-6)
+
+### Removed
+
+- `server/storage-cached.ts` (exemplo de integração morto, substituído pelo cache real). (arch-4)
+
+### Notas
+
+- Confirmado já correto (sem mudança): dedup de webhook atômico em `webhook-ledger.ts` (ACT-4) e contexto RLS nos `POST /api/leads` (ACT-5).
+- Todo o trabalho com tsc + build verdes e 759 testes passando (+ novos: idempotência, `db-tx`, dedup de lead, cores de chart, segurança do cache). Permanece 1 falha **pré-existente** em `data-export.test.ts` (fixture).
+
 ## [2.3.0] - 2026-06-12 — Nova identidade visual & polimento profissional
 
 ### Added

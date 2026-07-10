@@ -14,6 +14,7 @@ import { storage } from "./storage";
 import { processIncomingMessage, getConversationState } from "./integrations/whatsapp/isa-engine";
 import { log } from "./utils/log";
 import { checkFeatureAccess } from "./middleware/plan-limits";
+import { runWithTenantRlsContext } from "./db-rls";
 
 export function registerIsaRoutes(app: Express) {
   // Auth middleware (reuses the same pattern from routes.ts)
@@ -21,7 +22,10 @@ export function registerIsaRoutes(app: Express) {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ error: "Nao autenticado" });
     }
-    next();
+    if (!req.user.tenantId) {
+      return res.status(403).json({ error: "Sessão inválida" });
+    }
+    runWithTenantRlsContext(req.user.tenantId, () => next());
   };
 
   // ==================== CONVERSATIONS ====================
@@ -223,6 +227,15 @@ export function registerIsaRoutes(app: Express) {
    */
   app.post("/api/isa/webhook", async (req: Request, res: Response) => {
     try {
+      if (
+        process.env.NODE_ENV === "production" &&
+        process.env.ISA_ENABLE_LEGACY_WEBHOOK !== "true"
+      ) {
+        return res.status(410).json({
+          error: "Webhook ISA legado desabilitado. Use /api/webhooks/whatsapp.",
+        });
+      }
+
       // Verify webhook API key in production
       const isProduction = process.env.NODE_ENV === "production";
       const webhookSecret = process.env.ISA_WEBHOOK_SECRET;

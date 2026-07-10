@@ -6,7 +6,7 @@
  */
 
 import { db } from "../../db";
-import { whatsappConversations, whatsappMessages, type InsertWhatsappConversation } from "@shared/schema";
+import { users, whatsappConversations, whatsappMessages, type InsertWhatsappConversation } from "@shared/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { log } from "../../utils/log";
 
@@ -177,38 +177,79 @@ export class ConversationManager {
    */
   async updateConversation(
     conversationId: string,
+    tenantId: string,
     updates: UpdateConversationParams
-  ): Promise<any> {
+  ): Promise<any | null> {
     const [updated] = await db
       .update(whatsappConversations)
       .set({ ...updates, updatedAt: new Date() })
-      .where(eq(whatsappConversations.id, conversationId))
+      .where(
+        and(
+          eq(whatsappConversations.id, conversationId),
+          eq(whatsappConversations.tenantId, tenantId)
+        )
+      )
       .returning();
 
-    return updated;
+    return updated ?? null;
   }
 
   /**
    * Mark conversation as read
    */
-  async markAsRead(conversationId: string): Promise<void> {
-    await db
+  async markAsRead(conversationId: string, tenantId: string): Promise<boolean> {
+    const updated = await db
       .update(whatsappConversations)
       .set({ unreadCount: 0, updatedAt: new Date() })
-      .where(eq(whatsappConversations.id, conversationId));
+      .where(
+        and(
+          eq(whatsappConversations.id, conversationId),
+          eq(whatsappConversations.tenantId, tenantId)
+        )
+      )
+      .returning();
+
+    if (updated.length === 0) {
+      return false;
+    }
 
     log(`Conversation ${conversationId} marked as read`, "whatsapp");
+    return true;
   }
 
   /**
    * Assign conversation to user
    */
-  async assignToUser(conversationId: string, userId: string): Promise<any> {
+  async assignToUser(conversationId: string, tenantId: string, userId: string): Promise<any | null> {
+    const [assignee] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(
+        and(
+          eq(users.id, userId),
+          eq(users.tenantId, tenantId)
+        )
+      )
+      .limit(1);
+
+    if (!assignee) {
+      return null;
+    }
+
     const [updated] = await db
       .update(whatsappConversations)
       .set({ assignedTo: userId, updatedAt: new Date() })
-      .where(eq(whatsappConversations.id, conversationId))
+      .where(
+        and(
+          eq(whatsappConversations.id, conversationId),
+          eq(whatsappConversations.tenantId, tenantId)
+        )
+      )
       .returning();
+
+    if (!updated) {
+      return null;
+    }
 
     log(`Conversation ${conversationId} assigned to user ${userId}`, "whatsapp");
 
@@ -218,25 +259,47 @@ export class ConversationManager {
   /**
    * Close conversation
    */
-  async closeConversation(conversationId: string): Promise<void> {
-    await db
+  async closeConversation(conversationId: string, tenantId: string): Promise<boolean> {
+    const updated = await db
       .update(whatsappConversations)
       .set({ status: "closed", updatedAt: new Date() })
-      .where(eq(whatsappConversations.id, conversationId));
+      .where(
+        and(
+          eq(whatsappConversations.id, conversationId),
+          eq(whatsappConversations.tenantId, tenantId)
+        )
+      )
+      .returning();
+
+    if (updated.length === 0) {
+      return false;
+    }
 
     log(`Conversation ${conversationId} closed`, "whatsapp");
+    return true;
   }
 
   /**
    * Reopen conversation
    */
-  async reopenConversation(conversationId: string): Promise<void> {
-    await db
+  async reopenConversation(conversationId: string, tenantId: string): Promise<boolean> {
+    const updated = await db
       .update(whatsappConversations)
       .set({ status: "active", updatedAt: new Date() })
-      .where(eq(whatsappConversations.id, conversationId));
+      .where(
+        and(
+          eq(whatsappConversations.id, conversationId),
+          eq(whatsappConversations.tenantId, tenantId)
+        )
+      )
+      .returning();
+
+    if (updated.length === 0) {
+      return false;
+    }
 
     log(`Conversation ${conversationId} reopened`, "whatsapp");
+    return true;
   }
 
   /**
@@ -350,18 +413,34 @@ export class ConversationManager {
   /**
    * Delete conversation and all its messages
    */
-  async deleteConversation(conversationId: string): Promise<void> {
+  async deleteConversation(conversationId: string, tenantId: string): Promise<boolean> {
     // Delete messages first
     await db
       .delete(whatsappMessages)
-      .where(eq(whatsappMessages.conversationId, conversationId));
+      .where(
+        and(
+          eq(whatsappMessages.conversationId, conversationId),
+          eq(whatsappMessages.tenantId, tenantId)
+        )
+      );
 
     // Delete conversation
-    await db
+    const deleted = await db
       .delete(whatsappConversations)
-      .where(eq(whatsappConversations.id, conversationId));
+      .where(
+        and(
+          eq(whatsappConversations.id, conversationId),
+          eq(whatsappConversations.tenantId, tenantId)
+        )
+      )
+      .returning();
+
+    if (deleted.length === 0) {
+      return false;
+    }
 
     log(`Conversation ${conversationId} and all messages deleted`, "whatsapp");
+    return true;
   }
 }
 

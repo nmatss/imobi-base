@@ -48,7 +48,7 @@ export function PublicFooter({ variant = "compact" }: PublicFooterProps) {
               </a>
             </div>
 
-            <div className="flex items-center gap-6">
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-center">
               <Link href="/contato" className="hover:text-foreground">
                 Contato
               </Link>
@@ -61,7 +61,7 @@ export function PublicFooter({ variant = "compact" }: PublicFooterProps) {
               <Link href="/privacidade" className="hover:text-foreground">
                 Privacidade
               </Link>
-              <span className="text-muted-foreground/70">
+              <span className="w-full sm:w-auto text-muted-foreground/70">
                 &copy; {year} ImobiBase
               </span>
             </div>

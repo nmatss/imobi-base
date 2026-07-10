@@ -13,11 +13,17 @@ import { apiRequest } from "@/lib/queryClient";
 
 type Plan = {
   id: string;
+  slug?: string;
   name: string;
   price: string;
+  yearlyPrice: string | null;
   maxUsers: number;
   maxProperties: number;
+  maxLeads: number;
   maxIntegrations: number;
+  trialDays: number;
+  stripePriceId: string | null;
+  stripeYearlyPriceId: string | null;
   features: string[];
   isActive: boolean;
   createdAt: string;
@@ -33,9 +39,14 @@ export default function PlansPage() {
   const [formData, setFormData] = useState({
     name: "",
     price: "",
+    yearlyPrice: "",
     maxUsers: 5,
     maxProperties: 100,
+    maxLeads: -1,
     maxIntegrations: 3,
+    trialDays: 0,
+    stripePriceId: "",
+    stripeYearlyPriceId: "",
     features: [] as string[],
     isActive: true,
   });
@@ -68,7 +79,15 @@ export default function PlansPage() {
     if (!selectedPlan) return;
 
     try {
-      await apiRequest("PATCH", `/api/admin/plans/${selectedPlan.id}`, formData);
+      // Normaliza campos opcionais: string vazia -> null nas colunas nullable
+      // (Stripe IDs e preco anual), para nao gravar "" no banco.
+      const payload = {
+        ...formData,
+        yearlyPrice: formData.yearlyPrice.trim() || null,
+        stripePriceId: formData.stripePriceId.trim() || null,
+        stripeYearlyPriceId: formData.stripeYearlyPriceId.trim() || null,
+      };
+      await apiRequest("PATCH", `/api/admin/plans/${selectedPlan.id}`, payload);
       toast.success("Plano atualizado com sucesso!");
       setEditModalOpen(false);
       setSelectedPlan(null);
@@ -96,9 +115,14 @@ export default function PlansPage() {
     setFormData({
       name: plan.name,
       price: plan.price,
+      yearlyPrice: plan.yearlyPrice ?? "",
       maxUsers: plan.maxUsers,
       maxProperties: plan.maxProperties,
+      maxLeads: plan.maxLeads ?? -1,
       maxIntegrations: plan.maxIntegrations,
+      trialDays: plan.trialDays ?? 0,
+      stripePriceId: plan.stripePriceId ?? "",
+      stripeYearlyPriceId: plan.stripeYearlyPriceId ?? "",
       features: plan.features,
       isActive: plan.isActive,
     });
@@ -109,9 +133,14 @@ export default function PlansPage() {
     setFormData({
       name: "",
       price: "",
+      yearlyPrice: "",
       maxUsers: 5,
       maxProperties: 100,
+      maxLeads: -1,
       maxIntegrations: 3,
+      trialDays: 0,
+      stripePriceId: "",
+      stripeYearlyPriceId: "",
       features: [],
       isActive: true,
     });
@@ -137,7 +166,7 @@ export default function PlansPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
@@ -225,16 +254,17 @@ export default function PlansPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nome do Plano</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Básico"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="name">Nome do Plano</Label>
+              <Input
+                id="name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Básico"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="price">Preço Mensal (R$)</Label>
                 <Input
@@ -246,9 +276,29 @@ export default function PlansPage() {
                   placeholder="99.90"
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="yearlyPrice">Preço Anual (R$/mês)</Label>
+                <Input
+                  id="yearlyPrice"
+                  type="number"
+                  step="0.01"
+                  value={formData.yearlyPrice}
+                  onChange={(e) => setFormData({ ...formData, yearlyPrice: e.target.value })}
+                  placeholder="79.90"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="trialDays">Dias de Trial</Label>
+                <Input
+                  id="trialDays"
+                  type="number"
+                  value={formData.trialDays}
+                  onChange={(e) => setFormData({ ...formData, trialDays: parseInt(e.target.value) || 0 })}
+                />
+              </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="maxUsers">Máx. Usuários</Label>
                 <Input
@@ -268,6 +318,15 @@ export default function PlansPage() {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="maxLeads">Máx. Leads/mês</Label>
+                <Input
+                  id="maxLeads"
+                  type="number"
+                  value={formData.maxLeads}
+                  onChange={(e) => setFormData({ ...formData, maxLeads: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="maxIntegrations">Máx. Integrações</Label>
                 <Input
                   id="maxIntegrations"
@@ -275,6 +334,43 @@ export default function PlansPage() {
                   value={formData.maxIntegrations}
                   onChange={(e) => setFormData({ ...formData, maxIntegrations: parseInt(e.target.value) || 0 })}
                 />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground -mt-2">
+              Use <span className="font-mono">-1</span> para ilimitado.
+            </p>
+
+            <div className="space-y-3 rounded-lg border p-4">
+              <div>
+                <Label className="text-sm font-medium">Integração Stripe</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  IDs de preço (<span className="font-mono">price_...</span>) criados no
+                  Stripe Dashboard. Sem eles, o checkout deste plano fica indisponível.
+                  Também podem ser provisionados por variável de ambiente
+                  (<span className="font-mono">STRIPE_PRICE_&lt;SLUG&gt;_MONTHLY/YEARLY</span>).
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="stripePriceId">Stripe Price ID (mensal)</Label>
+                  <Input
+                    id="stripePriceId"
+                    value={formData.stripePriceId}
+                    onChange={(e) => setFormData({ ...formData, stripePriceId: e.target.value })}
+                    placeholder="price_1AbC..."
+                    className="font-mono text-sm"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="stripeYearlyPriceId">Stripe Price ID (anual)</Label>
+                  <Input
+                    id="stripeYearlyPriceId"
+                    value={formData.stripeYearlyPriceId}
+                    onChange={(e) => setFormData({ ...formData, stripeYearlyPriceId: e.target.value })}
+                    placeholder="price_1XyZ..."
+                    className="font-mono text-sm"
+                  />
+                </div>
               </div>
             </div>
 

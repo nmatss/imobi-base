@@ -99,6 +99,8 @@ export default function InspectionsPage() {
   const { confirm: confirmDialog, dialog: confirmDialogElement } = useConfirmDialog();
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
+  const [error, setError] = useState(false);
   const [featureBlocked, setFeatureBlocked] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -119,6 +121,9 @@ export default function InspectionsPage() {
   });
 
   const fetchInspections = useCallback(async () => {
+    // Marca refetch (troca de filtros) para dar feedback visual, e limpa erro anterior.
+    setIsFetching(true);
+    setError(false);
     try {
       const params = new URLSearchParams();
       if (filterProperty !== "all") params.append("propertyId", filterProperty);
@@ -137,12 +142,18 @@ export default function InspectionsPage() {
         const payload = await readJsonSafely(res);
         if (isPlanBlockedResponse(res, payload)) {
           setFeatureBlocked(true);
+        } else {
+          // Erros de servidor (500/401/502...) que não são gate de plano: mostra estado
+          // de erro com "Tentar novamente" em vez de cair no empty-state enganoso.
+          setError(true);
         }
       }
     } catch (e) {
       console.error("Failed to fetch inspections", e);
+      setError(true);
     } finally {
       setLoading(false);
+      setIsFetching(false);
     }
   }, [filterProperty, filterType, filterStatus]);
 
@@ -224,6 +235,16 @@ export default function InspectionsPage() {
   const getPropertyName = (propertyId: string) => {
     const property = properties.find((p: Property) => p.id === propertyId);
     return property?.title || property?.address || "Imovel";
+  };
+
+  const hasActiveFilters =
+    searchQuery !== "" || filterStatus !== "all" || filterType !== "all" || filterProperty !== "all";
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setFilterStatus("all");
+    setFilterType("all");
+    setFilterProperty("all");
   };
 
   if (loading) {
@@ -328,18 +349,34 @@ export default function InspectionsPage() {
       </Card>
 
       {/* Inspections List */}
-      {filteredInspections.length === 0 ? (
+      {error ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <AlertTriangle className="h-12 w-12 text-amber-500 mb-4" />
+            <h3 className="text-lg font-semibold">Erro ao carregar vistorias</h3>
+            <p className="text-muted-foreground text-sm mt-1 mb-4">
+              Não foi possível obter as vistorias. Verifique sua conexão e tente novamente.
+            </p>
+            <Button variant="outline" onClick={() => fetchInspections()}>Tentar novamente</Button>
+          </CardContent>
+        </Card>
+      ) : filteredInspections.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <ClipboardCheck className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-semibold">Nenhuma vistoria encontrada</h3>
+            <h3 className="text-lg font-semibold">
+              {hasActiveFilters ? "Nenhuma vistoria corresponde aos filtros" : "Nenhuma vistoria encontrada"}
+            </h3>
             <p className="text-muted-foreground text-sm mt-1">
-              Crie uma nova vistoria para comecar
+              {hasActiveFilters ? "Ajuste ou limpe os filtros para ver mais resultados." : "Crie uma nova vistoria para comecar"}
             </p>
+            {hasActiveFilters && (
+              <Button variant="outline" size="sm" className="mt-4" onClick={clearFilters}>Limpar filtros</Button>
+            )}
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-opacity ${isFetching ? "opacity-60 pointer-events-none" : ""}`}>
           {filteredInspections.map((inspection) => {
             const statusInfo = statusConfig[inspection.status] || statusConfig.in_progress;
             const StatusIcon = statusInfo.icon;

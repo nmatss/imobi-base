@@ -12,7 +12,7 @@ import { auditTrailService } from './integrations/clicksign/audit';
 import { certificateStorage } from './integrations/clicksign/certificate-storage';
 import { templateManager } from './integrations/clicksign/template-manager';
 import { db, schema } from './db';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { validateBody } from './middleware/validate';
 import { asyncHandler, BadRequestError } from './middleware/error-handler';
 import { requireAuth } from './middleware/auth';
@@ -29,13 +29,23 @@ import {
 const documentService = new DocumentService();
 const signerService = new SignerService();
 
+function sanitizeClickSignFilename(filename: string): string {
+  const basename = filename.split(/[\\/]/).pop()?.trim() || 'document.pdf';
+  const forbidden = new Set(['<', '>', ':', '"', '|', '?', '*']);
+  const safe = Array.from(basename)
+    .map((char) => (char.charCodeAt(0) < 32 || forbidden.has(char) ? '_' : char))
+    .join('')
+    .slice(0, 180);
+  return safe || 'document.pdf';
+}
+
 /**
  * Tenant isolation for ClickSign documents.
  *
  * A ClickSign documentKey is linked to a tenant through the `contracts` table:
- * contracts.clicksignDocumentKey -> contracts.tenantId. This is the only
- * persisted relationship that ties an external ClickSign identifier back to an
- * ImobiBase tenant (present in both the Postgres and SQLite schemas).
+ * contracts.clicksignDocumentKey -> contracts.tenantId. For ad-hoc uploaded
+ * documents, the backend also emits an authoritative audit log with
+ * entityType=document, action=UPLOAD and entityId=documentKey.
  *
  * Resolves the owning tenant of a documentKey. Returns null when no contract
  * references it (e.g. document never persisted locally / unknown key).
@@ -50,7 +60,41 @@ async function resolveDocumentTenantId(documentKey: string): Promise<string | nu
     .from(schema.contracts)
     .where(eq(schema.contracts.clicksignDocumentKey, documentKey))
     .limit(1);
-  return rows.length > 0 ? rows[0].tenantId : null;
+  if (rows.length > 0) return rows[0].tenantId;
+
+  const auditRows = await db
+    .select({ tenantId: schema.auditLogs.tenantId })
+    .from(schema.auditLogs)
+    .where(
+      and(
+        eq(schema.auditLogs.entityType, 'document'),
+        eq(schema.auditLogs.entityId, documentKey),
+        eq(schema.auditLogs.action, 'UPLOAD'),
+      ),
+    )
+    .limit(1);
+  return auditRows.length > 0 ? auditRows[0].tenantId : null;
+}
+
+async function ensureContractBelongsToTenant(
+  contractId: string | undefined,
+  tenantId: string,
+  res: Response,
+): Promise<boolean> {
+  if (!contractId) return true;
+
+  const rows = await db
+    .select({ id: schema.contracts.id })
+    .from(schema.contracts)
+    .where(and(eq(schema.contracts.id, contractId), eq(schema.contracts.tenantId, tenantId)))
+    .limit(1);
+
+  if (rows.length === 0) {
+    res.status(404).json({ error: 'Contract not found' });
+    return false;
+  }
+
+  return true;
 }
 
 /**
@@ -89,10 +133,11 @@ export function registerESignatureRoutes(app: Express) {
     // Get tenantId from authenticated user (not from request body)
     const tenantId = req.user!.tenantId;
     const { filename, contentBase64, deadline, autoClose, locale } = req.body;
+    const safeFilename = sanitizeClickSignFilename(filename);
 
       const document = await documentService.uploadDocument({
-        path: `/documents/${tenantId}/${filename}`,
-        filename,
+        path: `/documents/${tenantId}/${safeFilename}`,
+        filename: safeFilename,
         content_base64: contentBase64,
         deadline_at: deadline,
         auto_close: autoClose ?? true,
@@ -106,8 +151,8 @@ export function registerESignatureRoutes(app: Express) {
         entityId: document.key,
         userId: req.user?.id,
         action: 'UPLOAD',
-        description: `Document uploaded: ${filename}`,
-        metadata: { filename, documentKey: document.key },
+        description: `Document uploaded: ${safeFilename}`,
+        metadata: { filename: safeFilename, originalFilename: filename, documentKey: document.key },
         complianceLevel: 'standard',
       });
 
@@ -126,14 +171,13 @@ export function registerESignatureRoutes(app: Express) {
    * Create signature request
    * POST /api/esignature/create-request
    */
-  app.post('/api/esignature/create-request', async (req: Request, res: Response) => {
+  app.post('/api/esignature/create-request', validateBody(createSignatureRequestSchema), async (req: Request, res: Response) => {
     try {
       // Get tenantId from authenticated user (not from request body)
       const tenantId = req.user!.tenantId;
       const { documentKey, listName, signers, signingConfig } = req.body;
 
-      if (!documentKey || !signers || !Array.isArray(signers)) {
-        res.status(400).json({ error: 'Missing required fields' });
+      if (!(await ensureDocumentBelongsToTenant(documentKey, tenantId, res))) {
         return;
       }
 
@@ -179,14 +223,13 @@ export function registerESignatureRoutes(app: Express) {
    * Add signer to existing request
    * POST /api/esignature/add-signer
    */
-  app.post('/api/esignature/add-signer', async (req: Request, res: Response) => {
+  app.post('/api/esignature/add-signer', validateBody(addSignerSchema), async (req: Request, res: Response) => {
     try {
       // Get tenantId from authenticated user (not from request body)
       const tenantId = req.user!.tenantId;
       const { documentKey, listKey, signer } = req.body;
 
-      if (!documentKey || !listKey || !signer) {
-        res.status(400).json({ error: 'Missing required fields' });
+      if (!(await ensureDocumentBelongsToTenant(documentKey, tenantId, res))) {
         return;
       }
 
@@ -222,14 +265,13 @@ export function registerESignatureRoutes(app: Express) {
    * Send signature request
    * POST /api/esignature/send
    */
-  app.post('/api/esignature/send', async (req: Request, res: Response) => {
+  app.post('/api/esignature/send', validateBody(sendSignatureSchema), async (req: Request, res: Response) => {
     try {
       // Get tenantId from authenticated user (not from request body)
       const tenantId = req.user!.tenantId;
-      const { listKey, message } = req.body;
+      const { documentKey, listKey, message } = req.body;
 
-      if (!listKey) {
-        res.status(400).json({ error: 'Missing listKey' });
+      if (!(await ensureDocumentBelongsToTenant(documentKey, tenantId, res))) {
         return;
       }
 
@@ -413,6 +455,11 @@ export function registerESignatureRoutes(app: Express) {
       const { listKey, signerKey } = req.params;
       // Get tenantId from authenticated user (not from request body)
       const tenantId = req.user!.tenantId;
+      const documentKey = typeof req.body?.documentKey === 'string' ? req.body.documentKey : '';
+
+      if (!(await ensureDocumentBelongsToTenant(documentKey, tenantId, res))) {
+        return;
+      }
 
       await signerService.resendInvitation(listKey, signerKey);
 
@@ -439,14 +486,13 @@ export function registerESignatureRoutes(app: Express) {
    * Generate contract from template
    * POST /api/esignature/generate-contract
    */
-  app.post('/api/esignature/generate-contract', async (req: Request, res: Response) => {
+  app.post('/api/esignature/generate-contract', validateBody(generateContractSchema), async (req: Request, res: Response) => {
     try {
       // Get tenantId from authenticated user (not from request body)
       const tenantId = req.user!.tenantId;
       const { contractType, contractData, contractId } = req.body;
 
-      if (!contractType || !contractData) {
-        res.status(400).json({ error: 'Missing required fields' });
+      if (!(await ensureContractBelongsToTenant(contractId, tenantId, res))) {
         return;
       }
 
@@ -459,6 +505,13 @@ export function registerESignatureRoutes(app: Express) {
       } else {
         res.status(400).json({ error: 'Invalid contract type' });
         return;
+      }
+
+      if (contractId) {
+        await db
+          .update(schema.contracts)
+          .set({ clicksignDocumentKey: result.documentKey, updatedAt: new Date() })
+          .where(and(eq(schema.contracts.id, contractId), eq(schema.contracts.tenantId, tenantId)));
       }
 
       await auditTrailService.logEvent({
@@ -573,18 +626,30 @@ export function registerESignatureRoutes(app: Express) {
 
       const certInfo = certificateStorage.parseCertificate(certificateData);
 
+      // Reject malformed / expired certificates before persisting. Full
+      // ICP-Brasil chain validation is a follow-up (requires ICP root bundle).
+      if (certInfo.parseError) {
+        res.status(400).json({ error: certInfo.parseError });
+        return;
+      }
+      if (certInfo.expired) {
+        res.status(400).json({ error: 'Certificado expirado ou ainda não válido' });
+        return;
+      }
+
       const certificate = await certificateStorage.storeCertificate({
         tenantId,
         userId,
         certificateType: certificateType || 'ICP-Brasil',
         holderName: certInfo.holderName || 'Unknown',
         issuer: certInfo.issuer || 'Unknown',
-        serialNumber: 'MOCK_SERIAL',
+        serialNumber: certInfo.serialNumber || '',
         validFrom: certInfo.validFrom || new Date(),
         validUntil: certInfo.validUntil || new Date(),
         status: certInfo.status || 'active',
         certificateData,
-      });
+        fingerprint: certInfo.fingerprint,
+      } as any);
 
       await auditTrailService.logEvent({
         tenantId,

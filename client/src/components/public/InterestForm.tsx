@@ -48,7 +48,7 @@ export default function InterestForm({ propertyId, tenantId, propertyTitle }: In
           ...data,
           tenantId,
           propertyId,
-          source: "portal_publico",
+          source: "portal_publico_agendamento",
           status: "new",
           interests: [propertyTitle],
           notes: `Interesse pelo imóvel: ${propertyTitle}\n\nMensagem: ${data.message || "Sem mensagem adicional"}`,
@@ -57,8 +57,9 @@ export default function InterestForm({ propertyId, tenantId, propertyTitle }: In
 
       if (response.ok) {
         toast({
-          title: "Mensagem enviada!",
-          description: "Em breve entraremos em contato com você.",
+          title: "Solicitação enviada!",
+          description:
+            "A imobiliária vai entrar em contato para atendimento ou agendamento.",
         });
         reset();
       } else {
@@ -76,9 +77,9 @@ export default function InterestForm({ propertyId, tenantId, propertyTitle }: In
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Tenho interesse</CardTitle>
+        <CardTitle>Agendar visita ou falar com corretor</CardTitle>
         <CardDescription>
-          Preencha o formulário abaixo que entraremos em contato com você
+          Envie seus dados para receber atendimento sobre este imóvel
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -155,7 +156,7 @@ export default function InterestForm({ propertyId, tenantId, propertyTitle }: In
             <Textarea
               id="message"
               {...register("message")}
-              placeholder="Deixe uma mensagem..."
+              placeholder="Quero mais informações ou gostaria de agendar uma visita..."
               rows={4}
               disabled={isSubmitting}
               className={errors.message ? "border-destructive focus-visible:ring-destructive" : ""}
@@ -182,7 +183,7 @@ export default function InterestForm({ propertyId, tenantId, propertyTitle }: In
             ) : (
               <>
                 <Send className="mr-2 h-4 w-4" />
-                Enviar mensagem
+                Solicitar atendimento
               </>
             )}
           </Button>

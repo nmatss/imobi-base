@@ -229,15 +229,18 @@ export default function CheckoutPage() {
                 <CardContent className="space-y-6">
                   {plan.price > 0 ? (
                     <>
-                      {/* Stripe Elements placeholder */}
-                      <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center space-y-3">
-                        <CreditCard className="w-10 h-10 text-muted-foreground/50 mx-auto" />
+                      {/* O cartao e coletado na pagina hospedada do Stripe (PCI-DSS),
+                          para onde o usuario e redirecionado ao confirmar. */}
+                      <div className="border rounded-lg p-5 flex items-start gap-3 bg-muted/40">
+                        <Lock className="w-5 h-5 text-primary shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-sm font-medium text-muted-foreground">
-                            Formulário de Pagamento Stripe
+                          <p className="text-sm font-medium">
+                            Pagamento seguro pela Stripe
                           </p>
-                          <p className="text-xs text-muted-foreground/70 mt-1">
-                            O formulário de cartão de crédito será exibido aqui quando as chaves do Stripe estiverem configuradas.
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Ao confirmar, você é levado ao ambiente seguro da Stripe
+                            para inserir os dados do cartão. Não armazenamos o número
+                            do seu cartão.
                           </p>
                         </div>
                       </div>

@@ -48,6 +48,10 @@ import type { FinanceTransaction } from "../types";
 import { TRANSACTION_STATUS_CONFIG, ORIGIN_TYPE_LABELS } from "../types";
 import { cn } from "@/lib/utils";
 
+// Fluxo canônico é 'income'/'expense'. Normaliza defensivamente lançamentos legados
+// que possam ter sido gravados como 'in'/'out' por versões antigas do formulário.
+const isIncomeFlow = (flow: string) => flow === "income" || flow === "in";
+
 type Props = {
   transactions: FinanceTransaction[];
   onMarkAsPaid?: (id: string) => void;
@@ -112,7 +116,7 @@ export default function TransactionTable({
 
     // Type filter
     if (typeFilter !== "all") {
-      filtered = filtered.filter(t => t.flow === typeFilter);
+      filtered = filtered.filter(t => (isIncomeFlow(t.flow) ? "income" : "expense") === typeFilter);
     }
 
     // Status filter
@@ -229,8 +233,8 @@ export default function TransactionTable({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos os tipos</SelectItem>
-                    <SelectItem value="in">Receita</SelectItem>
-                    <SelectItem value="out">Despesa</SelectItem>
+                    <SelectItem value="income">Receita</SelectItem>
+                    <SelectItem value="expense">Despesa</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -335,21 +339,21 @@ export default function TransactionTable({
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        {transaction.flow === 'in' ? (
+                        {isIncomeFlow(transaction.flow) ? (
                           <>
                             <ArrowUpCircle
                               {...iconA11yProps}
-                              className="h-4 w-4 text-green-600"
+                              className="h-4 w-4 text-green-600 dark:text-green-400"
                             />
-                            <span className="text-green-600">Receita</span>
+                            <span className="text-green-600 dark:text-green-400">Receita</span>
                           </>
                         ) : (
                           <>
                             <ArrowDownCircle
                               {...iconA11yProps}
-                              className="h-4 w-4 text-red-600"
+                              className="h-4 w-4 text-red-600 dark:text-red-400"
                             />
-                            <span className="text-red-600">Despesa</span>
+                            <span className="text-red-600 dark:text-red-400">Despesa</span>
                           </>
                         )}
                       </div>
@@ -398,7 +402,12 @@ export default function TransactionTable({
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            aria-label="Abrir ações da transação"
+                          >
                             <MoreVertical {...iconA11yProps} className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -466,7 +475,12 @@ export default function TransactionTable({
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 -mr-2"
+                            aria-label="Abrir ações da transação"
+                          >
                             <MoreVertical {...iconA11yProps} className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -500,15 +514,15 @@ export default function TransactionTable({
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          {transaction.flow === 'in' ? (
+                          {isIncomeFlow(transaction.flow) ? (
                             <ArrowUpCircle
                               {...iconA11yProps}
-                              className="h-4 w-4 text-green-600 shrink-0"
+                              className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0"
                             />
                           ) : (
                             <ArrowDownCircle
                               {...iconA11yProps}
-                              className="h-4 w-4 text-red-600 shrink-0"
+                              className="h-4 w-4 text-red-600 dark:text-red-400 shrink-0"
                             />
                           )}
                           <p className="font-medium text-sm truncate">
@@ -522,8 +536,8 @@ export default function TransactionTable({
                         )}
                       </div>
                       <div className="text-right shrink-0">
-                        <p className={`font-bold text-base ${transaction.flow === 'in' ? 'text-green-600' : 'text-red-600'}`}>
-                          {transaction.flow === 'in' ? '+' : '-'} {formatCurrency(transaction.amount)}
+                        <p className={`font-bold text-base ${isIncomeFlow(transaction.flow) ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                          {isIncomeFlow(transaction.flow) ? '+' : '-'} {formatCurrency(transaction.amount)}
                         </p>
                       </div>
                     </div>
@@ -593,6 +607,7 @@ export default function TransactionTable({
                 className="h-8 w-8"
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
+                aria-label="Ir para a primeira página"
               >
                 <ChevronsLeft {...iconA11yProps} className="h-4 w-4" />
               </Button>
@@ -602,6 +617,7 @@ export default function TransactionTable({
                 className="h-8 w-8"
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
+                aria-label="Ir para a página anterior"
               >
                 <ChevronLeft {...iconA11yProps} className="h-4 w-4" />
               </Button>
@@ -630,6 +646,7 @@ export default function TransactionTable({
                         currentPage === pageNum && "pointer-events-none"
                       )}
                       onClick={() => setCurrentPage(pageNum)}
+                      aria-label={`Ir para a página ${pageNum}`}
                     >
                       {pageNum}
                     </Button>
@@ -643,6 +660,7 @@ export default function TransactionTable({
                       size="icon"
                       className="h-8 w-8 text-xs"
                       onClick={() => setCurrentPage(totalPages)}
+                      aria-label={`Ir para a página ${totalPages}`}
                     >
                       {totalPages}
                     </Button>
@@ -656,6 +674,7 @@ export default function TransactionTable({
                 className="h-8 w-8"
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
+                aria-label="Ir para a próxima página"
               >
                 <ChevronRight {...iconA11yProps} className="h-4 w-4" />
               </Button>
@@ -665,6 +684,7 @@ export default function TransactionTable({
                 className="h-8 w-8"
                 onClick={() => setCurrentPage(totalPages)}
                 disabled={currentPage === totalPages}
+                aria-label="Ir para a última página"
               >
                 <ChevronsRight {...iconA11yProps} className="h-4 w-4" />
               </Button>

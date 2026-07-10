@@ -58,7 +58,7 @@ WHATSAPP_VERIFY_TOKEN=your_custom_verify_token_here
 
 ### 3. Database Migration
 
-Run database migration to create WhatsApp tables:
+Apply reviewed migrations to create WhatsApp tables. In local/dev only, `db:push` can be used to sync the schema:
 
 ```bash
 npm run db:push

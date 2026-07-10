@@ -580,7 +580,7 @@ export default function CommissionReports() {
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">Total Comissões</p>
-              <p className="text-2xl font-bold text-green-600 mt-1">
+              <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-1">
                 {formatCurrency(stats.total)}
               </p>
             </div>
@@ -592,7 +592,7 @@ export default function CommissionReports() {
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">Pendente</p>
-              <p className="text-2xl font-bold text-orange-600 mt-1">
+              <p className="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-1">
                 {formatCurrency(stats.pending)}
               </p>
             </div>
@@ -604,7 +604,7 @@ export default function CommissionReports() {
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">Pago</p>
-              <p className="text-2xl font-bold text-blue-600 mt-1">
+              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1">
                 {formatCurrency(stats.paid)}
               </p>
             </div>
@@ -616,7 +616,7 @@ export default function CommissionReports() {
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">Média</p>
-              <p className="text-2xl font-bold text-purple-600 mt-1">
+              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1">
                 {formatCurrency(stats.average)}
               </p>
             </div>
@@ -628,10 +628,10 @@ export default function CommissionReports() {
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <p className="text-sm text-muted-foreground">Top Corretor</p>
-              <p className="text-sm font-bold text-amber-700 mt-1 truncate">
+              <p className="text-sm font-bold text-amber-700 dark:text-amber-300 mt-1 truncate">
                 {stats.topBroker.name}
               </p>
-              <p className="text-xs text-amber-600">
+              <p className="text-xs text-amber-600 dark:text-amber-400">
                 {formatCurrency(stats.topBroker.total)}
               </p>
             </div>
@@ -725,7 +725,7 @@ export default function CommissionReports() {
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={brokerData} layout="horizontal">
+                <BarChart data={brokerData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={(v) => `R$ ${(v / 1000).toFixed(0)}k`} />
                   <YAxis dataKey="name" type="category" tick={{ fontSize: 12 }} width={120} />

@@ -6,7 +6,7 @@
  */
 
 import { log } from "../../utils/log";
-import { validateExternalUrl } from "../../security/url-validator";
+import { fetchExternalUrl } from "../../security/url-validator";
 
 interface WhatsAppConfig {
   apiToken: string;
@@ -105,11 +105,20 @@ export class WhatsAppBusinessAPI {
   private readonly MAX_REQUESTS_PER_SECOND = 80;
 
   constructor(config: Partial<WhatsAppConfig>) {
+    // apiVersion entra na URL base do Graph API. Como pode vir de config de
+    // tenant (integration_configs), validamos o formato estritamente (vXX.Y)
+    // para evitar qualquer injeção de path/host na baseUrl. Valor inválido →
+    // default seguro.
+    const requestedApiVersion = config.apiVersion || "v18.0";
+    const safeApiVersion = /^v\d+(\.\d+)?$/.test(requestedApiVersion)
+      ? requestedApiVersion
+      : "v18.0";
+
     this.config = {
       apiToken: config.apiToken || process.env.WHATSAPP_API_TOKEN || "",
       phoneNumberId: config.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || "",
       businessAccountId: config.businessAccountId || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || "",
-      apiVersion: config.apiVersion || "v18.0",
+      apiVersion: safeApiVersion,
     };
 
     if (!this.config.apiToken || !this.config.phoneNumberId) {
@@ -155,13 +164,16 @@ export class WhatsAppBusinessAPI {
 
     try {
       const response = await this.withRateLimit(async () => {
-        const res = await fetch(url, {
+        // fetchExternalUrl resolve DNS e bloqueia alvos privados/redirects para
+        // rede interna (defense-in-depth de SSRF), mesmo com host fixo.
+        const res = await fetchExternalUrl(url, {
           method,
           headers: {
             "Authorization": `Bearer ${this.config.apiToken}`,
             "Content-Type": "application/json",
           },
           body: body ? JSON.stringify(body) : undefined,
+          maxRedirects: 0,
         });
 
         if (!res.ok) {
@@ -360,7 +372,7 @@ export class WhatsAppBusinessAPI {
     formData.append("file", new Blob([file], { type: mimeType }));
     formData.append("messaging_product", "whatsapp");
 
-    const response = await fetch(
+    const response = await fetchExternalUrl(
       `${this.baseUrl}/${this.config.phoneNumberId}/media`,
       {
         method: "POST",
@@ -368,6 +380,7 @@ export class WhatsAppBusinessAPI {
           "Authorization": `Bearer ${this.config.apiToken}`,
         },
         body: formData,
+        maxRedirects: 0,
       }
     );
 
@@ -393,16 +406,12 @@ export class WhatsAppBusinessAPI {
    * Download media
    */
   async downloadMedia(mediaUrl: string): Promise<Buffer> {
-    // Validar URL antes de fazer download para prevenir SSRF
-    const validation = validateExternalUrl(mediaUrl);
-    if (!validation.valid) {
-      throw new Error(`Invalid media URL: ${validation.error}`);
-    }
-
-    const response = await fetch(mediaUrl, {
+    const response = await fetchExternalUrl(mediaUrl, {
       headers: {
         "Authorization": `Bearer ${this.config.apiToken}`,
       },
+      timeoutMs: 10000,
+      maxRedirects: 3,
     });
 
     if (!response.ok) {

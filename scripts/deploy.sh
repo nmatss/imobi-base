@@ -18,6 +18,7 @@ NC='\033[0m' # No Color
 ENVIRONMENT=${1:-staging}
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKUP_DIR="backups"
+DEPLOYED=false
 
 # Functions
 log_info() {
@@ -79,12 +80,38 @@ npm run check || {
     exit 1
 }
 
+log_info "Running operational script typecheck..."
+npm run check:scripts || {
+    log_error "Operational script typecheck failed! Aborting deployment."
+    exit 1
+}
+
+log_info "Running lint without blocking warnings..."
+npm run lint -- --quiet || {
+    log_error "Lint errors found! Aborting deployment."
+    exit 1
+}
+
 # 3. Build application
 log_info "Building application..."
 npm run build || {
     log_error "Build failed! Aborting deployment."
     exit 1
 }
+
+if [[ "$ENVIRONMENT" == "production" ]]; then
+    log_info "Running strict production go-live gate..."
+    npm run ops:go-live:verify:strict || {
+        log_error "Strict go-live gate failed! Aborting production deployment."
+        exit 1
+    }
+else
+    log_info "Running static go-live readiness gate..."
+    npm run ops:go-live:verify:static || {
+        log_error "Static go-live gate failed! Aborting staging deployment."
+        exit 1
+    }
+fi
 
 # 4. Create backup (for Docker deployments)
 if [[ -f "docker-compose.yml" ]]; then
@@ -110,11 +137,17 @@ if [[ "$ENVIRONMENT" == "production" ]]; then
 
     # Deploy to Vercel
     if command -v vercel &> /dev/null; then
-        log_info "Deploying to Vercel..."
-        vercel --prod --yes || {
-            log_error "Vercel deployment failed!"
+        log_info "Building Vercel production artifact..."
+        vercel build --prod || {
+            log_error "Vercel production build failed!"
             exit 1
         }
+        log_info "Deploying prebuilt artifact to Vercel production..."
+        vercel deploy --prebuilt --prod || {
+            log_error "Vercel production deployment failed!"
+            exit 1
+        }
+        DEPLOYED=true
     fi
 
     # Or deploy with Docker
@@ -125,6 +158,7 @@ if [[ "$ENVIRONMENT" == "production" ]]; then
             log_error "Docker deployment failed!"
             exit 1
         }
+        DEPLOYED=true
     fi
 
 elif [[ "$ENVIRONMENT" == "staging" ]]; then
@@ -132,25 +166,38 @@ elif [[ "$ENVIRONMENT" == "staging" ]]; then
 
     # Deploy to Vercel staging
     if command -v vercel &> /dev/null; then
-        log_info "Deploying to Vercel staging..."
-        vercel --yes || {
+        log_info "Building Vercel staging artifact..."
+        vercel build || {
+            log_error "Vercel staging build failed!"
+            exit 1
+        }
+        log_info "Deploying prebuilt artifact to Vercel staging..."
+        vercel deploy --prebuilt || {
             log_error "Vercel staging deployment failed!"
             exit 1
         }
+        DEPLOYED=true
     fi
 fi
 
-# 6. Run database migrations
-log_info "Running database migrations..."
-if [[ -f "migrations/add-performance-indexes.sql" ]]; then
-    npm run db:migrate:indexes || log_warn "Database migrations failed"
+if [[ "$DEPLOYED" != "true" ]]; then
+    log_error "No deployment target was executed. Install/configure Vercel CLI or enable Docker deployment."
+    exit 1
+fi
+
+# 6. Database migration policy
+if [[ "$ENVIRONMENT" == "production" ]]; then
+    log_warn "Automatic production migrations are disabled. Apply reviewed migrations before deploy using docs/DEPLOYMENT_RUNBOOK.md."
+elif [[ "$APPLY_INDEX_MIGRATIONS" == "true" && -f "migrations/add-performance-indexes.sql" ]]; then
+    log_info "Applying staging index migrations because APPLY_INDEX_MIGRATIONS=true..."
+    npm run db:migrate:indexes || log_warn "Database index migrations failed"
 fi
 
 # 7. Health check with exponential backoff
 log_info "Performing health check..."
 
 if [[ "$ENVIRONMENT" == "production" ]]; then
-    HEALTH_URL="https://imobibase.com/api/health"
+    HEALTH_URL="https://imobibase.com.br/api/health"
 else
     HEALTH_URL="https://staging-imobibase.vercel.app/api/health"
 fi
@@ -211,7 +258,11 @@ if [[ "$ENVIRONMENT" == "production" ]]; then
     log_info "Creating git tag..."
     VERSION="v$(date +"%Y.%m.%d-%H%M%S")"
     git tag -a "$VERSION" -m "Production release $VERSION"
-    git push origin "$VERSION" || log_warn "Failed to push tag"
+    if [[ "$PUSH_RELEASE_TAG" == "true" ]]; then
+        git push origin "$VERSION" || log_warn "Failed to push tag"
+    else
+        log_warn "Release tag $VERSION created locally. Set PUSH_RELEASE_TAG=true to push it."
+    fi
 fi
 
 # 10. Cleanup old backups (keep last 10)
@@ -228,7 +279,7 @@ log_info "Commit: $(git rev-parse --short HEAD)"
 log_info "Health check: $HEALTH_URL"
 
 if [[ "$ENVIRONMENT" == "production" ]]; then
-    log_info "Production URL: https://imobibase.com"
+    log_info "Production URL: https://imobibase.com.br"
 else
     log_info "Staging URL: https://staging-imobibase.vercel.app"
 fi

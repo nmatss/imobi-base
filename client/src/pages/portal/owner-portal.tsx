@@ -37,6 +37,28 @@ function portalFetch(url: string) {
   });
 }
 
+function PortalLoading() {
+  return (
+    <div className="flex items-center justify-center py-16" role="status" aria-live="polite">
+      <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+      <span className="sr-only">Carregando...</span>
+    </div>
+  );
+}
+
+function PortalError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Card>
+      <CardContent className="flex flex-col items-center py-12 text-muted-foreground">
+        <AlertTriangle className="h-12 w-12 mb-4 text-amber-500" />
+        <p className="text-lg font-medium text-foreground">Não foi possível carregar</p>
+        <p className="text-sm mb-4">Ocorreu um erro ao obter os dados. Tente novamente.</p>
+        <Button variant="outline" size="sm" onClick={onRetry}>Tentar novamente</Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function OwnerPortal() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -98,36 +120,36 @@ export default function OwnerPortal() {
     }
   }, [brand]);
 
-  const { data: dashboard } = useQuery({
+  const { data: dashboard, isLoading: dashboardLoading, isError: dashboardError, refetch: refetchDashboard } = useQuery({
     queryKey: ["/api/portal/owner/dashboard"],
     queryFn: () => portalFetch("/api/portal/owner/dashboard"),
   });
 
-  const { data: properties } = useQuery({
+  const { data: properties, isLoading: propertiesLoading, isError: propertiesError, refetch: refetchProperties } = useQuery({
     queryKey: ["/api/portal/owner/properties"],
     queryFn: () => portalFetch("/api/portal/owner/properties"),
     enabled: activeTab === "properties" || activeTab === "dashboard",
   });
 
-  const { data: repasses } = useQuery({
+  const { data: repasses, isLoading: repassesLoading, isError: repassesError, refetch: refetchRepasses } = useQuery({
     queryKey: ["/api/portal/owner/repasses"],
     queryFn: () => portalFetch("/api/portal/owner/repasses"),
     enabled: activeTab === "repasses",
   });
 
-  const { data: contracts } = useQuery({
+  const { data: contracts, isLoading: contractsLoading, isError: contractsError, refetch: refetchContracts } = useQuery({
     queryKey: ["/api/portal/owner/contracts"],
     queryFn: () => portalFetch("/api/portal/owner/contracts"),
     enabled: activeTab === "contracts",
   });
 
-  const { data: maintenance } = useQuery({
+  const { data: maintenance, isLoading: maintenanceLoading, isError: maintenanceError, refetch: refetchMaintenance } = useQuery({
     queryKey: ["/api/portal/owner/maintenance"],
     queryFn: () => portalFetch("/api/portal/owner/maintenance"),
     enabled: activeTab === "maintenance",
   });
 
-  const { data: incomeReport } = useQuery({
+  const { data: incomeReport, isLoading: incomeLoading, isError: incomeError, refetch: refetchIncome } = useQuery({
     queryKey: ["/api/portal/owner/income-report"],
     queryFn: () => portalFetch("/api/portal/owner/income-report"),
     enabled: activeTab === "income",
@@ -259,6 +281,8 @@ export default function OwnerPortal() {
 
           {/* Dashboard */}
           <TabsContent value="dashboard">
+            {dashboardLoading ? <PortalLoading /> : dashboardError ? <PortalError onRetry={() => refetchDashboard()} /> : (
+            <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <Card>
                 <CardContent className="pt-6">
@@ -361,12 +385,14 @@ export default function OwnerPortal() {
                 </CardContent>
               </Card>
             </div>
+            </>
+            )}
           </TabsContent>
 
           {/* Properties */}
           <TabsContent value="properties">
             <div className="space-y-4">
-              {!properties || properties.length === 0 ? (
+              {propertiesLoading ? <PortalLoading /> : propertiesError ? <PortalError onRetry={() => refetchProperties()} /> : !properties || properties.length === 0 ? (
                 <Card>
                   <CardContent className="flex flex-col items-center py-12 text-muted-foreground">
                     <Home className="h-12 w-12 mb-4 opacity-50" />
@@ -455,7 +481,7 @@ export default function OwnerPortal() {
               </Select>
             </div>
 
-            {!filteredRepasses || filteredRepasses.length === 0 ? (
+            {repassesLoading ? <PortalLoading /> : repassesError ? <PortalError onRetry={() => refetchRepasses()} /> : !filteredRepasses || filteredRepasses.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center py-12 text-muted-foreground">
                   <DollarSign className="h-12 w-12 mb-4 opacity-50" />
@@ -509,7 +535,7 @@ export default function OwnerPortal() {
 
           {/* Contracts */}
           <TabsContent value="contracts">
-            {!contracts || contracts.length === 0 ? (
+            {contractsLoading ? <PortalLoading /> : contractsError ? <PortalError onRetry={() => refetchContracts()} /> : !contracts || contracts.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center py-12 text-muted-foreground">
                   <FileText className="h-12 w-12 mb-4 opacity-50" />
@@ -562,7 +588,7 @@ export default function OwnerPortal() {
 
           {/* Maintenance */}
           <TabsContent value="maintenance">
-            {!maintenance || maintenance.length === 0 ? (
+            {maintenanceLoading ? <PortalLoading /> : maintenanceError ? <PortalError onRetry={() => refetchMaintenance()} /> : !maintenance || maintenance.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center py-12 text-muted-foreground">
                   <Wrench className="h-12 w-12 mb-4 opacity-50" />
@@ -617,11 +643,11 @@ export default function OwnerPortal() {
 
           {/* Income Report */}
           <TabsContent value="income">
-            {!incomeReport ? (
+            {incomeLoading ? <PortalLoading /> : incomeError ? <PortalError onRetry={() => refetchIncome()} /> : !incomeReport ? (
               <Card>
                 <CardContent className="flex flex-col items-center py-12 text-muted-foreground">
                   <TrendingUp className="h-12 w-12 mb-4 opacity-50" />
-                  <p className="text-lg font-medium">Carregando relatório...</p>
+                  <p className="text-lg font-medium">Nenhum dado de rendimento disponível</p>
                 </CardContent>
               </Card>
             ) : (

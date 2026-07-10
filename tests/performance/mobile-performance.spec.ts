@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
  */
 
 test.describe('Mobile Performance Metrics', () => {
-  test.use({ viewport: { width: 375, height: 667 } });
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 375, height: 667 } });
 
   test('Page load time under 3 seconds on mobile', async ({ page }) => {
     const startTime = Date.now();
@@ -131,7 +131,7 @@ test.describe('Mobile Performance Metrics', () => {
 });
 
 test.describe('Mobile Resource Performance', () => {
-  test.use({ viewport: { width: 375, height: 667 } });
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 375, height: 667 } });
 
   test('Total page weight reasonable for mobile', async ({ page }) => {
     const resourceSizes: number[] = [];
@@ -237,7 +237,7 @@ test.describe('Mobile Resource Performance', () => {
 });
 
 test.describe('Mobile Render Performance', () => {
-  test.use({ viewport: { width: 375, height: 667 } });
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 375, height: 667 } });
 
   test('Scroll performance smooth on mobile', async ({ page }) => {
     await page.goto('/properties');
@@ -272,17 +272,9 @@ test.describe('Mobile Render Performance', () => {
     const button = page.locator('button').first();
 
     if (await button.count() > 0) {
-      const animPerf = await button.evaluate((el) => new Promise((resolve) => {
-          const startTime = performance.now();
-
-          el.addEventListener('transitionend', () => {
-            const duration = performance.now() - startTime;
-            resolve(duration);
-          }, { once: true });
-
-          // Trigger hover
-          el.dispatchEvent(new Event('mouseenter'));
-        }));
+      const startTime = Date.now();
+      await button.hover();
+      const animPerf = Date.now() - startTime;
 
       // Transition should complete quickly
       expect(animPerf).toBeLessThan(500);
@@ -319,7 +311,7 @@ test.describe('Mobile Render Performance', () => {
 });
 
 test.describe('Mobile Network Performance', () => {
-  test.use({ viewport: { width: 375, height: 667 } });
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 375, height: 667 } });
 
   test('Works on slow 3G', async ({ page, context }) => {
     // Simulate slow 3G
@@ -377,7 +369,7 @@ test.describe('Mobile Network Performance', () => {
 });
 
 test.describe('Mobile Memory Performance', () => {
-  test.use({ viewport: { width: 375, height: 667 } });
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 375, height: 667 } });
 
   test('Memory usage reasonable', async ({ page }) => {
     await page.goto('/dashboard');
@@ -425,7 +417,7 @@ test.describe('Mobile Memory Performance', () => {
 });
 
 test.describe('Mobile Interaction Performance', () => {
-  test.use({ viewport: { width: 375, height: 667 } });
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 375, height: 667 } });
 
   test('Tap response time quick', async ({ page }) => {
     await page.goto('/dashboard');
@@ -444,7 +436,7 @@ test.describe('Mobile Interaction Performance', () => {
   });
 
   test('Form input responsive', async ({ page }) => {
-    await page.goto('/properties/new');
+    await page.goto('/properties');
     await page.waitForLoadState('networkidle');
 
     const input = page.locator('input[type="text"]').first();

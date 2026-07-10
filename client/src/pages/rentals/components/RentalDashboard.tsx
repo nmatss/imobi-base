@@ -82,7 +82,7 @@ export function RentalDashboard({
       value: metrics?.activeContracts || 0,
       icon: FileText,
       color: "bg-blue-100 text-blue-600",
-      iconBg: "bg-blue-100",
+      iconBg: "bg-blue-100 dark:bg-blue-900/30",
     },
     {
       id: "vacantProperties",
@@ -90,7 +90,7 @@ export function RentalDashboard({
       value: metrics?.vacantProperties || 0,
       icon: Home,
       color: "bg-gray-100 text-gray-600",
-      iconBg: "bg-gray-100",
+      iconBg: "bg-gray-100 dark:bg-gray-800",
     },
     {
       id: "delinquency",
@@ -100,7 +100,7 @@ export function RentalDashboard({
       badgeColor: (metrics?.delinquencyPercentage || 0) > 10 ? "destructive" : "secondary",
       icon: AlertCircle,
       color: "bg-red-100 text-red-600",
-      iconBg: "bg-red-100",
+      iconBg: "bg-red-100 dark:bg-red-900/30",
     },
     {
       id: "pendingTransfers",
@@ -108,7 +108,7 @@ export function RentalDashboard({
       value: metrics?.pendingTransfers || 0,
       icon: DollarSign,
       color: "bg-orange-100 text-orange-600",
-      iconBg: "bg-orange-100",
+      iconBg: "bg-orange-100 dark:bg-orange-900/30",
     },
     {
       id: "contractsExpiring",
@@ -117,7 +117,7 @@ export function RentalDashboard({
       badge: metrics?.contractsExpiringThisMonth ? `${metrics.contractsExpiringThisMonth} venc.` : undefined,
       icon: Calendar,
       color: "bg-yellow-100 text-yellow-600",
-      iconBg: "bg-yellow-100",
+      iconBg: "bg-yellow-100 dark:bg-yellow-900/30",
     },
   ];
 
@@ -229,24 +229,24 @@ export function RentalDashboard({
           <CardContent className="p-4 sm:p-6">
             <h3 className="text-sm font-semibold mb-4">Receita Recorrente</h3>
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+              <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
                 <div>
                   <p className="text-xs text-muted-foreground">Mensal (MRR)</p>
-                  <p className="text-2xl font-bold text-green-600">
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                     {formatPrice(metrics?.monthlyRecurringRevenue || 0)}
                   </p>
                 </div>
-                <TrendingUp className="h-8 w-8 text-green-600" />
+                <TrendingUp className="h-8 w-8 text-green-600 dark:text-green-400" />
               </div>
 
-              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+              <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
                 <div>
                   <p className="text-xs text-muted-foreground">Projeção Anual</p>
-                  <p className="text-xl font-bold text-blue-600">
+                  <p className="text-xl font-bold text-blue-600 dark:text-blue-400">
                     {formatPrice((metrics?.monthlyRecurringRevenue || 0) * 12)}
                   </p>
                 </div>
-                <Calendar className="h-8 w-8 text-blue-600" />
+                <Calendar className="h-8 w-8 text-blue-600 dark:text-blue-400" />
               </div>
 
               <div className="pt-3 border-t">
@@ -271,15 +271,15 @@ export function RentalDashboard({
               {/* Delinquency - Critical Indicator */}
               <div className={`p-4 rounded-lg border-2 ${
                 (metrics?.delinquencyPercentage || 0) > 10
-                  ? 'bg-red-50 border-red-500'
-                  : 'bg-red-50 border-red-200'
+                  ? 'bg-red-50 dark:bg-red-950/30 border-red-500 dark:border-red-700'
+                  : 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800'
               }`}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <AlertCircle className={`h-5 w-5 ${
-                      (metrics?.delinquencyPercentage || 0) > 10 ? 'text-red-600' : 'text-red-500'
+                      (metrics?.delinquencyPercentage || 0) > 10 ? 'text-red-600 dark:text-red-400' : 'text-red-500 dark:text-red-400'
                     }`} />
-                    <span className="text-xs font-semibold text-red-900">
+                    <span className="text-xs font-semibold text-red-900 dark:text-red-300">
                       {(metrics?.delinquencyPercentage || 0) > 10 ? 'INADIMPLÊNCIA ALTA' : 'Inadimplência'}
                     </span>
                   </div>
@@ -287,29 +287,29 @@ export function RentalDashboard({
                     {metrics?.delinquencyPercentage || 0}%
                   </Badge>
                 </div>
-                <p className="text-2xl font-bold text-red-600">
+                <p className="text-2xl font-bold text-red-600 dark:text-red-400">
                   {formatPrice(metrics?.delinquencyValue || 0)}
                 </p>
               </div>
 
               {/* Pending Transfers */}
-              <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
+              <div className="p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg border border-orange-200 dark:border-orange-800">
                 <div className="flex items-center gap-2 mb-2">
-                  <DollarSign className="h-4 w-4 text-orange-600" />
-                  <span className="text-xs font-medium text-orange-900">Repasses Pendentes</span>
+                  <DollarSign className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                  <span className="text-xs font-medium text-orange-900 dark:text-orange-300">Repasses Pendentes</span>
                 </div>
-                <p className="text-lg font-bold text-orange-600">
+                <p className="text-lg font-bold text-orange-600 dark:text-orange-400">
                   {metrics?.pendingTransfers || 0} repasses
                 </p>
               </div>
 
               {/* Contracts Expiring */}
-              <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+              <div className="p-3 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg border border-yellow-200 dark:border-yellow-800">
                 <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="h-4 w-4 text-yellow-600" />
-                  <span className="text-xs font-medium text-yellow-900">Próximos Vencimentos</span>
+                  <Calendar className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                  <span className="text-xs font-medium text-yellow-900 dark:text-yellow-300">Próximos Vencimentos</span>
                 </div>
-                <p className="text-lg font-bold text-yellow-600">
+                <p className="text-lg font-bold text-yellow-600 dark:text-yellow-400">
                   {(metrics?.contractsExpiringThisMonth || 0) + (metrics?.contractsAdjustingThisMonth || 0)} contratos
                 </p>
               </div>
@@ -323,12 +323,12 @@ export function RentalDashboard({
         <CardContent className="p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-green-100 flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-green-600" />
+              <div className="h-12 w-12 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                <TrendingUp className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
               <div>
                 <p className="text-xs sm:text-sm text-muted-foreground">Receita Recorrente Mensal</p>
-                <p className="text-2xl sm:text-3xl font-bold text-green-600">
+                <p className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-400">
                   {formatPrice(metrics?.monthlyRecurringRevenue || 0)}
                 </p>
               </div>

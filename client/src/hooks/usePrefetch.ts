@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { propertiesKeys } from "./useProperties";
 import { leadsKeys } from "./useLeads";
 import { contractsKeys } from "./useContracts";
@@ -148,87 +148,61 @@ export function usePrefetch() {
  */
 export function usePrefetchOnHover() {
   const { prefetchProperty, prefetchLead, prefetchContract } = usePrefetch();
-  const timeouts = new Map<string, NodeJS.Timeout>();
+  // PERF-8: o Map de timers precisa ser estavel entre renders (useRef). Antes era
+  // `new Map()` a cada render, orfanando timers pendentes e recriando os callbacks.
+  const timeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
-  /**
-   * Handler para prefetch ao fazer hover em uma propriedade
-   */
+  // PERF-8: limpa TODOS os timers pendentes no unmount, evitando que um setTimeout
+  // dispare prefetch (fetch/atualizacao) apos o componente sair da arvore.
+  useEffect(() => {
+    const timeouts = timeoutsRef.current;
+    return () => {
+      for (const timeout of timeouts.values()) {
+        clearTimeout(timeout);
+      }
+      timeouts.clear();
+    };
+  }, []);
+
+  const schedule = useCallback(
+    (key: string, delay: number, run: () => void) => {
+      const timeouts = timeoutsRef.current;
+      const existing = timeouts.get(key);
+      if (existing) clearTimeout(existing);
+
+      const timeout = setTimeout(() => {
+        run();
+        timeouts.delete(key);
+      }, delay);
+      timeouts.set(key, timeout);
+
+      return () => {
+        const pending = timeouts.get(key);
+        if (pending) {
+          clearTimeout(pending);
+          timeouts.delete(key);
+        }
+      };
+    },
+    [],
+  );
+
   const onPropertyHover = useCallback(
-    (propertyId: string, delay: number = 300) => {
-      // Limpa timeout anterior se existir
-      if (timeouts.has(propertyId)) {
-        clearTimeout(timeouts.get(propertyId));
-      }
-
-      // Cria novo timeout
-      const timeout = setTimeout(() => {
-        prefetchProperty(propertyId);
-        timeouts.delete(propertyId);
-      }, delay);
-
-      timeouts.set(propertyId, timeout);
-
-      // Retorna função de cleanup
-      return () => {
-        if (timeouts.has(propertyId)) {
-          clearTimeout(timeouts.get(propertyId));
-          timeouts.delete(propertyId);
-        }
-      };
-    },
-    [prefetchProperty, timeouts]
+    (propertyId: string, delay: number = 300) =>
+      schedule(propertyId, delay, () => prefetchProperty(propertyId)),
+    [schedule, prefetchProperty],
   );
 
-  /**
-   * Handler para prefetch ao fazer hover em um lead
-   */
   const onLeadHover = useCallback(
-    (leadId: string, delay: number = 300) => {
-      if (timeouts.has(leadId)) {
-        clearTimeout(timeouts.get(leadId));
-      }
-
-      const timeout = setTimeout(() => {
-        prefetchLead(leadId);
-        timeouts.delete(leadId);
-      }, delay);
-
-      timeouts.set(leadId, timeout);
-
-      return () => {
-        if (timeouts.has(leadId)) {
-          clearTimeout(timeouts.get(leadId));
-          timeouts.delete(leadId);
-        }
-      };
-    },
-    [prefetchLead, timeouts]
+    (leadId: string, delay: number = 300) =>
+      schedule(leadId, delay, () => prefetchLead(leadId)),
+    [schedule, prefetchLead],
   );
 
-  /**
-   * Handler para prefetch ao fazer hover em um contrato
-   */
   const onContractHover = useCallback(
-    (contractId: string, delay: number = 300) => {
-      if (timeouts.has(contractId)) {
-        clearTimeout(timeouts.get(contractId));
-      }
-
-      const timeout = setTimeout(() => {
-        prefetchContract(contractId);
-        timeouts.delete(contractId);
-      }, delay);
-
-      timeouts.set(contractId, timeout);
-
-      return () => {
-        if (timeouts.has(contractId)) {
-          clearTimeout(timeouts.get(contractId));
-          timeouts.delete(contractId);
-        }
-      };
-    },
-    [prefetchContract, timeouts]
+    (contractId: string, delay: number = 300) =>
+      schedule(contractId, delay, () => prefetchContract(contractId)),
+    [schedule, prefetchContract],
   );
 
   return {

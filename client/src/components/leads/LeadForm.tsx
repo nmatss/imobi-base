@@ -229,15 +229,17 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
           <div className="space-y-2">
             <Label htmlFor="preferredType">Tipo de Imóvel</Label>
             <Select
-              value={watch("preferredType") || ""}
-              onValueChange={(value) => setValue("preferredType", value as any)}
+              value={watch("preferredType") || "__none__"}
+              onValueChange={(value) =>
+                setValue("preferredType", value === "__none__" ? undefined : value as any)
+              }
               disabled={isSubmitting}
             >
               <SelectTrigger id="preferredType">
                 <SelectValue placeholder="Selecione o tipo" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Não especificado</SelectItem>
+                <SelectItem value="__none__">Não especificado</SelectItem>
                 <SelectItem value="house">Casa</SelectItem>
                 <SelectItem value="apartment">Apartamento</SelectItem>
                 <SelectItem value="commercial">Comercial</SelectItem>
@@ -250,15 +252,17 @@ export function LeadForm({ lead, onSuccess, onCancel }: LeadFormProps) {
           <div className="space-y-2">
             <Label htmlFor="preferredCategory">Categoria</Label>
             <Select
-              value={watch("preferredCategory") || ""}
-              onValueChange={(value) => setValue("preferredCategory", value as any)}
+              value={watch("preferredCategory") || "__none__"}
+              onValueChange={(value) =>
+                setValue("preferredCategory", value === "__none__" ? undefined : value as any)
+              }
               disabled={isSubmitting}
             >
               <SelectTrigger id="preferredCategory">
                 <SelectValue placeholder="Selecione a categoria" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Não especificado</SelectItem>
+                <SelectItem value="__none__">Não especificado</SelectItem>
                 <SelectItem value="sale">Venda</SelectItem>
                 <SelectItem value="rent">Aluguel</SelectItem>
                 <SelectItem value="both">Venda ou Aluguel</SelectItem>

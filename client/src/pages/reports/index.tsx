@@ -76,6 +76,7 @@ import {
 } from "recharts";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/lib/toast-helpers";
+import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 
 const COLORS = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
@@ -192,7 +193,7 @@ function KPICard({
           {trend && (
             <div className={cn(
               "flex items-center text-sm font-medium",
-              trend.direction === 'up' ? "text-green-600" : "text-red-600"
+              trend.direction === 'up' ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
             )}>
               {trend.direction === 'up' ? (
                 <ArrowUpRight className="h-4 w-4 mr-1" />
@@ -355,24 +356,25 @@ export default function ReportsPage() {
     }
   };
 
-  const loadSavedReports = () => {
-    // Mock saved reports - in production, fetch from backend
-    setSavedReports([
-      {
-        id: "1",
-        name: "Relatório Mensal Vendas",
-        type: "vendas",
-        filters: { period: "month" },
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: "2",
-        name: "Performance Trimestral",
-        type: "corretores",
-        filters: { period: "quarter" },
-        createdAt: new Date().toISOString()
-      }
-    ]);
+  const loadSavedReports = async () => {
+    // Persistência real via /api/reports/saved (gated por 'advanced_reports').
+    try {
+      const res = await apiRequest("GET", "/api/reports/saved");
+      const data = await res.json();
+      setSavedReports(
+        (Array.isArray(data) ? data : []).map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          type: r.reportType as ReportType,
+          filters: r.filters || {},
+          createdAt: r.createdAt,
+        })),
+      );
+    } catch {
+      // Plano sem 'advanced_reports' (403) ou erro de rede → lista vazia,
+      // sem exibir dados de exemplo fabricados.
+      setSavedReports([]);
+    }
   };
 
   const loadReportData = async (type: ReportType) => {
@@ -401,6 +403,13 @@ export default function ReportsPage() {
         case 'corretores':
           endpoint = '/api/reports/broker-performance';
           break;
+      }
+
+      // 'comissoes' (e qualquer tipo sem endpoint) tem carregamento/render próprios
+      // (CommissionReports). Sem este guard, o fetch viraria GET da própria SPA,
+      // res.json() lançaria e dispararia um toast de erro espúrio.
+      if (!endpoint) {
+        return;
       }
 
       const res = await fetch(`${endpoint}?${params}`, { credentials: "include" });
@@ -517,16 +526,32 @@ export default function ReportsPage() {
     return headers + rows.join('\n');
   };
 
-  const handleSaveReport = () => {
-    const newReport: SavedReport = {
-      id: Date.now().toString(),
-      name: `Relatório ${selectedReport} - ${new Date().toLocaleDateString('pt-BR')}`,
-      type: selectedReport!,
-      filters: { period, startDate, endDate, selectedBroker },
-      createdAt: new Date().toISOString()
-    };
-    setSavedReports([newReport, ...savedReports]);
-    toast.success("Relatório salvo", "Você pode acessá-lo rapidamente depois");
+  const handleSaveReport = async () => {
+    if (!selectedReport) return;
+    try {
+      const res = await apiRequest("POST", "/api/reports/saved", {
+        name: `Relatório ${selectedReport} - ${new Date().toLocaleDateString('pt-BR')}`,
+        reportType: selectedReport,
+        filters: { period, startDate, endDate, selectedBroker },
+      });
+      const saved = await res.json();
+      setSavedReports((prev) => [
+        {
+          id: saved.id,
+          name: saved.name,
+          type: saved.reportType as ReportType,
+          filters: saved.filters || {},
+          createdAt: saved.createdAt,
+        },
+        ...prev,
+      ]);
+      toast.success("Relatório salvo", "Você pode acessá-lo rapidamente depois");
+    } catch {
+      toast.error(
+        "Não foi possível salvar o relatório",
+        "Verifique se seu plano inclui relatórios avançados e tente novamente.",
+      );
+    }
   };
 
   // Date Picker Bottom Sheet (Mobile)
@@ -772,11 +797,17 @@ export default function ReportsPage() {
                       className="w-full justify-start h-auto py-3 px-4"
                       onClick={() => {
                         setSelectedReport(report.type);
-                        // Apply saved filters
-                        setPeriod(report.filters.period);
-                        setStartDate(report.filters.startDate);
-                        setEndDate(report.filters.endDate);
                         setSelectedBroker(report.filters.selectedBroker || 'all');
+                        // Deriva datas válidas a partir do período salvo; só usa startDate/endDate
+                        // explícitos quando o filtro salvo é 'custom' (evita enviar 'undefined' e
+                        // renderizar "Invalid Date").
+                        if (report.filters.period === 'custom' && report.filters.startDate && report.filters.endDate) {
+                          setPeriod('custom');
+                          setStartDate(report.filters.startDate);
+                          setEndDate(report.filters.endDate);
+                        } else {
+                          handlePeriodChange(report.filters.period);
+                        }
                         loadReportData(report.type);
                       }}
                     >
@@ -825,11 +856,12 @@ export default function ReportsPage() {
                           variant="ghost"
                           size="sm"
                           className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
                             setSelectedReport(type.id);
-                            loadReportData(type.id);
-                            setTimeout(() => setShowExportOptions(true), 500);
+                            // Aguarda os dados antes de abrir o ExportSheet (evita CSV vazio por race de timeout).
+                            await loadReportData(type.id);
+                            setShowExportOptions(true);
                           }}
                         >
                           <Download className="w-4 h-4" />
@@ -870,10 +902,11 @@ export default function ReportsPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={(e) => {
+                          onClick={async (e) => {
                             e.stopPropagation();
-                            handleReportTypeSelect(type.id);
-                            setTimeout(() => setShowExportOptions(true), 500);
+                            // Aguarda o carregamento concluir antes de abrir o ExportSheet.
+                            await handleReportTypeSelect(type.id);
+                            setShowExportOptions(true);
                           }}
                           disabled={generatingReport === type.id}
                         >
@@ -895,33 +928,8 @@ export default function ReportsPage() {
           })}
         </div>
 
-        {/* Quick Stats Preview */}
-        <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <Activity className="h-5 w-5 text-primary" />
-              <h3 className="font-semibold">Resumo Rápido do Mês</h3>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="text-center p-3 bg-background/50 rounded-lg">
-                <p className="text-xl sm:text-2xl font-bold text-green-600">12</p>
-                <p className="text-xs text-muted-foreground">Vendas</p>
-              </div>
-              <div className="text-center p-3 bg-background/50 rounded-lg">
-                <p className="text-xl sm:text-2xl font-bold text-blue-600">38</p>
-                <p className="text-xs text-muted-foreground">Contratos</p>
-              </div>
-              <div className="text-center p-3 bg-background/50 rounded-lg">
-                <p className="text-xl sm:text-2xl font-bold text-purple-600">156</p>
-                <p className="text-xs text-muted-foreground">Leads</p>
-              </div>
-              <div className="text-center p-3 bg-background/50 rounded-lg">
-                <p className="text-xl sm:text-2xl font-bold text-orange-600">87%</p>
-                <p className="text-xs text-muted-foreground">Meta</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Removido: "Resumo Rápido do Mês" com números fixos/fabricados (B4).
+            Os KPIs reais de cada relatório aparecem ao gerar o relatório abaixo. */}
       </div>
       </TooltipProvider>
     );
@@ -1181,13 +1189,11 @@ export default function ReportsPage() {
               title="Total de Vendas"
               value={data.kpis?.totalSales || 0}
               icon={BarChart3}
-              trend={{ value: 12, direction: 'up' }}
             />
             <KPICard
               title="Valor Total"
               value={formatCurrency(data.kpis?.totalValue || 0)}
               icon={DollarSign}
-              trend={{ value: 8, direction: 'up' }}
             />
             <KPICard
               title="Ticket Médio"
@@ -1198,7 +1204,6 @@ export default function ReportsPage() {
               title="Taxa de Conversão"
               value={formatPercent(data.kpis?.conversionRate || 0)}
               icon={Target}
-              trend={{ value: 3, direction: 'down' }}
             />
             <KPICard
               title="Top Corretor"
@@ -1219,7 +1224,6 @@ export default function ReportsPage() {
               title="Receita Recorrente"
               value={formatCurrency(data.totalReceived || 0)}
               icon={DollarSign}
-              trend={{ value: 5, direction: 'up' }}
             />
             <KPICard
               title="Taxa de Inadimplência"
@@ -1229,7 +1233,6 @@ export default function ReportsPage() {
                   : 0
               )}
               icon={AlertCircle}
-              trend={{ value: 2, direction: 'down' }}
             />
             <KPICard
               title="Taxa de Ocupação"
@@ -1250,13 +1253,11 @@ export default function ReportsPage() {
               title="Leads Ganhos"
               value={data.wonLeads || 0}
               icon={Check}
-              trend={{ value: 15, direction: 'up' }}
             />
             <KPICard
               title="Leads Perdidos"
               value={data.lostLeads || 0}
               icon={X}
-              trend={{ value: 5, direction: 'down' }}
             />
             <KPICard
               title="Taxa de Conversão"
@@ -1276,7 +1277,6 @@ export default function ReportsPage() {
               title="Receita Total"
               value={formatCurrency(data.dre?.totalRevenue || 0)}
               icon={DollarSign}
-              trend={{ value: 10, direction: 'up' }}
             />
             <KPICard
               title="Despesas"
@@ -1287,7 +1287,6 @@ export default function ReportsPage() {
               title="Lucro Líquido"
               value={formatCurrency(data.dre?.netProfit || 0)}
               icon={TrendingUp}
-              trend={{ value: 18, direction: 'up' }}
             />
             <KPICard
               title="Margem de Lucro"
@@ -1609,19 +1608,19 @@ export default function ReportsPage() {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center p-3 bg-green-50 dark:bg-green-950/20 rounded-lg">
                     <span className="text-sm font-medium">Receita de Vendas</span>
-                    <span className="font-bold text-green-600">
+                    <span className="font-bold text-green-600 dark:text-green-400">
                       {formatCurrency(data.dre?.salesRevenue || 0)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
                     <span className="text-sm font-medium">Receita de Aluguéis</span>
-                    <span className="font-bold text-blue-600">
+                    <span className="font-bold text-blue-600 dark:text-blue-400">
                       {formatCurrency(data.dre?.rentalRevenue || 0)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
                     <span className="text-sm font-medium">Outras Receitas</span>
-                    <span className="font-bold text-purple-600">
+                    <span className="font-bold text-purple-600 dark:text-purple-400">
                       {formatCurrency(data.dre?.otherIncome || 0)}
                     </span>
                   </div>
@@ -1633,13 +1632,13 @@ export default function ReportsPage() {
                   </div>
                   <div className="flex justify-between items-center p-3 bg-red-50 dark:bg-red-950/20 rounded-lg">
                     <span className="text-sm font-medium">Despesas Operacionais</span>
-                    <span className="font-bold text-red-600">
+                    <span className="font-bold text-red-600 dark:text-red-400">
                       {formatCurrency(data.dre?.operationalExpenses || 0)}
                     </span>
                   </div>
                   <div className="border-t pt-3 flex justify-between items-center p-3 bg-green-100 dark:bg-green-950/30 rounded-lg">
                     <span className="font-semibold">Lucro Líquido</span>
-                    <span className="text-lg font-bold text-green-600">
+                    <span className="text-lg font-bold text-green-600 dark:text-green-400">
                       {formatCurrency(data.dre?.netProfit || 0)}
                     </span>
                   </div>
@@ -1789,7 +1788,7 @@ export default function ReportsPage() {
                         <td className="text-center py-3 px-4 text-sm">{broker.leadsWorked}</td>
                         <td className="text-center py-3 px-4 text-sm">{broker.visits}</td>
                         <td className="text-center py-3 px-4 text-sm">{broker.proposals}</td>
-                        <td className="text-center py-3 px-4 font-semibold text-green-600 text-sm">
+                        <td className="text-center py-3 px-4 font-semibold text-green-600 dark:text-green-400 text-sm">
                           {broker.contractsClosed}
                         </td>
                         <td className="text-right py-3 px-4 text-sm">

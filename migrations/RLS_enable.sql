@@ -25,6 +25,19 @@
 
 BEGIN;
 
+-- ---- analytics_events -------------------------------------------------------------------
+ALTER TABLE "analytics_events" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "analytics_events" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "analytics_events";
+CREATE POLICY tenant_isolation ON "analytics_events"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
 -- ---- account_deletion_requests -------------------------------------------------------------------
 ALTER TABLE "account_deletion_requests" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "account_deletion_requests" FORCE  ROW LEVEL SECURITY;
@@ -57,6 +70,19 @@ ALTER TABLE "audit_logs" FORCE  ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS tenant_isolation ON "audit_logs";
 CREATE POLICY tenant_isolation ON "audit_logs"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- auto_marketing_content -------------------------------------------------------------------
+ALTER TABLE "auto_marketing_content" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "auto_marketing_content" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "auto_marketing_content";
+CREATE POLICY tenant_isolation ON "auto_marketing_content"
     USING (
         tenant_id = current_setting('app.tenant_id', true)
     )
@@ -126,9 +152,31 @@ DROP POLICY IF EXISTS tenant_isolation ON "contracts";
 CREATE POLICY tenant_isolation ON "contracts"
     USING (
         tenant_id = current_setting('app.tenant_id', true)
+          OR (
+              clicksign_document_key IS NOT NULL
+              AND clicksign_document_key = current_setting('app.clicksign_document_key', true)
+          )
+          OR id IN (
+              SELECT ds.contract_id
+              FROM "digital_signatures" ds
+              WHERE ds.token IS NOT NULL
+                AND ds.token = current_setting('app.digital_signature_token', true)
+                AND (ds.expires_at IS NULL OR ds.expires_at > now())
+          )
     )
     WITH CHECK (
         tenant_id = current_setting('app.tenant_id', true)
+          OR (
+              clicksign_document_key IS NOT NULL
+              AND clicksign_document_key = current_setting('app.clicksign_document_key', true)
+          )
+          OR id IN (
+              SELECT ds.contract_id
+              FROM "digital_signatures" ds
+              WHERE ds.token IS NOT NULL
+                AND ds.token = current_setting('app.digital_signature_token', true)
+                AND (ds.expires_at IS NULL OR ds.expires_at > now())
+          )
     );
 
 -- ---- cookie_preferences -------------------------------------------------------------------
@@ -178,6 +226,32 @@ ALTER TABLE "data_processing_activities" FORCE  ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS tenant_isolation ON "data_processing_activities";
 CREATE POLICY tenant_isolation ON "data_processing_activities"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- dashboard_layouts -------------------------------------------------------------------
+ALTER TABLE "dashboard_layouts" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "dashboard_layouts" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "dashboard_layouts";
+CREATE POLICY tenant_isolation ON "dashboard_layouts"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- drip_campaigns -------------------------------------------------------------------
+ALTER TABLE "drip_campaigns" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "drip_campaigns" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "drip_campaigns";
+CREATE POLICY tenant_isolation ON "drip_campaigns"
     USING (
         tenant_id = current_setting('app.tenant_id', true)
     )
@@ -245,6 +319,49 @@ DROP POLICY IF EXISTS tenant_isolation ON "integration_configs";
 CREATE POLICY tenant_isolation ON "integration_configs"
     USING (
         tenant_id = current_setting('app.tenant_id', true)
+          OR (
+              integration_name = 'whatsapp'
+              AND config->>'phoneNumberId' = current_setting('app.whatsapp_phone_number_id', true)
+          )
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- isa_conversations -------------------------------------------------------------------
+ALTER TABLE "isa_conversations" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "isa_conversations" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "isa_conversations";
+CREATE POLICY tenant_isolation ON "isa_conversations"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- isa_messages -------------------------------------------------------------------
+ALTER TABLE "isa_messages" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "isa_messages" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "isa_messages";
+CREATE POLICY tenant_isolation ON "isa_messages"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- isa_settings -------------------------------------------------------------------
+ALTER TABLE "isa_settings" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "isa_settings" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "isa_settings";
+CREATE POLICY tenant_isolation ON "isa_settings"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
     )
     WITH CHECK (
         tenant_id = current_setting('app.tenant_id', true)
@@ -282,6 +399,19 @@ ALTER TABLE "maintenance_tickets" FORCE  ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS tenant_isolation ON "maintenance_tickets";
 CREATE POLICY tenant_isolation ON "maintenance_tickets"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- market_indices -------------------------------------------------------------------
+ALTER TABLE "market_indices" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "market_indices" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "market_indices";
+CREATE POLICY tenant_isolation ON "market_indices"
     USING (
         tenant_id = current_setting('app.tenant_id', true)
     )
@@ -338,6 +468,37 @@ DROP POLICY IF EXISTS tenant_isolation ON "properties";
 CREATE POLICY tenant_isolation ON "properties"
     USING (
         tenant_id = current_setting('app.tenant_id', true)
+          OR (
+              status = 'available'
+              AND id = ANY(string_to_array(current_setting('app.public_property_ids', true), ','))
+          )
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- property_comparisons -------------------------------------------------------------------
+ALTER TABLE "property_comparisons" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "property_comparisons" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "property_comparisons";
+CREATE POLICY tenant_isolation ON "property_comparisons"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+          OR id = current_setting('app.property_comparison_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- property_inspections -------------------------------------------------------------------
+ALTER TABLE "property_inspections" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "property_inspections" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "property_inspections";
+CREATE POLICY tenant_isolation ON "property_inspections"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
     )
     WITH CHECK (
         tenant_id = current_setting('app.tenant_id', true)
@@ -349,6 +510,19 @@ ALTER TABLE "property_sales" FORCE  ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS tenant_isolation ON "property_sales";
 CREATE POLICY tenant_isolation ON "property_sales"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- property_valuations -------------------------------------------------------------------
+ALTER TABLE "property_valuations" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "property_valuations" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "property_valuations";
+CREATE POLICY tenant_isolation ON "property_valuations"
     USING (
         tenant_id = current_setting('app.tenant_id', true)
     )
@@ -460,6 +634,21 @@ CREATE POLICY tenant_isolation ON "tenant_subscriptions"
         tenant_id = current_setting('app.tenant_id', true)
     );
 
+-- ---- webhook_events -------------------------------------------------------------------
+ALTER TABLE "webhook_events" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "webhook_events" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "webhook_events";
+CREATE POLICY tenant_isolation ON "webhook_events"
+    USING (
+        tenant_id IS NULL
+          OR tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id IS NULL
+          OR tenant_id = current_setting('app.tenant_id', true)
+    );
+
 -- ---- usage_logs -------------------------------------------------------------------
 ALTER TABLE "usage_logs" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "usage_logs" FORCE  ROW LEVEL SECURITY;
@@ -510,10 +699,12 @@ ALTER TABLE "user_sessions" FORCE  ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation ON "user_sessions";
 CREATE POLICY tenant_isolation ON "user_sessions"
     USING (
-        tenant_id = current_setting('app.tenant_id', true)
+        tenant_id IS NULL
+          OR tenant_id = current_setting('app.tenant_id', true)
     )
     WITH CHECK (
-        tenant_id = current_setting('app.tenant_id', true)
+        tenant_id IS NULL
+          OR tenant_id = current_setting('app.tenant_id', true)
     );
 
 -- ---- users -------------------------------------------------------------------
@@ -524,6 +715,18 @@ DROP POLICY IF EXISTS tenant_isolation ON "users";
 CREATE POLICY tenant_isolation ON "users"
     USING (
         tenant_id = current_setting('app.tenant_id', true)
+          OR id = current_setting('app.user_id', true)
+          OR lower(email) = current_setting('app.auth_email', true)
+          OR (
+              password_reset_token IS NOT NULL
+              AND password_reset_token = current_setting('app.password_reset_token_hash', true)
+              AND password_reset_expires > now()
+          )
+          OR (
+              verification_token IS NOT NULL
+              AND verification_token = current_setting('app.email_verification_token_hash', true)
+              AND verification_token_expires > now()
+          )
     )
     WITH CHECK (
         tenant_id = current_setting('app.tenant_id', true)
@@ -600,6 +803,97 @@ ALTER TABLE "whatsapp_templates" FORCE  ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS tenant_isolation ON "whatsapp_templates";
 CREATE POLICY tenant_isolation ON "whatsapp_templates"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- buyer_selections -------------------------------------------------------------------
+ALTER TABLE "buyer_selections" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "buyer_selections" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "buyer_selections";
+CREATE POLICY tenant_isolation ON "buyer_selections"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- ai_actions -------------------------------------------------------------------
+ALTER TABLE "ai_actions" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "ai_actions" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "ai_actions";
+CREATE POLICY tenant_isolation ON "ai_actions"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- ai_action_audit -------------------------------------------------------------------
+ALTER TABLE "ai_action_audit" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "ai_action_audit" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "ai_action_audit";
+CREATE POLICY tenant_isolation ON "ai_action_audit"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- lead_score_weights -------------------------------------------------------------------
+ALTER TABLE "lead_score_weights" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "lead_score_weights" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "lead_score_weights";
+CREATE POLICY tenant_isolation ON "lead_score_weights"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- lead_assignment_state -------------------------------------------------------------------
+ALTER TABLE "lead_assignment_state" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "lead_assignment_state" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "lead_assignment_state";
+CREATE POLICY tenant_isolation ON "lead_assignment_state"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- signature_certificates -------------------------------------------------------------------
+ALTER TABLE "signature_certificates" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "signature_certificates" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "signature_certificates";
+CREATE POLICY tenant_isolation ON "signature_certificates"
+    USING (
+        tenant_id = current_setting('app.tenant_id', true)
+    )
+    WITH CHECK (
+        tenant_id = current_setting('app.tenant_id', true)
+    );
+
+-- ---- user_calendar_connections -------------------------------------------------------------------
+ALTER TABLE "user_calendar_connections" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "user_calendar_connections" FORCE  ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS tenant_isolation ON "user_calendar_connections";
+CREATE POLICY tenant_isolation ON "user_calendar_connections"
     USING (
         tenant_id = current_setting('app.tenant_id', true)
     )
